@@ -1,0 +1,17 @@
+{
+  "name": "levelcompiler",
+  "productName": "Level Compiler",
+  "version": "1.0.0",
+  "description": "Calc and show core levels",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron ."
+  },
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "csv-parse": "^5.5.2",
+    "electron": "^27.0.3",
+    "output": "build"
+  }
+}

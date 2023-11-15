@@ -1,0 +1,74 @@
+body,
+html {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  overflow-y: hidden;
+  overflow-x: hidden;
+}
+
+#scroller {
+  /*Size is displayed size*/
+  width: 100%;
+  height: calc(100% - 30px);
+  margin: 10;
+  /*border: 1px solid lightblue;*/
+  overflow-y: scroll;
+  overflow-x: scroll;
+  display: block;
+}
+
+#canvasBase {
+  /*Size is virtual full size. make blank area for getting scroll.*/
+  overflow: hidden;
+  position: relative;
+
+  width: 2000px;
+  height: 10000px;
+}
+
+#plotCanvas {
+  /*Size is displayed size*/
+  top: 0px;
+  left: 0px;
+  position: absolute;
+  pointer-events: none;
+}
+
+footer {
+  display: flex;
+  justify-content: space-between;
+  margin: 0px;
+  height: 30px; /* height */
+  background-color: #f0f0f0; /* colour */
+  color: #333;
+  text-align: right;
+  line-height: 30px;
+  position: fixed;
+  bottom: 0;
+  width: 100%;
+}
+.footerLeft {
+  text-align: left;
+  padding-left: 10px;
+}
+.footerRight {
+  display: flex;
+  padding-right: 10px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+#footerLeftText {
+  text-align: center;
+}
+
+#Yaxis {
+  margin-right: 10px;
+}
+
+.about {
+  text-align: center;
+}
