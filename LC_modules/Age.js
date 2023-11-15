@@ -1,0 +1,28 @@
+class Age {
+  //private properties
+  constructor() {
+    this.id = [null, null, null, null, null];
+    this.name = "";
+    this.age_mid = null;
+    this.age_upper_1std = null;
+    this.age_lower_1std = null;
+    this.gae_raw = null;
+
+    this.hole_name = null;
+    this.section_name = null;
+    this.distance = null;
+    this.section_id = [null, null, null, null];
+    this.composite_depth = null;
+    this.event_free_depth = null;
+
+    this.source_type = "general"; //"general", "terrestrial", "marine", "tephra", "orbital", "climate"
+    this.source_code = "";
+
+    this.unit = "";
+    this.note = "";
+
+    this.order = null;
+  }
+}
+
+module.exports = { Age };

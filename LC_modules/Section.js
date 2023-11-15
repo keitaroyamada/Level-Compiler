@@ -1,10 +1,11 @@
 class Section {
   //Private properties
   constructor() {
-    this.id = [null, null, null];
+    this.id = [null, null, null, null];
     this.name = "";
     this.markers = [];
-    this.reserved_marker_ids = [null];
+    this.order = null;
+    this.reserved_marker_ids = [0];
   }
 }
 module.exports = { Section };

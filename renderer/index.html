@@ -9,11 +9,34 @@
     <script src="js/renderer.js" defer></script>
   </head>
   <body>
-    <div id="scroller">
-      <!--size is displayed size-->
-      <div id="canvasBase"></div>
+    <div class="base">
+      <div id="toolbar">
+        <button id="bt_reload">
+          <img src="../icons/reload.png" alt="" />
+        </button>
+
+        <button id="bt_finder">
+          <img src="../icons/finder.png" alt="" />
+        </button>
+        <button id="bt_measure">
+          <img src="../icons/measure.png" alt="" />
+        </button>
+        <button id="bt_snapshot">
+          <img src="../icons/snapshot.png" alt="" />
+        </button>
+        <button id="bt_pen">
+          <img src="../icons/pen.png" alt="" />
+        </button>
+        <button id="bt_divider">
+          <img src="../icons/divider.png" alt="" />
+        </button>
+      </div>
+      <div id="scroller">
+        <!--size is displayed size-->
+        <div id="canvasBase"></div>
+      </div>
+      <canvas id="plotCanvas"></canvas>
     </div>
-    <canvas id="plotCanvas"></canvas>
   </body>
   <footer>
     <div class="footerLeft">
@@ -22,7 +45,7 @@
         <option value="composite_depth">Composite depth</option>
         <option value="event_free_depth">Event free depth</option>
         <option value="age">Age</option>
-        <option value="canvas_position">Canva position</option>
+        <option value="canvas_position">Canvas position</option>
       </select>
     </div>
     <!--<button id="testButton">test</button>-->

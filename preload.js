@@ -9,4 +9,5 @@ contextBridge.exposeInMainWorld("LCapi", {
   LoadEventFromCsv: (args) => ipcRenderer.invoke("LoadEventFromCsv", args),
   CalcCompositeDepth: () => ipcRenderer.invoke("CalcCompositeDepth"),
   CalcEventFreeDepth: (args) => ipcRenderer.invoke("CalcEventFreeDepth", args),
+  OpenFinder: (args) => ipcRenderer.invoke("OpenFinder", args),
 });

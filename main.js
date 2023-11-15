@@ -1,5 +1,6 @@
 //npm start
 //npx electronmon .
+//npm cache verify --force
 
 const path = require("path");
 const { app, BrowserWindow, Menu, ipcMain, dialog } = require("electron");
@@ -41,14 +42,14 @@ function createMainWIndow() {
   });
 
   ipcMain.handle("Initiarise", async (_e) => {
-    //import model
+    //import modeln
     console.log("MAIN: Initiarise");
     LCCore.projectData = new Project();
-    LCCore.projectData.id = 1;
+    LCCore.projectData.id = [1, null, null, null];
     LCCore.model_data = null;
     LCCore.event_data = null;
     LCCore.reserved_project_ids = [1];
-    console.log("Project data is initiarised.");
+    console.log("MAIN: Project data is initiarised.");
     return LCCore;
   });
 
@@ -61,9 +62,9 @@ function createMainWIndow() {
 
   ipcMain.handle("LoadEventFromCsv", async (_e, event_path) => {
     //import model
-    console.log('MAIN: Load event list from "' + event_path + '"');
     LCCore.loadEventFromCsv(event_path);
     LCCore.getModelSummary();
+    console.log('MAIN: Load event list from "' + event_path + '"');
     return LCCore.projectData;
   });
 
@@ -92,9 +93,32 @@ function createMainWIndow() {
         return result.filePaths[0];
       });
   });
+
+  ipcMain.handle("OpenFinder", async (_e) => {
+    //create finder window
+    createFinderWindow();
+  });
+
+  ipcMain.on("request-mainprocess-info", (event) => {
+    const info = "";
+    event.sender.send("mainprocess-info", info);
+  });
+
   //===================================================================================================================================
 }
 
+//--------------------------------------------------------------------------------------------------
+//create finder window
+function createFinderWindow() {
+  const aboutWindow = new BrowserWindow({
+    title: "Finder",
+    width: 300,
+    height: 300,
+  });
+  aboutWindow.loadFile(path.join(__dirname, "./renderer/finder.html"));
+}
+
+//--------------------------------------------------------------------------------------------------
 //create about window
 function createAboutWindow() {
   const aboutWindow = new BrowserWindow({
@@ -105,6 +129,7 @@ function createAboutWindow() {
   aboutWindow.loadFile(path.join(__dirname, "./renderer/about.html"));
 }
 
+//--------------------------------------------------------------------------------------------------
 app.whenReady().then(() => {
   createMainWIndow();
 
@@ -118,7 +143,7 @@ app.whenReady().then(() => {
     }
   });
 });
-
+//--------------------------------------------------------------------------------------------------
 //Menu template
 const menu = [
   ...(isMac

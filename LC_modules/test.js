@@ -1,15 +1,20 @@
 var { LevelCompilerCore } = require("./LevelCompilerCore.js");
+var { LevelCompilerAge } = require("./LevelCompilerAge.js");
 const lcfnc = require("./lcfnc.js");
 
-const model_path =
+let model_path =
   "C:/Users/slinn/Dropbox/Prj_LevelCompiler/_LC test data/0. LC test model with event.csv";
 const event_path =
   "C:/Users/slinn/Dropbox/Prj_LevelCompiler/_LC test data/2. LC test event.csv";
 
+const age_path =
+  "C:/Users/slinn/Dropbox/Prj_LevelCompiler/_LC test data/SG IntCal20 yr BP chronology for LC (01 Jun. 2021).csv";
+
+model_path =
+  "C:/Users/slinn/Dropbox/Prj_LevelCompiler/_LC test data/SG Correlation model for LC (24 Nov. 2023).csv";
+
 const p = new LevelCompilerCore();
 p.loadModelFromCsv(model_path);
-//p.getModelSummary();
-//p.loadEventFromCsv(event_path);
 p.calcCompositeDepth();
 p.calcEventFreeDepth();
 //p.testShow();
@@ -17,6 +22,11 @@ p.calcEventFreeDepth();
 //console.log(costs);
 //p.calcCompositeDepth();
 //
+//p.getModelSummary();
+//if (p.checkModel(p.getDepthFromName("event_free_depth", "D", "03", 15.6))) {}
+//console.log(p.getDepthFromName("event_free_depth", "D", "03", 15.6));
+const a = new LevelCompilerAge();
+a.loadAgeFromCsv(p, age_path);
 
 /*
 const serialized = JSON.parse(
@@ -52,3 +62,7 @@ testCore.addMarker(m2);
 //console.log(testCore.markers);
 testCore.markers[0].isMaster = true;
 */
+
+/*
+
+    */

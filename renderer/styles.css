@@ -8,8 +8,26 @@ html {
   overflow-x: hidden;
 }
 
+.base {
+  width: 100%;
+  height: 100%;
+  overflow-y: hidden;
+  overflow-x: hidden;
+  position: relative;
+}
+#toolbar {
+  width: 100%;
+  height: 40px;
+  flex-shrink: 0;
+  display: flex;
+  background-color: #f0f0f0;
+  flex-direction: row;
+  gap: 0px;
+  padding: 0px;
+}
 #scroller {
   /*Size is displayed size*/
+  top: 100px;
   width: 100%;
   height: calc(100% - 30px);
   margin: 10;
@@ -25,15 +43,91 @@ html {
   position: relative;
 
   width: 2000px;
-  height: 10000px;
+  height: 2000px;
 }
 
 #plotCanvas {
   /*Size is displayed size*/
-  top: 0px;
+  top: 40px;
   left: 0px;
   position: absolute;
   pointer-events: none;
+}
+
+#left_panel {
+  display: flex;
+  flex-direction: column;
+  width: 75%;
+  height: 100%;
+  overflow-y: hidden;
+  overflow-x: hidden;
+}
+
+#hole_panel {
+}
+
+#bt_reload {
+  box-sizing: border-box;
+  width: 40px;
+  height: 40px;
+}
+#bt_reload img {
+  height: 75%;
+  width: 100%;
+}
+
+#bt_measure {
+  box-sizing: border-box;
+  width: 40px;
+  height: 40px;
+}
+#bt_measure img {
+  height: 75%;
+  width: 100%;
+}
+
+#bt_finder {
+  box-sizing: border-box;
+  width: 40px;
+  height: 40px;
+}
+
+#bt_finder img {
+  height: 75%;
+  width: 100%;
+}
+
+#bt_snapshot {
+  box-sizing: border-box;
+  width: 40px;
+  height: 40px;
+}
+
+#bt_snapshot img {
+  height: 75%;
+  width: 100%;
+}
+
+#bt_divider {
+  box-sizing: border-box;
+  width: 40px;
+  height: 40px;
+}
+
+#bt_divider img {
+  height: 75%;
+  width: 100%;
+}
+
+#bt_pen {
+  box-sizing: border-box;
+  width: 40px;
+  height: 40px;
+}
+
+#bt_pen img {
+  height: 75%;
+  width: 100%;
 }
 
 footer {

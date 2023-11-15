@@ -94,15 +94,32 @@ function makeMarkerIdBase(rn, cn) {
   }
   return output;
 }
-function getUniqueId(preservedIdList) {
-  return Math.max.apply(null, preservedIdList) + 1;
+function getUniqueId(reserved_idxs) {
+  return Math.max.apply(null, reserved_idxs) + 1;
 }
 function zeroPadding(str) {
   if (/^\d+$/.test(str.toString()) == true) {
     //case number
-    str = str.padStart(2, "0");
+    str = str.toString().padStart(2, "0");
   }
   return str;
+}
+function randNormal(mean, std, n) {
+  let output = [];
+  for (let i = 0; i < n; i++) {
+    //Box–Muller's method
+    var x = Math.random();
+    var y = Math.random();
+
+    var z1 = Math.sqrt(-2 * Math.log(x)) * Math.cos(2 * Math.PI * y);
+    //var z2 = Math.sqrt(-2 * Math.log(x)) * Math.sin(2 * Math.PI * y);
+
+    const val = z1 * std + mean;
+    //std + z1 * mean, z2: std + z2 * mean
+    output.push(val);
+  }
+
+  return output;
 }
 
 module.exports = {
@@ -114,4 +131,5 @@ module.exports = {
   getUniqueId,
   makeMarkerIdBase,
   zeroPadding,
+  randNormal,
 };

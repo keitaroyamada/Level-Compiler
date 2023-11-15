@@ -1,9 +1,10 @@
 class Project {
   constructor() {
-    this.id = [null];
+    this.id = [null, null, null, null];
     this.name = "";
     this.holes = [];
-    this.reserved_hole_ids = [null];
+    this.correlation_version = [];
+    this.reserved_hole_ids = [0];
   }
 }
 
