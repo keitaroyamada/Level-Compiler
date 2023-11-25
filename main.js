@@ -7,12 +7,14 @@ const { app, BrowserWindow, Menu, ipcMain, dialog } = require("electron");
 const { LevelCompilerCore } = require("./LC_modules/LevelCompilerCore.js");
 const { Project } = require("./LC_modules/Project.js");
 const { lcfnc } = require("./LC_modules/lcfnc.js");
+const { LevelCompilerAge } = require("./LC_modules/LevelCompilerAge.js");
 
 //properties
 const isMac = process.platform === "darwin";
 const isDev = process.env.NODE_ENV !== "development";
 //const isDev = false;
 const LCCore = new LevelCompilerCore();
+const LCAge = new LevelCompilerAge();
 
 //const isDev = false;
 

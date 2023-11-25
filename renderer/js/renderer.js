@@ -590,6 +590,7 @@ document.addEventListener("DOMContentLoaded", () => {
               offScreenCtx.fillStyle = "black";
               offScreenCtx.font = "12px Arial";
 
+              /*
               offScreenCtx.fillText(
                 (Math.round(marker.distance * 10) / 10).toFixed(1).toString(),
                 (hole_x0 + shift_x) * xMag +
@@ -598,14 +599,13 @@ document.addEventListener("DOMContentLoaded", () => {
                   5,
                 (marker_top + shift_y) * yMag + pad_y - 2
               );
-
+              */
               //----------------------------------------------------------------------------------temp
-              /*
-              if (marker.composite_depth !== null) {
+
+              const tag = "composite_depth";
+              if (marker[tag] !== null && !isNaN(marker[tag])) {
                 offScreenCtx.fillText(
-                  (Math.round(marker.event_free_depth * 10) / 10)
-                    .toFixed(1)
-                    .toString(),
+                  (Math.round(marker[tag] * 10) / 10).toFixed(1).toString(),
                   //(Math.round(marker.distance * 10) / 10).toFixed(1).toString(),
                   (hole_x0 + shift_x) * xMag +
                     pad_x +
@@ -616,7 +616,7 @@ document.addEventListener("DOMContentLoaded", () => {
               } else {
                 offScreenCtx.fillStyle = "red";
                 offScreenCtx.fillText(
-                  "NO DATA",
+                  tag + " NO DATA",
                   //(Math.round(marker.distance * 10) / 10).toFixed(1).toString(),
                   (hole_x0 + shift_x) * xMag +
                     pad_x +
@@ -625,7 +625,7 @@ document.addEventListener("DOMContentLoaded", () => {
                   (marker_top + shift_y) * yMag + pad_y - 2
                 );
               }
-              */
+
               //----------------------------------------------------------------------------------temp
 
               //add connection

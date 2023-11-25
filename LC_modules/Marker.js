@@ -9,7 +9,6 @@ class Marker {
     this.drilling_depth = null;
     this.event = [];
     this.age = null;
-    this.age_error = null;
     this.h_connection = [];
     this.v_connection = [];
     this.connection_rank = null;

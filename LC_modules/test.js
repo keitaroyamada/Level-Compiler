@@ -1,6 +1,8 @@
 var { LevelCompilerCore } = require("./LevelCompilerCore.js");
 var { LevelCompilerAge } = require("./LevelCompilerAge.js");
+var { Trinity } = require("./Trinity.js");
 const lcfnc = require("./lcfnc.js");
+const { Age } = require("./Age.js");
 
 let model_path =
   "C:/Users/slinn/Dropbox/Prj_LevelCompiler/_LC test data/0. LC test model with event.csv";
@@ -17,6 +19,15 @@ const p = new LevelCompilerCore();
 p.loadModelFromCsv(model_path);
 p.calcCompositeDepth();
 p.calcEventFreeDepth();
+
+const a = new LevelCompilerAge();
+a.loadAgeFromCsv(p, age_path);
+a.checkAges();
+const age = a.getAgeFromEFD(1, 100);
+const efd = a.getEFDFromAge(1, 520.123);
+
+console.log(age.mid + "+/-" + age.lower + "/" + age.upper);
+console.log(efd.mid + "+/-" + efd.lower + "/" + efd.upper);
 //p.testShow();
 //var costs = p.dfs([1, 3, 1, "marker", 1]);
 //console.log(costs);
@@ -25,8 +36,40 @@ p.calcEventFreeDepth();
 //p.getModelSummary();
 //if (p.checkModel(p.getDepthFromName("event_free_depth", "D", "03", 15.6))) {}
 //console.log(p.getDepthFromName("event_free_depth", "D", "03", 15.6));
-const a = new LevelCompilerAge();
-a.loadAgeFromCsv(p, age_path);
+/*
+let trinityList = [];
+let data1 = new Trinity();
+data1.name = "test1";
+data1.hole_name = "SG93";
+data1.section_name = "15";
+data1.distance = 49;
+let data2 = new Trinity();
+data2.name = "test2";
+data2.hole_name = "A";
+data2.section_name = "1";
+data2.distance = 250;
+
+trinityList.push(data1);
+trinityList.push(data2);
+
+console.log("-------------------------------------------------------------");
+const output = p.getDepthFromTrinity(trinityList, "event_free_depth");
+output.forEach((o) => {
+  console.log(o[0] + ":" + o[1]);
+});
+*/
+
+/*
+let data = new Age();
+data.name = "tttttttttttttttttttttttttttttttttttttttttttttttttttttttttt";
+data.event_free_depth = -10;
+a.addAge(1, data);
+//a.removeAge(1, 751);
+a.sortAges();
+a.AgeModels[0].ages.forEach((element) => {
+  console.log(element.name + "/" + element.id + "/" + element.order);
+});
+*/
 
 /*
 const serialized = JSON.parse(

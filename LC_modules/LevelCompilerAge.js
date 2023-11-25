@@ -18,7 +18,15 @@ class LevelCompilerAge {
   loadAgeFromCsv(LCCore, age_path) {
     //check dataset
     const num_age_dataset = this.AgeModels.length;
-    console.log(age_path);
+    console.log("Load age model :" + age_path);
+
+    //check correlation model
+    if (LCCore.checkModel()) {
+    } else {
+      console.log("There is any error in model interpolation.");
+      return;
+    }
+    LCCore.sortModel();
 
     //load age model
     const csv_data = lcfnc.readcsv(age_path);
@@ -36,7 +44,8 @@ class LevelCompilerAge {
     }
 
     //reconstruct age model
-    const ageDataSet = new AgeSet();
+    let ageDataSet = new AgeSet();
+    ageDataSet.id = num_age_dataset + 1;
     ageDataSet.name = model.name;
     ageDataSet.version = model.version;
 
@@ -44,9 +53,9 @@ class LevelCompilerAge {
       //get age data
       const ageData = new Age();
       ageData.name = csv_data[r][0];
-      ageData.age_mid = csv_data[r][7];
-      ageData.age_upper_1std = csv_data[r][6];
-      ageData.age_lower_1std = csv_data[r][8];
+      ageData.age_mid = parseFloat(csv_data[r][7]);
+      ageData.age_upper_1std = parseFloat(csv_data[r][6]);
+      ageData.age_lower_1std = parseFloat(csv_data[r][8]);
       ageData.gae_raw = null;
 
       if (csv_data[r][9] == "") {
@@ -59,8 +68,8 @@ class LevelCompilerAge {
       ageData.note = csv_data[r][12];
 
       //ids
-      ageDataSet.reserved_age_ids.add(r);
-      ageData.id = [null, null, null, null, r];
+      ageDataSet.reserved_age_ids.push(r);
+      ageData.id = r;
       ageData.order = r;
 
       //get position
@@ -69,52 +78,70 @@ class LevelCompilerAge {
         csv_data[r][2] !== "" ||
         csv_data[r][3] !== ""
       ) {
-        //case defined by trinity
-        ageData.hole_name = csv_data[r][1]; //hole
-        ageData.section_name = lcfnc.zeroPadding(csv_data[r][2]); //section
-        ageData.distance = parseFloat(csv_data[r][3]); //distance
+        //case defined by trinity--------------------------------------------------------
+        ageData.trinityData.name = csv_data[r][0];
+        ageData.trinityData.hole_name = lcfnc.zeroPadding(csv_data[r][1]); //hole
+        ageData.trinityData.section_name = lcfnc.zeroPadding(csv_data[r][2]); //section
+        ageData.trinityData.distance = parseFloat(csv_data[r][3]); //distance
 
         //calc EFD
-        if (LCCore.checkModel) {
-          const [sectionId, efd] = LCCore.getDepthFromName(
-            "event_free_depth",
-            ageData.hole_name,
-            ageData.section_name,
-            ageData.distance
-          );
-          if (sectionId == null) {
-            console.log(
-              ageData.hole_name +
-                "-" +
-                ageData.section_name +
-                "-" +
-                ageData.distance
-            );
+        const [[sectionId, efd]] = LCCore.getDepthFromTrinity(
+          [ageData.trinityData],
+          "event_free_depth"
+        );
 
-            console.log(
-              "[" + r + "]: Could not determine the position of " + ageData.name
-            );
-            continue;
-          } else {
-            ageData.event_free_depth = efd;
-            ageData.section_id = sectionId;
-          }
+        if (isNaN(efd)) {
+          console.log(
+            csv_data[r][0] +
+              ":" +
+              csv_data[r][1] +
+              "-" +
+              csv_data[r][2] +
+              "-" +
+              csv_data[r][3] +
+              "cm EFD:" +
+              efd
+          );
+        }
+
+        if (sectionId == null) {
+          console.log(
+            "[" +
+              r +
+              "]: Could not determine the position of " +
+              ageData.trinityData.name
+          );
+          continue;
         } else {
-          console.log("There is any error in model interpolation.");
+          ageData.event_free_depth = efd;
+          ageData.section_id = sectionId;
         }
       } else if (csv_data[r][4] !== "") {
-        //defined by CD
+        //defined by CD-----------------------------------------------------------------
         //check model version
         if (ageDataSet.version == LCCore.projectData.correlation_version) {
           ageData.composite_depth = csv_data[r][4]; //cd
+
+          //convert CD => EFD
         } else {
           console.log(
             "Correlation Model Versions do not match between Core model and Age model."
           );
-          ageData.composite_depth = csv_data[r][4]; //Scheduled to be deleted in the future
+          //Scheduled to be deleted in the future
+          ageData.composite_depth = csv_data[r][4];
+          //convert CD => EFD
+          const efdval = LCCore.getEFDfromCD(ageData.composite_depth);
+          if (efdval !== NaN) {
+            ageData.event_free_depth = efdval;
+          } else {
+            console.log(
+              "Comsposite depth is out of model definition. :" + csv_data[r][0]
+            );
+          }
+          //
         }
       } else if (csv_data[r][5] !== "") {
-        //defined by EFD
+        //defined by EFD---------------------------------------------------------------
         //check model version
         if (ageDataSet.version == LCCore.projectData.correlation_version) {
           ageData.event_free_depth = csv_data[r][5]; //efd
@@ -129,6 +156,224 @@ class LevelCompilerAge {
     }
 
     this.AgeModels.push(ageDataSet);
+  }
+  sortAges() {
+    //sort age model by efd
+    for (let m = 0; m < this.AgeModels.length; m++) {
+      this.AgeModels[m].ages.sort((a, b) =>
+        a.event_free_depth < b.event_free_depth ? -1 : 1
+      );
+
+      for (let a = 0; a < this.AgeModels[m].ages.length; a++) {
+        console.log(this.AgeModels[m].ages[a].event_free_depth);
+        this.AgeModels[m].ages[a].order = a;
+      }
+    }
+    console.log("Age model sorted.");
+  }
+  checkAges() {
+    this.AgeModels.forEach((model) => {
+      let num_error_ages = 0;
+      let num_error_ages_u = 0;
+      let num_error_ages_l = 0;
+      let num_error_efds = 0;
+      model.ages.forEach((ageData) => {
+        if (
+          isNaN(ageData.event_free_depth) ||
+          ageData.event_free_depth == null
+        ) {
+          num_error_efds += 1;
+        }
+        if (isNaN(ageData.age_mid) || ageData.age_mid == null) {
+          num_error_ages += 1;
+        }
+        if (isNaN(ageData.age_upper_1std) || ageData.age_upper_1std == null) {
+          num_error_ages_u += 1;
+        }
+        if (isNaN(ageData.age_lower_1std) || ageData.age_lower_1std == null) {
+          num_error_ages_l += 1;
+        }
+      });
+
+      console.log(
+        "Total Age Model Error: EFD:" +
+          num_error_efds +
+          ", Age: [" +
+          num_error_ages +
+          "," +
+          num_error_ages_u +
+          "," +
+          num_error_ages_l +
+          "]"
+      );
+    });
+  }
+  addAge(targetAgeModelId, ageData) {
+    //get access index
+    let targetAgeModelIdx = null;
+    this.AgeModels.forEach((a, n) => {
+      if (targetAgeModelId == a.id) {
+        targetAgeModelIdx = n;
+      }
+    });
+
+    //update unique id
+    const newId = lcfnc.getUniqueId(
+      this.AgeModels[targetAgeModelIdx].reserved_age_ids
+    );
+    ageData.id = newId;
+
+    //add
+    this.AgeModels[targetAgeModelIdx].ages.push(ageData);
+  }
+  removeAge(targetAgeModelId, targetAgeDataId) {
+    //get access index
+    let targetAgeModelIdx = null;
+    this.AgeModels.forEach((a, n) => {
+      if (targetAgeModelId == a.id) {
+        targetAgeModelIdx = n;
+      }
+    });
+
+    //remove
+    this.AgeModels[targetAgeModelIdx].ages = this.AgeModels[
+      targetAgeModelIdx
+    ].ages.filter((item) => item.id !== targetAgeDataId);
+  }
+  getAgeFromEFD(targetAgeModelId, efd) {
+    //get access index
+    let targetAgeModelIdx = null;
+    this.AgeModels.forEach((a, n) => {
+      if (targetAgeModelId == a.id) {
+        targetAgeModelIdx = n;
+      }
+    });
+    if (targetAgeModelIdx == null) {
+      return;
+    }
+
+    //console.log(targetAgeModelIdx + ":" + this.AgeModels[targetAgeModelIdx]);
+    //get upper/lower age data
+    let upperData = this.AgeModels[targetAgeModelIdx].ages[0];
+    let lowerData =
+      this.AgeModels[targetAgeModelIdx].ages[
+        this.AgeModels[targetAgeModelIdx].ages.length - 1
+      ];
+
+    this.AgeModels[targetAgeModelIdx].ages.forEach((ageData, a) => {
+      if (
+        ageData.event_free_depth <= efd &&
+        upperData.event_free_depth < ageData.event_free_depth
+      ) {
+        //if above
+        upperData = ageData;
+      }
+      if (
+        ageData.event_free_depth >= efd &&
+        lowerData.event_free_depth > ageData.event_free_depth
+      ) {
+        //if below
+        lowerData = ageData;
+      }
+    });
+
+    //apply interpolation
+    const interpolatedAge = this.interpolate(
+      upperData,
+      lowerData,
+      "age",
+      efd,
+      "linear"
+    );
+    return interpolatedAge;
+  }
+  //sub functions
+  interpolate(upperAgeData, lowerAgeData, target, efd, method) {
+    if (method == "linear") {
+      //simply interpolate by linear method
+      //make function
+      const interp = ([d1, d3], [a1, a3], d2) => {
+        const a2 = a1 + ((d2 - d1) / (d3 - d1)) * (a3 - a1);
+        return a2;
+      };
+
+      //get data
+      const u_efd = parseFloat(upperAgeData.event_free_depth);
+      const u_age = parseFloat(upperAgeData.age_mid);
+      const u_age_u = u_age - parseFloat(upperAgeData.age_upper_1std);
+      const u_age_l = u_age + parseFloat(upperAgeData.age_lower_1std);
+
+      const l_efd = parseFloat(lowerAgeData.event_free_depth);
+      const l_age = parseFloat(lowerAgeData.age_mid);
+      const l_age_u = l_age - parseFloat(lowerAgeData.age_upper_1std);
+      const l_age_l = l_age + parseFloat(lowerAgeData.age_lower_1std);
+
+      //console.log(u_efd + "/" + l_efd + "/" + u_age + "/" + l_age + "/" + efd);
+      //calc
+      let interp_mid = null;
+      let interp_upper = null;
+      let interp_lower = null;
+      if (target == "age") {
+        interp_mid = interp([u_efd, l_efd], [u_age, l_age], efd);
+        interp_upper = interp([u_efd, l_efd], [u_age_u, l_age_u], efd);
+        interp_lower = interp([u_efd, l_efd], [u_age_l, l_age_l], efd);
+      } else if (target == "efd") {
+        interp_mid = interp([u_age, l_age], [u_efd, l_efd], efd);
+        interp_upper = interp([u_age_u, l_age_u], [u_efd, l_efd], efd);
+        interp_lower = interp([u_age_l, l_age_l], [u_efd, l_efd], efd);
+      }
+
+      return {
+        type: target,
+        mid: interp_mid,
+        upper: interp_upper,
+        lower: interp_lower,
+      };
+    } else if (method == "MC") {
+      console.log("under construction");
+      return;
+    }
+  }
+  getEFDFromAge(targetAgeModelId, age) {
+    //get access index
+    let targetAgeModelIdx = null;
+    this.AgeModels.forEach((a, n) => {
+      if (targetAgeModelId == a.id) {
+        targetAgeModelIdx = n;
+      }
+    });
+    if (targetAgeModelIdx == null) {
+      return;
+    }
+
+    //console.log(targetAgeModelIdx + ":" + this.AgeModels[targetAgeModelIdx]);
+    //get upper/lower age data
+    let upperData = this.AgeModels[targetAgeModelIdx].ages[0];
+    let lowerData =
+      this.AgeModels[targetAgeModelIdx].ages[
+        this.AgeModels[targetAgeModelIdx].ages.length - 1
+      ];
+
+    this.AgeModels[targetAgeModelIdx].ages.forEach((ageData, a) => {
+      if (ageData.age_mid <= age && upperData.age_mid < ageData.age_mid) {
+        //if above
+        upperData = ageData;
+      }
+      if (ageData.age_mid >= age && lowerData.age_mid > ageData.age_mid) {
+        //if below
+        lowerData = ageData;
+      }
+    });
+
+    //apply interpolation
+    const interpolatedEFD = this.interpolate(
+      upperData,
+      lowerData,
+      "efd",
+      age,
+      "linear"
+    );
+    return interpolatedEFD;
   }
 }
 
