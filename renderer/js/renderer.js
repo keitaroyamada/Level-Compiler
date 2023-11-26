@@ -12,9 +12,13 @@ document.addEventListener("DOMContentLoaded", () => {
   const YAxisDropdown = document.getElementById("YAxisSelect");
 
   let LCCore = null;
+  let correlation_model_list = [];
+  let age_model_list = [];
+  let selected_correlation_model_id = null;
+  let selected_age_model_id = null;
   let selectedObject = null;
-  let mousePos = [0, 0];
-  let canvasPos = [0, 0];
+  let mousePos = [0, 0]; //mouse absolute position
+  let canvasPos = [0, 0]; //canvas scroller position
   //--------------------------------------------------------------------------------------------
   //plot properties
   let objOpts = {
@@ -24,9 +28,11 @@ document.addEventListener("DOMContentLoaded", () => {
     marker: [],
     event: [],
     connection: [],
+    age: [],
   };
-  objOpts.canvas.depth_scale = "drilling_depth";
-  objOpts.canvas.zoom_level = [3, 3]; //[x, y](1pix/2cm)
+  objOpts.canvas.depth_scale = "composite_depth";
+  objOpts.canvas.zoom_level = [4, 3]; //[x, y](1pix/2cm)
+  objOpts.canvas.age_zoom_correction = 1 / 20;
   objOpts.canvas.dpir = 1; //window.devicePixelRatio || 1;
   objOpts.canvas.mouse_over_colour = "red";
   objOpts.canvas.pad_x = 200; //[px]
@@ -70,63 +76,335 @@ document.addEventListener("DOMContentLoaded", () => {
   //hide test event
   const testButton = document.getElementById("footerLeftText");
   testButton.addEventListener("click", async () => {
+    //initiarise
+    await initiariseCorrelationModel();
+    await initiariseAgeModel();
+
     //get model path
     const model_path =
-      "C:/Users/slinn/Dropbox/Prj_LevelCompiler/_LC test data/0. LC test model with event.csv";
-    const event_path =
-      "C:/Users/slinn/Dropbox/Prj_LevelCompiler/_LC test data/2. LC test event.csv";
-
-    const sg06_path =
       "C:/Users/slinn/Dropbox/Prj_LevelCompiler/_LC test data/SG Correlation model for LC (24 Nov. 2023).csv";
+    const age_path =
+      "C:/Users/slinn/Dropbox/Prj_LevelCompiler/_LC test data/SG IntCal20 yr BP chronology for LC (01 Jun. 2021).csv";
 
-    console.log(
-      "Actual canvas: " + scroller.clientWidth + "x" + scroller.clientHeight
-    );
+    //mount correlation model
+    await mountModel(model_path);
 
-    //    alert("test");
+    //load model into renderer
+    selected_correlation_model_id = correlation_model_list.length; //load latest
+    await loadModel(selected_correlation_model_id);
 
-    //initiarise
-    LCCore = await window.LCapi.Initiarise();
-    //load model
-    //LCCore = await window.LCapi.LoadModelFromCsv(model_path);
-    LCCore = await window.LCapi.LoadModelFromCsv(sg06_path);
-    //LCCore = await window.LCapi.LoadEventFromCsv(event_path);
-    //calc composite depth
-    LCCore = await window.LCapi.CalcCompositeDepth();
+    //mount age model
+    await mountAge(age_path);
 
-    //calc event free depth
-    LCCore = await window.LCapi.CalcEventFreeDepth();
-    //shwo model summary
-    console.log(LCCore);
+    //load age model into LCCore
+    selected_age_model_id = age_model_list.length; //load latest
+    await loadAge(selected_age_model_id);
 
-    //make virtual canva data
-    makeVirtualObjects([0, 0]);
+    //make virtual canvas data
+    makeVirtualObjects(true);
 
     //plot update
     updatePlot([0, 0]);
 
-    /*updateObjectPosition(
-      warper,
-      dummyInner,
-      scroller,
-      ctx,
-      virtualCanvas,
-      [0, 0]
-    );
-    */
-    //updateObjectPosition(ctx, [0, 0], [virtualCtx.width, virtualCtx.height]);
-
-    console.log("Canvas size: " + canvas.height + "x" + canvas.width);
-    css = getComputedStyle(canvas);
-    cssWidth = parseInt(css.width, 10);
-    cssHeight = parseInt(css.height, 10);
-
-    console.log("CSS size: " + cssHeight + "x" + cssWidth);
-    //LC.testMethod();
+    //console.log("Canvas size: " + canvas.height + "x" + canvas.width);
   });
   //============================================================================================
   //============================================================================================
+  //age model choser
+  document
+    .getElementById("AgeModelSelect")
+    .addEventListener("change", (event) => {
+      const ageId = event.target.value;
+      console.log(`Selected: ${ageId}`);
+
+      //load age model
+      loadAge(ageId);
+
+      makeVirtualObjects(true);
+      updatePlot([0, 0]);
+    });
   //============================================================================================
+  //measure
+  document
+    .getElementById("bt_measure")
+    .addEventListener("click", async (event) => {
+      const canvas = document.getElementById("plotCanvas");
+      const ctx = canvas.getContext("2d");
+      let clickCount = 0;
+      let firstPoint = null;
+
+      canvas.addEventListener("click", (event) => {
+        if (clickCount === 0) {
+          console.log("click first");
+          firstPoint = { x: event.offsetX, y: event.offsetY };
+          clickCount++;
+        } else if (clickCount === 1) {
+          console.log("click end");
+          const secondPoint = { x: event.offsetX, y: event.offsetY };
+          ctx.beginPath();
+          ctx.moveTo(firstPoint.x, firstPoint.y);
+          ctx.lineTo(secondPoint.x, secondPoint.y);
+          ctx.stroke();
+
+          //calc
+          const distance = Math.sqrt(
+            Math.pow(secondPoint.x - firstPoint.x, 2) +
+              Math.pow(secondPoint.y - firstPoint.y, 2)
+          );
+          console.log("距離:", distance);
+
+          clickCount = 0; // カウントリセット
+        }
+      });
+
+      console.log("Model reloaded.");
+    });
+  //============================================================================================
+  //Unload all models
+  window.LCapi.receive("UnLoadModelsMenuClicked", async () => {
+    const response = await window.LCapi.Confirm(
+      "Confirmation",
+      "Are you sure you want to clear the loaded model?"
+    );
+    if (response) {
+      //ok
+      //initiarise
+      await initiariseCorrelationModel();
+      await initiariseAgeModel();
+
+      //clear canvas data
+      await initiariseCanvas();
+    } else {
+      //no
+      return;
+    }
+  });
+  //============================================================================================
+  //load age model
+  window.LCapi.receive("LoadAgeModelMenuClicked", async () => {
+    if (correlation_model_list.length == 0) {
+      return;
+    }
+    //call from main process
+    let path = "";
+    try {
+      path = await window.LCapi.FileChoseDialog("Chose Age model", [
+        {
+          name: "CSV file",
+          extensions: ["csv"],
+        },
+      ]);
+    } catch (error) {
+      console.error("ERROR: File load error", error);
+      return;
+    }
+
+    //mount correlation model
+    await mountAge(path);
+
+    //load model into renderer
+    selected_age_model_id = age_model_list.length; //load latest
+    await loadAge(selected_age_model_id);
+
+    //make virtual canvas data
+    makeVirtualObjects(true);
+
+    //plot update
+    updatePlot([0, 0]);
+  });
+  //============================================================================================
+  //load correlation model
+  window.LCapi.receive("LoadCorrelationModelMenuClicked", async () => {
+    //call from main process
+    let path = "";
+    try {
+      path = await window.LCapi.FileChoseDialog("Chose correlation model", [
+        {
+          name: "CSV file",
+          extensions: ["csv"],
+        },
+      ]);
+    } catch (error) {
+      console.error("ERROR: File load error", error);
+      return;
+    }
+
+    //initiarise
+    initiariseCorrelationModel();
+    initiariseAgeModel();
+    selected_age_model_id = null;
+    selected_correlation_model_id = null;
+
+    //mount correlation model
+    await mountModel(path);
+
+    //load model into renderer
+    selected_correlation_model_id = correlation_model_list.length; //load latest
+    await loadModel(selected_correlation_model_id);
+
+    //make virtual canvas data
+    makeVirtualObjects(true);
+
+    //plot update
+    updatePlot([0, 0]);
+  });
+  //============================================================================================
+  //check hole list
+  document
+    .querySelector("#hole_list")
+    .addEventListener("change", function (event) {
+      if (event.target.type === "checkbox") {
+        console.log(
+          "チェックボックス " +
+            event.target.id +
+            " が " +
+            (event.target.checked
+              ? "チェックされました"
+              : "チェック解除されました")
+        );
+      }
+    });
+  //============================================================================================
+  //reload
+  document
+    .getElementById("bt_reload")
+    .addEventListener("click", async (event) => {
+      if (correlation_model_list.length == 0) {
+        return;
+      }
+
+      const temp_correlation_model_list = correlation_model_list;
+      const temp_age_model_list = age_model_list;
+
+      //initiarise
+      await initiariseCorrelationModel();
+      await initiariseAgeModel();
+      await initiariseCanvas();
+      console.log("list" + temp_age_model_list);
+
+      //correlation model
+      for (let i = 0; i < temp_correlation_model_list.length; i++) {
+        //mount
+        await mountModel(temp_correlation_model_list[i][2]);
+
+        //load
+        selected_correlation_model_id = i + 1;
+        await loadModel(selected_correlation_model_id);
+      }
+
+      for (let i = 0; i < temp_age_model_list.length; i++) {
+        //mount
+        await mountAge(temp_age_model_list[i][2]);
+
+        //load
+        selected_age_model_id = i + 1;
+        await loadAge(selected_age_model_id);
+      }
+
+      //make virtual canvas data
+      makeVirtualObjects(true);
+
+      //plot update
+      updatePlot([0, 0]);
+
+      console.log("Model reloaded.");
+    });
+  //============================================================================================
+  //zoomout
+  document
+    .getElementById("bt_zoomout")
+    .addEventListener("click", async (event) => {
+      if (event.altKey) {
+        objOpts.canvas.zoom_level[0] -= 1;
+      } else {
+        objOpts.canvas.zoom_level[1] -= 2;
+      }
+
+      //limit of smaller
+      if (objOpts.canvas.zoom_level[0] < 0.1) {
+        objOpts.canvas.zoom_level[0] = 0.1;
+      }
+      if (objOpts.canvas.zoom_level[1] < 0.1) {
+        objOpts.canvas.zoom_level[1] = 0.1;
+      }
+
+      //mouse position
+      const relative_scroll_pos_x = scroller.scrollLeft / scroller.scrollWidth;
+      const relative_scroll_pos_y = scroller.scrollTop / scroller.scrollHeight;
+
+      //calc new canvas size
+      makeVirtualObjects(false); //make only base canvas
+      const canvasBase_height = parseInt(
+        canvasBase.style.height.match(/\d+/)[0],
+        10
+      );
+      const canvasBase_width = parseInt(
+        canvasBase.style.width.match(/\d+/)[0],
+        10
+      );
+
+      //get new scroll pos
+      const new_scroll_pos_x = canvasBase_width * relative_scroll_pos_x;
+      const new_scroll_pos_y = canvasBase_height * relative_scroll_pos_y;
+
+      let x = new_scroll_pos_x;
+      let y = new_scroll_pos_y;
+
+      scroller.scrollTo(x, y); //move scroll position
+
+      //update plot
+      canvasPos = [x, y];
+      makeVirtualObjects(true);
+      updatePlot([0, 0]);
+    });
+  //============================================================================================
+  //zoomin
+  document
+    .getElementById("bt_zoomin")
+    .addEventListener("click", async (event) => {
+      if (event.altKey) {
+        objOpts.canvas.zoom_level[0] += 1;
+      } else {
+        objOpts.canvas.zoom_level[1] += 2;
+      }
+
+      //limit of smaller
+      if (objOpts.canvas.zoom_level[0] < 0.1) {
+        objOpts.canvas.zoom_level[0] = 0.1;
+      }
+      if (objOpts.canvas.zoom_level[1] < 0.1) {
+        objOpts.canvas.zoom_level[1] = 0.1;
+      }
+
+      //mouse position
+      const relative_scroll_pos_x = scroller.scrollLeft / scroller.scrollWidth;
+      const relative_scroll_pos_y = scroller.scrollTop / scroller.scrollHeight;
+
+      //calc new canvas size
+      makeVirtualObjects(false); //make only base canvas
+      const canvasBase_height = parseInt(
+        canvasBase.style.height.match(/\d+/)[0],
+        10
+      );
+      const canvasBase_width = parseInt(
+        canvasBase.style.width.match(/\d+/)[0],
+        10
+      );
+
+      //get new scroll pos
+      const new_scroll_pos_x = canvasBase_width * relative_scroll_pos_x;
+      const new_scroll_pos_y = canvasBase_height * relative_scroll_pos_y;
+
+      let x = new_scroll_pos_x;
+      let y = new_scroll_pos_y;
+
+      scroller.scrollTo(x, y); //move scroll position
+
+      //update plot
+      canvasPos = [x, y];
+      makeVirtualObjects(true);
+      updatePlot([0, 0]);
+    });
   //============================================================================================
   //open finder
   document.getElementById("bt_finder").addEventListener("click", async () => {
@@ -135,7 +413,7 @@ document.addEventListener("DOMContentLoaded", () => {
   });
   //============================================================================================
   //mouse position event
-  document.addEventListener("mousemove", function (event) {
+  document.addEventListener("mousemove", async function (event) {
     //show depth/age
     var rect = canvas.getBoundingClientRect(); // Canvas position and size
     var mouseX = event.clientX - rect.left;
@@ -148,57 +426,56 @@ document.addEventListener("DOMContentLoaded", () => {
     const shift_x = objOpts.canvas.shift_x;
     const shift_y = objOpts.canvas.shift_y;
 
+    //mouse position
     let x = (scroller.scrollLeft + mouseX - pad_x) / xMag - shift_x;
     let y = (scroller.scrollTop + mouseY - pad_y) / yMag - shift_y;
 
-    //console.log(      "Mouse position: X=" +        (mouseX - pad) / xMag +        ", Y=" +        (mouseY - pad) / yMag    );
-    if (objOpts.canvas.depth_scale == "age") {
-      txt = "Age: " + Math.round(y) + " calBP";
-    } else if (objOpts.canvas.depth_scale == "composite_depth") {
-      txt = "Composite Depth: " + (Math.round(y) / 100).toFixed(2) + " m";
-    } else if (objOpts.canvas.depth_scale == "drilling_depth") {
-      txt = "Drilling Depth: " + (Math.round(y) / 100).toFixed(2) + " m";
-    } else if (objOpts.canvas.depth_scale == "event_free_depth") {
-      txt = "Event Free Depth: " + (Math.round(y) / 100).toFixed(2) + " m";
-    } else if (objOpts.canvas.depth_scale == "canvas_position") {
-      txt = "Canvas Position: [" + mouseX + "," + mouseY + "]";
-    }
+    //get text
+    const txt = await getFooterInfo(selected_correlation_model_id, y, objOpts);
+
     //update
     var el = document.getElementById("footerLeftText");
-
     el.innerText = txt;
 
     mousePos = [mouseX, mouseY];
-    //makeVirtualObjects();
+    //makeVirtualObjects(true);
     //updatePlot([0, 0]);
   });
   //============================================================================================
   //scroll event
   scroller.addEventListener(
     "scroll",
-    (event) => {
-      //scroll event
-      const xMag = objOpts.canvas.zoom_level[0] * objOpts.canvas.dpir;
+    async function (event) {
+      //show depth/age
+      //const xMag = objOpts.canvas.zoom_level[0] * objOpts.canvas.dpir;
       const yMag = objOpts.canvas.zoom_level[1] * objOpts.canvas.dpir;
-      const pad_x = objOpts.canvas.pad_x;
+      //const pad_x = objOpts.canvas.pad_x;
       const pad_y = objOpts.canvas.pad_y;
-      const shift_x = objOpts.canvas.shift_x;
+      //const shift_x = objOpts.canvas.shift_x;
       const shift_y = objOpts.canvas.shift_y;
 
-      //event.preventDefault();
-      //const target = event.target;
+      //mouse position
+      //const mouseCanvasPosX = (scroller.scrollLeft + mousePos[0] - pad_x) / xMag - shift_x;
+      const mouseCanvasPosY =
+        (scroller.scrollTop + mousePos[1] - pad_y) / yMag - shift_y;
 
-      const x = scroller.scrollLeft; //* xMag;
-      const y = scroller.scrollTop; //* yMag;
+      ///scroller position
+      canvasPos[0] = scroller.scrollLeft; //* xMag;
+      canvasPos[1] = scroller.scrollTop; //* yMag;
 
-      //canvas.getBoundingClientRect().top = 0;
-      //console.log("Scroll pos: " + canvas.getBoundingClientRect().top);//top position of canvas
-      //console.log("Scroll pos: " + x + "x" + y);
-      //console.log(canvas.width + "x" + canvas.height);
-
-      canvasPos = [x, y];
-      makeVirtualObjects();
+      //update plot
+      makeVirtualObjects(true);
       updatePlot([0, 0]);
+      //get text
+      const txt = await getFooterInfo(
+        selected_correlation_model_id,
+        mouseCanvasPosY,
+        objOpts
+      );
+
+      //update footer info
+      var el = document.getElementById("footerLeftText");
+      el.innerText = txt;
     },
     { passive: false }
   );
@@ -210,15 +487,15 @@ document.addEventListener("DOMContentLoaded", () => {
       if (event.altKey) {
         event.preventDefault();
 
+        //wheel event
         var deltaX = event.deltaX;
         var deltaY = event.deltaY;
 
         //add zoom level
-        const zlx = objOpts.canvas.zoom_level[0];
-        const zly = objOpts.canvas.zoom_level[1];
-        objOpts.canvas.zoom_level[1] -= 0.001 * deltaY;
-        objOpts.canvas.zoom_level[0] -= 0.001 * deltaX;
+        objOpts.canvas.zoom_level[0] += 0.001 * deltaX;
+        objOpts.canvas.zoom_level[1] += 0.001 * deltaY;
 
+        //limit of smaller
         if (objOpts.canvas.zoom_level[0] < 0.1) {
           objOpts.canvas.zoom_level[0] = 0.1;
         }
@@ -226,46 +503,36 @@ document.addEventListener("DOMContentLoaded", () => {
           objOpts.canvas.zoom_level[1] = 0.1;
         }
 
-        //calc image centre
-        var rect = canvas.getBoundingClientRect();
-        var mouseX = event.clientX - rect.left;
-        var mouseY = event.clientY - rect.top;
-        const xMag = zlx * objOpts.canvas.dpir;
-        const yMag = zly * objOpts.canvas.dpir;
-        const pad_x = objOpts.canvas.pad_x;
-        const pad_y = objOpts.canvas.pad_y;
-        const shift_x = objOpts.canvas.shift_x;
-        const shift_y = objOpts.canvas.shift_y;
+        //mouse position
+        const relative_scroll_pos_x =
+          scroller.scrollLeft / scroller.scrollWidth;
+        const relative_scroll_pos_y =
+          scroller.scrollTop / scroller.scrollHeight;
 
-        let x = 0;
-        // scroller.scrollLeft + scroller.clientWidth / 2;
-        //1st: let y = (scroller.scrollTop + scroller.clientHeight / 2 + shift_y) * yMag;
-        let y = (scroller.scrollTop + scroller.clientHeight / 2) * yMag;
+        //calc new canvas size
+        makeVirtualObjects(false); //make only base canvas
+        const canvasBase_height = parseInt(
+          canvasBase.style.height.match(/\d+/)[0],
+          10
+        );
+        const canvasBase_width = parseInt(
+          canvasBase.style.width.match(/\d+/)[0],
+          10
+        );
 
-        // let x = (scroller.scrollLeft + mouseX - pad_x) / xMag - shift_x;
-        // let y = (scroller.scrollTop + mouseY - pad_y) / yMag - shift_y;
+        //get new scroll pos
+        const new_scroll_pos_x = canvasBase_width * relative_scroll_pos_x;
+        const new_scroll_pos_y = canvasBase_height * relative_scroll_pos_y;
 
-        //var rect = canvas.getBoundingClientRect(); // Canvas position and size
-        //const pad = objOpts.canvas.pad;
-        //var mouseX = 0; //event.clientX - rect.left;
-        //var mouseY = event.clientY - rect.top;
+        let x = new_scroll_pos_x;
+        let y = new_scroll_pos_y;
 
-        //console.log("Alt+Scroll detected!");
-        //console.log(mouseX + "--" + mouseY);
-        //console.log("Zoom Level: " + objOpts.canvas.zoom_level[1]);
-        //make new image
+        scroller.scrollTo(x, y); //move scroll position
 
+        //update plot
         canvasPos = [x, y];
-        makeVirtualObjects();
+        makeVirtualObjects(true);
         updatePlot([0, 0]);
-
-        const plotCener = true;
-        if (plotCener) {
-          ctx.stroke();
-          ctx.arc(x, y, 10, 0, 2 * Math.PI, false);
-          ctx.fillStyle = "red";
-          ctx.fill();
-        }
       }
     },
     { passive: false }
@@ -278,7 +545,7 @@ document.addEventListener("DOMContentLoaded", () => {
     var mouseX = scroller.scrollLeft;
     var mouseY = scroller.scrollTop;
 
-    makeVirtualObjects();
+    makeVirtualObjects(true);
     updatePlot([0, 0]);
   });
   //============================================================================================
@@ -286,7 +553,7 @@ document.addEventListener("DOMContentLoaded", () => {
   //main functions
   //============================================================================================
   //============================================================================================
-  function makeVirtualObjects() {
+  function makeVirtualObjects(isDrawObject) {
     const [x, y] = canvasPos;
     let mouse_over_txt = "";
     let isIn = [];
@@ -316,20 +583,15 @@ document.addEventListener("DOMContentLoaded", () => {
     const dpir = objOpts.canvas.dpir; //window.devicePixelRatio || 1;
 
     const xMag = dpir * objOpts.canvas.zoom_level[0];
-    const yMag = dpir * objOpts.canvas.zoom_level[1];
+    let yMag = dpir * objOpts.canvas.zoom_level[1];
+    if (objOpts.canvas.depth_scale == "age") {
+      yMag = yMag * objOpts.canvas.age_zoom_correction;
+    }
     const pad_x = objOpts.canvas.pad_x;
     const pad_y = objOpts.canvas.pad_y;
     //get shift amounts
     const shift_x = objOpts.canvas.shift_x;
     const shift_y = objOpts.canvas.shift_y;
-
-    //get mouse position on off screen
-    //=====================================================================================================
-    //let mouse_x =       (scroller.scrollLeft + mousePos[0] - pad_x) / xMag - shift_x;//cm
-    //let mouse_y =       (scroller.scrollTop + mousePos[1] - pad_y) / yMag - shift_y ;
-    let mouse_x = scroller.scrollLeft + mousePos[0]; //pix
-    let mouse_y = scroller.scrollTop + mousePos[1];
-    //=====================================================================================================
 
     //initiarise off screan canvas
     let canvasBaseWidth = parseInt(
@@ -355,9 +617,10 @@ document.addEventListener("DOMContentLoaded", () => {
     //offscreen canvas size is limited in canvas, so make trimed offscreen
     let offScreenCanvasWidth = scroller.clientWidth;
     let offScreenCanvasHeight = scroller.clientHeight;
-
     offScreenCanvas.width = offScreenCanvasWidth;
     offScreenCanvas.height = offScreenCanvasHeight;
+
+    //console.log(      "Viertual size" + offScreenCanvas.height + "x" + offScreenCanvas.width    );
 
     offScreenCtx = offScreenCanvas.getContext("2d");
     offScreenCtx.clearRect(0, 0, offScreenCanvasWidth, offScreenCanvasHeight); //initiarise
@@ -374,21 +637,34 @@ document.addEventListener("DOMContentLoaded", () => {
     //console.log(      "Offscreen canvas: " +        offScreenCanvas.width +        "x" +        offScreenCanvas.height    );
     //console.log("View canvas: " + canvas.width + "x" + canvas.height);
 
+    if (!isDrawObject) {
+      return;
+    }
+    //---------------------------------------------------------------------------------------------------------------------------
+    //make objects on canvas
+
     //move trimed area(left, top)
     offScreenCtx.save(); //save current location. after processing, restore
     offScreenCtx.translate(-x, -y);
 
     //draw grid
-    const gridSizeX = this.fitScaler(objOpts.canvas.zoom_level[0]);
-    const gridSizeY = this.fitScaler(objOpts.canvas.zoom_level[1]);
+    /*
+    let gridMag = 1;
+    if (objOpts.canvas.depth_scale == "age") {
+      gridMag = objOpts.canvas.age_zoom_correction;
+    }
+    const gridSizeX = this.fitScaler(objOpts.canvas.zoom_level[0], gridMag);
+    const gridSizeY = this.fitScaler(objOpts.canvas.zoom_level[1], gridMag);
     gridCanvas(
       [gridSizeX, gridSizeY],
       [xMag, yMag],
       offScreenCtx,
       [canvasBaseWidth, canvasBaseHeight],
       [shift_x, shift_y],
-      [pad_x, pad_y]
+      [pad_x, pad_y],
+      objOpts
     );
+    */
 
     //draw model
     LCCore.holes.forEach((hole, h) => {
@@ -590,7 +866,6 @@ document.addEventListener("DOMContentLoaded", () => {
               offScreenCtx.fillStyle = "black";
               offScreenCtx.font = "12px Arial";
 
-              /*
               offScreenCtx.fillText(
                 (Math.round(marker.distance * 10) / 10).toFixed(1).toString(),
                 (hole_x0 + shift_x) * xMag +
@@ -599,10 +874,10 @@ document.addEventListener("DOMContentLoaded", () => {
                   5,
                 (marker_top + shift_y) * yMag + pad_y - 2
               );
-              */
-              //----------------------------------------------------------------------------------temp
 
-              const tag = "composite_depth";
+              //----------------------------------------------------------------------------------temp
+              /*
+              const tag = "age";
               if (marker[tag] !== null && !isNaN(marker[tag])) {
                 offScreenCtx.fillText(
                   (Math.round(marker[tag] * 10) / 10).toFixed(1).toString(),
@@ -625,7 +900,7 @@ document.addEventListener("DOMContentLoaded", () => {
                   (marker_top + shift_y) * yMag + pad_y - 2
                 );
               }
-
+              */
               //----------------------------------------------------------------------------------temp
 
               //add connection
@@ -742,7 +1017,7 @@ document.addEventListener("DOMContentLoaded", () => {
     //ctx.restore();
   }
   //--------------------------------------------------------------------------------------------
-  function gridCanvas(gridSize, scale, ctx, canvasSize, shift, pad) {
+  function gridCanvas(gridSize, scale, ctx, canvasSize, shift, pad, opts) {
     //grid canvas
     //gridSize: pix
     const gridColor = "#ccc";
@@ -780,19 +1055,29 @@ document.addEventListener("DOMContentLoaded", () => {
       ctx.stroke();
 
       //ytick labels
-      ctx.strokeStyle = "black";
-      ctx.font = "20px Arial";
-      ctx.fillText(
-        " " +
+      let tickText = null;
+      if (opts.canvas.depth_scale == "age") {
+        tickText =
+          " " +
+          (
+            Math.round((y / yMag / 100) * 1000 ** (showOrder + 1)) /
+            10 ** (showOrder + 1)
+          )
+            .toFixed(showOrder)
+            .toString();
+      } else {
+        tickText =
+          " " +
           (
             Math.round((y / yMag / 100) * 10 ** (showOrder + 1)) /
             10 ** (showOrder + 1)
           )
             .toFixed(showOrder)
-            .toString(),
-        pad[0] + ytickLoc,
-        y + shift[1] * yMag + pad[1]
-      );
+            .toString();
+      }
+      ctx.strokeStyle = "black";
+      ctx.font = "20px Arial";
+      ctx.fillText(tickText, pad[0] + ytickLoc, y + shift[1] * yMag + pad[1]);
     }
     //horizontal grid(upward)
     for (let y = 0; y >= -shift[1] * yMag; y -= gridSize[1] * scale[1]) {
@@ -851,6 +1136,128 @@ document.addEventListener("DOMContentLoaded", () => {
       ctx.stroke();
     }
   }
+  //--------------------------------------------------------------------------------------------
+  async function mountModel(in_path) {
+    if (in_path == null) {
+      return;
+    }
+
+    //mount model into LCCore
+    const name = await window.LCapi.MountModelFromCsv(in_path);
+    const id = correlation_model_list.length + 1;
+    correlation_model_list.push([id, name, in_path]); //[id,name,path]
+    console.log("Mounted. ID: " + id + ", Name: " + name);
+  }
+
+  async function loadModel(model_id) {
+    model_id = 1;
+    //load model into LCCore
+    //now, LC is able to hold one project file, model_id is dummy
+    LCCore = await window.LCapi.LoadModelFromLCCore(model_id);
+
+    //add hole list
+    LCCore.holes.forEach((hole) => {
+      const container = document.getElementById("hole_list");
+      const checkboxDiv = document.createElement("div");
+      const checkbox = document.createElement("input");
+      checkbox.type = "checkbox";
+      checkbox.id = hole.id.toString();
+      checkbox.name = hole.name;
+      checkbox.checked = true;
+      const label = document.createElement("label");
+      label.htmlFor = hole.id.toString();
+      label.textContent = hole.name;
+
+      checkboxDiv.appendChild(checkbox);
+      checkboxDiv.appendChild(label);
+      container.appendChild(checkboxDiv);
+    });
+
+    //calc composite depth
+    LCCore = await window.LCapi.CalcCompositeDepth();
+
+    //calc event free depth
+    LCCore = await window.LCapi.CalcEventFreeDepth();
+
+    //shwo model summary
+    console.log(LCCore);
+    console.log("Loaded ID: " + model_id + ", Name: " + LCCore.name);
+  }
+
+  async function mountAge(in_path) {
+    if (in_path == null) {
+      return;
+    }
+
+    //load age model
+    const results = await window.LCapi.MountAgeFromCsv(in_path);
+    age_model_list.push([results[0], results[1], in_path]); //[id,name,path]
+
+    //add dropdown
+    const newOption = document.createElement("option");
+    newOption.value = results[0];
+    newOption.textContent = results[1];
+    document.getElementById("AgeModelSelect").appendChild(newOption);
+
+    console.log("Mounted ID: " + results[0] + ", Name: " + results[1]);
+  }
+
+  async function loadAge(age_id) {
+    //load age model
+    const results = await window.LCapi.LoadAgeFromLCAge(age_id);
+
+    if (results == null) {
+      console.log("RENDERER: Fail to read age model.");
+    } else {
+      //shwo model summary
+      LCCore = results;
+
+      let name = "";
+      age_model_list.forEach((a) => {
+        if (a[0] == age_id) {
+          name = a[1];
+        }
+      });
+
+      console.log("Loaded ID: " + age_id + ", Name: " + name);
+
+      console.log(LCCore);
+    }
+  }
+
+  async function initiariseCorrelationModel() {
+    //canvas initiarise
+    const parentElement = document.getElementById("hole_list");
+    while (parentElement.firstChild) {
+      parentElement.removeChild(parentElement.firstChild);
+    }
+
+    //data initiarise
+    LCCore = null;
+    await window.LCapi.InitiariseCorrelationModel();
+    correlation_model_list = [];
+    selected_correlation_model_id = null;
+  }
+
+  async function initiariseAgeModel() {
+    //canvas initiarise(remove all children)
+    const parentElement = document.getElementById("AgeModelSelect");
+    while (parentElement.firstChild) {
+      parentElement.removeChild(parentElement.firstChild);
+    }
+
+    //data initiarise
+    await window.LCapi.InitiariseAgeModel();
+    age_model_list = [];
+    selected_age_model_id = null;
+  }
+  async function initiariseCanvas() {
+    //clear canvas data
+    offScreenCtx.clearRect(0, 0, scroller.clientWidth, scroller.clientHeight); //initiarise
+
+    //plot update
+    updatePlot([0, 0]);
+  }
   //============================================================================================
 });
 
@@ -902,21 +1309,26 @@ function filledRoundSection(ctx, x, y, width, height, radius) {
 
   ctx.fill(); // ここで塗りつぶしを実行
 }
-function fitScaler(zoom_level) {
-  let step = 50;
+function fitScaler(zoom_level, mag) {
+  let step = 0;
+  let mod = 5;
+
   if (zoom_level <= 0.1) {
-    step = 1000;
+    step = (1000 * mod) / mag;
   } else if (zoom_level <= 0.5) {
-    step = 100;
+    step = (100 * mod) / mag;
   } else if (zoom_level <= 2.0) {
-    step = 50;
+    step = (50 * mod) / mag;
   } else if (zoom_level <= 5) {
-    step = 10;
+    step = (10 * mod) / mag;
   } else if (zoom_level <= 10) {
-    step = 5;
-  } else if (zoom_level <= 15) {
-    step = 1;
+    step = (5 * mod) / mag;
   }
+  /*
+  else if (zoom_level <= 15) {
+    step = (1 * mod) / mag;
+  }
+  */
 
   return step;
 }
@@ -1035,5 +1447,34 @@ function isPointInRect(point, rect) {
     point[1] >= rect[1] &&
     point[1] <= rect[1] + rect[3]
   );
+}
+async function getFooterInfo(model_id, y, objOpts) {
+  let txt = "";
+  let age = "";
+
+  if (objOpts.canvas.depth_scale == "age") {
+    txt = "Age: " + Math.round(y).toLocaleString() + " calBP";
+  } else if (objOpts.canvas.depth_scale == "composite_depth") {
+    age = await window.LCapi.GetAgeFromCD(model_id, y, "linear");
+    txt =
+      "Composite Depth: " +
+      (Math.round(y) / 100).toFixed(2) +
+      " m (Age: " +
+      Math.round(age).toLocaleString() +
+      " calBP)";
+  } else if (objOpts.canvas.depth_scale == "drilling_depth") {
+    txt = "Drilling Depth: " + (Math.round(y) / 100).toFixed(2) + " m";
+  } else if (objOpts.canvas.depth_scale == "event_free_depth") {
+    age = await window.LCapi.GetAgeFromEFD(model_id, y, "linear");
+    txt =
+      "Event Free Depth: " +
+      (Math.round(y) / 100).toFixed(2) +
+      " m (Age: " +
+      Math.round(age).toLocaleString() +
+      " calBP)";
+  } else if (objOpts.canvas.depth_scale == "canvas_position") {
+    txt = "Canvas Position: [" + mouseX + "," + mouseY + "]";
+  }
+  return txt;
 }
 //============================================================================================

@@ -18,7 +18,7 @@ class LevelCompilerAge {
   loadAgeFromCsv(LCCore, age_path) {
     //check dataset
     const num_age_dataset = this.AgeModels.length;
-    console.log("Load age model :" + age_path);
+    //console.log("Load age model :" + age_path);
 
     //check correlation model
     if (LCCore.checkModel()) {
@@ -249,7 +249,7 @@ class LevelCompilerAge {
       }
     });
     if (targetAgeModelIdx == null) {
-      return;
+      return null;
     }
 
     //console.log(targetAgeModelIdx + ":" + this.AgeModels[targetAgeModelIdx]);
@@ -285,6 +285,7 @@ class LevelCompilerAge {
       efd,
       "linear"
     );
+
     return interpolatedAge;
   }
   //sub functions
@@ -293,7 +294,12 @@ class LevelCompilerAge {
       //simply interpolate by linear method
       //make function
       const interp = ([d1, d3], [a1, a3], d2) => {
-        const a2 = a1 + ((d2 - d1) / (d3 - d1)) * (a3 - a1);
+        let a2 = null;
+        if (d3 - d1 == 0) {
+          a2 = a1;
+        } else {
+          a2 = a1 + ((d2 - d1) / (d3 - d1)) * (a3 - a1);
+        }
         return a2;
       };
 
@@ -334,7 +340,7 @@ class LevelCompilerAge {
       return;
     }
   }
-  getEFDFromAge(targetAgeModelId, age) {
+  getEFDFromAge(targetAgeModelId, age, method) {
     //get access index
     let targetAgeModelIdx = null;
     this.AgeModels.forEach((a, n) => {
@@ -342,8 +348,8 @@ class LevelCompilerAge {
         targetAgeModelIdx = n;
       }
     });
-    if (targetAgeModelIdx == null) {
-      return;
+    if (targetAgeModelIdx == 0) {
+      return null;
     }
 
     //console.log(targetAgeModelIdx + ":" + this.AgeModels[targetAgeModelIdx]);
@@ -371,7 +377,7 @@ class LevelCompilerAge {
       lowerData,
       "efd",
       age,
-      "linear"
+      method
     );
     return interpolatedEFD;
   }

@@ -5,47 +5,60 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta http-equiv="Content-Security-Policy" content="script-src 'self'" />
     <title>Level Compiler</title>
-    <link rel="stylesheet" href="styles.css" />
+    <link rel="stylesheet" href="index_styles.css" />
     <script src="js/renderer.js" defer></script>
   </head>
   <body>
-    <div class="base">
-      <div id="toolbar">
-        <button id="bt_reload" title="reload model">
-          <img src="../icons/reload.png" alt="" />
-        </button>
-        <button id="bt_finder" title="">
-          <img src="../icons/finder.png" alt="" />
-        </button>
-        <button id="bt_measure" title="measure">
-          <img src="../icons/measure.png" alt="" />
-        </button>
-        <button id="bt_snapshot" title="snapshot">
-          <img src="../icons/snapshot.png" alt="" />
-        </button>
-        <button id="bt_pen" title="pen">
-          <img src="../icons/pen.png" alt="" />
-        </button>
-        <button id="bt_divider" title="divider">
-          <img src="../icons/divider.png" alt="" />
-        </button>
+    <div class="container">
+      <div class="base">
+        <div id="toolbar">
+          <button id="bt_reload" title="reload model">
+            <img src="../icons/tool/reload.png" alt="" />
+          </button>
+          <button id="bt_finder" title="finder">
+            <img src="../icons/tool/finder.png" alt="" />
+          </button>
+          <button id="bt_zoomin" title="finder">
+            <img src="../icons/tool/zoomin.png" alt="" />
+          </button>
+          <button id="bt_zoomout" title="finder">
+            <img src="../icons/tool/zoomout.png" alt="" />
+          </button>
+          <button id="bt_measure" title="measure">
+            <img src="../icons/tool/measure.png" alt="" />
+          </button>
+          <button id="bt_snapshot" title="snapshot">
+            <img src="../icons/tool/snapshot.png" alt="" />
+          </button>
+          <button id="bt_pen" title="pen">
+            <img src="../icons/tool/pen.png" alt="" />
+          </button>
+          <button id="bt_divider" title="divider">
+            <img src="../icons/tool/divider.png" alt="" />
+          </button>
+        </div>
+        <div id="scroller">
+          <!--size is displayed size-->
+          <div id="canvasBase"></div>
+        </div>
+        <canvas id="plotCanvas"></canvas>
       </div>
-      <div id="scroller">
-        <!--size is displayed size-->
-        <div id="canvasBase"></div>
+      <div class="rightsidemenu">
+        <div class="hole_menu">
+          <div id="hole_list"></div>
+        </div>
       </div>
-      <canvas id="plotCanvas"></canvas>
     </div>
   </body>
   <footer>
     <div class="footerLeft">
       <select id="YAxisSelect">
         <option value="drilling_depth">Drilling depth</option>
-        <option value="composite_depth">Composite depth</option>
+        <option value="composite_depth" selected>Composite depth</option>
         <option value="event_free_depth">Event free depth</option>
         <option value="age">Age</option>
-        <option value="canvas_position">Canvas position</option>
       </select>
+      <select id="AgeModelSelect"></select>
     </div>
     <!--<button id="testButton">test</button>-->
     <div class="footerRight">

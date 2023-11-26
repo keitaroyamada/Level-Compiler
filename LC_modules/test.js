@@ -23,11 +23,13 @@ p.calcEventFreeDepth();
 const a = new LevelCompilerAge();
 a.loadAgeFromCsv(p, age_path);
 a.checkAges();
-const age = a.getAgeFromEFD(1, 100);
-const efd = a.getEFDFromAge(1, 520.123);
 
-console.log(age.mid + "+/-" + age.lower + "/" + age.upper);
-console.log(efd.mid + "+/-" + efd.lower + "/" + efd.upper);
+//const age = a.getAgeFromEFD(0, 100, "linear");
+//const efd = a.getEFDFromAge(1, 520.123);
+
+p.clacMarkerAges(a, 1);
+//console.log(p.projectData.holes[0].sections[0].markers[0].age);
+
 //p.testShow();
 //var costs = p.dfs([1, 3, 1, "marker", 1]);
 //console.log(costs);
