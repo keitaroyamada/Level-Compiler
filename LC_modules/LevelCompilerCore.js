@@ -14,6 +14,7 @@ class LevelCompilerCore {
     this.model_data = null;
     this.reserved_project_ids = [1];
     this.search_idx_list = {};
+    this.selected_id = null;
   }
 
   //methods
@@ -21,12 +22,21 @@ class LevelCompilerCore {
     //load model
     this.model_data = lcfnc.readcsv(model_path);
     var fileName = model_path.split(/[/\\]/).pop();
-    var match = fileName.match(/^(.*?)\((.*?)\)\.csv$/);
+    const patern = /\[?(.*?)\]?([^\[\]()]*)(?:\((.*?)\))?\.csv$/; // ^(.*?)\((.*?)\)\.csv$/)
+    var match = fileName.match(patern);
     let model_info = {};
 
     if (match) {
-      model_info.name = match[1];
-      model_info.version = match[2];
+      //check model type
+      if (!match[1].toLowerCase().includes("correlation")) {
+        console.error("Mounted file is not correlation model.");
+        this.model_data = null;
+        return;
+      } else if (match[1] !== "") {
+        console.log("There is no identifier for correlation model.");
+      }
+      model_info.name = match[2];
+      model_info.version = match[3];
     } else {
       model_info.name = fileName.replace(".csv", "");
       model_info.version = "";
@@ -382,6 +392,7 @@ class LevelCompilerCore {
 
     //check data
     if (this.model_data == null) {
+      console.log("There is no correlation model.");
       return;
     }
     //initiarise
@@ -429,6 +440,7 @@ class LevelCompilerCore {
 
     //check data
     if (this.model_data == null) {
+      console.log("There is no correlation model.");
       return;
     }
     //initiarise
@@ -472,6 +484,11 @@ class LevelCompilerCore {
     console.log("LCCore: Calced event free depth.");
   }
   checkModel() {
+    if (this.projectData.holes.length == 0) {
+      console.log("There is no correlation model.");
+      return;
+    }
+
     let cd_counts = 0;
     let efd_counts = 0;
     this.projectData.holes.forEach((hole) => {
@@ -594,6 +611,12 @@ class LevelCompilerCore {
       const d3 =
         this.projectData.holes[lowerIdxs[0][1]].sections[lowerIdxs[0][2]]
           .markers[lowerIdxs[0][3]].distance;
+      const D1_rank =
+        this.projectData.holes[upperIdxs[0][1]].sections[upperIdxs[0][2]]
+          .markers[upperIdxs[0][3]].connection_rank;
+      const D3_rank =
+        this.projectData.holes[lowerIdxs[0][1]].sections[lowerIdxs[0][2]]
+          .markers[lowerIdxs[0][3]].connection_rank;
 
       if (D1 == null || D3 == null) {
         console.log("ERROR: " + calcType + " of value is empty.");
@@ -606,12 +629,20 @@ class LevelCompilerCore {
       //merge data
       let upperData = {
         id: null,
-        nearest_data: { event_free_depth: D1, composite_depth: D1 },
+        nearest_data: {
+          event_free_depth: D1,
+          composite_depth: D1,
+          connection_rank: D1_rank,
+        },
         cumulate_distance: d1 - distance,
       };
       let lowerData = {
         id: null,
-        nearest_data: { event_free_depth: D3, composite_depth: D3 },
+        nearest_data: {
+          event_free_depth: D3,
+          composite_depth: D3,
+          connection_rank: D3_rank,
+        },
         cumulate_distance: d3 - distance,
       };
 
@@ -621,8 +652,8 @@ class LevelCompilerCore {
         lowerData,
         calcType
       );
-
-      output.push([sectionId, interpolatedEFD]);
+      const new_rank = ss.max([D1_rank, D3_rank]);
+      output.push([sectionId, interpolatedEFD, new_rank]);
     }
     return output;
   }
@@ -668,16 +699,66 @@ class LevelCompilerCore {
     //console.log(      this.getMarkerNameFromId(upperData.id) +        "-" +        this.getMarkerNameFromId(lowerData.id) +        ":" +        interpolatedEFD    );
     return interpolatedEFD;
   }
+  getCDfromEFD(targetEFD) {
+    //this method is return paseudo result because multiple CDs are match.
+    //initiarise
+    let upperData = {
+      id: null,
+      nearest_data: { event_free_depth: null, composite_depth: null },
+      cumulate_distance: -Infinity,
+    };
+    let lowerData = {
+      id: null,
+      nearest_data: { event_free_depth: null, composite_depth: null },
+      cumulate_distance: Infinity,
+    };
+
+    this.projectData.holes.forEach((hole) => {
+      hole.sections.forEach((section) => {
+        section.markers.forEach((marker) => {
+          const temp = marker.event_free_depth - targetEFD;
+          if (temp <= 0 && upperData.cumulate_distance < temp) {
+            //console.log(this.getMarkerNameFromId(marker.id));
+            upperData.id = marker.id;
+            upperData.nearest_data.composite_depth = marker.composite_depth;
+            upperData.nearest_data.event_free_depth = marker.event_free_depth;
+            upperData.cumulate_distance = temp;
+          }
+          if (temp >= 0 && lowerData.cumulate_distance > temp) {
+            lowerData.id = marker.id;
+            lowerData.nearest_data.composite_depth = marker.composite_depth;
+            lowerData.nearest_data.event_free_depth = marker.event_free_depth;
+            lowerData.cumulate_distance = temp;
+          }
+        });
+      });
+    });
+
+    const interpolatedEFD = this.clacInterpolateDepth(
+      upperData,
+      lowerData,
+      "composite_depth"
+    );
+    //console.log(      this.getMarkerNameFromId(upperData.id) +        "-" +        this.getMarkerNameFromId(lowerData.id) +        ":" +        interpolatedEFD    );
+    return interpolatedEFD;
+  }
 
   clacMarkerAges(LCAge, ageModelId) {
+    if (this.projectData.holes.length == 0) {
+      console.log("There is no correlation model.");
+      return;
+    }
+    if (LCAge.AgeModels.length == 0) {
+      console.log("There is no age model.");
+      return;
+    }
+
     this.projectData.holes.forEach((hole, h) => {
       hole.sections.forEach((section, s) => {
         section.markers.forEach((marker, m) => {
           if (marker.event_free_depth !== null) {
-            const age = LCAge.getAgeFromEFD(
-              ageModelId,
-              marker.event_free_depth
-            );
+            LCAge.selected_id = ageModelId;
+            const age = LCAge.getAgeFromEFD(marker.event_free_depth, "linear");
             marker.age = age.mid;
           }
         });
@@ -2336,6 +2417,95 @@ class LevelCompilerCore {
     }
     return relative_idxs;
   }
+  getNearestTrinity(depth, calcType) {
+    //this method returns paseudo result because multiple sections matched, but returns most goood sections based on centre of sections.
+    let nearestSectionData = null;
+    let diffDepth = Infinity;
+    for (let h = 0; h < this.projectData.holes.length; h++) {
+      for (let s = 0; s < this.projectData.holes[h].sections.length; s++) {
+        const sectionData = this.projectData.holes[h].sections[s];
+        const midSec =
+          (sectionData.markers[0][calcType] +
+            sectionData.markers[sectionData.markers.length - 1][calcType]) /
+          2;
+
+        if (diffDepth > Math.abs(midSec - depth)) {
+          diffDepth = Math.abs(midSec - depth);
+          nearestSectionData = sectionData;
+        }
+      }
+    }
+
+    if (nearestSectionData == null) {
+      return [null, null, null];
+    }
+
+    //
+    let upperData = nearestSectionData.markers[0];
+    let lowerData =
+      nearestSectionData.markers[nearestSectionData.markers.length - 1];
+
+    nearestSectionData.markers.forEach((marker) => {
+      const temp = marker[calcType] - depth;
+      if (temp <= 0 && marker[calcType] - upperData[calcType] < temp) {
+        upperData = marker;
+      }
+      if (temp >= 0 && marker[calcType] - lowerData[calcType] > temp) {
+        lowerData = marker;
+      }
+    });
+
+    //make function
+    const interp = ([d1, d3], [a1, a3], d2) => {
+      let a2 = null;
+      if (d3 - d1 == 0) {
+        a2 = a1;
+      } else {
+        a2 = a1 + ((d2 - d1) / (d3 - d1)) * (a3 - a1);
+      }
+      return a2;
+    };
+
+    const interpDistance = interp(
+      [upperData[calcType], lowerData[calcType]],
+      [upperData.distance, lowerData.distance],
+      depth
+    );
+
+    const idxs = this.getIdxById(nearestSectionData.id);
+
+    return [
+      this.projectData.holes[idxs[1]].name,
+      nearestSectionData.name,
+      interpDistance,
+    ];
+  }
+  getIdxFromTrinity([holeName, sectionName, distance]) {
+    let idx = [0, null, null, null];
+    for (let h = 0; h < this.projectData.holes.length; h++) {
+      const hole = this.projectData.holes[h];
+      if (hole.name == lcfnc.zeroPadding(holeName)) {
+        idx[1] = h;
+        for (let s = 0; s < hole.sections.length; s++) {
+          const section = hole.sections[s];
+          if (
+            lcfnc.zeroPadding(section.name) == lcfnc.zeroPadding(sectionName)
+          ) {
+            idx[2] = s;
+            for (let m = 0; m < section.markers.length; m++) {
+              const marker = section.markers[m];
+              if (marker.distance == distance) {
+                idx[3] == m;
+              }
+            }
+          }
+        }
+      }
+    }
+    return idx;
+  }
+
+  getParallelSection;
 }
 
 module.exports = { LevelCompilerCore };

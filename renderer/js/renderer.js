@@ -16,6 +16,7 @@ document.addEventListener("DOMContentLoaded", () => {
   let age_model_list = [];
   let selected_correlation_model_id = null;
   let selected_age_model_id = null;
+  let finderEnable = false;
   let selectedObject = null;
   let mousePos = [0, 0]; //mouse absolute position
   let canvasPos = [0, 0]; //canvas scroller position
@@ -82,15 +83,19 @@ document.addEventListener("DOMContentLoaded", () => {
 
     //get model path
     const model_path =
-      "C:/Users/slinn/Dropbox/Prj_LevelCompiler/_LC test data/SG Correlation model for LC (24 Nov. 2023).csv";
+      "C:/Users/slinn/Dropbox/Prj_LevelCompiler/_LC test data/[correlation]SG Correlation model for LC (24 Nov. 2023).csv";
     const age_path =
-      "C:/Users/slinn/Dropbox/Prj_LevelCompiler/_LC test data/SG IntCal20 yr BP chronology for LC (01 Jun. 2021).csv";
+      "C:/Users/slinn/Dropbox/Prj_LevelCompiler/_LC test data/[age]SG IntCal20 yr BP chronology for LC (01 Jun. 2021).csv";
 
     //mount correlation model
     await mountModel(model_path);
 
     //load model into renderer
     selected_correlation_model_id = correlation_model_list.length; //load latest
+    await window.LCapi.UpdateModelSelection({
+      correlation: selected_correlation_model_id,
+      age: selected_age_model_id,
+    });
     await loadModel(selected_correlation_model_id);
 
     //mount age model
@@ -98,6 +103,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
     //load age model into LCCore
     selected_age_model_id = age_model_list.length; //load latest
+    await window.LCapi.UpdateModelSelection({
+      correlation: selected_correlation_model_id,
+      age: selected_age_model_id,
+    });
     await loadAge(selected_age_model_id);
 
     //make virtual canvas data
@@ -110,14 +119,59 @@ document.addEventListener("DOMContentLoaded", () => {
   });
   //============================================================================================
   //============================================================================================
+  //============================================================================================
+  //============================================================================================
+  //============================================================================================
+  //============================================================================================
+  //============================================================================================
+  //============================================================================================
+  //Unload all models
+  window.LCapi.receive("MoveToHorizonFromFinder", async (data) => {
+    //move position based on finder
+    if (objOpts.canvas.depth_scale !== "drilling_depth") {
+      //get location
+      const pos_y = data[objOpts.canvas.depth_scale];
+
+      //convert scale from depth to pix
+      let canvasPosY = null;
+      if (objOpts.canvas.depth_scale == "age") {
+        canvasPosY =
+          (pos_y + objOpts.canvas.shift_y) *
+            (objOpts.canvas.dpir *
+              objOpts.canvas.zoom_level[1] *
+              objOpts.canvas.age_zoom_correction) +
+          objOpts.canvas.pad_y;
+      } else {
+        canvasPosY =
+          (pos_y + objOpts.canvas.shift_y) *
+            (objOpts.canvas.dpir * objOpts.canvas.zoom_level[1]) +
+          objOpts.canvas.pad_y;
+      }
+
+      //move scroller
+      scroller.scrollTop = canvasPosY - scroller.clientHeight / 2;
+      //scroller.moveTo(scroller.scrollLeft, pos_y);
+
+      //move canvas
+      canvasPos[1] = canvasPosY - scroller.clientHeight / 2;
+      makeVirtualObjects(true);
+      updatePlot([0, 0]);
+    }
+  });
+  //============================================================================================
   //age model choser
   document
     .getElementById("AgeModelSelect")
-    .addEventListener("change", (event) => {
+    .addEventListener("change", async (event) => {
       const ageId = event.target.value;
       console.log(`Selected: ${ageId}`);
 
       //load age model
+      selected_age_model_id = ageId;
+      await window.LCapi.UpdateModelSelection({
+        correlation: selected_correlation_model_id,
+        age: selected_age_model_id,
+      });
       loadAge(ageId);
 
       makeVirtualObjects(true);
@@ -194,6 +248,9 @@ document.addEventListener("DOMContentLoaded", () => {
           extensions: ["csv"],
         },
       ]);
+      if (path == nul) {
+        return;
+      }
     } catch (error) {
       console.error("ERROR: File load error", error);
       return;
@@ -204,6 +261,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
     //load model into renderer
     selected_age_model_id = age_model_list.length; //load latest
+    await window.LCapi.UpdateModelSelection({
+      correlation: selected_correlation_model_id,
+      age: selected_age_model_id,
+    });
     await loadAge(selected_age_model_id);
 
     //make virtual canvas data
@@ -224,6 +285,9 @@ document.addEventListener("DOMContentLoaded", () => {
           extensions: ["csv"],
         },
       ]);
+      if (path == null) {
+        return;
+      }
     } catch (error) {
       console.error("ERROR: File load error", error);
       return;
@@ -234,12 +298,20 @@ document.addEventListener("DOMContentLoaded", () => {
     initiariseAgeModel();
     selected_age_model_id = null;
     selected_correlation_model_id = null;
+    await window.LCapi.UpdateModelSelection({
+      correlation: selected_correlation_model_id,
+      age: selected_age_model_id,
+    });
 
     //mount correlation model
     await mountModel(path);
 
     //load model into renderer
     selected_correlation_model_id = correlation_model_list.length; //load latest
+    await window.LCapi.UpdateModelSelection({
+      correlation: selected_correlation_model_id,
+      age: selected_age_model_id,
+    });
     await loadModel(selected_correlation_model_id);
 
     //make virtual canvas data
@@ -289,6 +361,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
         //load
         selected_correlation_model_id = i + 1;
+        await window.LCapi.UpdateModelSelection({
+          correlation: selected_correlation_model_id,
+          age: selected_age_model_id,
+        });
         await loadModel(selected_correlation_model_id);
       }
 
@@ -298,6 +374,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
         //load
         selected_age_model_id = i + 1;
+        await window.LCapi.UpdateModelSelection({
+          correlation: selected_correlation_model_id,
+          age: selected_age_model_id,
+        });
         await loadAge(selected_age_model_id);
       }
 
@@ -408,10 +488,24 @@ document.addEventListener("DOMContentLoaded", () => {
   //============================================================================================
   //open finder
   document.getElementById("bt_finder").addEventListener("click", async () => {
-    //await LCapi.OpenFinder("OpenFinder", async () => {});
-    window.open("Finder.html", "", "width=300,height=300");
+    if (!finderEnable) {
+      finderEnable = true;
+      document.getElementById("bt_finder").style.backgroundColor = "#ccc";
+      await LCapi.OpenFinder("OpenFinder", async () => {});
+    } else {
+      finderEnable = false;
+      document.getElementById("bt_finder").style.backgroundColor = "#f0f0f0";
+      await LCapi.CloseFinder("CloseFinder", async () => {});
+    }
+  });
+  //load correlation model
+  window.LCapi.receive("FinderClosed", async () => {
+    //call from main process
+    finderEnable = false;
+    document.getElementById("bt_finder").style.backgroundColor = "#f0f0f0";
   });
   //============================================================================================
+
   //mouse position event
   document.addEventListener("mousemove", async function (event) {
     //show depth/age
@@ -1237,6 +1331,10 @@ document.addEventListener("DOMContentLoaded", () => {
     await window.LCapi.InitiariseCorrelationModel();
     correlation_model_list = [];
     selected_correlation_model_id = null;
+    await window.LCapi.UpdateModelSelection({
+      correlation: selected_correlation_model_id,
+      age: selected_age_model_id,
+    });
   }
 
   async function initiariseAgeModel() {
@@ -1250,6 +1348,10 @@ document.addEventListener("DOMContentLoaded", () => {
     await window.LCapi.InitiariseAgeModel();
     age_model_list = [];
     selected_age_model_id = null;
+    await window.LCapi.UpdateModelSelection({
+      correlation: selected_correlation_model_id,
+      age: selected_age_model_id,
+    });
   }
   async function initiariseCanvas() {
     //clear canvas data

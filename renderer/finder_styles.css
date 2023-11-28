@@ -1,3 +1,116 @@
 .about {
   text-align: center;
 }
+
+#bt_row {
+  display: flex;
+  flex-direction: row;
+}
+#fix {
+  display: flex;
+  width: 30px;
+  height: 30px;
+  background-color: white;
+  border: none;
+  justify-content: center;
+  align-items: center;
+  margin-left: 10px;
+}
+
+#fix img {
+  width: 30px;
+  height: 30px;
+}
+
+#link {
+  display: flex;
+  width: 30px;
+  height: 30px;
+  background-color: white;
+  border: none;
+  justify-content: center;
+  align-items: center;
+  margin-left: 10px;
+}
+
+#link img {
+  width: 30px;
+  height: 30px;
+}
+
+#marker {
+  display: flex;
+  width: 30px;
+  height: 30px;
+  background-color: white;
+  border-color: transparent;
+  justify-content: center;
+  align-items: center;
+  margin-left: 10px;
+}
+
+#marker img {
+  width: 30px;
+  height: 30px;
+}
+
+#holeTitle {
+  margin-bottom: 1px;
+}
+#sectionTitle {
+  margin-bottom: 1px;
+}
+#distanceTitle {
+  margin-bottom: 1px;
+}
+#cdTitle {
+  margin-bottom: 1px;
+}
+#efdTitle {
+  margin-bottom: 1px;
+}
+#ddTitle {
+  margin-bottom: 1px;
+}
+#ageTitle {
+  margin-bottom: 1px;
+}
+
+#error_container {
+  display: flex;
+  flex-direction: row;
+}
+
+#ageUpperTitle {
+  margin-top: 1px;
+  margin-bottom: 1px;
+}
+#ageLowerTitle {
+  margin-top: 1px;
+  margin-bottom: 1px;
+}
+
+#holeOptions {
+  width: 180px;
+}
+#sectionOptions {
+  width: 180px;
+}
+#distanceInput {
+  width: 170px;
+}
+#cdInput {
+  width: 170px;
+}
+#efdInput {
+  width: 170px;
+}
+#ageInput {
+  width: 170px;
+}
+#ageUpperInput {
+  width: 80px;
+}
+#ageLowerInput {
+  width: 80px;
+}

@@ -10,10 +10,10 @@ const event_path =
   "C:/Users/slinn/Dropbox/Prj_LevelCompiler/_LC test data/2. LC test event.csv";
 
 const age_path =
-  "C:/Users/slinn/Dropbox/Prj_LevelCompiler/_LC test data/SG IntCal20 yr BP chronology for LC (01 Jun. 2021).csv";
+  "C:/Users/slinn/Dropbox/Prj_LevelCompiler/_LC test data/[age]SG IntCal20 yr BP chronology for LC (01 Jun. 2021).csv";
 
 model_path =
-  "C:/Users/slinn/Dropbox/Prj_LevelCompiler/_LC test data/SG Correlation model for LC (24 Nov. 2023).csv";
+  "C:/Users/slinn/Dropbox/Prj_LevelCompiler/_LC test data/[correlation]SG Correlation model for LC (24 Nov. 2023).csv";
 
 const p = new LevelCompilerCore();
 p.loadModelFromCsv(model_path);
@@ -21,13 +21,17 @@ p.calcCompositeDepth();
 p.calcEventFreeDepth();
 
 const a = new LevelCompilerAge();
+
 a.loadAgeFromCsv(p, age_path);
-a.checkAges();
+console.log(a.getAgeFromEFD("100", "linear"));
+
+//a.checkAges();
 
 //const age = a.getAgeFromEFD(0, 100, "linear");
-//const efd = a.getEFDFromAge(1, 520.123);
+//const efd = a.getEFDFromAge(1, 150, "linear");
+//console.log(efd);
 
-p.clacMarkerAges(a, 1);
+//p.clacMarkerAges(a, 1);
 //console.log(p.projectData.holes[0].sections[0].markers[0].age);
 
 //p.testShow();

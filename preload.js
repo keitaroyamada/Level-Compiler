@@ -27,7 +27,11 @@ contextBridge.exposeInMainWorld("LCapi", {
 
   FileChoseDialog: (args1, args2) =>
     ipcRenderer.invoke("FileChoseDialog", args1, args2),
-  OpenFinder: (args) => ipcRenderer.invoke("OpenFinder", args),
+  OpenFinder: () => ipcRenderer.invoke("OpenFinder"),
+  CloseFinder: () => ipcRenderer.invoke("CloseFinder"),
+
+  UpdateModelSelection: (args) =>
+    ipcRenderer.invoke("UpdateModelSelection", args),
 
   Confirm: (args1, args2) => ipcRenderer.invoke("Confirm", args1, args2),
 

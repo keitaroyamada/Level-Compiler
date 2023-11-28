@@ -2,11 +2,18 @@ const { parse } = require("csv-parse/sync");
 const fs = require("fs");
 
 function readcsv(data_path) {
-  const csvData = parse(fs.readFileSync(data_path, "utf8"), {
-    columns: false,
-    delimiter: ",",
-  });
-  return csvData;
+  try {
+    const csvData = parse(fs.readFileSync(data_path, "utf8"), {
+      columns: false,
+      delimiter: ",",
+    });
+    return csvData;
+  } catch (error) {
+    console.error(
+      "Fail to read csv file. There is no such a file named: " + data_path
+    );
+    return null;
+  }
 }
 
 function uuidv4() {

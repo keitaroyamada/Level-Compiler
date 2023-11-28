@@ -7,6 +7,7 @@ class Hole {
     this.type = "general"; //["general","piston"]
     this.order = null;
     this.reserved_section_ids = [0];
+    this.enable = true;
   }
 }
 

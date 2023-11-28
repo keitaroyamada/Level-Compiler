@@ -13,6 +13,7 @@ class LevelCompilerAge {
   //private properties
   constructor() {
     this.AgeModels = [];
+    this.selected_id = null;
   }
 
   loadAgeFromCsv(LCCore, age_path) {
@@ -30,14 +31,29 @@ class LevelCompilerAge {
 
     //load age model
     const csv_data = lcfnc.readcsv(age_path);
+    if (csv_data == null) {
+      return null;
+    }
+
     var fileName = age_path.split(/[/\\]/).pop();
-    var match = fileName.match(/^(.*?)\((.*?)\)\.csv$/);
+    const patern = /\[?(.*?)\]?([^\[\]()]*)(?:\((.*?)\))?\.csv$/; // /^(.*?)\((.*?)\)\.csv$/)
+
+    var match = fileName.match(patern);
 
     let model = {};
 
     if (match) {
-      model.name = match[1];
-      model.version = match[2];
+      //check model type
+      if (!match[1].toLowerCase().includes("age")) {
+        console.error("Mounted file is not age model.");
+        this.model_data = null;
+        return;
+      } else if (match[1] !== "") {
+        console.log("There is no identifier for age model.");
+      }
+
+      model.name = match[2];
+      model.version = match[3];
     } else {
       model.name = fileName.replace(".csv", "");
       model.version = "";
@@ -48,6 +64,7 @@ class LevelCompilerAge {
     ageDataSet.id = num_age_dataset + 1;
     ageDataSet.name = model.name;
     ageDataSet.version = model.version;
+    this.selected_id = num_age_dataset + 1;
 
     for (let r = 1; r < csv_data.length; r++) {
       //get age data
@@ -172,6 +189,9 @@ class LevelCompilerAge {
     console.log("Age model sorted.");
   }
   checkAges() {
+    if (this.AgeModels.length == 0) {
+      console.log("There is no age model.");
+    }
     this.AgeModels.forEach((model) => {
       let num_error_ages = 0;
       let num_error_ages_u = 0;
@@ -208,7 +228,8 @@ class LevelCompilerAge {
       );
     });
   }
-  addAge(targetAgeModelId, ageData) {
+  addAge(ageData) {
+    const targetAgeModelId = this.selected_id;
     //get access index
     let targetAgeModelIdx = null;
     this.AgeModels.forEach((a, n) => {
@@ -226,7 +247,8 @@ class LevelCompilerAge {
     //add
     this.AgeModels[targetAgeModelIdx].ages.push(ageData);
   }
-  removeAge(targetAgeModelId, targetAgeDataId) {
+  removeAge(targetAgeDataId) {
+    const targetAgeModelId = this.selected_id;
     //get access index
     let targetAgeModelIdx = null;
     this.AgeModels.forEach((a, n) => {
@@ -240,7 +262,8 @@ class LevelCompilerAge {
       targetAgeModelIdx
     ].ages.filter((item) => item.id !== targetAgeDataId);
   }
-  getAgeFromEFD(targetAgeModelId, efd) {
+  getAgeFromEFD(efd, method) {
+    const targetAgeModelId = this.selected_id;
     //get access index
     let targetAgeModelIdx = null;
     this.AgeModels.forEach((a, n) => {
@@ -250,6 +273,10 @@ class LevelCompilerAge {
     });
     if (targetAgeModelIdx == null) {
       return null;
+    }
+
+    if (efd == null) {
+      return { type: null, mid: null, upper: null, lower: null };
     }
 
     //console.log(targetAgeModelIdx + ":" + this.AgeModels[targetAgeModelIdx]);
@@ -283,7 +310,7 @@ class LevelCompilerAge {
       lowerData,
       "age",
       efd,
-      "linear"
+      method
     );
 
     return interpolatedAge;
@@ -337,10 +364,16 @@ class LevelCompilerAge {
       };
     } else if (method == "MC") {
       console.log("under construction");
-      return;
+      return {
+        type: target,
+        mid: null,
+        upper: null,
+        lower: null,
+      };
     }
   }
-  getEFDFromAge(targetAgeModelId, age, method) {
+  getEFDFromAge(age, method) {
+    const targetAgeModelId = this.selected_id;
     //get access index
     let targetAgeModelIdx = null;
     this.AgeModels.forEach((a, n) => {
@@ -348,8 +381,22 @@ class LevelCompilerAge {
         targetAgeModelIdx = n;
       }
     });
-    if (targetAgeModelIdx == 0) {
-      return null;
+
+    if (targetAgeModelIdx == null) {
+      return {
+        type: null,
+        mid: null,
+        upper: null,
+        lower: null,
+      };
+    }
+    if (age == null) {
+      return {
+        type: target,
+        mid: null,
+        upper: null,
+        lower: null,
+      };
     }
 
     //console.log(targetAgeModelIdx + ":" + this.AgeModels[targetAgeModelIdx]);

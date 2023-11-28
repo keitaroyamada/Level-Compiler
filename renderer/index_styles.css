@@ -126,6 +126,7 @@ html {
   box-sizing: border-box;
   width: 40px;
   height: 40px;
+  border: 1px solid gray;
 }
 
 #bt_finder img {
@@ -162,6 +163,18 @@ html {
 }
 
 #bt_pen img {
+  height: 75%;
+  width: 100%;
+}
+
+#bt_target {
+  box-sizing: border-box;
+  width: 40px;
+  height: 40px;
+  border: 1px solid gray;
+}
+
+#bt_target img {
   height: 75%;
   width: 100%;
 }

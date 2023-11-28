@@ -1,0 +1,75 @@
+.about {
+  text-align: center;
+}
+
+.import_row {
+  display: flex;
+  flex-direction: row;
+  width: 100%;
+}
+.import_row p {
+  padding-left: 30px;
+}
+
+#cvt_bt_import {
+  width: 100px;
+  height: 30px;
+}
+#cvt_bt_convert {
+  width: 100px;
+  height: 30px;
+}
+
+.data_id {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+}
+.correlation_id {
+  width: 450;
+  display: flex;
+  flex-direction: column;
+}
+.correlation_id select {
+  width: 200px;
+}
+.age_id {
+  padding-left: 30px;
+  width: 450;
+  display: flex;
+  flex-direction: column;
+}
+.age_id select {
+  width: 200px;
+}
+
+.depth {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+}
+
+.depth_definition {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+}
+
+#cvt_data__table {
+  padding-top: 20px;
+  width: 100%;
+  height: 350px;
+  overflow: auto;
+}
+
+.export_row {
+  padding-top: 20px;
+}
+
+#cvt_source_chooser {
+  display: flex;
+  flex-direction: row;
+}
+#cvt_source_chooser div {
+  padding-left: 20px;
+}

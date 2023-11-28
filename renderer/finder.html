@@ -4,15 +4,63 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta http-equiv="Content-Security-Policy" content="script-src 'self'" />
-    <title>Level Compiler</title>
-    <link rel="stylesheet" href="styles.css" />
-    <script src="js/renderer.js" defer></script>
+    <title>LC Finder</title>
+    <link rel="stylesheet" href="finder_styles.css" />
+    <script src="js/renderer_finder.js" defer></script>
   </head>
   <body>
-    <div class="about">
-      <h2 class="text-xl text-teal-100 text-center">Level Compiler App</h2>
-      <p class="text-xl text-teal-300 mt-2">Version 1.0.0</p>
-      <p class="text-xl text-teal-300 mt-2">MIT License</p>
+    <div id="bt_row">
+      <div>
+        <button id="fix" title="top mode">
+          <img id="fix_img" src="../icons/tool/fixed.png" alt="" />
+        </button>
+      </div>
+
+      <div>
+        <button id="link" title="link sections">
+          <img id="link_img" src="../icons/tool/link.png" alt="" />
+        </button>
+      </div>
+    </div>
+    <div>
+      <p id="holeTitle">Hole</p>
+      <select id="holeOptions"></select>
+    </div>
+    <div>
+      <p id="sectionTitle">Section</p>
+      <select id="sectionOptions"></select>
+    </div>
+    <div>
+      <p id="distanceTitle">Distance [cm]</p>
+      <input id="distanceInput" value="0.0" type="number" />
+    </div>
+    <div>
+      <p id="cdTitle">Composite depth [cm]</p>
+      <input id="cdInput" value="0.0" type="number" />
+    </div>
+    <div>
+      <p id="efdTitle">Event free depth [cm]</p>
+      <input id="efdInput" value="0.0" type="number" />
+    </div>
+    <div>
+      <p id="ageTitle">Age [calBP] (68.2%)</p>
+      <input id="ageInput" value="0" type="number" />
+    </div>
+    <div id="error_container">
+      <div>
+        <input id="ageUpperInput" value="0" readonly="true" />
+      </div>
+      <div>
+        <input id="ageLowerInput" value="0" readonly="true" />
+      </div>
     </div>
   </body>
 </html>
+
+<!-- 
+  <div>
+      <p id="sectionTitle">Section</p>
+      <input list="sectionOptions" id="sectionCombo" />
+      <datalist id="sectionOptions"> </datalist>
+    </div>
+-->
