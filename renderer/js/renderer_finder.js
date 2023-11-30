@@ -1,6 +1,7 @@
 document.addEventListener("DOMContentLoaded", () => {
   let isFix = true;
   let isLink = true;
+  let isCalledFinder = false;
   let holeList = [];
   let sectionList = [];
   let inputDistance = null;
@@ -39,6 +40,7 @@ document.addEventListener("DOMContentLoaded", () => {
       console.log(`Hole: ${event.target.value}`);
 
       //calc
+      isCalledFinder = true;
       await calc("trinity");
       await limitDistance();
       //change sec list
@@ -54,6 +56,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
       //calc
       console.log(`Section: ${event.target.value}`);
+      isCalledFinder = true;
       await calc("trinity");
       await limitDistance();
     });
@@ -64,6 +67,7 @@ document.addEventListener("DOMContentLoaded", () => {
     .addEventListener("change", async (event) => {
       //calc
       console.log(`Distance: ${event.target.value}`);
+      isCalledFinder = true;
       await calc("trinity");
     });
   //-------------------------------------------------------------------------------------------
@@ -73,6 +77,7 @@ document.addEventListener("DOMContentLoaded", () => {
     .addEventListener("change", async (event) => {
       //calc
       console.log(`CD: ${event.target.value}`);
+      isCalledFinder = true;
       await calc("composite_depth");
     });
   //-------------------------------------------------------------------------------------------
@@ -82,6 +87,7 @@ document.addEventListener("DOMContentLoaded", () => {
     .addEventListener("change", async (event) => {
       //calc
       console.log(`EFD: ${event.target.value}`);
+      isCalledFinder = true;
       await calc("event_free_depth");
     });
   //-------------------------------------------------------------------------------------------
@@ -91,6 +97,7 @@ document.addEventListener("DOMContentLoaded", () => {
     .addEventListener("change", async (event) => {
       //calc
       console.log(`Age: ${event.target.value}`);
+      isCalledFinder = true;
       await calc("age");
     });
   //-------------------------------------------------------------------------------------------
@@ -157,7 +164,14 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
   //-------------------------------------------------------------------------------------------
-  async function calc(calcType) {
+  async function calc(...args) {
+    let calcType = args[0];
+    let depth = null;
+    if (args.length == 2) {
+      depth = args[1];
+    }
+    console.log(calcType, depth);
+
     let calcedData = {};
     if (calcType == "trinity") {
       //get trinity data
@@ -177,7 +191,6 @@ document.addEventListener("DOMContentLoaded", () => {
         "trinity",
         "linear"
       );
-      console.log(calcedData);
 
       //apply
       document.getElementById("cdInput").value =
@@ -191,16 +204,21 @@ document.addEventListener("DOMContentLoaded", () => {
       document.getElementById("ageLowerInput").value =
         Math.round(calcedData.age_lower * 10) / 10;
     } else if (calcType == "composite_depth") {
-      const cd = parseFloat(document.getElementById("cdInput").value);
+      let cd = null;
+      if (depth == null) {
+        cd = parseFloat(document.getElementById("cdInput").value);
+      } else {
+        cd = depth;
+      }
+
       //calc
       calcedData = await window.FinderApi.finderConvert(
         ["", cd],
         "composite_depth",
         "linear"
       );
-      console.log(calcedData);
 
-      //apply
+      //apply//calc(data[2]);
       let hole_idx = null;
       holeList.forEach((hole, h) => {
         if (hole[2] == calcedData.hole) {
@@ -230,14 +248,19 @@ document.addEventListener("DOMContentLoaded", () => {
       document.getElementById("ageLowerInput").value =
         Math.round(calcedData.age_lower * 10) / 10;
     } else if (calcType == "event_free_depth") {
-      const efd = parseFloat(document.getElementById("efdInput").value);
+      let efd = null;
+      if (depth == null) {
+        efd = parseFloat(document.getElementById("efdInput").value);
+      } else {
+        efd = depth;
+      }
+
       //calc
       calcedData = await window.FinderApi.finderConvert(
         ["", efd],
         "event_free_depth",
         "linear"
       );
-      console.log(calcedData);
 
       //apply
       let hole_idx = null;
@@ -269,14 +292,19 @@ document.addEventListener("DOMContentLoaded", () => {
       document.getElementById("ageLowerInput").value =
         Math.round(calcedData.age_lower * 10) / 10;
     } else if (calcType == "age") {
-      const age = parseFloat(document.getElementById("ageInput").value);
+      let age = null;
+      if (depth == null) {
+        age = parseFloat(document.getElementById("ageInput").value);
+      } else {
+        age = depth;
+      }
+
       //calc
       calcedData = await window.FinderApi.finderConvert(
         ["", age],
         "age",
         "linear"
       );
-      console.log(calcedData);
 
       //apply
       let hole_idx = null;
@@ -315,8 +343,10 @@ document.addEventListener("DOMContentLoaded", () => {
         Math.round(calcedData.age_lower * 10) / 10;
     }
 
+    // /      console.log(calcedData);
+
     //move position
-    if (isLink) {
+    if (isLink && isCalledFinder) {
       document.getElementById("Options");
       const send_data = {
         source: calcType,
@@ -344,7 +374,6 @@ document.addEventListener("DOMContentLoaded", () => {
   });
   //-------------------------------------------------------------------------------------------
   document.getElementById("link").addEventListener("click", async (event) => {
-    await window.FinderApi.changeFix(isFix);
     if (isLink) {
       isLink = false;
       //document.getElementById("fix").style.backgroundColor = "white";
@@ -356,6 +385,29 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
   //-------------------------------------------------------------------------------------------
+  //update depth from main renderer
+  window.FinderApi.receive("SendDepthFromMain", async (data) => {
+    if (isLink) {
+      //data[correlation id, depth, depth scale]
+
+      if (data[2] == "composite_depth") {
+        document.getElementById("cdInput").value =
+          Math.round(data[1] * 10) / 10;
+      } else if (data[2] == "event_free_depth") {
+        document.getElementById("efdInput").value =
+          Math.round(data[1] * 10) / 10;
+      } else if (data[2] == "age") {
+        document.getElementById("ageInput").value =
+          Math.round(data[1] * 10) / 10;
+      }
+
+      //call event
+      //document.getElementById("cdInput").dispatchEvent(new Event("change"));
+
+      //calc
+      await calc(data[2], data[1]);
+    }
+  });
 
   //-------------------------------------------------------------------------------------------
   //-------------------------------------------------------------------------------------------

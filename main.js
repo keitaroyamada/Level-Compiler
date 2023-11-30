@@ -1,6 +1,11 @@
 //npm start
 //npx electronmon .
 //npm cache verify --force
+//build: https://program-life.com/2041
+//installer: npx electron-builder --mac --x64
+//portable: npx electron-builder --mac --x64 --dir
+//installer: npx electron-builder --win --x64
+//portable: npx electron-builder --win --x64 --dir
 
 const path = require("path");
 const { app, BrowserWindow, Menu, ipcMain, dialog } = require("electron");
@@ -36,24 +41,6 @@ function createMainWIndow() {
       preload: path.join(__dirname, "preload.js"),
     },
   });
-
-  //when close
-  /*
-  mainWindow.on("close", (e) => {
-    if (!e.ctrlKey) {
-      const choice = dialog.showMessageBoxSync(mainWindow, {
-        type: "question",
-        buttons: ["Yes", "No"],
-        title: "Confirm",
-        message: "Are you sure you want to close Level Compiler?",
-      });
-
-      if (choice === 1) {
-        e.preventDefault();
-      }
-    }
-  });
-  */
 
   //open devtools if in dev env
   if (isDev) {
@@ -132,8 +119,44 @@ function createMainWIndow() {
               win.show();
               //win.webContents.openDevTools();
               win.setMenu(null);
+              win.setAlwaysOnTop(true, "normal");
               win.webContents.send("ConverterMenuClicked", "");
             });
+          },
+        },
+      ],
+    },
+    {
+      label: "Mode",
+      submenu: [
+        {
+          label: "Vector mode",
+          type: "checkbox",
+          checked: false,
+          click: () => {
+            lcmenu.forEach((m1) => {
+              if (m1.label == "Mode") {
+                m1.submenu[0].checked = true;
+                m1.submenu[1].checked = false;
+                menuRebuild();
+              }
+            });
+            mainWindow.webContents.send("CanvasModeChanged", "vector");
+          },
+        },
+        {
+          label: "Raster mode",
+          type: "checkbox",
+          checked: true,
+          click: () => {
+            lcmenu.forEach((m1) => {
+              if (m1.label == "Mode") {
+                m1.submenu[0].checked = false;
+                m1.submenu[1].checked = true;
+                menuRebuild();
+              }
+            });
+            mainWindow.webContents.send("CanvasModeChanged", "raster");
           },
         },
       ],
@@ -159,9 +182,12 @@ function createMainWIndow() {
   ];
 
   //Implement menu
-  const mainMenu = Menu.buildFromTemplate(lcmenu);
-  Menu.setApplicationMenu(mainMenu);
-
+  menuRebuild();
+  //===================================================================================================================================
+  function menuRebuild() {
+    let mainMenu = Menu.buildFromTemplate(lcmenu);
+    Menu.setApplicationMenu(mainMenu);
+  }
   //===================================================================================================================================
   //IPC from renderer
   ipcMain.handle("test", async (_e, _arg1, _arg2) => {
@@ -191,33 +217,89 @@ function createMainWIndow() {
     return;
   });
 
-  ipcMain.handle("MountModelFromCsv", async (_e, model_path) => {
+  ipcMain.handle("RegisterModelFromCsv", async (_e, model_path) => {
     try {
-      //import model
-      console.log('MAIN: Import correlation model from "' + model_path + '"');
+      //register model
       LCCore.loadModelFromCsv(model_path);
-      return LCCore.projectData.name;
+      LCCore.selected_id = 1; //because supported only single model (start from 1)
+      console.log(
+        'MAIN: Registered correlation model from "' + model_path + '"'
+      );
+      return {
+        id: LCCore.selected_id,
+        name: LCCore.projectData.name,
+        path: model_path,
+      };
     } catch (error) {
+      console.error("Correlation model register error.");
       return null;
-      console.error("Correlation model load error.");
     }
   });
 
   ipcMain.handle("LoadModelFromLCCore", async (_e, model_id) => {
     //import model
-    console.log('MAIN: Load correlation model id: "' + model_id + '"');
+    LCCore.selected_id = model_id; //no used at this version
+
+    console.log(
+      'MAIN: Load correlation model. id: "' +
+        model_id +
+        '"' +
+        " name:" +
+        LCCore.projectData.name
+    );
     return LCCore.projectData;
   });
-  ipcMain.handle("UpdateModelSelection", async (_e, model_id) => {
-    //import model
-    LCCore.selected_id = model_id.correlation;
-    LCAge.selected_id = model_id.age;
+  ipcMain.handle("RegistertAgeFromCsv", async (_e, age_path) => {
+    try {
+      //import model
+      LCAge.loadAgeFromCsv(LCCore, age_path);
+      LCAge.selected_id; //latest version is automatucally selected in loadAgeFromCsv
+
+      //apply latest age model to the depth model
+      let model_name = null;
+      LCAge.AgeModels.forEach((model) => {
+        if (model.id == LCAge.selected_id) {
+          model_name = model.name;
+        }
+      });
+
+      console.log("MAIN: Registered age model from " + age_path);
+      return { id: LCAge.selected_id, name: model_name, path: age_path };
+    } catch (error) {
+      console.error("Age model register error.");
+      console.log(error);
+      return null;
+    }
+  });
+
+  ipcMain.handle("LoadAgeFromLCAge", async (_e, age_id) => {
+    //apply latest age model to the depth model
+    let model_name = null;
+
+    //set new id
+    LCAge.selected_id = age_id;
+
+    //get model name
+    LCAge.AgeModels.forEach((model) => {
+      if (model.id == LCAge.selected_id) {
+        model_name = model.name;
+      }
+    });
+
+    if (model_name == null) {
+      return null;
+    }
+
+    //load ages into LCCore
+    LCCore.clacMarkerAges(LCAge);
+
     console.log(
-      "MAIN: Update model selection: Correlation: " +
-        model_id.correlation +
-        ", Age: " +
-        model_id.age
+      "MAIN: Load age model into LCCore. id: " +
+        LCAge.selected_id +
+        " name:" +
+        model_name
     );
+    return LCCore.projectData;
   });
 
   ipcMain.handle("CalcCompositeDepth", async (_e) => {
@@ -235,54 +317,13 @@ function createMainWIndow() {
     return LCCore.projectData;
   });
 
-  ipcMain.handle("MountAgeFromCsv", async (_e, age_path) => {
-    try {
-      //import model
-      //console.log('MAIN: Import age model from "' + age_path + '"');
-      LCAge.loadAgeFromCsv(LCCore, age_path);
-
-      //apply latest age model to the depth model
-      const model_id = LCAge.AgeModels.length;
-      let model_name = "";
-      LCAge.AgeModels.forEach((model) => {
-        model_name = model.name;
-      });
-
-      console.log("MAIN: Imported age model");
-      return [model_id, model_name];
-    } catch (error) {
-      console.error("Age model load error.");
-    }
-  });
-
-  ipcMain.handle("LoadAgeFromLCAge", async (_e, age_id) => {
-    //apply latest age model to the depth model
-    console.log("MAIN: Load age model id: " + age_id);
-    let model_name = null;
-    LCAge.AgeModels.forEach((model) => {
-      if (model.id == age_id) {
-        model_name = model.name;
-      }
-    });
-
-    if (model_name == null) {
-      return null;
-    }
-
-    console.log(age_id + ":" + model_name);
-    //load ages into LCCore
-    LCCore.clacMarkerAges(LCAge, age_id);
-    return LCCore.projectData;
-  });
-
   ipcMain.handle("FileChoseDialog", async (_e, title, ext) => {
     const result = await getfile(mainWindow, title, ext);
     return result;
   });
 
-  ipcMain.handle("GetAgeFromEFD", async (_e, modelId, efd, method) => {
+  ipcMain.handle("GetAgeFromEFD", async (_e, efd, method) => {
     //calc age
-    LCAge.selected_id = modelId;
     const age = LCAge.getAgeFromEFD(efd, method);
     if (age == null) {
       return "";
@@ -291,7 +332,7 @@ function createMainWIndow() {
     }
   });
 
-  ipcMain.handle("GetAgeFromCD", async (_e, modelId, cd, method) => {
+  ipcMain.handle("GetAgeFromCD", async (_e, cd, method) => {
     //calc efd
     const efd = LCCore.getEFDfromCD(cd);
     if (efd == null) {
@@ -299,7 +340,6 @@ function createMainWIndow() {
     }
 
     //calc age
-    LCAge.selected_id = modelId;
     const age = LCAge.getAgeFromEFD(efd, method);
     if (age == null) {
       return "";
@@ -356,6 +396,9 @@ function createMainWIndow() {
     };
     const result = await dialog.showMessageBox(options);
     return result.response === 0;
+  });
+  ipcMain.handle("SendDepthToFinder", async (_e, data) => {
+    finderWindow.webContents.send("SendDepthFromMain", data);
   });
 
   ipcMain.on("request-mainprocess-info", (event) => {
@@ -935,6 +978,7 @@ function createAboutWindow() {
     width: 300,
     height: 300,
   });
+  aboutWindow.setMenu(null);
   aboutWindow.loadFile(path.join(__dirname, "./renderer/about.html"));
 }
 

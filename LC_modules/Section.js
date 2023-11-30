@@ -6,6 +6,7 @@ class Section {
     this.markers = [];
     this.order = null;
     this.reserved_marker_ids = [0];
+    this.enable = true;
   }
 }
 module.exports = { Section };

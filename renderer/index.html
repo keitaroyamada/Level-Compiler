@@ -6,6 +6,10 @@
     <meta http-equiv="Content-Security-Policy" content="script-src 'self'" />
     <title>Level Compiler</title>
     <link rel="stylesheet" href="index_styles.css" />
+
+    <script src="js/p5.min.js"></script>
+    <script src="js/p5.svg.js" defer></script>
+
     <script src="js/renderer.js" defer></script>
   </head>
   <body>
@@ -18,14 +22,11 @@
           <button id="bt_finder" title="finder">
             <img src="../icons/tool/finder.png" alt="" />
           </button>
-          <button id="bt_zoomin" title="finder">
+          <button id="bt_zoomin" title="Alt + scroll">
             <img src="../icons/tool/zoomin.png" alt="" />
           </button>
-          <button id="bt_zoomout" title="finder">
+          <button id="bt_zoomout" title="Alt + scroll">
             <img src="../icons/tool/zoomout.png" alt="" />
-          </button>
-          <button id="bt_target" title="show target">
-            <img src="../icons/tool/target.png" alt="" />
           </button>
           <button id="bt_measure" title="measure">
             <img src="../icons/tool/measure.png" alt="" />
@@ -44,7 +45,10 @@
           <!--size is displayed size-->
           <div id="canvasBase"></div>
         </div>
-        <canvas id="plotCanvas"></canvas>
+        <div id="p5Canvas"></div>
+        <div id="p5penCanvas"></div>
+        <div id="p5measureCanvas"></div>
+        <canvas id="rasterCanvas"></canvas>
       </div>
       <div class="rightsidemenu">
         <div class="hole_menu">

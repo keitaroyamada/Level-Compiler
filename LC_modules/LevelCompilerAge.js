@@ -40,16 +40,17 @@ class LevelCompilerAge {
 
     var match = fileName.match(patern);
 
-    let model = {};
+    let model = {}; //tempdata
 
     if (match) {
       //check model type
       if (!match[1].toLowerCase().includes("age")) {
-        console.error("Mounted file is not age model.");
-        this.model_data = null;
+        console.error("Registered file is not age model.");
         return;
-      } else if (match[1] !== "") {
-        console.log("There is no identifier for age model.");
+      }
+
+      if (!match[1].toLowerCase().includes("age") && match[1] !== "") {
+        console.log("There is no identifier for age model, but continue.");
       }
 
       model.name = match[2];

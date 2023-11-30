@@ -743,7 +743,7 @@ class LevelCompilerCore {
     return interpolatedEFD;
   }
 
-  clacMarkerAges(LCAge, ageModelId) {
+  clacMarkerAges(LCAge) {
     if (this.projectData.holes.length == 0) {
       console.log("There is no correlation model.");
       return;
@@ -757,7 +757,6 @@ class LevelCompilerCore {
       hole.sections.forEach((section, s) => {
         section.markers.forEach((marker, m) => {
           if (marker.event_free_depth !== null) {
-            LCAge.selected_id = ageModelId;
             const age = LCAge.getAgeFromEFD(marker.event_free_depth, "linear");
             marker.age = age.mid;
           }
