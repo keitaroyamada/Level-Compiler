@@ -1,0 +1,39 @@
+.about {
+  text-align: center;
+}
+
+.depth {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+}
+
+#depth_definition {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+}
+
+#dv_source_chooser {
+  display: flex;
+  flex-direction: row;
+}
+#dv_source_chooser div {
+  padding-left: 20px;
+}
+
+#dv_data__table {
+  padding-top: 20px;
+  width: 100%;
+  height: 350px;
+  overflow: auto;
+}
+
+.export_row {
+  padding-top: 20px;
+}
+
+#dv_bt_convert {
+  width: 100px;
+  height: 30px;
+}

@@ -13,6 +13,7 @@ const { LevelCompilerCore } = require("./LC_modules/LevelCompilerCore.js");
 const { Project } = require("./LC_modules/Project.js");
 const { lcfnc } = require("./LC_modules/lcfnc.js");
 const { LevelCompilerAge } = require("./LC_modules/LevelCompilerAge.js");
+const { LevelCompilerPlot } = require("./LC_modules/LevelCompilerPlot.js");
 const fs = require("fs");
 const { parse } = require("csv-parse/sync");
 const { stringify } = require("csv-stringify/sync");
@@ -24,9 +25,11 @@ const isDev = process.env.NODE_ENV !== "development";
 //const isDev = false;
 const LCCore = new LevelCompilerCore();
 const LCAge = new LevelCompilerAge();
+const LCPlot = new LevelCompilerPlot();
 
 //
 let finderWindow = null;
+let dividerWindow = null;
 
 //const isDev = false;
 
@@ -216,6 +219,16 @@ function createMainWIndow() {
     console.log("MAIN: Project age data is initiarised.");
     return;
   });
+  ipcMain.handle("InitiarisePlot", async (_e) => {
+    //import modeln
+    console.log("MAIN: Initiarise plot data");
+    LCPlot.age_collections = [];
+    LCPlot.data_collections = [];
+    LCPlot.age_selected_id = null;
+    LCPlot.data_selected_id = null;
+    console.log("MAIN: Project plot data is initiarised.");
+    return;
+  });
 
   ipcMain.handle("RegisterModelFromCsv", async (_e, model_path) => {
     try {
@@ -301,6 +314,51 @@ function createMainWIndow() {
     );
     return LCCore.projectData;
   });
+  ipcMain.handle("RegisterPlotFromLCAge", async (_e) => {
+    try {
+      //register all LCAge models
+      for (let i = 0; i < LCAge.AgeModels.length; i++) {
+        //make new collection
+        const model_name = LCAge.AgeModels[i].name;
+        const model_id = LCAge.AgeModels[i].id;
+        LCPlot.addNewAgeCollection(model_name, model_id);
+
+        //get idx
+        let age_idx = null;
+        LCAge.AgeModels.forEach((a, idx) => {
+          if (a.id == model_id) {
+            age_idx = idx;
+          }
+        });
+
+        //register dage data from LCAge
+        LCPlot.addDatasetFromLCAgeModel(
+          LCPlot.age_selected_id, //new made lotdata id
+          LCAge.AgeModels[age_idx]
+        );
+
+        console.log(
+          "MAIN: Registered age plot data from " + LCAge.AgeModels[age_idx].name
+        );
+      }
+    } catch (error) {
+      console.error("ERROR: Plot data register from LCAge error.");
+      console.log(error);
+    }
+  });
+
+  ipcMain.handle("LoadPlotFromLCPlot", async (_e) => {
+    //calc latest age and depth
+    LCPlot.calcAgeCollectionPosition(LCCore, LCAge);
+
+    //LC plot age_collection id is as same as LCAge id
+    LCPlot.age_selected_id = LCAge.selected_id;
+
+    if (LCPlot) {
+      console.log("Main: Load plot data from LCPlot");
+      return LCPlot;
+    }
+  });
 
   ipcMain.handle("CalcCompositeDepth", async (_e) => {
     //import model
@@ -326,7 +384,7 @@ function createMainWIndow() {
     //calc age
     const age = LCAge.getAgeFromEFD(efd, method);
     if (age == null) {
-      return "";
+      return NaN;
     } else {
       return age.mid;
     }
@@ -336,7 +394,7 @@ function createMainWIndow() {
     //calc efd
     const efd = LCCore.getEFDfromCD(cd);
     if (efd == null) {
-      return "";
+      return NaN;
     }
 
     //calc age
@@ -345,6 +403,47 @@ function createMainWIndow() {
       return "";
     } else {
       return age.mid;
+    }
+  });
+
+  ipcMain.handle("OpenDivider", async (_e) => {
+    console.log("called");
+    if (dividerWindow) {
+      dividerWindow.focus();
+      dividerWindow.webContents.send("DividerToolClicked", "");
+      return;
+    }
+
+    //create finder window
+    dividerWindow = new BrowserWindow({
+      title: "Divider",
+      width: 1000,
+      height: 1000,
+      webPreferences: {
+        preload: path.join(__dirname, "preload_divider.js"),
+      },
+    });
+
+    dividerWindow.on("closed", () => {
+      dividerWindow = null;
+      mainWindow.webContents.send("DividerClosed", "");
+    });
+    dividerWindow.setMenu(null);
+
+    dividerWindow.loadFile(path.join(__dirname, "./renderer/divider.html"));
+
+    dividerWindow.once("ready-to-show", () => {
+      dividerWindow.show();
+      dividerWindow.webContents.openDevTools();
+      dividerWindow.setAlwaysOnTop(true, "normal");
+      dividerWindow.webContents.send("DividerToolClicked", "");
+    });
+  });
+  ipcMain.handle("CloseDivider", async (_e) => {
+    if (dividerWindow) {
+      dividerWindow.close();
+      dividerWindow = null;
+      return;
     }
   });
 

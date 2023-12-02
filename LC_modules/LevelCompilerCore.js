@@ -632,6 +632,7 @@ class LevelCompilerCore {
         nearest_data: {
           event_free_depth: D1,
           composite_depth: D1,
+          drilling_depth: D1,
           connection_rank: D1_rank,
         },
         cumulate_distance: d1 - distance,
@@ -641,6 +642,7 @@ class LevelCompilerCore {
         nearest_data: {
           event_free_depth: D3,
           composite_depth: D3,
+          drilling_depth: D3,
           connection_rank: D3_rank,
         },
         cumulate_distance: d3 - distance,

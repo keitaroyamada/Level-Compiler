@@ -77,9 +77,9 @@ class LevelCompilerAge {
       ageData.gae_raw = null;
 
       if (csv_data[r][9] == "") {
-        ageData.source_type = csv_data[r][9];
-      } else {
         ageData.source_type = "general"; //"general", "terrestrial", "marine", "tephra", "orbital", "climate"
+      } else {
+        ageData.source_type = csv_data[r][9];
       }
       ageData.source_code = csv_data[r][10];
       ageData.unit = csv_data[r][11];
@@ -97,6 +97,7 @@ class LevelCompilerAge {
         csv_data[r][3] !== ""
       ) {
         //case defined by trinity--------------------------------------------------------
+        ageData.original_depth_type = "trinity";
         ageData.trinityData.name = csv_data[r][0];
         ageData.trinityData.hole_name = lcfnc.zeroPadding(csv_data[r][1]); //hole
         ageData.trinityData.section_name = lcfnc.zeroPadding(csv_data[r][2]); //section
@@ -137,6 +138,7 @@ class LevelCompilerAge {
       } else if (csv_data[r][4] !== "") {
         //defined by CD-----------------------------------------------------------------
         //check model version
+        ageData.original_depth_type = "composite_depth";
         if (ageDataSet.version == LCCore.projectData.correlation_version) {
           ageData.composite_depth = csv_data[r][4]; //cd
 
@@ -146,7 +148,7 @@ class LevelCompilerAge {
             "Correlation Model Versions do not match between Core model and Age model."
           );
           //Scheduled to be deleted in the future
-          ageData.composite_depth = csv_data[r][4];
+          ageData.composite_depth = parseFloat(csv_data[r][4]);
           //convert CD => EFD
           const efdval = LCCore.getEFDfromCD(ageData.composite_depth);
           if (efdval !== NaN) {
@@ -161,6 +163,7 @@ class LevelCompilerAge {
       } else if (csv_data[r][5] !== "") {
         //defined by EFD---------------------------------------------------------------
         //check model version
+        ageData.original_depth_type = "event_free_depth";
         if (ageDataSet.version == LCCore.projectData.correlation_version) {
           ageData.event_free_depth = csv_data[r][5]; //efd
         } else {

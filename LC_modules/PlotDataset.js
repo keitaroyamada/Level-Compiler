@@ -5,12 +5,8 @@ class PlotDataset {
   constructor() {
     this.id = null;
     this.name = "";
-    this.original_depth_type = null;
-    this.trinity = new Trinity();
-    this.drilling_depth = null;
-    this.composite_depth = null;
-    this.event_free_depth = null;
-    this.data = [[]];
+    this.data_series = [];
+    this.plot_type = "scatter";
   }
 }
 module.exports = { PlotDataset };

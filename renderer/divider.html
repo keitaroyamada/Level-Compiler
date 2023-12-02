@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="Content-Security-Policy" content="script-src 'self'" />
+    <title>LC Divider</title>
+    <link rel="stylesheet" href="divider_styles.css" />
+    <script src="js/renderer_divider.js" defer></script>
+  </head>
+  <body>
+    <div class="depth">
+      <div>
+        <p>Select source columns</p>
+        <select id="dv_source_type">
+          <option value="trinity" selected>Trinity depth</option>
+          <option value="composite_depth">Composite depth</option>
+          <option value="event_free_depth">Event free depth</option>
+          <option value="age">Age</option>
+        </select>
+      </div>
+      <div id="depth_definition"></div>
+    </div>
+    <div id="dv_source_chooser"></div>
+    <div id="dv_data__table">
+      <table id="data_table"></table>
+    </div>
+    <div class="export_row">
+      <button id="dv_bt_divide" title="divide">Divide</button>
+    </div>
+  </body>
+</html>

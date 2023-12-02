@@ -8,8 +8,9 @@ class Age {
     this.age_mid = null;
     this.age_upper_1std = null;
     this.age_lower_1std = null;
-    this.gae_raw = null;
+    this.age_raw = null;
 
+    this.original_depth_type = null;
     this.trinityData = new Trinity();
     this.section_id = [null, null, null, null];
     this.composite_depth = null;

@@ -5,85 +5,145 @@ const { Hole } = require("./Hole.js");
 const { Section } = require("./Section.js");
 const { Marker } = require("./Marker.js");
 const { Trinity } = require("./Trinity.js");
-const { PlotDataGroup } = require("./PlotDataGroup.js");
-const { PlotDataSeries } = require("./PlotCollection.js");
-const { PlotDataum } = require("./PlotDataset.js");
+const { PlotCollection } = require("./PlotCollection.js");
+const { PlotDataset } = require("./PlotDataset.js");
+const { PlotData } = require("./PlotData.js");
+
 var ss = require("simple-statistics");
 
 class LevelCompilerPlot {
   constructor() {
-    this.collections = []; //dataRepository > dataCollection > data
+    this.age_collections = []; //dataRepository > dataCollection > dataset > data
+    this.age_selected_id = null;
+
+    this.data_collections = []; //dataRepository > dataCollection > dataset > data
+    this.data_selected_id = null;
   }
 
   //from new csv
 
   //methods
-  addCollection(
-    collectionName,
-    nameList,
-    depthDataSet, //{type, data}
-    depthTypeList,
-    trimedDataList,
-    interpolateMethod
-  ) {
-    //check input
-    if (!LCCore || !LCAge) {
-      return;
-    }
-
-    //make new data group
-    const newDataGroup = new PlotDataGroup();
-    newDataGroup.id = this.dataGroups.length + 1;
-    newDataGroup.name = groupName;
-
-    //make data series
-    for (let r = 0; r < depthDataList.length; r++) {
-      let output = [];
-      if (depthTypeList[r] == "trinity") {
-        const dd = LCCore.getDepthFromTrinity(
-          depthDataList[r],
-          "drilling_depth"
-        );
-        const cd = LCCore.getDepthFromTrinity(
-          depthDataList[r],
-          "composite_depth"
-        );
-        const efd = LCCore.getDepthFromTrinity(
-          depthDataList[r],
-          "event_free_depth"
-        );
-        const age = LCAge.getAgeFromEFD(efd, interpolateMethod);
-
-        const newDataSeries = new PlotDataSeries();
-        newDataSeries.id = newDataGroup.seriesSet.length + 1;
-        newDataSeries.name = trimedDataList[r][0];
-
-        for (let c = 1; c < trimedDataList[r].length; c++) {
-          newDataSeries.dataSet.push({
-            name: nameList[r],
-            age: age,
-            composite_depth: cd,
-            event_free_depth: efd,
-            drilling_depth: dd,
-            value: trimedDataList[r][c],
-          });
-        }
-
-        [nameList[r], dd, cd, efd, age];
-
-        for (let i = 0; i < data.length; i++) {
-          output.push([data[i].name]);
-        }
-      } else if (depthTypeList[r] == "composite_depth") {
-      } else if (depthTypeList[r] == "event_free_depth") {
-      }
-    }
+  addNewAgeCollection(name, age_id) {
+    const newCollection = new PlotCollection();
+    newCollection.id = age_id;
+    newCollection.name = name;
+    this.age_collections.push(newCollection);
+    this.age_selected_id = age_id;
   }
 
-  makeSampleFormat(depthData, position, calcType) {
-    //data, [trinity, data1, ] or [name, data1, data2]
-    //position, []
-    //calcType: [trinity composite_depth event_free_depth age]
+  addDatasetFromLCAgeModel(age_collectionId, LCAgeModel) {
+    //get collection idx
+    let targetIdx = null;
+    this.age_collections.forEach((col, c) => {
+      if (col.id == age_collectionId) {
+        targetIdx = c;
+      }
+    });
+
+    //add age dataset
+    const newDataset = new PlotDataset();
+
+    for (let a = 0; a < LCAgeModel.ages.length; a++) {
+      //make new dataset
+      const newData = new PlotData();
+
+      //input data
+      newData.id = LCAgeModel.ages[a].id;
+      newData.name = LCAgeModel.ages[a].name;
+      newData.original_depth_type = LCAgeModel.ages[a].original_depth_type;
+      newData.trinity = LCAgeModel.ages[a].trinityData;
+      newData.drilling_depth = null;
+      newData.composite_depth = LCAgeModel.ages[a].composite_depth;
+      newData.event_free_depth = LCAgeModel.ages[a].event_free_depth;
+      newData.age = LCAgeModel.ages[a].age_mid;
+      newData.data = LCAgeModel.ages[a].age_mid;
+      newData.source_type = LCAgeModel.ages[a].source_type;
+      newData.source_code = LCAgeModel.ages[a].source_code;
+      newData.unit = LCAgeModel.ages[a].unit;
+      newData.description = LCAgeModel.ages[a].note;
+
+      //add
+
+      newDataset.data_series.push(newData);
+    }
+
+    this.age_collections[targetIdx].datasets.push(newDataset);
+  }
+
+  calcAgeCollectionPosition(LCCore, LCAge) {
+    for (let c = 0; c < this.age_collections.length; c++) {
+      const collection = this.age_collections[c];
+      for (let d = 0; d < collection.datasets.length; d++) {
+        const dataset = collection.datasets[d];
+        for (let s = 0; s < dataset.data_series.length; s++) {
+          const data = dataset.data_series[s];
+          const calcType = data.original_depth_type;
+
+          if (calcType == "trinity") {
+            //calc
+            const cd = LCCore.getDepthFromTrinity(
+              [data.trinity],
+              "composite_depth"
+            );
+            const efd = LCCore.getDepthFromTrinity(
+              [data.trinity],
+              "event_free_depth"
+            );
+            const dd = LCCore.getDepthFromTrinity(
+              [data.trinity],
+              "drilling_depth"
+            );
+            const age = LCAge.getAgeFromEFD(efd[0][1], "linear");
+
+            //add
+            this.age_collections[c].datasets[d].data_series[s].drilling_depth =
+              dd[0][1];
+            this.age_collections[c].datasets[d].data_series[s].composite_depth =
+              cd[0][1];
+            this.age_collections[c].datasets[d].data_series[
+              s
+            ].event_free_depth = efd[0][1];
+            this.age_collections[c].datasets[d].data_series[s].age = age.mid;
+          } else if (calcType == "composite_depth") {
+            //calc
+            const efd = LCCore.getEFDfromCD(data.composite_depth);
+            const age = LCAge.getAgeFromEFD(efd, "linear");
+
+            //add
+            this.age_collections[c].datasets[d].data_series[
+              s
+            ].event_free_depth = efd;
+            this.age_collections[c].datasets[d].data_series[s].age = age.mid;
+          } else if (calcType == "event_free_depth") {
+            //calc
+            const efd =
+              this.age_collections[c].datasets[d].data_series[s]
+                .event_free_depth;
+            const cd = LCCore.getCDfromEFD(efd); //paseudo
+            const age = LCAge.getAgefromEFD(efd);
+
+            //add
+            this.age_collections[c].datasets[d].data_series[s].composite_depth =
+              cd;
+            this.age_collections[c].datasets[d].data_series[s].age = age.mid;
+          } else if (calcType == "age") {
+            //calc
+            const age = this.age_collections[c].datasets[d].data_series[s].age;
+            const efd = LCAge.getEFDFromAge(age, "linear");
+            const cd = LCCore.getCDfromEFD(efd.mid); //paseudo
+
+            //add
+            this.age_collections[c].datasets[d].data_series[
+              s
+            ].event_free_depth = efd.mid;
+            this.age_collections[c].datasets[d].data_series[s].composite_depth =
+              cd;
+          } else {
+            continue;
+          }
+        }
+      }
+    }
   }
 }
 

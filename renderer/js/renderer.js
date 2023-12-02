@@ -8,6 +8,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   //model
   let LCCore = null;
+  let LCplot = null;
 
   //model source path
   let correlation_model_list = []; //for reload
@@ -37,6 +38,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
   //finder control
   let finderEnable = false;
+  let dividerEnable = false;
+  let isSVG = false;
+  let isGrid = false;
   //============================================================================================
 
   //--------------------------------------------------------------------------------------------
@@ -63,6 +67,8 @@ document.addEventListener("DOMContentLoaded", () => {
   objOpts.canvas.bottom_pad = 100; //[cm]
   objOpts.canvas.background_colour = "white";
   objOpts.canvas.target_horizon = false;
+  objOpts.canvas.grid_width = 0.8;
+  objOpts.canvas.grid_solour = "gray";
 
   objOpts.hole.distance = 20;
   objOpts.hole.width = 20;
@@ -107,7 +113,25 @@ document.addEventListener("DOMContentLoaded", () => {
 
   objOpts.pen.colour = "red";
 
+  objOpts.age.incon_size = 20;
+  objOpts.age.alt_radius = 3;
+  objOpts.age.incon_list = {
+    terrestrial: ["../icons/plot/terrestrial.png", "green"],
+    marine: ["../icons/plot/marine.png", "blue"],
+    tephra: ["../icons/plot/tephra.png", "red"],
+    climate: ["../icons/plot/climate.png", "yellow"],
+    orbital: ["../icons/plot/orbital.png", "orange"],
+    general: ["../icons/plot/general.png", "black"],
+  };
+
   //============================================================================================
+  //resources
+  //get plot image data
+  let agePlotIcons = {};
+  loadRasterPlotIcons(agePlotIcons, objOpts);
+  let ageVectorPlotIcons = {};
+  loadVectorPlotIcons(ageVectorPlotIcons, objOpts);
+
   //============================================================================================
   //============================================================================================
   //============================================================================================
@@ -122,6 +146,7 @@ document.addEventListener("DOMContentLoaded", () => {
     await initiariseCorrelationModel();
     await initiariseAgeModel();
     await initiariseCanvas();
+    await initiarisePlot();
 
     //get model path
     const model_path =
@@ -145,11 +170,52 @@ document.addEventListener("DOMContentLoaded", () => {
     console.log(age_model_list);
     await loadAge(age_model_list[0].id);
 
+    //register age into LCplot
+    await registerPlotFromLCAge();
+
+    //load LCplot
+    await loadPlotData();
+
     //update
     updateView();
 
     //console.log("Canvas size: " + canvas.height + "x" + canvas.width);
   });
+  //============================================================================================
+  //open divider
+  document.getElementById("bt_divider").addEventListener("click", async () => {
+    if (LCCore) {
+      if (!dividerEnable) {
+        dividerEnable = true;
+        document.getElementById("bt_divider").style.backgroundColor = "#ccc";
+        await LCapi.OpenDivider("OpenDivider", async () => {});
+      } else {
+        dividerEnable = false;
+        document.getElementById("bt_divider").style.backgroundColor = "#f0f0f0";
+        await LCapi.CloseDivider("CloseDvider", async () => {});
+      }
+    }
+  });
+
+  window.LCapi.receive("DividerClosed", async () => {
+    //call from main process
+    dividerEnable = false;
+    document.getElementById("bt_divider").style.backgroundColor = "#f0f0f0";
+  });
+  //============================================================================================
+  //grid
+  document
+    .getElementById("bt_grid")
+    .addEventListener("click", async (event) => {
+      if (isGrid) {
+        isGrid = false;
+        document.getElementById("bt_grid").style.backgroundColor = "#f0f0f0";
+      } else {
+        isGrid = true;
+        document.getElementById("bt_grid").style.backgroundColor = "#ccc";
+      }
+      updateView();
+    });
   //============================================================================================
   //pen
   document.getElementById("bt_pen").addEventListener("click", async (event) => {
@@ -169,40 +235,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
   //============================================================================================
-  //FInder send event (move to)
-  window.LCapi.receive("MoveToHorizonFromFinder", async (data) => {
-    //move position based on finder
-    if (objOpts.canvas.depth_scale !== "drilling_depth") {
-      //get location
-      const pos_y = data[objOpts.canvas.depth_scale];
 
-      //convert scale from depth to pix
-      let canvasPosY = null;
-      if (objOpts.canvas.depth_scale == "age") {
-        canvasPosY =
-          (pos_y + objOpts.canvas.shift_y) *
-            (objOpts.canvas.dpir *
-              objOpts.canvas.zoom_level[1] *
-              objOpts.canvas.age_zoom_correction) +
-          objOpts.canvas.pad_y;
-      } else {
-        canvasPosY =
-          (pos_y + objOpts.canvas.shift_y) *
-            (objOpts.canvas.dpir * objOpts.canvas.zoom_level[1]) +
-          objOpts.canvas.pad_y;
-      }
-
-      //move scroller
-      scroller.scrollTop = canvasPosY - scroller.clientHeight / 2;
-      //scroller.moveTo(scroller.scrollLeft, pos_y);
-
-      //move canvas
-      canvasPos[1] = canvasPosY - scroller.clientHeight / 2;
-
-      //update plot
-      updateView();
-    }
-  });
   //============================================================================================
   //age model chooser
   document
@@ -213,7 +246,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
       //load age model
       selected_age_model_id = ageId;
-      loadAge(selected_age_model_id);
+      await loadAge(selected_age_model_id);
+      await loadPlotData();
 
       //update plot
       updateView();
@@ -225,11 +259,11 @@ document.addEventListener("DOMContentLoaded", () => {
     .addEventListener("click", async (event) => {
       if (isDrawVector) {
         //download vector image from p5 canvas
-        isSaveVector = true;
+        isSVG = true;
         const targetCanvas = new p5(p5Sketch);
         targetCanvas.save("model.svg");
         //targetCanvas.save("model.png");
-        isSaveVector = false;
+        isSVG = false;
         console.log("Take snapshot as svg.");
       } else {
         //download raster image from canvas
@@ -273,6 +307,7 @@ document.addEventListener("DOMContentLoaded", () => {
       await initiariseCorrelationModel();
       await initiariseAgeModel();
       await initiariseCanvas();
+      await initiarisePlot();
     } else {
       //no
       return;
@@ -302,7 +337,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     //mount correlation model
-    await mountAge(path);
+    await registerAge(path);
 
     //load model into renderer
     selected_age_model_id = age_model_list.length; //load latest
@@ -310,6 +345,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
     //load
     await loadAge(selected_age_model_id);
+
+    //
+    await registerPlotFromLCAge();
+    await loadPlotData();
 
     //update plot
     updateView();
@@ -338,9 +377,10 @@ document.addEventListener("DOMContentLoaded", () => {
     await initiariseCorrelationModel();
     await initiariseAgeModel();
     await initiariseCanvas();
+    await initiarisePlot();
 
     //mount correlation model
-    await mountModel(path);
+    await registerModel(path);
 
     //load model into renderer
     await loadModel(1);
@@ -349,6 +389,7 @@ document.addEventListener("DOMContentLoaded", () => {
     updateView();
   });
   //============================================================================================
+  //change canvas mode
   window.LCapi.receive("CanvasModeChanged", async (data) => {
     //call from main process
     if (data == "vector") {
@@ -395,32 +436,35 @@ document.addEventListener("DOMContentLoaded", () => {
 
       const temp_correlation_model_list = correlation_model_list;
       const temp_age_model_list = age_model_list;
+      const selecteed_cprrelation_model_id = 1;
+      const selected_age_model_id =
+        document.getElementById("AgeModelSelect").value;
 
       //initiarise
       await initiariseCorrelationModel();
       await initiariseAgeModel();
       await initiariseCanvas();
+      await initiarisePlot();
       console.log("list" + temp_age_model_list);
 
       //correlation model
       for (let i = 0; i < temp_correlation_model_list.length; i++) {
         //mount
         await registerModel(temp_correlation_model_list[i].path);
-
-        //load
-        await loadModel(temp_correlation_model_list[i].id);
       }
+      await loadModel(selecteed_cprrelation_model_id);
 
       for (let i = 0; i < temp_age_model_list.length; i++) {
         //mount
         await registerAge(temp_age_model_list[i].path);
-
-        //load
-        await loadAge(temp_age_model_list[i].id);
       }
+      await loadAge(selected_age_model_id);
       console.log(LCCore);
 
       //plot update
+      await registerPlotFromLCAge();
+      await loadPlotData();
+
       //update plot
       updateView();
 
@@ -543,7 +587,6 @@ document.addEventListener("DOMContentLoaded", () => {
     finderEnable = false;
     document.getElementById("bt_finder").style.backgroundColor = "#f0f0f0";
   });
-  //============================================================================================
   //mouse click (send depth to finder)
   scroller.addEventListener("click", async function () {
     //send to finder
@@ -572,6 +615,40 @@ document.addEventListener("DOMContentLoaded", () => {
       console.log("Click: Send the depth to Finder");
     }
   });
+  //FInder send event (move to)
+  window.LCapi.receive("MoveToHorizonFromFinder", async (data) => {
+    //move position based on finder
+    if (objOpts.canvas.depth_scale !== "drilling_depth") {
+      //get location
+      const pos_y = data[objOpts.canvas.depth_scale];
+
+      //convert scale from depth to pix
+      let canvasPosY = null;
+      if (objOpts.canvas.depth_scale == "age") {
+        canvasPosY =
+          (pos_y + objOpts.canvas.shift_y) *
+            (objOpts.canvas.dpir *
+              objOpts.canvas.zoom_level[1] *
+              objOpts.canvas.age_zoom_correction) +
+          objOpts.canvas.pad_y;
+      } else {
+        canvasPosY =
+          (pos_y + objOpts.canvas.shift_y) *
+            (objOpts.canvas.dpir * objOpts.canvas.zoom_level[1]) +
+          objOpts.canvas.pad_y;
+      }
+
+      //move scroller
+      scroller.scrollTop = canvasPosY - scroller.clientHeight / 2;
+      //scroller.moveTo(scroller.scrollLeft, pos_y);
+
+      //move canvas
+      canvasPos[1] = canvasPosY - scroller.clientHeight / 2;
+
+      //update plot
+      updateView();
+    }
+  });
   //============================================================================================
   //mouse move position event
   document.addEventListener("mousemove", async function (event) {
@@ -592,10 +669,15 @@ document.addEventListener("DOMContentLoaded", () => {
     const pad_y = objOpts.canvas.pad_y;
     const shift_x = objOpts.canvas.shift_x;
     const shift_y = objOpts.canvas.shift_y;
+    let age_mod = 1;
+
+    if (objOpts.canvas.depth_scale == "age") {
+      age_mod = objOpts.canvas.age_zoom_correction;
+    }
 
     //mouse position
     let x = (scroller.scrollLeft + mouseX - pad_x) / xMag - shift_x;
-    let y = (scroller.scrollTop + mouseY - pad_y) / yMag - shift_y;
+    let y = (scroller.scrollTop + mouseY - pad_y) / yMag / age_mod - shift_y;
 
     //get text
     const txt = await getFooterInfo(y, objOpts);
@@ -809,7 +891,7 @@ document.addEventListener("DOMContentLoaded", () => {
     sketch.setup = () => {
       let sketchCanvas = null;
 
-      if (isSaveVector) {
+      if (isSVG) {
         sketchCanvas = sketch.createCanvas(
           scroller.clientWidth,
           scroller.clientHeight,
@@ -840,9 +922,7 @@ document.addEventListener("DOMContentLoaded", () => {
       sketch.push(); //save
       sketch.translate(-canvasPos[0], -canvasPos[1]); //if you want revers move
 
-      //draw grid
-
-      //draw mocel
+      //draw model
       //get adjust values
       const dpir = objOpts.canvas.dpir; //window.devicePixelRatio || 1;
       const xMag = dpir * objOpts.canvas.zoom_level[0];
@@ -855,6 +935,111 @@ document.addEventListener("DOMContentLoaded", () => {
       //get shift amounts
       const shift_x = objOpts.canvas.shift_x;
       const shift_y = objOpts.canvas.shift_y;
+
+      //-----------------------------------------------------------------------------------------
+      //draw grid
+      if (isGrid) {
+        //function
+        const title = (tickType) => {
+          if (tickType == "age") {
+            const text = "Age [calBP]";
+            return text;
+          } else if (tickType == "composite_depth") {
+            const text = "Composite depth [m]";
+            return text;
+          } else if (tickType == "event_free_depth") {
+            const text = "Event free depth [m]";
+            return text;
+          } else if (tickType == "drilling_depth") {
+            const text = "Drilling depth [m]";
+            return text;
+          }
+        };
+
+        //scale title
+        sketch.drawingContext.setLineDash([]);
+        sketch.fill("black");
+        sketch.noStroke(); // sketch.stroke("black");
+        sketch.textFont("Arial");
+        sketch.textSize("30px");
+        sketch.push();
+        sketch.translate(
+          scroller.scrollLeft + 30,
+          scroller.scrollTop + scroller.clientHeight / 2
+        );
+        sketch.rotate((-90 / 180) * Math.PI);
+        sketch.text(title(objOpts.canvas.depth_scale), 0, 0);
+        sketch.pop();
+
+        //
+        const gridStartY = (0 + shift_y) * yMag + pad_y; //pix
+        let age_mod = 1;
+        if (objOpts.canvas.depth_scale == "age") {
+          age_mod = objOpts.canvas.age_zoom_correction;
+        }
+        const gridStepY = fitScaler(
+          objOpts.canvas.zoom_level[1],
+          yMag / age_mod
+        ); //pix
+
+        const gridMaxY = parseInt(canvasBase.style.height.match(/\d+/)[0], 10);
+        const gridMaxX = parseInt(canvasBase.style.width.match(/\d+/)[0], 10);
+
+        const gridMinY = objOpts.canvas.shift_y; //pix
+
+        const tickType = objOpts.canvas.depth_scale;
+        const tickStepY = 2;
+
+        //function
+        const txt = (tickType, y) => {
+          const d = (y - pad_y) / yMag - shift_y;
+          if (tickType == "age") {
+            const text = " " + Math.round(d).toLocaleString();
+            return text;
+          } else {
+            const text =
+              " " + (Math.round(d) / 100).toFixed(2).toLocaleString();
+            return text;
+          }
+        };
+
+        //ygrid downward
+        for (let y = gridStartY; y < gridMaxY; y += gridStepY) {
+          //grid
+          sketch.drawingContext.setLineDash([]);
+          sketch.strokeWeight(objOpts.canvas.grid_width);
+          sketch.stroke(objOpts.canvas.grid_solour);
+          sketch.line(120, y, gridMaxX, y);
+
+          //label
+          const tickLabel = txt(tickType, y);
+          const tickWidth = ctx.measureText(tickLabel).width;
+          sketch.fill("black");
+          sketch.noStroke(); // sketch.stroke("black");
+          sketch.textFont("Arial");
+          sketch.textSize("20px");
+          sketch.text(tickLabel, scroller.scrollLeft + 50, y + 8);
+        }
+
+        //ygrid upward
+        for (let y = gridStartY; y > gridMinY; y -= gridStepY) {
+          //grid
+          sketch.drawingContext.setLineDash([]);
+          sketch.strokeWeight(objOpts.canvas.grid_width);
+          sketch.stroke(objOpts.canvas.grid_solour);
+          sketch.line(120, y, gridMaxX, y);
+
+          //label
+          const tickLabel = txt(tickType, y);
+          const tickWidth = ctx.measureText(tickLabel).width;
+          sketch.fill("black");
+          sketch.noStroke(); // sketch.stroke("black");
+          sketch.textFont("Arial");
+          sketch.textSize("20px");
+          sketch.text(tickLabel, scroller.scrollLeft + 50, y + 8);
+        }
+      }
+      //-----------------------------------------------------------------------------------------
 
       //initiarise
       let num_disable = {
@@ -1160,6 +1345,112 @@ document.addEventListener("DOMContentLoaded", () => {
         }
       }
 
+      //==========================================================================================
+      //draw age points
+      if (LCplot == null) {
+        return;
+      }
+
+      //
+      let age_plot_idx = null;
+      LCplot.age_collections.forEach((a, idx) => {
+        if (a.id == LCplot.age_selected_id) {
+          age_plot_idx = idx;
+        }
+      });
+
+      //get age data(because age data, age series is single)
+      const ageSeries =
+        LCplot.age_collections[age_plot_idx].datasets[0].data_series;
+
+      //get position & plot
+
+      for (let a = 0; a < ageSeries.length; a++) {
+        num_disable = {
+          hole: 0,
+        };
+        let posX;
+        let posY;
+        if (ageSeries[a].original_depth_type == "trinity") {
+          //plot next to core
+          //get hole
+          let hole = null;
+          let isSkip = false;
+          for (let i = 0; i < LCCore.holes.length; i++) {
+            const hole_temp = LCCore.holes[i];
+            if (hole_temp.name == ageSeries[a].trinity.hole_name) {
+              if (hole_temp.enable == false) {
+                isSkip = true;
+              }
+              hole = hole_temp;
+              break;
+            } else {
+              if (hole_temp.enable == false) {
+                num_disable.hole += 1;
+              }
+            }
+          }
+
+          if (isSkip || hole == null) {
+            //if disabel hole
+            continue;
+          }
+
+          //calc position
+
+          posX =
+            ((objOpts.hole.distance + objOpts.hole.width) *
+              (hole.order - num_disable.hole) +
+              shift_x) *
+              xMag +
+            pad_x +
+            objOpts.hole.width * xMag -
+            objOpts.age.incon_size * 1.2;
+          posY =
+            (ageSeries[a][objOpts.canvas.depth_scale] + shift_y) * yMag +
+            pad_y -
+            objOpts.age.incon_size / 2;
+
+          //console.log(posX + "/" + posY);
+          //------------------------------------------------
+        } else {
+          //plot 0
+          const age_shift_x = -50;
+          posX =
+            age_shift_x + shift_x * xMag + pad_x - objOpts.age.incon_size * 1.2;
+          posY =
+            (ageSeries[a][objOpts.canvas.depth_scale] + shift_y) * yMag +
+            pad_y -
+            objOpts.age.incon_size / 2;
+
+          //console.log(ageSeries[a]);
+          //console.log(ageSeries[a].name + ":" + posX + "/" + posY);
+        }
+        //---------------------------------------------------------------------------------------
+        //plot main
+        if (ageSeries[a].source_type == "") {
+          sketch.image(
+            ageVectorPlotIcons["none"],
+            posX,
+            posY,
+            objOpts.age.incon_size,
+            objOpts.age.incon_size
+          );
+        } else {
+          sketch.image(
+            ageVectorPlotIcons[ageSeries[a].source_type],
+            posX,
+            posY,
+            objOpts.age.incon_size,
+            objOpts.age.incon_size
+          );
+        }
+
+        //---------------------------------------------------------------------------------------
+      }
+
+      //==========================================================================================
+
       sketch.pop(); //restore
     };
 
@@ -1261,24 +1552,103 @@ document.addEventListener("DOMContentLoaded", () => {
     offScreenCtx.translate(-canvasPos[0], -canvasPos[1]);
 
     //draw grid
-    /*
-    let gridMag = 1;
-    if (objOpts.canvas.depth_scale == "age") {
-      gridMag = objOpts.canvas.age_zoom_correction;
-    }
-    const gridSizeX = this.fitScaler(objOpts.canvas.zoom_level[0], gridMag);
-    const gridSizeY = this.fitScaler(objOpts.canvas.zoom_level[1], gridMag);
-    gridCanvas(
-      [gridSizeX, gridSizeY],
-      [xMag, yMag],
-      offScreenCtx,
-      [canvasBaseWidth, canvasBaseHeight],
-      [shift_x, shift_y],
-      [pad_x, pad_y],
-      objOpts
-    );
-    */
+    if (isGrid) {
+      //function
+      const title = (tickType) => {
+        if (tickType == "age") {
+          const text = "Age [calBP]";
+          return text;
+        } else if (tickType == "composite_depth") {
+          const text = "Composite depth [m]";
+          return text;
+        } else if (tickType == "event_free_depth") {
+          const text = "Event free depth [m]";
+          return text;
+        } else if (tickType == "drilling_depth") {
+          const text = "Drilling depth [m]";
+          return text;
+        }
+      };
 
+      //scale title
+      offScreenCtx.strokeStyle = "black";
+      offScreenCtx.font = "20px Arial";
+      rotateText(
+        offScreenCtx,
+        title(objOpts.canvas.depth_scale),
+        -90,
+        [
+          scroller.scrollLeft + 30,
+          scroller.scrollTop + scroller.clientHeight / 2,
+        ],
+        objOpts
+      );
+
+      //
+      const gridStartY = (0 + shift_y) * yMag + pad_y; //pix
+      let age_mod = 1;
+      if (objOpts.canvas.depth_scale == "age") {
+        age_mod = objOpts.canvas.age_zoom_correction;
+      }
+      const gridStepY = fitScaler(objOpts.canvas.zoom_level[1], yMag / age_mod); //pix
+
+      const gridMaxY = canvasBaseHeight; //pix
+      const gridMinY = objOpts.canvas.shift_y; //pix
+      const gridMaxX = canvasBaseWidth;
+
+      const tickType = objOpts.canvas.depth_scale;
+      const tickStepY = 2;
+
+      //function
+      const txt = (tickType, y) => {
+        const d = (y - pad_y) / yMag - shift_y;
+        if (tickType == "age") {
+          const text = " " + Math.round(d).toLocaleString();
+          return text;
+        } else {
+          const text = " " + (Math.round(d) / 100).toFixed(2).toLocaleString();
+          return text;
+        }
+      };
+
+      //ygrid downward
+      for (let y = gridStartY; y < gridMaxY; y += gridStepY) {
+        //grid
+        offScreenCtx.beginPath();
+        offScreenCtx.moveTo(120, y);
+        offScreenCtx.lineTo(gridMaxX, y);
+        offScreenCtx.strokeStyle = objOpts.canvas.grid_solour; //"#ccc";
+        offScreenCtx.lineWidth = objOpts.canvas.grid_width;
+        offScreenCtx.stroke();
+
+        //label
+        const tickLabel = txt(tickType, y);
+        const tickWidth = ctx.measureText(tickLabel).width;
+        offScreenCtx.strokeStyle = "black";
+        offScreenCtx.font = "20px Arial";
+        offScreenCtx.fillText(tickLabel, scroller.scrollLeft + 50, y + 8);
+      }
+
+      //ygrid upward
+      for (let y = gridStartY; y > gridMinY; y -= gridStepY) {
+        //grid
+        offScreenCtx.beginPath();
+        offScreenCtx.moveTo(120, y);
+        offScreenCtx.lineTo(gridMaxX, y);
+        offScreenCtx.strokeStyle = objOpts.canvas.grid_solour; //"#ccc";
+        offScreenCtx.lineWidth = objOpts.canvas.grid_width;
+        offScreenCtx.stroke();
+
+        //label
+        const tickLabel = txt(tickType, y);
+        const tickWidth = ctx.measureText(tickLabel).width;
+        offScreenCtx.strokeStyle = "black";
+        offScreenCtx.font = "20px Arial";
+        offScreenCtx.fillText(tickLabel, scroller.scrollLeft + 50, y + 8);
+      }
+    }
+
+    //-----------------------------------------------------------------------------------------------------------------------
     //draw model
     let num_disable = {
       hole: 0,
@@ -1597,7 +1967,123 @@ document.addEventListener("DOMContentLoaded", () => {
         }
       }
     }
+    //==========================================================================================
+    //draw age points
+    if (LCplot == null) {
+      return;
+    }
 
+    //
+    let age_plot_idx = null;
+    LCplot.age_collections.forEach((a, idx) => {
+      if (a.id == LCplot.age_selected_id) {
+        age_plot_idx = idx;
+      }
+    });
+
+    //get age data(because age data, age series is single)
+    const ageSeries =
+      LCplot.age_collections[age_plot_idx].datasets[0].data_series;
+
+    //plot
+
+    for (let a = 0; a < ageSeries.length; a++) {
+      num_disable = {
+        hole: 0,
+      };
+      let posX;
+      let posY;
+      if (ageSeries[a].original_depth_type == "trinity") {
+        //plot next to core
+        //get hole
+        let hole = null;
+        let isSkip = false;
+
+        for (let i = 0; i < LCCore.holes.length; i++) {
+          const hole_temp = LCCore.holes[i];
+          if (hole_temp.name == ageSeries[a].trinity.hole_name) {
+            if (hole_temp.enable == false) {
+              isSkip = true;
+            }
+            hole = hole_temp;
+            break;
+          } else {
+            if (hole_temp.enable == false) {
+              num_disable.hole += 1;
+            }
+          }
+        }
+
+        if (isSkip || hole == null) {
+          //if disabel hole
+          continue;
+        }
+
+        //calc position
+        posX =
+          ((objOpts.hole.distance + objOpts.hole.width) *
+            (hole.order - num_disable.hole) +
+            shift_x) *
+            xMag +
+          pad_x +
+          objOpts.hole.width * xMag -
+          objOpts.age.incon_size * 1.2;
+        posY =
+          (ageSeries[a][objOpts.canvas.depth_scale] + shift_y) * yMag +
+          pad_y -
+          objOpts.age.incon_size / 2;
+
+        //console.log(posX + "/" + posY);
+        //------------------------------------------------
+      } else {
+        //plot 0
+        const age_shift_x = -50;
+        posX =
+          age_shift_x + shift_x * xMag + pad_x - objOpts.age.incon_size * 1.2;
+        posY =
+          (ageSeries[a][objOpts.canvas.depth_scale] + shift_y) * yMag +
+          pad_y -
+          objOpts.age.incon_size / 2;
+
+        //console.log(ageSeries[a]);
+        //console.log(ageSeries[a].name + ":" + posX + "/" + posY);
+      }
+
+      //plotlet
+      if (ageSeries[a].source_type == "") {
+        offScreenCtx.drawImage(
+          agePlotIcons["none"],
+          posX,
+          posY,
+          objOpts.age.incon_size,
+          objOpts.age.incon_size
+        );
+      } else if (
+        ageSeries[a].source_type == "terrestrial" ||
+        ageSeries[a].source_type == "marine" ||
+        ageSeries[a].source_type == "orbital" ||
+        ageSeries[a].source_type == "climate" ||
+        ageSeries[a].source_type == "tephra" ||
+        ageSeries[a].source_type == "general"
+      ) {
+        offScreenCtx.drawImage(
+          agePlotIcons[ageSeries[a].source_type],
+          posX,
+          posY,
+          objOpts.age.incon_size,
+          objOpts.age.incon_size
+        );
+      } else {
+        offScreenCtx.drawImage(
+          agePlotIcons["none"],
+          posX,
+          posY,
+          objOpts.age.incon_size,
+          objOpts.age.incon_size
+        );
+      }
+    }
+    //==========================================================================================
     offScreenCtx.restore();
   }
   //--------------------------------------------------------------------------------------------
@@ -1934,126 +2420,9 @@ document.addEventListener("DOMContentLoaded", () => {
     };
   };
   //--------------------------------------------------------------------------------------------
-  function gridCanvas(gridSize, scale, ctx, canvasSize, shift, pad, opts) {
-    //grid canvas
-    //gridSize: pix
-    const gridColor = "#ccc";
-    const gridWidth = 0.8;
-    const ytickLoc = -100;
-    const [xMag, yMag] = scale;
-    let y0 = 0;
-    let showOrder = 1;
-    if (gridSize[1] <= 5) {
-      showOrder = 2;
-    } else if (gridSize[1] >= 100) {
-      showOrder = 0;
-    }
 
-    //let x = (scroller.scrollLeft + mouseX - pad_x) / xMag - shift_x;
-    //let y = (scroller.scrollTop + mouseY - pad_y) / yMag - shift_y;
-
-    //horizontal grid(downward)
-    for (
-      let y = 0;
-      y <= canvasSize[1] + shift[1] * yMag;
-      y += gridSize[1] * scale[1]
-    ) {
-      ctx.beginPath();
-      ctx.moveTo(
-        0 + shift[0] * xMag + pad[0] + ytickLoc,
-        y + shift[1] * yMag + pad[1]
-      );
-      ctx.lineTo(
-        canvasSize[0] + pad[0] + ytickLoc,
-        y + shift[1] * yMag + pad[1]
-      );
-      ctx.strokeStyle = gridColor;
-      ctx.lineWidth = gridWidth;
-      ctx.stroke();
-
-      //ytick labels
-      let tickText = null;
-      if (opts.canvas.depth_scale == "age") {
-        tickText =
-          " " +
-          (
-            Math.round((y / yMag / 100) * 1000 ** (showOrder + 1)) /
-            10 ** (showOrder + 1)
-          )
-            .toFixed(showOrder)
-            .toString();
-      } else {
-        tickText =
-          " " +
-          (
-            Math.round((y / yMag / 100) * 10 ** (showOrder + 1)) /
-            10 ** (showOrder + 1)
-          )
-            .toFixed(showOrder)
-            .toString();
-      }
-      ctx.strokeStyle = "black";
-      ctx.font = "20px Arial";
-      ctx.fillText(tickText, pad[0] + ytickLoc, y + shift[1] * yMag + pad[1]);
-    }
-    //horizontal grid(upward)
-    for (let y = 0; y >= -shift[1] * yMag; y -= gridSize[1] * scale[1]) {
-      if (y !== 0) {
-        ctx.beginPath();
-        ctx.moveTo(
-          0 + shift[0] * xMag + pad[0] + ytickLoc,
-          y + shift[1] * yMag + pad[1]
-        );
-        ctx.lineTo(
-          canvasSize[0] + pad[0] + ytickLoc,
-          y + shift[1] * yMag + pad[1]
-        );
-        ctx.strokeStyle = gridColor;
-        ctx.lineWidth = gridWidth;
-        ctx.stroke();
-
-        ctx.strokeStyle = "black";
-        ctx.font = "20px Arial";
-        ctx.fillText(
-          (
-            Math.round((y / yMag / 100) * 10 ** (showOrder + 1)) /
-            10 ** (showOrder + 1)
-          )
-            .toFixed(showOrder)
-            .toString(),
-          pad[0] + ytickLoc,
-          y + shift[1] * yMag + pad[1]
-        );
-        y0 = y;
-      }
-    }
-
-    //vertical grid (rightward)
-    for (let x = 0; x <= canvasSize[0]; x += gridSize[0] * scale[0]) {
-      ctx.beginPath();
-      ctx.moveTo(x + shift[0] * xMag + pad[0], y0 + shift[1] * yMag + pad[1]);
-      ctx.lineTo(
-        x + shift[0] * xMag + pad[0],
-        canvasSize[1] + shift[1] * xMag + pad[1]
-      );
-      ctx.strokeStyle = gridColor;
-      ctx.lineWidth = gridWidth;
-      ctx.stroke();
-    }
-    //vertical grid (leftward)
-    for (let x = 0; x >= canvasSize[0]; x -= gridSize[0] * scale[0]) {
-      ctx.beginPath();
-      ctx.moveTo(x + shift[0] * xMag + pad[0], y0 + shift[1] * yMag + pad[1]);
-      ctx.lineTo(
-        x + shift[0] * xMag + pad[0],
-        canvasSize[1] + shift[1] * xMag + pad[1]
-      );
-      ctx.strokeStyle = gridColor;
-      ctx.lineWidth = gridWidth;
-      ctx.stroke();
-    }
-  }
   //--------------------------------------------------------------------------------------------
+
   async function registerModel(in_path) {
     if (in_path == null) {
       return;
@@ -2103,6 +2472,8 @@ document.addEventListener("DOMContentLoaded", () => {
       //calc event free depth
       LCCore = await window.LCapi.CalcEventFreeDepth();
 
+      //sort
+      sortHoleByRank(LCCore);
       //shwo model summary
       //console.log(LCCore);
       console.log("Correlation model Loaded.");
@@ -2146,8 +2517,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
       let name = "";
       age_model_list.forEach((a) => {
-        if (a[0] == age_id) {
-          name = a[1];
+        if (a.id == age_id) {
+          name = a.name;
         }
       });
 
@@ -2159,6 +2530,25 @@ document.addEventListener("DOMContentLoaded", () => {
       updateView();
     } else {
       console.log("RENDERER: Fail to read age model.");
+    }
+  }
+  async function registerPlotFromLCAge() {
+    if (correlation_model_list.length == 0) {
+      return;
+    }
+    if (age_model_list.length == 0) {
+      return;
+    }
+    //load age model
+    await window.LCapi.RegisterPlotFromLCAge();
+  }
+  async function loadPlotData() {
+    //LC plot age_collection id is as same as LCAge id
+    const results = await window.LCapi.LoadPlotFromLCPlot();
+    if (results) {
+      LCplot = results;
+      console.log("Plot age data loaded");
+      console.log(results);
     }
   }
 
@@ -2186,6 +2576,13 @@ document.addEventListener("DOMContentLoaded", () => {
     await window.LCapi.InitiariseAgeModel();
     age_model_list = [];
   }
+  async function initiarisePlot() {
+    //canvas initiarise(remove all children)
+
+    //data initiarise
+    await window.LCapi.InitiarisePlot();
+    LCplot = null;
+  }
   async function initiariseCanvas() {
     //plot update
     if (isDrawVector) {
@@ -2211,25 +2608,12 @@ document.addEventListener("DOMContentLoaded", () => {
   }
   function updateView() {
     if (LCCore) {
-      //initiarise
-      //canvas initiarise
-      /*
-      const parentElement1 = document.getElementById("p5Canvas");
-      while (parentElement1.firstChild) {
-        parentElement1.removeChild(parentElement1.firstChild);
-      }
-      vectorObjects = null;
-      //clear canvas data
-      offScreenCtx.clearRect(0, 0, scroller.clientWidth, scroller.clientHeight); //initiarise
-      //plot update
-      updateRaster([0, 0]);
-      */
-
       //update
       if (isDrawVector) {
         if (vectorObjects == null) {
           vectorObjects = new p5(p5Sketch);
         }
+
         document.getElementById("p5Canvas").style.display = "block";
         document.getElementById("rasterCanvas").style.display = "none";
         makeP5CanvasBase();
@@ -2259,8 +2643,9 @@ document.addEventListener("DOMContentLoaded", () => {
 //============================================================================================
 
 function rotateText(ctx, txt, degree, center, objOpts) {
+  const textWidth = ctx.measureText(txt).width;
   ctx.save();
-  ctx.translate(center[0], center[1]); //move rotation center
+  ctx.translate(center[0], center[1] + textWidth / 2); //move rotation center
   ctx.rotate((degree * Math.PI) / 180);
   ctx.fillStyle = objOpts.section.font_colour;
   ctx.font =
@@ -2302,25 +2687,21 @@ function filledRoundSection(ctx, x, y, width, height, radius) {
   ctx.fill(); // ここで塗りつぶしを実行
 }
 function fitScaler(zoom_level, mag) {
-  let step = 0;
-  let mod = 5;
+  let step = null;
 
-  if (zoom_level <= 0.1) {
-    step = (1000 * mod) / mag;
-  } else if (zoom_level <= 0.5) {
-    step = (100 * mod) / mag;
-  } else if (zoom_level <= 2.0) {
-    step = (50 * mod) / mag;
-  } else if (zoom_level <= 5) {
-    step = (10 * mod) / mag;
-  } else if (zoom_level <= 10) {
-    step = (5 * mod) / mag;
+  if (zoom_level <= 0.4) {
+    step = 1000 * mag;
+  } else if (zoom_level <= 1.2) {
+    step = 100 * mag;
+  } else if (zoom_level <= 3) {
+    step = 50 * mag;
+  } else if (zoom_level <= 8) {
+    step = 10 * mag;
+  } else if (zoom_level <= 20) {
+    step = 5 * mag;
+  } else {
+    step = 1 * mag;
   }
-  /*
-  else if (zoom_level <= 15) {
-    step = (1 * mod) / mag;
-  }
-  */
 
   return step;
 }
@@ -2487,10 +2868,7 @@ async function getFooterInfo(y, objOpts) {
   let age = "";
 
   if (objOpts.canvas.depth_scale == "age") {
-    txt =
-      "Age: " +
-      Math.round(y / objOpts.canvas.age_zoom_correction).toLocaleString() +
-      " calBP";
+    txt = "Age: " + Math.round(y).toLocaleString() + " calBP";
   } else if (objOpts.canvas.depth_scale == "composite_depth") {
     age = await window.LCapi.GetAgeFromCD(y, "linear");
     txt =
@@ -2603,5 +2981,84 @@ function calcCanvasBaseSize(LCCore, objOpts) {
       pad_y
   );
   return [canvasBaseWidth, canvasBaseHeight];
+}
+async function createRasterCircleImage(canvasSize, radius, color) {
+  let canvas = document.createElement("canvas");
+  let ctx = canvas.getContext("2d");
+  canvas.width = canvas.height = canvasSize;
+  ctx.beginPath();
+  ctx.arc(canvasSize / 2, canvasSize / 2, radius, 0, 2 * Math.PI);
+  ctx.fillStyle = color;
+  ctx.fill();
+  return canvas.toDataURL();
+}
+async function loadRasterPlotIcons(agePlotIcons, objOpts) {
+  for (let key in objOpts.age.incon_list) {
+    const path = objOpts.age.incon_list[key][0];
+    const colour = objOpts.age.incon_list[key][1];
+
+    let img = new Image();
+    img.src = path;
+    img.onerror = async () => {
+      img.src = await createRasterCircleImage(
+        objOpts.age.incon_size,
+        objOpts.age.alt_radius,
+        colour
+      );
+    };
+    agePlotIcons[key] = img;
+  }
+
+  let img = new Image();
+  img.src = await createRasterCircleImage(
+    objOpts.age.incon_size,
+    objOpts.age.alt_radius,
+    "black"
+  );
+  agePlotIcons["none"] = img;
+}
+
+async function loadVectorPlotIcons(ageVectorPlotIcons, objOpts) {
+  new p5(async (p) => {
+    ageVectorPlotIcons["none"] = await createVectorCircleImage(
+      p,
+      objOpts.age.incon_size,
+      objOpts.age.alt_radius,
+      "black"
+    );
+    for (let key in objOpts.age.incon_list) {
+      const path = objOpts.age.incon_list[key][0];
+      const colour = objOpts.age.incon_list[key][1];
+      ageVectorPlotIcons[key] = await p.loadImage(
+        path,
+        async () => {
+          //console.log("");
+        },
+        async () => {
+          console.log("fail to load image of " + key);
+          ageVectorPlotIcons[key] = await createVectorCircleImage(
+            p,
+            objOpts.age.incon_size,
+            objOpts.age.alt_radius,
+            colour
+          );
+        }
+      );
+    }
+  });
+}
+
+async function createVectorCircleImage(p, canvasSize, radius, color) {
+  let fallbackImg = p.createGraphics(canvasSize, canvasSize);
+  fallbackImg.clear();
+  fallbackImg.fill(color);
+  fallbackImg.ellipse(canvasSize / 2, canvasSize / 2, radius * 2, radius * 2);
+  return fallbackImg;
+}
+
+function sortHoleByRank(LCCore) {
+  LCCore.holes.sort((a, b) => {
+    a.order < b.order ? -1 : 1;
+  });
 }
 //============================================================================================
