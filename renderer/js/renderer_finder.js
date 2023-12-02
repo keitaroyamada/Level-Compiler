@@ -365,11 +365,11 @@ document.addEventListener("DOMContentLoaded", () => {
     if (isFix) {
       isFix = false;
       //document.getElementById("fix").style.backgroundColor = "white";
-      document.getElementById("fix_img").src = "../icons/tool/fix.png";
+      document.getElementById("fix_img").src = "../resources/tool/fix.png";
     } else {
       isFix = true;
       //document.getElementById("fix").style.backgroundColor = "lightgray";
-      document.getElementById("fix_img").src = "../icons/tool/fixed.png";
+      document.getElementById("fix_img").src = "../resources/tool/fixed.png";
     }
   });
   //-------------------------------------------------------------------------------------------
@@ -377,11 +377,11 @@ document.addEventListener("DOMContentLoaded", () => {
     if (isLink) {
       isLink = false;
       //document.getElementById("fix").style.backgroundColor = "white";
-      document.getElementById("link_img").src = "../icons/tool/unlink.png";
+      document.getElementById("link_img").src = "../resources/tool/unlink.png";
     } else {
       isLink = true;
       //document.getElementById("fix").style.backgroundColor = "lightgray";
-      document.getElementById("link_img").src = "../icons/tool/link.png";
+      document.getElementById("link_img").src = "../resources/tool/link.png";
     }
   });
   //-------------------------------------------------------------------------------------------

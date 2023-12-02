@@ -116,12 +116,12 @@ document.addEventListener("DOMContentLoaded", () => {
   objOpts.age.incon_size = 20;
   objOpts.age.alt_radius = 3;
   objOpts.age.incon_list = {
-    terrestrial: ["../icons/plot/terrestrial.png", "green"],
-    marine: ["../icons/plot/marine.png", "blue"],
-    tephra: ["../icons/plot/tephra.png", "red"],
-    climate: ["../icons/plot/climate.png", "yellow"],
-    orbital: ["../icons/plot/orbital.png", "orange"],
-    general: ["../icons/plot/general.png", "black"],
+    terrestrial: ["../resources/plot/terrestrial.png", "green"],
+    marine: ["../resources/plot/marine.png", "blue"],
+    tephra: ["../resources/plot/tephra.png", "red"],
+    climate: ["../resources/plot/climate.png", "yellow"],
+    orbital: ["../resources/plot/orbital.png", "orange"],
+    general: ["../resources/plot/general.png", "black"],
   };
 
   //============================================================================================
