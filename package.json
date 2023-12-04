@@ -1,7 +1,7 @@
 {
   "name": "levelcompiler",
   "productName": "Level Compiler",
-  "version": "1.0.0",
+  "version": "0.0.1",
   "description": "Calc and show core levels",
   "main": "main.js",
   "scripts": {
@@ -11,7 +11,20 @@
   "license": "MIT",
   "dependencies": {
     "csv-parse": "^5.5.2",
-    "electron": "^27.0.3",
+    "csv-stringify": "^6.4.4",
+    "simple-statistics": "^7.8.3",
     "output": "build"
+  },
+  "build": {
+    "appId": "your.app.id",
+    "win": {
+      "icon": "./icon/levelcompiler.png"
+    },
+    "mac": {
+      "icon": "./icon/levelcompiler.png"
+    },
+    "linux": {
+      "icon": "./icon/levelcompiler.png"
+    }
   }
 }

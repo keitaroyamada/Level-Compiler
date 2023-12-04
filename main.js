@@ -1,3 +1,4 @@
+//    "electron": "^27.0.3",
 //npm start
 //npx electronmon .
 //npm cache verify --force
@@ -23,6 +24,7 @@ const { Trinity } = require("./LC_modules/Trinity.js");
 const isMac = process.platform === "darwin";
 const isDev = process.env.NODE_ENV !== "development";
 //const isDev = false;
+//const isDev = false;
 const LCCore = new LevelCompilerCore();
 const LCAge = new LevelCompilerAge();
 const LCPlot = new LevelCompilerPlot();
@@ -43,6 +45,7 @@ function createMainWIndow() {
       //contextIsolation: true, //Do not change for security reason
       preload: path.join(__dirname, "preload.js"),
     },
+    icon: "./icon/levelcompiler.ico",
   });
 
   //open devtools if in dev env
@@ -122,7 +125,7 @@ function createMainWIndow() {
               win.show();
               //win.webContents.openDevTools();
               win.setMenu(null);
-              win.setAlwaysOnTop(true, "normal");
+              //win.setAlwaysOnTop(true, "normal");
               win.webContents.send("ConverterMenuClicked", "");
             });
           },
@@ -546,7 +549,7 @@ function createMainWIndow() {
     }
   });
   ipcMain.handle("cvtExport", async (_e, data) => {
-    console.log(data);
+    //console.log(data);
     putcsvfile(mainWindow, data);
   });
 
@@ -600,6 +603,14 @@ function createMainWIndow() {
         //calc age
         LCAge.selected_id = modelIds.age;
         const age = LCAge.getAgeFromEFD(efd, method);
+        let age_mid;
+        let age_upper;
+        let age_lower;
+        if (age) {
+          age_mid = age.mid;
+          age_upper = age.upper;
+          age_lower = age.lower;
+        }
 
         //get age model idx
         let ageIdx = null;
@@ -617,9 +628,9 @@ function createMainWIndow() {
           send_data[0] !== undefined ? send_data[0].distance : NaN,
           cd !== null ? cd[0] : NaN,
           efd !== null ? efd : NaN,
-          age.mid !== null ? age.mid : NaN,
-          age.upper !== null ? age.upper : NaN,
-          age.lower !== null ? age.lower : NaN,
+          age_mid !== null ? age_mid : NaN,
+          age_upper !== null ? age_upper : NaN,
+          age_lower !== null ? age_lower : NaN,
           new_rank !== null ? new_rank : NaN,
           LCCore.projectData.id !== null
             ? LCCore.projectData.correlation_version
@@ -644,6 +655,14 @@ function createMainWIndow() {
         //calc age
         LCAge.selected_id = modelIds.age;
         const age = LCAge.getAgeFromEFD(efd, method);
+        let age_mid;
+        let age_upper;
+        let age_lower;
+        if (age) {
+          age_mid = age_mid;
+          age_upper = age_upper;
+          age_lower = age_lower;
+        }
 
         //get age model idx
         let ageIdx = null;
@@ -661,9 +680,9 @@ function createMainWIndow() {
           NaN,
           cd !== null ? cd[0] : NaN,
           efd !== null ? efd : NaN,
-          age.mid !== null ? age.mid : NaN,
-          age.upper !== null ? age.upper : NaN,
-          age.lower !== null ? age.lower : NaN,
+          age_mid !== null ? age_mid : NaN,
+          age_upper !== null ? age_upper : NaN,
+          age_lower !== null ? age_lower : NaN,
           3,
           "Converted from composite depth",
           LCCore.projectData.id !== null
@@ -683,6 +702,14 @@ function createMainWIndow() {
         //calc age
         LCAge.selected_id = modelIds.age;
         const age = LCAge.getAgeFromEFD(efd, method);
+        let age_mid;
+        let age_upper;
+        let age_lower;
+        if (age) {
+          age_mid = age_mid;
+          age_upper = age_upper;
+          age_lower = age_lower;
+        }
 
         //get age model idx
         let ageIdx = null;
@@ -700,9 +727,9 @@ function createMainWIndow() {
           NaN,
           NaN,
           efd !== null ? efd : NaN,
-          age.mid !== null ? age.mid : NaN,
-          age.upper !== null ? age.upper : NaN,
-          age.lower !== null ? age.lower : NaN,
+          age_mid !== null ? age_mid : NaN,
+          age_upper !== null ? age_upper : NaN,
+          age_lower !== null ? age_lower : NaN,
           3,
           "Converted from event free depth",
           "Converted from event free depth",

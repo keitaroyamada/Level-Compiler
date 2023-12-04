@@ -149,18 +149,18 @@ document.addEventListener("DOMContentLoaded", () => {
     await initiarisePlot();
 
     //get model path
+    //const model_path =      "C:/Users/slinn/Dropbox/Prj_LevelCompiler/_LC test data/[correlation]SG Correlation model for LC (24 Nov. 2023).csv";
     const model_path =
-      "C:/Users/slinn/Dropbox/Prj_LevelCompiler/_LC test data/[correlation]SG Correlation model for LC (24 Nov. 2023).csv";
-    const age1_path =
-      "C:/Users/slinn/Dropbox/Prj_LevelCompiler/_LC test data/[age]SG IntCal20 yr BP chronology for LC (01 Jun. 2021).csv";
+      "C:/Users/slinn/Dropbox/Prj_LevelCompiler/_LC test data/[correlation]SG14 LC test model with event(temp).csv";
+    //const age1_path =      "C:/Users/slinn/Dropbox/Prj_LevelCompiler/_LC test data/[age]SG IntCal20 yr BP chronology for LC (01 Jun. 2021).csv";
 
-    const age2_path =
-      "C:/Users/slinn/Dropbox/Prj_LevelCompiler/_LC test data/[age]SG IntCal13 yr BP chronology for LC (06 Apr. 2020).csv";
+    //const age2_path =      "C:/Users/slinn/Dropbox/Prj_LevelCompiler/_LC test data/[age]SG IntCal13 yr BP chronology for LC (06 Apr. 2020).csv";
     //register correlation model
     await registerModel(model_path);
 
     //load model into renderer
     await loadModel(1);
+    console.log(LCCore);
 
     //register age model
     await registerAge(age1_path);
@@ -447,23 +447,24 @@ document.addEventListener("DOMContentLoaded", () => {
       await initiarisePlot();
       console.log("list" + temp_age_model_list);
 
-      //correlation model
+      //reload correlation model
       for (let i = 0; i < temp_correlation_model_list.length; i++) {
-        //mount
         await registerModel(temp_correlation_model_list[i].path);
       }
       await loadModel(selecteed_cprrelation_model_id);
 
+      //reload age model
       for (let i = 0; i < temp_age_model_list.length; i++) {
-        //mount
         await registerAge(temp_age_model_list[i].path);
       }
       await loadAge(selected_age_model_id);
-      console.log(LCCore);
 
-      //plot update
+      //reload plot data
       await registerPlotFromLCAge();
       await loadPlotData();
+
+      console.log(LCCore);
+      console.log(LCplot);
 
       //update plot
       updateView();
@@ -1969,7 +1970,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
     //==========================================================================================
     //draw age points
-    if (LCplot == null) {
+    if (LCplot == null || LCplot.age_collections.length == 0) {
       return;
     }
 
@@ -2474,6 +2475,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
       //sort
       sortHoleByRank(LCCore);
+
       //shwo model summary
       //console.log(LCCore);
       console.log("Correlation model Loaded.");
@@ -2921,10 +2923,25 @@ function getEventPosiotion(LCCore, event, marker_top, objOpts) {
     } else if (event[0] == "erosion") {
       if (
         objOpts.canvas.depth_scale == "event_free_depth" ||
-        objOpts.canvas.depth_scale == "composite_depth"
+        objOpts.canvas.depth_scale == "composite_depth" ||
+        objOpts.canvas.depth_scale == "age"
       ) {
-        lowerDepth = marker[objOpts.canvas.depth_scale];
-        eventThickness = event[2];
+        lowerDepth = marker_top + event[2];
+        eventThickness = -event[2];
+      } else {
+        lowerDepth = null;
+        eventThickness = 0;
+      }
+    }
+  } else if (event[1] == "upward") {
+    if (event[0] == "erosion") {
+      if (
+        objOpts.canvas.depth_scale == "event_free_depth" ||
+        objOpts.canvas.depth_scale == "composite_depth" ||
+        objOpts.canvas.depth_scale == "age"
+      ) {
+        lowerDepth = marker_top;
+        eventThickness = -event[2];
       } else {
         lowerDepth = null;
         eventThickness = 0;
