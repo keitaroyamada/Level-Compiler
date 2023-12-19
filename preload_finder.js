@@ -6,11 +6,11 @@ contextBridge.exposeInMainWorld("FinderApi", {
   finderGetCoreList: () => ipcRenderer.invoke("finderGetCoreList"),
   changeFix: (args) => ipcRenderer.invoke("changeFix", args),
 
-  finderConvert: (args1, args2, args3) =>
-    ipcRenderer.invoke("finderConvert", args1, args2, args3),
+  finderConvert: (args1, args2, args3, args4) =>
+    ipcRenderer.invoke("finderConvert", args1, args2, args3, args4),
 
-  getSectionLimit: (args1, args2) =>
-    ipcRenderer.invoke("getSectionLimit", args1, args2),
+  getSectionLimit: (args1, args2, args3) =>
+    ipcRenderer.invoke("getSectionLimit", args1, args2, args3),
 
   MoveToHorizon: (args1) => ipcRenderer.invoke("MoveToHorizon", args1),
 

@@ -15,8 +15,7 @@ contextBridge.exposeInMainWorld("LCapi", {
   //register and load models
   RegisterModelFromCsv: (args) =>
     ipcRenderer.invoke("RegisterModelFromCsv", args),
-  LoadModelFromLCCore: (args) =>
-    ipcRenderer.invoke("LoadModelFromLCCore", args),
+  LoadModelFromLCCore: () => ipcRenderer.invoke("LoadModelFromLCCore"),
   RegisterAgeFromCsv: (args) => ipcRenderer.invoke("RegistertAgeFromCsv", args),
   LoadAgeFromLCAge: (args) => ipcRenderer.invoke("LoadAgeFromLCAge", args),
   RegisterPlotFromLCAge: () => ipcRenderer.invoke("RegisterPlotFromLCAge"),
@@ -24,17 +23,17 @@ contextBridge.exposeInMainWorld("LCapi", {
 
   //calcs
   CalcCompositeDepth: () => ipcRenderer.invoke("CalcCompositeDepth"),
-  CalcEventFreeDepth: (args) => ipcRenderer.invoke("CalcEventFreeDepth", args),
-  GetAgeFromEFD: (args1, args2, args3) =>
-    ipcRenderer.invoke("GetAgeFromEFD", args1, args2, args3),
-  GetAgeFromCD: (args1, args2, args3) =>
-    ipcRenderer.invoke("GetAgeFromCD", args1, args2, args3),
+  CalcEventFreeDepth: () => ipcRenderer.invoke("CalcEventFreeDepth"),
+  GetAgeFromEFD: (args0, args1) =>
+    ipcRenderer.invoke("GetAgeFromEFD", args0, args1),
+  GetAgeFromCD: (args0, args1) =>
+    ipcRenderer.invoke("GetAgeFromCD", args0, args1),
 
   //tools
   OpenFinder: () => ipcRenderer.invoke("OpenFinder"),
   CloseFinder: () => ipcRenderer.invoke("CloseFinder"),
-  depthConvert: (args1, args2, args3) =>
-    ipcRenderer.invoke("finderConvert", args1, args2, args3),
+  depthConvert: (args0, args1, args2, args3) =>
+    ipcRenderer.invoke("finderConvert", args0, args1, args2, args3),
   SendDepthToFinder: (args) => ipcRenderer.invoke("SendDepthToFinder", args),
   OpenDivider: () => ipcRenderer.invoke("OpenDivider"),
   CloseDivider: () => ipcRenderer.invoke("CloseDivider"),

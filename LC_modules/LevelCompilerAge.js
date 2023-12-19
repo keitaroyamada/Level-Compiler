@@ -17,17 +17,30 @@ class LevelCompilerAge {
   }
 
   loadAgeFromCsv(LCCore, age_path) {
+    //target
+    LCCore.sortModel();
+    const targetProjectId = LCCore.base_project_id;
+    let targetProjectIdx = null;
+    LCCore.projects.forEach((project, p) => {
+      if (project.id[0] == targetProjectId[0]) {
+        targetProjectIdx = [p, null, null, null];
+      }
+    });
+    if (targetProjectId == null) {
+      console.log("ERROR: There is no such a project.");
+      return;
+    }
+
     //check dataset
     const num_age_dataset = this.AgeModels.length;
     //console.log("Load age model :" + age_path);
 
     //check correlation model
-    if (LCCore.checkModel()) {
+    if (LCCore.checkModel()[targetProjectIdx[0]]) {
     } else {
-      console.log("There is any error in model interpolation.");
+      console.log("ERROR: There is any error in model interpolation.");
       return;
     }
-    LCCore.sortModel();
 
     //load age model
     const csv_data = lcfnc.readcsv(age_path);
@@ -105,6 +118,7 @@ class LevelCompilerAge {
 
         //calc EFD
         const [[sectionId, efd]] = LCCore.getDepthFromTrinity(
+          targetProjectId,
           [ageData.trinityData],
           "event_free_depth"
         );
@@ -139,7 +153,10 @@ class LevelCompilerAge {
         //defined by CD-----------------------------------------------------------------
         //check model version
         ageData.original_depth_type = "composite_depth";
-        if (ageDataSet.version == LCCore.projectData.correlation_version) {
+        if (
+          ageDataSet.version ==
+          LCCore.projects[targetProjectIdx[0]].correlation_version
+        ) {
           ageData.composite_depth = csv_data[r][4]; //cd
 
           //convert CD => EFD
@@ -150,7 +167,10 @@ class LevelCompilerAge {
           //Scheduled to be deleted in the future
           ageData.composite_depth = parseFloat(csv_data[r][4]);
           //convert CD => EFD
-          const efdval = LCCore.getEFDfromCD(ageData.composite_depth);
+          const efdval = LCCore.getEFDfromCD(
+            targetProjectId,
+            ageData.composite_depth
+          );
           if (efdval !== NaN) {
             ageData.event_free_depth = efdval;
           } else {
@@ -164,7 +184,10 @@ class LevelCompilerAge {
         //defined by EFD---------------------------------------------------------------
         //check model version
         ageData.original_depth_type = "event_free_depth";
-        if (ageDataSet.version == LCCore.projectData.correlation_version) {
+        if (
+          ageDataSet.version ==
+          LCCore.projects[targetProjectIdx[0]].correlation_version
+        ) {
           ageData.event_free_depth = csv_data[r][5]; //efd
         } else {
           console.log(

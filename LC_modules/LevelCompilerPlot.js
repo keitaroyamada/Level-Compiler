@@ -71,6 +71,8 @@ class LevelCompilerPlot {
   }
 
   calcAgeCollectionPosition(LCCore, LCAge) {
+    const targetProjectId = LCCore.base_project_id;
+
     for (let c = 0; c < this.age_collections.length; c++) {
       const collection = this.age_collections[c];
       for (let d = 0; d < collection.datasets.length; d++) {
@@ -82,14 +84,17 @@ class LevelCompilerPlot {
           if (calcType == "trinity") {
             //calc
             const cd = LCCore.getDepthFromTrinity(
+              targetProjectId,
               [data.trinity],
               "composite_depth"
             );
             const efd = LCCore.getDepthFromTrinity(
+              targetProjectId,
               [data.trinity],
               "event_free_depth"
             );
             const dd = LCCore.getDepthFromTrinity(
+              targetProjectId,
               [data.trinity],
               "drilling_depth"
             );
@@ -106,7 +111,10 @@ class LevelCompilerPlot {
             this.age_collections[c].datasets[d].data_series[s].age = age.mid;
           } else if (calcType == "composite_depth") {
             //calc
-            const efd = LCCore.getEFDfromCD(data.composite_depth);
+            const efd = LCCore.getEFDfromCD(
+              targetProjectId,
+              data.composite_depth
+            );
             const age = LCAge.getAgeFromEFD(efd, "linear");
 
             //add
@@ -119,7 +127,7 @@ class LevelCompilerPlot {
             const efd =
               this.age_collections[c].datasets[d].data_series[s]
                 .event_free_depth;
-            const cd = LCCore.getCDfromEFD(efd); //paseudo
+            const cd = LCCore.getCDfromEFD(targetProjectId, efd); //paseudo
             const age = LCAge.getAgefromEFD(efd);
 
             //add
@@ -130,7 +138,7 @@ class LevelCompilerPlot {
             //calc
             const age = this.age_collections[c].datasets[d].data_series[s].age;
             const efd = LCAge.getEFDFromAge(age, "linear");
-            const cd = LCCore.getCDfromEFD(efd.mid); //paseudo
+            const cd = LCCore.getCDfromEFD(targetProjectId, efd.mid); //paseudo
 
             //add
             this.age_collections[c].datasets[d].data_series[

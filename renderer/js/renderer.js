@@ -36,11 +36,10 @@ document.addEventListener("DOMContentLoaded", () => {
     measureData: { type: null, start: null, end: null },
   };
 
-  //finder control
+  //view control
   let finderEnable = false;
   let dividerEnable = false;
   let isSVG = false;
-  let isGrid = false;
   //============================================================================================
 
   //--------------------------------------------------------------------------------------------
@@ -67,8 +66,10 @@ document.addEventListener("DOMContentLoaded", () => {
   objOpts.canvas.bottom_pad = 100; //[cm]
   objOpts.canvas.background_colour = "white";
   objOpts.canvas.target_horizon = false;
+  objOpts.canvas.is_grid = false;
   objOpts.canvas.grid_width = 0.8;
-  objOpts.canvas.grid_solour = "gray";
+  objOpts.canvas.grid_colour = "gray";
+  objOpts.canvas.is_target = false;
 
   objOpts.hole.distance = 20;
   objOpts.hole.width = 20;
@@ -89,7 +90,14 @@ document.addEventListener("DOMContentLoaded", () => {
   objOpts.marker.line_colour = "gray";
   objOpts.marker.line_width = 1;
   objOpts.marker.width = 20;
-  objOpts.marker.rank_colours = ["blue", "green", "#088F8F", "orange", "red"];
+  objOpts.marker.is_rank = false;
+  objOpts.marker.rank_colours = [
+    "blue",
+    "green",
+    "lightgreen",
+    "orange",
+    "red",
+  ];
   objOpts.marker.ignore_zoom_level = 0.4;
   objOpts.marker.font = "Arial";
   objOpts.marker.font_size = 12;
@@ -97,11 +105,11 @@ document.addEventListener("DOMContentLoaded", () => {
 
   objOpts.event.line_colour = "red";
   objOpts.event.face_colour = {
-    general: "yellow",
-    erosion: "orange",
-    tephra: "pink",
+    general: "Gold",
+    erosion: "Teal",
+    tephra: "Crimson",
     void: "purple",
-    disturbed: "white",
+    disturbed: "SlateGray",
     earthquake: "green",
   };
   objOpts.event.line_width = 1;
@@ -149,25 +157,29 @@ document.addEventListener("DOMContentLoaded", () => {
     await initiarisePlot();
 
     //get model path
-    //const model_path =      "C:/Users/slinn/Dropbox/Prj_LevelCompiler/_LC test data/[correlation]SG Correlation model for LC (24 Nov. 2023).csv";
-    const model_path =
-      "C:/Users/slinn/Dropbox/Prj_LevelCompiler/_LC test data/[correlation]SG14 LC test model with event(temp).csv";
-    //const age1_path =      "C:/Users/slinn/Dropbox/Prj_LevelCompiler/_LC test data/[age]SG IntCal20 yr BP chronology for LC (01 Jun. 2021).csv";
+    const model_path1 =
+      "C:/Users/slinn/Dropbox/Prj_LevelCompiler/_LC test data/[correlation]SG Correlation model for LC (24 Nov. 2023).csv";
 
-    //const age2_path =      "C:/Users/slinn/Dropbox/Prj_LevelCompiler/_LC test data/[age]SG IntCal13 yr BP chronology for LC (06 Apr. 2020).csv";
+    const model_path2 =
+      "C:/Users/slinn/Dropbox/Prj_LevelCompiler/_LC test data/[duo]SG14 LC test model with event(temp).csv";
+    //const model_path =     "C:/Users/slinn/Dropbox/Prj_LevelCompiler/_LC test data/[correlation]SG14 LC test model with event(temp).csv";
+    const age1_path =
+      "C:/Users/slinn/Dropbox/Prj_LevelCompiler/_LC test data/[age]SG IntCal20 yr BP chronology for LC (01 Jun. 2021).csv";
+
+    const age2_path =
+      "C:/Users/slinn/Dropbox/Prj_LevelCompiler/_LC test data/[age]SG IntCal13 yr BP chronology for LC (06 Apr. 2020).csv";
     //register correlation model
-    await registerModel(model_path);
+    await registerModel(model_path1);
+    await registerModel(model_path2);
 
     //load model into renderer
-    await loadModel(1);
-    console.log(LCCore);
+    await loadModel();
 
     //register age model
     await registerAge(age1_path);
     await registerAge(age2_path);
 
     //load age model into LCCore
-    console.log(age_model_list);
     await loadAge(age_model_list[0].id);
 
     //register age into LCplot
@@ -176,8 +188,11 @@ document.addEventListener("DOMContentLoaded", () => {
     //load LCplot
     await loadPlotData();
 
+    //console.log(LCCore);
     //update
     updateView();
+    //console.log(LCCore);
+    //console.log(LCplot);
 
     //console.log("Canvas size: " + canvas.height + "x" + canvas.width);
   });
@@ -203,15 +218,46 @@ document.addEventListener("DOMContentLoaded", () => {
     document.getElementById("bt_divider").style.backgroundColor = "#f0f0f0";
   });
   //============================================================================================
+  //target
+  document
+    .getElementById("bt_target")
+    .addEventListener("click", async (event) => {
+      var target_line = document.getElementById("horizontal_target");
+      if (objOpts.canvas.is_target) {
+        objOpts.canvas.is_target = false;
+        document.getElementById("bt_target").style.backgroundColor = "#f0f0f0";
+        target_line.style.display = "none";
+      } else {
+        objOpts.canvas.is_target = true;
+        document.getElementById("bt_target").style.backgroundColor = "#ccc";
+        target_line.style.display = "block";
+      }
+      updateView();
+    });
+  //============================================================================================
+  //rank
+  document
+    .getElementById("bt_rank")
+    .addEventListener("click", async (event) => {
+      if (objOpts.marker.is_rank) {
+        objOpts.marker.is_rank = false;
+        document.getElementById("bt_rank").style.backgroundColor = "#f0f0f0";
+      } else {
+        objOpts.marker.is_rank = true;
+        document.getElementById("bt_rank").style.backgroundColor = "#ccc";
+      }
+      updateView();
+    });
+  //============================================================================================
   //grid
   document
     .getElementById("bt_grid")
     .addEventListener("click", async (event) => {
-      if (isGrid) {
-        isGrid = false;
+      if (objOpts.canvas.is_grid) {
+        objOpts.canvas.is_grid = false;
         document.getElementById("bt_grid").style.backgroundColor = "#f0f0f0";
       } else {
-        isGrid = true;
+        objOpts.canvas.is_grid = true;
         document.getElementById("bt_grid").style.backgroundColor = "#ccc";
       }
       updateView();
@@ -268,6 +314,7 @@ document.addEventListener("DOMContentLoaded", () => {
       } else {
         //download raster image from canvas
         const dataURL = canvas.toDataURL("image/png");
+        measureSketch;
         const downloadLink = document.createElement("a");
         downloadLink.href = dataURL;
         downloadLink.download = "canvas-image.png";
@@ -409,18 +456,29 @@ document.addEventListener("DOMContentLoaded", () => {
     .addEventListener("change", function (event) {
       if (event.target.type === "checkbox") {
         //get id
-        const section_id = event.target.id.split(",");
-        const section_idx = getIdxById(LCCore, section_id);
+        const target_id = event.target.id.split(",");
+        const target_idx = getIdxById(LCCore, target_id);
 
+        let setVal = false;
         if (event.target.checked) {
-          //case checked
-          LCCore.holes[section_idx[1]].enable = true;
-          console.log("Hole " + event.target.name + " show.");
+          setVal = true;
         } else {
-          //case unchecked
-          LCCore.holes[section_idx[1]].enable = false;
-          console.log("Hole " + event.target.name + " hide.");
+          setVal = false;
         }
+
+        if (target_id[1] == "") {
+          //case project selected
+          LCCore.projects[target_idx[0]].enable = setVal;
+          LCCore.projects[target_idx[0]].holes.forEach((hole) => {
+            hole.enable = setVal;
+            const el = document.getElementById(hole.id.toString());
+            el.checked = setVal;
+          });
+        } else {
+          //case hole selected
+          LCCore.projects[target_idx[0]].holes[target_idx[1]].enable = setVal;
+        }
+
         //update plot
         updateView();
       }
@@ -648,6 +706,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
       //update plot
       updateView();
+
+      //target line
+      var target_line = document.getElementById("horizontal_target");
+      target_line.style.top = scroller.clientHeight / 2 + "px";
     }
   });
   //============================================================================================
@@ -681,7 +743,7 @@ document.addEventListener("DOMContentLoaded", () => {
     let y = (scroller.scrollTop + mouseY - pad_y) / yMag / age_mod - shift_y;
 
     //get text
-    const txt = await getFooterInfo(y, objOpts);
+    const txt = await getFooterInfo(LCCore, y, objOpts);
 
     //update
     var el = document.getElementById("footerLeftText");
@@ -689,6 +751,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
     mousePos = [mouseX, mouseY];
 
+    //target line
+    var target_line = document.getElementById("horizontal_target");
+    target_line.style.top = event.clientY + "px";
     /*
     //send to finder
     if (finderEnable) {
@@ -726,7 +791,7 @@ document.addEventListener("DOMContentLoaded", () => {
       updateView();
 
       //get text
-      const txt = await getFooterInfo(mouseCanvasPosY, objOpts);
+      const txt = await getFooterInfo(LCCore, mouseCanvasPosY, objOpts);
 
       //update footer info
       var el = document.getElementById("footerLeftText");
@@ -831,19 +896,24 @@ document.addEventListener("DOMContentLoaded", () => {
     let holes_top = Infinity;
     let holes_bottom = -Infinity;
 
-    for (let h = 0; h < LCCore.holes.length; h++) {
-      let hole_top =
-        LCCore.holes[h].sections[0].markers[0][objOpts.canvas.depth_scale];
-      let hole_bottom = LCCore.holes[h].sections
-        .slice(-1)[0]
-        .markers.slice(-1)[0][objOpts.canvas.depth_scale];
-      if (holes_top > hole_top) {
-        holes_top = hole_top;
-      }
-      if (holes_bottom < hole_bottom) {
-        holes_bottom = hole_bottom;
+    for (let p = 0; p < LCCore.projects.length; p++) {
+      for (let h = 0; h < LCCore.projects[p].holes.length; h++) {
+        let hole_top =
+          LCCore.projects[p].holes[h].sections[0].markers[0][
+            objOpts.canvas.depth_scale
+          ];
+        let hole_bottom = LCCore.projects[p].holes[h].sections
+          .slice(-1)[0]
+          .markers.slice(-1)[0][objOpts.canvas.depth_scale];
+        if (holes_top > hole_top) {
+          holes_top = hole_top;
+        }
+        if (holes_bottom < hole_bottom) {
+          holes_bottom = hole_bottom;
+        }
       }
     }
+
     objOpts.canvas.shift_y = holes_top;
 
     //scale factor
@@ -861,9 +931,20 @@ document.addEventListener("DOMContentLoaded", () => {
     const shift_y = objOpts.canvas.shift_y;
 
     //initiarise off screan canvas
+    let num_total_holes = 0;
+    LCCore.projects.forEach((project) => {
+      if (project.enable) {
+        project.holes.forEach((hole) => {
+          if (hole.enable) {
+            num_total_holes += 1;
+          }
+        });
+      }
+    });
+
     let canvasBaseWidth = parseInt(
       (objOpts.hole.distance + objOpts.hole.width + shift_x) *
-        (LCCore.holes.length + 1) *
+        (num_total_holes + 1) *
         xMag +
         pad_x
     );
@@ -939,7 +1020,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
       //-----------------------------------------------------------------------------------------
       //draw grid
-      if (isGrid) {
+      if (objOpts.canvas.is_grid) {
         //function
         const title = (tickType) => {
           if (tickType == "age") {
@@ -1009,7 +1090,7 @@ document.addEventListener("DOMContentLoaded", () => {
           //grid
           sketch.drawingContext.setLineDash([]);
           sketch.strokeWeight(objOpts.canvas.grid_width);
-          sketch.stroke(objOpts.canvas.grid_solour);
+          sketch.stroke(objOpts.canvas.grid_colour);
           sketch.line(120, y, gridMaxX, y);
 
           //label
@@ -1027,7 +1108,7 @@ document.addEventListener("DOMContentLoaded", () => {
           //grid
           sketch.drawingContext.setLineDash([]);
           sketch.strokeWeight(objOpts.canvas.grid_width);
-          sketch.stroke(objOpts.canvas.grid_solour);
+          sketch.stroke(objOpts.canvas.grid_colour);
           sketch.line(120, y, gridMaxX, y);
 
           //label
@@ -1044,306 +1125,346 @@ document.addEventListener("DOMContentLoaded", () => {
 
       //initiarise
       let num_disable = {
+        total: 0,
         hole: 0,
       };
 
       //main
-      for (let h = 0; h < LCCore.holes.length; h++) {
-        //make hole objects===================================================================================
-        //load hole data
-        const hole = LCCore.holes[h];
+      for (let p = 0; p < LCCore.projects.length; p++) {
+        const project = LCCore.projects[p];
+        for (let h = 0; h < LCCore.projects[p].holes.length; h++) {
+          //make hole objects===================================================================================
+          //load hole data
+          const hole = project.holes[h];
 
-        //check enable
-        if (!hole.enable) {
-          //case not plot, count
-          num_disable.hole += 1;
-          continue;
-        }
-
-        //calc position excluding diable holes------------------------------
-        let hole_top = hole.sections[0].markers[0][objOpts.canvas.depth_scale];
-        let hole_bottom = hole.sections.slice(-1)[0].markers.slice(-1)[0][
-          objOpts.canvas.depth_scale
-        ];
-        let hole_x0 =
-          (objOpts.hole.distance + objOpts.hole.width) *
-          (hole.order - num_disable.hole);
-
-        //check position
-        if (hole_top == null || hole_bottom == null || hole_x0 == null) {
-          console.log(h + " th hole has any problem in the position.");
-          continue;
-        }
-
-        // draw hole line --------------------------------------------------
-        sketch.drawingContext.setLineDash([5, 5]);
-        sketch.strokeWeight(objOpts.hole.line_width);
-        sketch.stroke(objOpts.hole.line_colour);
-        sketch.line(
-          (hole_x0 + shift_x + objOpts.hole.width / 2) * xMag + pad_x,
-          (hole_top + shift_y) * yMag + pad_y,
-          (hole_x0 + shift_x + objOpts.hole.width / 2) * xMag + pad_x,
-          (hole_bottom + shift_y) * yMag + pad_y
-        );
-
-        //add  hole name---------------------------------------------------
-        sketch.drawingContext.setLineDash([]);
-        sketch.fill(objOpts.hole.font_colour);
-        sketch.stroke(objOpts.hole.font_colour);
-        sketch.textFont(objOpts.hole.font);
-        sketch.textSize(objOpts.hole.font_size);
-        sketch.text(
-          hole.name,
-          (hole_x0 + shift_x + objOpts.hole.width * 0.3) * xMag + pad_x,
-          (hole_top + shift_y) * yMag + pad_y - 20
-        );
-
-        //get plot order for hit test--------------------------------------
-
-        let section_plot_order = [];
-        for (let i = 0; i < hole.sections.length; i++) {
-          section_plot_order.push(i);
-        }
-
-        /*
-        if (hit_object_idx !== null) {
-          if (h == hit_object_idx[0]) {
-            //extract hit object
-            const hitObj = section_plot_order.slice(hit_object_idx[1], 1)[0];
-
-            //insert last order
-            section_plot_order.push(hitObj);
+          //check enable
+          if (!hole.enable) {
+            //case not plot, count
+            num_disable.hole += 1;
+            continue;
           }
-        }
-        */
 
-        for (let s_o = 0; s_o < hole.sections.length; s_o++) {
-          const s = section_plot_order[s_o];
-
-          //make section objects===================================================================================
-          //load section data
-          const section = hole.sections[s];
-
-          //calc position----------------------------------------------------
-          let section_top = section.markers[0][objOpts.canvas.depth_scale];
-          let section_bottom =
-            section.markers.slice(-1)[0][objOpts.canvas.depth_scale];
-          let section_mid = (section_top + section_bottom) / 2;
+          //calc position excluding diable holes------------------------------
+          let hole_top =
+            hole.sections[0].markers[0][objOpts.canvas.depth_scale];
+          let hole_bottom = hole.sections.slice(-1)[0].markers.slice(-1)[0][
+            objOpts.canvas.depth_scale
+          ];
+          let hole_x0 =
+            (objOpts.hole.distance + objOpts.hole.width) *
+            (num_disable.total + hole.order - num_disable.hole);
 
           //check position
-          if (section_top == null || section_bottom == null) {
-            console.log(
-              h +
-                " th hole, " +
-                s +
-                " th section has any problem in the position."
+          if (hole_top == null && hole_bottom == null && hole_x0 == null) {
+            //console.log(h + " th hole has any problem in the position.");
+            // draw hole line --------------------------------------------------
+            sketch.drawingContext.setLineDash([5, 5]);
+            sketch.strokeWeight(objOpts.hole.line_width);
+            sketch.stroke(objOpts.hole.line_colour);
+            sketch.line(
+              (hole_x0 + shift_x + objOpts.hole.width / 2) * xMag + pad_x,
+              (hole_top + shift_y) * yMag + pad_y,
+              (hole_x0 + shift_x + objOpts.hole.width / 2) * xMag + pad_x,
+              (hole_bottom + shift_y) * yMag + pad_y
             );
-            continue;
           }
 
-          //calc position
-          const sec_x0 = (hole_x0 + shift_x) * xMag + pad_x;
-          const sec_y0 = (section_top + shift_y) * yMag + pad_y;
-          const sec_w = objOpts.section.width * xMag;
-          const sec_h = (section_bottom - section_top) * yMag;
-
-          //draw section-----------------------------------------------------
-          //sketch.drawingContext.setLineDash([]);
-          sketch.strokeWeight(objOpts.section.line_width);
-          sketch.stroke(objOpts.section.line_colour);
-          sketch.fill(objOpts.section.face_colour);
-          sketch.rect(sec_x0, sec_y0, sec_w, sec_h, 3, 3, 3, 3); //rounded
-
-          //check zoom level for ignoring plot markers
-          if (objOpts.canvas.zoom_level[1] < objOpts.marker.ignore_zoom_level) {
-            continue;
-          }
-
-          //add section name-------------------------------------------------
-          sketch.fill(objOpts.section.font_colour);
-          sketch.noStroke();
-          sketch.textFont(objOpts.section.font);
-          sketch.textSize(objOpts.section.font_size);
-          sketch.push();
-          sketch.translate(
-            (hole_x0 + shift_x) * xMag + pad_x - 10,
-            (section_mid + shift_y) * yMag + pad_y
+          //add  hole name---------------------------------------------------
+          sketch.drawingContext.setLineDash([]);
+          sketch.fill(objOpts.hole.font_colour);
+          sketch.stroke(objOpts.hole.font_colour);
+          sketch.textFont(objOpts.hole.font);
+          sketch.textSize(objOpts.hole.font_size);
+          sketch.text(
+            hole.name,
+            (hole_x0 + shift_x + objOpts.hole.width * 0.3) * xMag + pad_x,
+            (hole_top + shift_y) * yMag + pad_y - 20
           );
-          sketch.rotate((-90 / 180) * Math.PI);
-          sketch.text(hole.name + "-" + section.name, 0, 0);
-          sketch.pop();
 
-          for (let m = 0; m < section.markers.length; m++) {
-            //make marker objects=================================================================================
-            //load marker data
-            const marker = section.markers[m];
-            let markerLineColour = objOpts.marker.line_colour;
+          //get plot order for hit test--------------------------------------
 
-            //calc marker position
-            let marker_top = marker[objOpts.canvas.depth_scale];
+          let section_plot_order = [];
+          for (let i = 0; i < hole.sections.length; i++) {
+            section_plot_order.push(i);
+          }
+
+          /*
+          if (hit_object_idx !== null) {
+            if (h == hit_object_idx[0]) {
+              //extract hit object
+              const hitObj = section_plot_order.slice(hit_object_idx[1], 1)[0];
+  
+              //insert last order
+              section_plot_order.push(hitObj);
+            }
+          }
+          */
+
+          for (let s_o = 0; s_o < hole.sections.length; s_o++) {
+            const s = section_plot_order[s_o];
+
+            //make section objects===================================================================================
+            //load section data
+            const section = hole.sections[s];
+
+            //calc position----------------------------------------------------
+            let section_top = section.markers[0][objOpts.canvas.depth_scale];
+            let section_bottom =
+              section.markers.slice(-1)[0][objOpts.canvas.depth_scale];
+            let section_mid = (section_top + section_bottom) / 2;
 
             //check position
-            if (marker_top == null) {
-              console.log(
-                h +
-                  " th hole, " +
-                  s +
-                  " th section, " +
-                  m +
-                  " th marker position has any problem."
-              );
+            if (section_top == null || section_bottom == null) {
+              //console.log(  h +" th hole, " +  s +   " th section has any problem in the position."      );
+              continue;
             }
 
-            //first, draw event
-            for (let e = 0; e < marker.event.length; e++) {
-              //make marker objects=================================================================================
-              //get position
-              const event = marker.event[e];
+            //calc position
+            const sec_x0 = (hole_x0 + shift_x) * xMag + pad_x;
+            const sec_y0 = (section_top + shift_y) * yMag + pad_y;
+            const sec_w = objOpts.section.width * xMag;
+            const sec_h = (section_bottom - section_top) * yMag;
 
-              const [lowerDepth, eventThickness] = getEventPosiotion(
-                LCCore,
-                event,
-                marker_top,
-                objOpts
+            //draw section-----------------------------------------------------
+            //sketch.drawingContext.setLineDash([]);
+            sketch.strokeWeight(objOpts.section.line_width);
+            sketch.stroke(objOpts.section.line_colour);
+            sketch.fill(objOpts.section.face_colour);
+            sketch.rect(sec_x0, sec_y0, sec_w, sec_h, 3, 3, 3, 3); //rounded
+
+            //check zoom level for ignoring plot markers
+            if (
+              objOpts.canvas.zoom_level[1] < objOpts.marker.ignore_zoom_level
+            ) {
+              continue;
+            }
+
+            //add section name-------------------------------------------------
+            sketch.fill(objOpts.section.font_colour);
+            sketch.noStroke();
+            sketch.textFont(objOpts.section.font);
+            sketch.textSize(objOpts.section.font_size);
+            sketch.push();
+            sketch.translate(
+              (hole_x0 + shift_x) * xMag + pad_x - 10,
+              (section_mid + shift_y) * yMag + pad_y
+            );
+            sketch.rotate((-90 / 180) * Math.PI);
+            sketch.text(hole.name + "-" + section.name, 0, 0);
+            sketch.pop();
+
+            for (let m = 0; m < section.markers.length; m++) {
+              //make marker objects=================================================================================
+              //load marker data
+              const marker = section.markers[m];
+              let markerLineColour = objOpts.marker.line_colour;
+
+              //calc marker position
+              let marker_top = marker[objOpts.canvas.depth_scale];
+
+              //check position
+              if (marker_top == null) {
+                //console.log(  h + " th hole, " + s + " th section, " +  m + " th marker position has any problem."  );
+              }
+
+              //first, draw event
+              for (let e = 0; e < marker.event.length; e++) {
+                //make marker objects=================================================================================
+                //get position
+                const event = marker.event[e];
+
+                const [lowerDepth, eventThickness] = getEventPosiotion(
+                  LCCore,
+                  event,
+                  marker_top,
+                  objOpts
+                );
+
+                //draw event layers
+
+                if (lowerDepth !== null) {
+                  sketch.fill(objOpts.event.face_colour[event[3]]);
+                  sketch.noStroke();
+                  sketch.stroke(objOpts.event.face_colour[event[3]]);
+                  sketch.rect(
+                    (hole_x0 + shift_x) * xMag + pad_x + 3,
+                    (lowerDepth + shift_y) * yMag + pad_y,
+                    objOpts.section.width * xMag - 6,
+                    eventThickness * yMag
+                  );
+                }
+              }
+              //make marker objects=================================================================================
+              // remove top and bottom markers
+              let topBot = 0;
+              if (m == 0 || m == section.markers.length - 1) {
+                topBot -= objOpts.marker.width * xMag; //or +20
+              }
+
+              //draw markers
+              sketch.drawingContext.setLineDash([]);
+              sketch.strokeWeight(objOpts.marker.line_width);
+              sketch.stroke(objOpts.marker.line_colour); //(markerLineColour);
+              sketch.line(
+                (hole_x0 + shift_x) * xMag + pad_x,
+                (marker_top + shift_y) * yMag + pad_y,
+                (hole_x0 + shift_x) * xMag +
+                  pad_x +
+                  objOpts.marker.width * xMag +
+                  topBot,
+                (marker_top + shift_y) * yMag + pad_y
               );
 
-              //draw event layers
-
-              if (lowerDepth !== null) {
-                sketch.fill(objOpts.event.face_colour[event[3]]);
+              //add rank marker-------------------------------------------
+              if (objOpts.marker.is_rank) {
+                sketch.fill("black");
                 sketch.noStroke();
-                sketch.stroke(objOpts.event.face_colour[event[3]]);
-                sketch.rect(
-                  (hole_x0 + shift_x) * xMag + pad_x + 3,
-                  (lowerDepth + shift_y) * yMag + pad_y,
-                  objOpts.section.width * xMag - 6,
-                  eventThickness * yMag
+                sketch.textFont("Arial");
+                sketch.textSize(15);
+                sketch.text(
+                  marker.connection_rank,
+                  (hole_x0 + shift_x) * xMag + pad_x - 23,
+                  (marker_top + shift_y) * yMag + pad_y + 5
+                );
+
+                if (marker.connection_rank == null) {
+                  sketch.fill("black");
+                } else if (marker.connection_rank > 4) {
+                  sketch.fill("brown");
+                } else {
+                  sketch.fill(
+                    objOpts.marker.rank_colours[marker.connection_rank]
+                  );
+                }
+                sketch.ellipse(
+                  (hole_x0 + shift_x) * xMag + pad_x,
+                  (marker_top + shift_y) * yMag + pad_y,
+                  8
                 );
               }
-            }
-            //make marker objects=================================================================================
-            // remove top and bottom markers
-            let topBot = 0;
-            if (m == 0 || m == section.markers.length - 1) {
-              topBot -= objOpts.marker.width * xMag; //or +20
-            }
 
-            //draw markers
-            sketch.drawingContext.setLineDash([]);
-            sketch.strokeWeight(objOpts.marker.line_width);
-            sketch.stroke(objOpts.marker.line_colour); //(markerLineColour);
-            sketch.line(
-              (hole_x0 + shift_x) * xMag + pad_x,
-              (marker_top + shift_y) * yMag + pad_y,
-              (hole_x0 + shift_x) * xMag +
-                pad_x +
-                objOpts.marker.width * xMag +
-                topBot,
-              (marker_top + shift_y) * yMag + pad_y
-            );
+              //add marker name--------------------------------------------
+              //add marker name without top/bottom name
+              if (m !== 0 && m !== section.markers.length - 1) {
+                sketch.fill(objOpts.marker.font_colour);
+                sketch.noStroke();
+                sketch.textFont(objOpts.marker.font);
+                sketch.textSize(objOpts.marker.font_size);
+                sketch.text(
+                  marker.name,
+                  (hole_x0 + shift_x) * xMag + pad_x + 10,
+                  (marker_top + shift_y) * yMag + pad_y - 2
+                );
+              }
 
-            //add rank marker-------------------------------------------
-            if (marker.connection_rank == null) {
-              sketch.fill("black");
-            } else {
-              sketch.fill(objOpts.marker.rank_colours[marker.connection_rank]);
-            }
-            sketch.ellipse(
-              (hole_x0 + shift_x) * xMag + pad_x,
-              (marker_top + shift_y) * yMag + pad_y,
-              8
-            );
-
-            //add marker name--------------------------------------------
-            //add marker name without top/bottom name
-            if (m !== 0 && m !== section.markers.length - 1) {
+              //add marker distance----------------------------------------
               sketch.fill(objOpts.marker.font_colour);
               sketch.noStroke();
               sketch.textFont(objOpts.marker.font);
               sketch.textSize(objOpts.marker.font_size);
               sketch.text(
-                marker.name,
-                (hole_x0 + shift_x) * xMag + pad_x + 10,
+                (Math.round(marker.distance * 10) / 10).toFixed(1).toString(),
+                (hole_x0 + shift_x) * xMag +
+                  pad_x +
+                  objOpts.marker.width * xMag +
+                  5,
                 (marker_top + shift_y) * yMag + pad_y - 2
               );
+              //add master section-----------------------------------------
+              if (marker.isMaster) {
+                if (section.markers[m + 1] !== undefined) {
+                  if (section.markers[m + 1].isMaster) {
+                    sketch.drawingContext.setLineDash([]);
+                    sketch.strokeWeight(4);
+                    sketch.stroke("blue"); //(markerLineColour);
+                    const next_marker_top =
+                      section.markers[m + 1][objOpts.canvas.depth_scale];
+                    sketch.line(
+                      (hole_x0 + shift_x) * xMag + pad_x,
+                      (marker_top + shift_y) * yMag + pad_y,
+                      (hole_x0 + shift_x) * xMag + pad_x,
+                      (next_marker_top + shift_y) * yMag + pad_y
+                    );
+                  }
+                }
+              }
+
+              //-----------------------------------------------------------
+              //make connection objects=================================================================================
+              //add connection
+              const connectionData = this.getNearestConnectedMarkerIdx(
+                LCCore,
+                marker.id
+              );
+
+              //check connection
+              if (connectionData == null) {
+                //there is no connection
+                continue;
+              }
+
+              const idxTo = connectionData.connected_idx;
+
+              //get connectied hole position
+              const connectedHole_x0 =
+                (objOpts.hole.distance + objOpts.hole.width) *
+                (1 * LCCore.projects[idxTo[0]].order +
+                  connectionData.num_total -
+                  connectionData.num_total_disable); //LCCore.projects[idxTo[0]].holes[idxTo[1]].order
+
+              const connectedMarker_top =
+                LCCore.projects[idxTo[0]].holes[idxTo[1]].sections[idxTo[2]]
+                  .markers[idxTo[3]][objOpts.canvas.depth_scale];
+
+              if (connectedMarker_top == null) {
+                //console.log("Connected marker position is null.");
+                continue;
+              }
+              //get connector position
+              const cn_x0 =
+                (hole_x0 + shift_x + objOpts.marker.width) * xMag + pad_x;
+              const cn_y0 = (marker_top + shift_y) * yMag + pad_y;
+              const cn_x1 = cn_x0 + objOpts.connection.indexWidth;
+              const cn_y1 = cn_y0;
+              const cn_x3 = (connectedHole_x0 + shift_x) * xMag + pad_x;
+              const cn_y3 = (connectedMarker_top + shift_y) * yMag + pad_y;
+              const cn_x2 = cn_x3 - objOpts.connection.indexWidth;
+              const cn_y2 = cn_y3;
+
+              //get style
+              if (cn_y0 !== cn_y3) {
+                //not horizontal
+                //offScreenCtx.strokeStyle = "red";
+              }
+              if (!connectionData.isNext) {
+                //connected core is not located at the next
+                sketch.drawingContext.setLineDash([5, 5]);
+              } else {
+                sketch.drawingContext.setLineDash([]);
+              }
+
+              if (
+                marker.isMaster &&
+                LCCore.projects[idxTo[0]].holes[idxTo[1]].sections[idxTo[2]]
+                  .markers[idxTo[3]].isMaster
+              ) {
+                //if connection of master section
+                sketch.stroke("blue");
+              }
+
+              //draw connection---------------------------------------------
+              sketch.strokeWeight(objOpts.connection.line_width);
+              sketch.stroke(markerLineColour);
+
+              sketch.line(cn_x0, cn_y0, cn_x1, cn_y1); //start point
+              sketch.line(cn_x1, cn_y1, cn_x2, cn_y2); //index left
+              sketch.line(cn_x2, cn_y2, cn_x3, cn_y3); //index right
+
+              //=====================================================================================================
             }
-
-            //add marker distance----------------------------------------
-            sketch.fill(objOpts.marker.font_colour);
-            sketch.noStroke();
-            sketch.textFont(objOpts.marker.font);
-            sketch.textSize(objOpts.marker.font_size);
-            sketch.text(
-              (Math.round(marker.distance * 10) / 10).toFixed(1).toString(),
-              (hole_x0 + shift_x) * xMag +
-                pad_x +
-                objOpts.marker.width * xMag +
-                5,
-              (marker_top + shift_y) * yMag + pad_y - 2
-            );
-            //make connection objects=================================================================================
-            //add connection
-            const [idxTo, isNext, numDisable] =
-              this.getNearestConnectedMarkerIdx(LCCore, marker.id);
-
-            //check connection
-            if (idxTo == null) {
-              //there is no connection
-              continue;
-            }
-
-            //get connectied hole position
-            const connectedHole_x0 =
-              (objOpts.hole.distance + objOpts.hole.width) *
-              (LCCore.holes[idxTo[1]].order - num_disable.hole - numDisable);
-            const connectedMarker_top =
-              LCCore.holes[idxTo[1]].sections[idxTo[2]].markers[idxTo[3]][
-                objOpts.canvas.depth_scale
-              ];
-
-            //get connector position
-            const cn_x0 =
-              (hole_x0 + shift_x + objOpts.marker.width) * xMag + pad_x;
-            const cn_y0 = (marker_top + shift_y) * yMag + pad_y;
-            const cn_x1 = cn_x0 + objOpts.connection.indexWidth;
-            const cn_y1 = cn_y0;
-            const cn_x3 = (connectedHole_x0 + shift_x) * xMag + pad_x;
-            const cn_y3 = (connectedMarker_top + shift_y) * yMag + pad_y;
-            const cn_x2 = cn_x3 - objOpts.connection.indexWidth;
-            const cn_y2 = cn_y3;
-
-            //get style
-            if (cn_y0 !== cn_y3) {
-              //not horizontal
-              //offScreenCtx.strokeStyle = "red";
-            }
-            if (!isNext) {
-              //connected core is not located at the next
-              sketch.drawingContext.setLineDash([5, 5]);
-            } else {
-              sketch.drawingContext.setLineDash([]);
-            }
-
-            if (
-              marker.isMaster &&
-              LCCore.holes[idxTo[1]].sections[idxTo[2]].markers[idxTo[3]]
-                .isMaster
-            ) {
-              //if connection of master section
-              sketch.stroke("blue");
-            }
-
-            //draw connection---------------------------------------------
-            sketch.strokeWeight(objOpts.connection.line_width);
-            sketch.stroke(markerLineColour);
-
-            sketch.line(cn_x0, cn_y0, cn_x1, cn_y1); //start point
-            sketch.line(cn_x1, cn_y1, cn_x2, cn_y2); //index left
-            sketch.line(cn_x2, cn_y2, cn_x3, cn_y3); //index right
-
-            //=====================================================================================================
           }
         }
+        num_disable.total += project.holes.length + 1;
       }
 
       //==========================================================================================
@@ -1377,17 +1498,19 @@ document.addEventListener("DOMContentLoaded", () => {
           //get hole
           let hole = null;
           let isSkip = false;
-          for (let i = 0; i < LCCore.holes.length; i++) {
-            const hole_temp = LCCore.holes[i];
-            if (hole_temp.name == ageSeries[a].trinity.hole_name) {
-              if (hole_temp.enable == false) {
-                isSkip = true;
-              }
-              hole = hole_temp;
-              break;
-            } else {
-              if (hole_temp.enable == false) {
-                num_disable.hole += 1;
+          for (let p = 0; p < LCCore.projects.length; p++) {
+            for (let h = 0; h < LCCore.projects[p].holes.length; h++) {
+              const hole_temp = LCCore.projects[p].holes[h];
+              if (hole_temp.name == ageSeries[a].trinity.hole_name) {
+                if (hole_temp.enable == false) {
+                  isSkip = true;
+                }
+                hole = hole_temp;
+                break;
+              } else {
+                if (hole_temp.enable == false) {
+                  num_disable.hole += 1;
+                }
               }
             }
           }
@@ -1469,19 +1592,24 @@ document.addEventListener("DOMContentLoaded", () => {
     if (LCCore == null) {
       return;
     }
-    for (let h = 0; h < LCCore.holes.length; h++) {
-      let hole_top =
-        LCCore.holes[h].sections[0].markers[0][objOpts.canvas.depth_scale];
-      let hole_bottom = LCCore.holes[h].sections
-        .slice(-1)[0]
-        .markers.slice(-1)[0][objOpts.canvas.depth_scale];
-      if (holes_top > hole_top) {
-        holes_top = hole_top;
-      }
-      if (holes_bottom < hole_bottom) {
-        holes_bottom = hole_bottom;
+    for (let p = 0; p < LCCore.projects.length; p++) {
+      for (let h = 0; h < LCCore.projects[p].holes.length; h++) {
+        let hole_top =
+          LCCore.projects[p].holes[h].sections[0].markers[0][
+            objOpts.canvas.depth_scale
+          ];
+        let hole_bottom = LCCore.projects[p].holes[h].sections
+          .slice(-1)[0]
+          .markers.slice(-1)[0][objOpts.canvas.depth_scale];
+        if (holes_top > hole_top) {
+          holes_top = hole_top;
+        }
+        if (holes_bottom < hole_bottom) {
+          holes_bottom = hole_bottom;
+        }
       }
     }
+
     objOpts.canvas.shift_y = holes_top;
 
     //scale factor
@@ -1498,10 +1626,21 @@ document.addEventListener("DOMContentLoaded", () => {
     const shift_x = objOpts.canvas.shift_x;
     const shift_y = objOpts.canvas.shift_y;
 
-    //initiarise off screan canvas
+    //initiarise canvas base
+    let num_total_holes = 0;
+    LCCore.projects.forEach((project) => {
+      if (project.enable) {
+        project.holes.forEach((hole) => {
+          if (hole.enable) {
+            num_total_holes += 1;
+          }
+        });
+      }
+    });
+
     let canvasBaseWidth = parseInt(
       (objOpts.hole.distance + objOpts.hole.width + shift_x) *
-        (LCCore.holes.length + 1) *
+        (num_total_holes + 1) *
         xMag +
         pad_x
     );
@@ -1553,7 +1692,7 @@ document.addEventListener("DOMContentLoaded", () => {
     offScreenCtx.translate(-canvasPos[0], -canvasPos[1]);
 
     //draw grid
-    if (isGrid) {
+    if (objOpts.canvas.is_grid) {
       //function
       const title = (tickType) => {
         if (tickType == "age") {
@@ -1618,7 +1757,7 @@ document.addEventListener("DOMContentLoaded", () => {
         offScreenCtx.beginPath();
         offScreenCtx.moveTo(120, y);
         offScreenCtx.lineTo(gridMaxX, y);
-        offScreenCtx.strokeStyle = objOpts.canvas.grid_solour; //"#ccc";
+        offScreenCtx.strokeStyle = objOpts.canvas.grid_colour; //"#ccc";
         offScreenCtx.lineWidth = objOpts.canvas.grid_width;
         offScreenCtx.stroke();
 
@@ -1636,7 +1775,7 @@ document.addEventListener("DOMContentLoaded", () => {
         offScreenCtx.beginPath();
         offScreenCtx.moveTo(120, y);
         offScreenCtx.lineTo(gridMaxX, y);
-        offScreenCtx.strokeStyle = objOpts.canvas.grid_solour; //"#ccc";
+        offScreenCtx.strokeStyle = objOpts.canvas.grid_colour; //"#ccc";
         offScreenCtx.lineWidth = objOpts.canvas.grid_width;
         offScreenCtx.stroke();
 
@@ -1653,321 +1792,383 @@ document.addEventListener("DOMContentLoaded", () => {
     //draw model
     let num_disable = {
       hole: 0,
+      total: 0,
     };
 
-    for (let h = 0; h < LCCore.holes.length; h++) {
-      //make hole objects===================================================================================
-      //load hole data
-      const hole = LCCore.holes[h];
-
-      //check enable
-      if (!hole.enable) {
-        //case not plot, count
-        num_disable.hole += 1;
-        continue;
+    for (let p = 0; p < LCCore.projects.length; p++) {
+      if (LCCore.projects[p].enable == false) {
+        return;
       }
+      const project = LCCore.projects[p];
+      for (let h = 0; h < project.holes.length; h++) {
+        //make hole objects===================================================================================
+        //load hole data
+        const hole = project.holes[h];
 
-      //calc position excluding diable holes------------------------------
-      let hole_top = hole.sections[0].markers[0][objOpts.canvas.depth_scale];
-      let hole_bottom = hole.sections.slice(-1)[0].markers.slice(-1)[0][
-        objOpts.canvas.depth_scale
-      ];
-      let hole_x0 =
-        (objOpts.hole.distance + objOpts.hole.width) *
-        (hole.order - num_disable.hole);
-
-      //check position
-      if (hole_top == null || hole_bottom == null || hole_x0 == null) {
-        console.log(h + " th hole has any problem in the position.");
-        continue;
-      }
-
-      // draw hole line --------------------------------------------------
-      offScreenCtx.setLineDash([5, 5]);
-      offScreenCtx.lineWidth = objOpts.hole.line_width;
-      offScreenCtx.strokeStyle = objOpts.hole.line_colour;
-
-      offScreenCtx.beginPath();
-      offScreenCtx.moveTo(
-        (hole_x0 + shift_x + objOpts.hole.width / 2) * xMag + pad_x,
-        (hole_top + shift_y) * yMag + pad_y
-      ); //start point
-      offScreenCtx.lineTo(
-        (hole_x0 + shift_x + objOpts.hole.width / 2) * xMag + pad_x,
-        (hole_bottom + shift_y) * yMag + pad_y
-      ); //end point
-      offScreenCtx.stroke();
-
-      //add  hole name---------------------------------------------------
-      offScreenCtx.fillStyle = objOpts.hole.font_colour;
-      offScreenCtx.font =
-        objOpts.hole.font_size.toString() + "px " + objOpts.hole.font;
-      offScreenCtx.fillText(
-        hole.name,
-        (hole_x0 + shift_x + objOpts.hole.width * 0.3) * xMag + pad_x,
-        (hole_top + shift_y) * yMag + pad_y - 20
-      );
-
-      //get plot order for hit test--------------------------------------
-      let section_plot_order = [];
-      for (let i = 0; i < hole.sections.length; i++) {
-        section_plot_order.push(i);
-      }
-
-      /*
-      if (hit_object_idx !== null) {
-        if (h == hit_object_idx[0]) {
-          //extract hit object
-          const hitObj = section_plot_order.slice(hit_object_idx[1], 1)[0];
-
-          //insert last order
-          section_plot_order.push(hitObj);
+        //check enable
+        if (!hole.enable) {
+          //case not plot, count
+          num_disable.hole += 1;
+          continue;
         }
-      }
-      */
 
-      for (let s_o = 0; s_o < hole.sections.length; s_o++) {
-        const s = section_plot_order[s_o];
-
-        //make section objects===================================================================================
-        //load section data
-        const section = hole.sections[s];
-
-        //calc position----------------------------------------------------
-        let section_top = section.markers[0][objOpts.canvas.depth_scale];
-        let section_bottom =
-          section.markers.slice(-1)[0][objOpts.canvas.depth_scale];
-        let section_mid = (section_top + section_bottom) / 2;
+        //calc position excluding diable holes------------------------------
+        let hole_top = hole.sections[0].markers[0][objOpts.canvas.depth_scale];
+        let hole_bottom = hole.sections.slice(-1)[0].markers.slice(-1)[0][
+          objOpts.canvas.depth_scale
+        ];
+        let hole_x0 =
+          (objOpts.hole.distance + objOpts.hole.width) *
+          (num_disable.total + hole.order - num_disable.hole);
 
         //check position
-        if (section_top == null || section_bottom == null) {
-          console.log(
-            h +
-              " th hole, " +
-              s +
-              " th section has any problem in the position."
-          );
-          continue;
-        }
+        if (hole_top !== null && hole_bottom !== null && hole_x0 !== null) {
+          //if bottom core has depth, draw hole line
+          // draw hole line --------------------------------------------------
+          offScreenCtx.setLineDash([5, 5]);
+          offScreenCtx.lineWidth = objOpts.hole.line_width;
+          offScreenCtx.strokeStyle = objOpts.hole.line_colour;
 
-        //calc position
-        const sec_x0 = (hole_x0 + shift_x) * xMag + pad_x;
-        const sec_y0 = (section_top + shift_y) * yMag + pad_y;
-        const sec_w = objOpts.section.width * xMag;
-        const sec_h = (section_bottom - section_top) * yMag;
-
-        //draw section-----------------------------------------------------
-        offScreenCtx.setLineDash([]);
-        offScreenCtx.lineWidth = objOpts.section.line_width;
-        offScreenCtx.strokeStyle = objOpts.section.line_colour;
-        offScreenCtx.fillStyle = objOpts.section.face_colour;
-        offScreenCtx.beginPath();
-        filledRoundSection(offScreenCtx, sec_x0, sec_y0, sec_w, sec_h, 10);
-        roundSection(offScreenCtx, sec_x0, sec_y0, sec_w, sec_h, 10);
-
-        //check zoom level for ignoring plot markers
-        if (objOpts.canvas.zoom_level[1] < objOpts.marker.ignore_zoom_level) {
-          continue;
-        }
-
-        //add section name-------------------------------------------------
-        offScreenCtx.fillStyle = objOpts.section.font;
-        offScreenCtx.font = objOpts.section.font_colour;
-        offScreenCtx.beginPath();
-        rotateText(
-          offScreenCtx,
-          hole.name + "-" + section.name,
-          -90,
-          [
-            (hole_x0 + shift_x) * xMag + pad_x - 10,
-            (section_mid + shift_y) * yMag + pad_y,
-          ],
-          objOpts
-        );
-
-        for (let m = 0; m < section.markers.length; m++) {
-          //make marker objects=================================================================================
-          //load marker data
-          const marker = section.markers[m];
-          let markerLineColour = objOpts.marker.line_colour;
-
-          //calc marker position
-          let marker_top = marker[objOpts.canvas.depth_scale];
-
-          //check position
-          if (marker_top == null) {
-            console.log(
-              h +
-                " th hole, " +
-                s +
-                " th section, " +
-                m +
-                " th marker position has any problem."
-            );
-          }
-
-          //first, draw event
-          for (let e = 0; e < marker.event.length; e++) {
-            //make marker objects=================================================================================
-            //get position
-            const event = marker.event[e];
-
-            const [lowerDepth, eventThickness] = getEventPosiotion(
-              LCCore,
-              event,
-              marker_top,
-              objOpts
-            );
-
-            //draw event layers
-            if (lowerDepth !== null) {
-              offScreenCtx.setLineDash([]);
-              offScreenCtx.fillStyle = objOpts.event.face_colour[event[3]];
-              markerLineColour = objOpts.event.face_colour[event[3]];
-              offScreenCtx.beginPath();
-              const ex0 = (hole_x0 + shift_x) * xMag + pad_x + 3;
-              const ey0 = (lowerDepth + shift_y) * yMag + pad_y;
-              const ew = objOpts.section.width * xMag - 6;
-              const eh = eventThickness * yMag;
-              offScreenCtx.fillRect(ex0, ey0, ew, eh);
-              offScreenCtx.stroke();
-            }
-          }
-
-          //make marker objects=================================================================================
-          // draw markers
-          offScreenCtx.setLineDash([]);
-          offScreenCtx.lineWidth = objOpts.marker.line_width;
-          offScreenCtx.strokeStyle = objOpts.marker.line_colour; //markerLineColour;
-
-          let topBot = 0;
-          if (m == 0 || m == section.markers.length - 1) {
-            topBot -= objOpts.marker.width * xMag; //or +20
-          }
           offScreenCtx.beginPath();
           offScreenCtx.moveTo(
-            (hole_x0 + shift_x) * xMag + pad_x,
-            (marker_top + shift_y) * yMag + pad_y
+            (hole_x0 + shift_x + objOpts.hole.width / 2) * xMag + pad_x,
+            (hole_top + shift_y) * yMag + pad_y
           ); //start point
           offScreenCtx.lineTo(
-            (hole_x0 + shift_x) * xMag +
-              pad_x +
-              objOpts.marker.width * xMag +
-              topBot,
-            (marker_top + shift_y) * yMag + pad_y
+            (hole_x0 + shift_x + objOpts.hole.width / 2) * xMag + pad_x,
+            (hole_bottom + shift_y) * yMag + pad_y
           ); //end point
           offScreenCtx.stroke();
+        }
 
-          //add rank marker-------------------------------------------
-          offScreenCtx.beginPath();
-          offScreenCtx.arc(
-            (hole_x0 + shift_x) * xMag + pad_x,
-            (marker_top + shift_y) * yMag + pad_y,
-            4,
-            0,
-            2 * Math.PI,
-            false
-          );
-          if (marker.connection_rank == null) {
-            offScreenCtx.fillStyle = "black";
-          } else {
-            offScreenCtx.fillStyle =
-              objOpts.marker.rank_colours[marker.connection_rank];
+        //add  hole name---------------------------------------------------
+        offScreenCtx.fillStyle = objOpts.hole.font_colour;
+        offScreenCtx.font =
+          objOpts.hole.font_size.toString() + "px " + objOpts.hole.font;
+        offScreenCtx.fillText(
+          hole.name,
+          (hole_x0 + shift_x + objOpts.hole.width * 0.3) * xMag + pad_x,
+          (hole_top + shift_y) * yMag + pad_y - 20
+        );
+
+        //get plot order for hit test--------------------------------------
+        let section_plot_order = [];
+        for (let i = 0; i < hole.sections.length; i++) {
+          section_plot_order.push(i);
+        }
+
+        /*
+        if (hit_object_idx !== null) {
+          if (h == hit_object_idx[0]) {
+            //extract hit object
+            const hitObj = section_plot_order.slice(hit_object_idx[1], 1)[0];
+  
+            //insert last order
+            section_plot_order.push(hitObj);
           }
-          offScreenCtx.fill();
+        }
+        */
 
-          //add marker name--------------------------------------------
-          //add marker name without top/bottom name
-          if (m !== 0 && m !== section.markers.length - 1) {
+        for (let s_o = 0; s_o < hole.sections.length; s_o++) {
+          const s = section_plot_order[s_o];
+
+          //make section objects===================================================================================
+          //load section data
+          const section = hole.sections[s];
+
+          //calc position----------------------------------------------------
+          let section_top = section.markers[0][objOpts.canvas.depth_scale];
+          let section_bottom =
+            section.markers.slice(-1)[0][objOpts.canvas.depth_scale];
+          let section_mid = (section_top + section_bottom) / 2;
+
+          //check position
+          if (section_top == null || section_bottom == null) {
+            //console.log( h + " th hole, " +   s +  " th section has any problem in the position."  );
+            continue;
+          }
+
+          //calc position
+          const sec_x0 = (hole_x0 + shift_x) * xMag + pad_x;
+          const sec_y0 = (section_top + shift_y) * yMag + pad_y;
+          const sec_w = objOpts.section.width * xMag;
+          const sec_h = (section_bottom - section_top) * yMag;
+
+          //draw section-----------------------------------------------------
+          offScreenCtx.setLineDash([]);
+          offScreenCtx.lineWidth = objOpts.section.line_width;
+          offScreenCtx.strokeStyle = objOpts.section.line_colour;
+          offScreenCtx.fillStyle = objOpts.section.face_colour;
+          offScreenCtx.beginPath();
+          filledRoundSection(offScreenCtx, sec_x0, sec_y0, sec_w, sec_h, 10);
+          roundSection(offScreenCtx, sec_x0, sec_y0, sec_w, sec_h, 10);
+
+          //check zoom level for ignoring plot markers
+          if (objOpts.canvas.zoom_level[1] < objOpts.marker.ignore_zoom_level) {
+            continue;
+          }
+
+          //add section name-------------------------------------------------
+          offScreenCtx.fillStyle = objOpts.section.font;
+          offScreenCtx.font = objOpts.section.font_colour;
+          offScreenCtx.beginPath();
+          rotateText(
+            offScreenCtx,
+            hole.name + "-" + section.name,
+            -90,
+            [
+              (hole_x0 + shift_x) * xMag + pad_x - 10,
+              (section_mid + shift_y) * yMag + pad_y,
+            ],
+            objOpts
+          );
+
+          for (let m = 0; m < section.markers.length; m++) {
+            //make marker objects=================================================================================
+            //load marker data
+            const marker = section.markers[m];
+            let markerLineColour = objOpts.marker.line_colour;
+
+            //calc marker position
+            let marker_top = marker[objOpts.canvas.depth_scale];
+
+            //check position
+            if (marker_top == null) {
+              //console.log( hole.name + "-" +  section.name +  "-" +  marker.distance +  "cm" +  " marker position has any problem."   );
+            }
+
+            //first, draw event
+            for (let e = 0; e < marker.event.length; e++) {
+              //make marker objects=================================================================================
+              //get position
+              const event = marker.event[e];
+
+              const [lowerDepth, eventThickness] = getEventPosiotion(
+                LCCore,
+                event,
+                marker_top,
+                objOpts
+              );
+
+              //draw event layers
+              if (lowerDepth !== null) {
+                offScreenCtx.setLineDash([]);
+                offScreenCtx.fillStyle = objOpts.event.face_colour[event[3]];
+                markerLineColour = objOpts.event.face_colour[event[3]];
+                offScreenCtx.beginPath();
+                const ex0 = (hole_x0 + shift_x) * xMag + pad_x + 3;
+                const ey0 = (lowerDepth + shift_y) * yMag + pad_y;
+                const ew = objOpts.section.width * xMag - 6;
+                const eh = eventThickness * yMag;
+                offScreenCtx.fillRect(ex0, ey0, ew, eh);
+                offScreenCtx.stroke();
+              }
+            }
+
+            //make marker objects=================================================================================
+            // draw markers
+            offScreenCtx.setLineDash([]);
+            offScreenCtx.lineWidth = objOpts.marker.line_width;
+            offScreenCtx.strokeStyle = objOpts.marker.line_colour; //markerLineColour;
+
+            let topBot = 0;
+            if (m == 0 || m == section.markers.length - 1) {
+              topBot -= objOpts.marker.width * xMag; //or +20
+            }
+            offScreenCtx.beginPath();
+            offScreenCtx.moveTo(
+              (hole_x0 + shift_x) * xMag + pad_x,
+              (marker_top + shift_y) * yMag + pad_y
+            ); //start point
+            offScreenCtx.lineTo(
+              (hole_x0 + shift_x) * xMag +
+                pad_x +
+                objOpts.marker.width * xMag +
+                topBot,
+              (marker_top + shift_y) * yMag + pad_y
+            ); //end point
+            offScreenCtx.stroke();
+
+            //add rank marker-------------------------------------------
+            if (objOpts.marker.is_rank) {
+              offScreenCtx.fillStyle = "black";
+              offScreenCtx.font = "15px Arial";
+              offScreenCtx.fillText(
+                marker.connection_rank,
+                (hole_x0 + shift_x) * xMag + pad_x - 23,
+                (marker_top + shift_y) * yMag + pad_y + 5
+              );
+
+              offScreenCtx.beginPath();
+              offScreenCtx.arc(
+                (hole_x0 + shift_x) * xMag + pad_x,
+                (marker_top + shift_y) * yMag + pad_y,
+                4,
+                0,
+                2 * Math.PI,
+                false
+              );
+              if (marker.connection_rank == null) {
+                offScreenCtx.fillStyle = "black";
+              } else if (marker.connection_rank > 4) {
+                offScreenCtx.fillStyle = "brown";
+              } else {
+                offScreenCtx.fillStyle =
+                  objOpts.marker.rank_colours[marker.connection_rank];
+              }
+              offScreenCtx.fill();
+            }
+
+            //add master section-----------------------------------------
+            if (marker.isMaster) {
+              if (section.markers[m + 1] !== undefined) {
+                if (section.markers[m + 1].isMaster) {
+                  offScreenCtx.setLineDash([]);
+                  offScreenCtx.lineWidth = 4;
+                  offScreenCtx.strokeStyle = "blue"; //markerLineColour;
+                  const next_marker_top =
+                    section.markers[m + 1][objOpts.canvas.depth_scale];
+
+                  offScreenCtx.beginPath();
+                  offScreenCtx.moveTo(
+                    (hole_x0 + shift_x) * xMag + pad_x,
+                    (marker_top + shift_y) * yMag + pad_y
+                  ); //start point
+                  offScreenCtx.lineTo(
+                    (hole_x0 + shift_x) * xMag + pad_x,
+                    (next_marker_top + shift_y) * yMag + pad_y
+                  ); //end point
+                  offScreenCtx.stroke();
+                }
+              }
+            }
+
+            //-----------------------------------------------------------
+
+            //add marker name--------------------------------------------
+            //add marker name without top/bottom name
+            if (m !== 0 && m !== section.markers.length - 1) {
+              offScreenCtx.fillStyle = objOpts.marker.font_colour;
+              offScreenCtx.font =
+                objOpts.marker.font_size.toString() +
+                "px " +
+                objOpts.marker.font;
+              offScreenCtx.beginPath();
+              offScreenCtx.fillText(
+                marker.name,
+                (hole_x0 + shift_x) * xMag + pad_x + 10,
+                (marker_top + shift_y) * yMag + pad_y - 2
+              );
+            }
+
+            //add marker distance----------------------------------------
             offScreenCtx.fillStyle = objOpts.marker.font_colour;
             offScreenCtx.font =
               objOpts.marker.font_size.toString() + "px " + objOpts.marker.font;
             offScreenCtx.beginPath();
             offScreenCtx.fillText(
-              marker.name,
-              (hole_x0 + shift_x) * xMag + pad_x + 10,
+              (Math.round(marker.distance * 10) / 10).toFixed(1).toString(),
+              (hole_x0 + shift_x) * xMag +
+                pad_x +
+                objOpts.marker.width * xMag +
+                5,
               (marker_top + shift_y) * yMag + pad_y - 2
             );
+            //make connection objects=================================================================================
+            //add connection
+            const connectionData = this.getNearestConnectedMarkerIdx(
+              LCCore,
+              marker.id
+            );
+
+            //check connection
+            if (connectionData == null) {
+              //there is no connection
+              continue;
+            }
+
+            //get connectied hole position
+            //
+            const idxTo = connectionData.connected_idx;
+
+            /*
+            console.log(connectionData);
+            console.log(
+              hole.name +
+                "-" +
+                section.name +
+                "-" +
+                marker.name +
+                " --> " +
+                LCCore.projects[idxTo[0]].holes[idxTo[1]].name +
+                "-" +
+                LCCore.projects[idxTo[0]].holes[idxTo[1]].sections[idxTo[2]]
+                  .name +
+                "-" +
+                LCCore.projects[idxTo[0]].holes[idxTo[1]].sections[idxTo[2]]
+                  .markers[idxTo[3]].name
+            );
+            */
+
+            const connectedHole_x0 =
+              (objOpts.hole.distance + objOpts.hole.width) *
+              (1 * LCCore.projects[idxTo[0]].order +
+                connectionData.num_total -
+                connectionData.num_total_disable); //LCCore.projects[idxTo[0]].holes[idxTo[1]].order
+
+            const connectedMarker_top =
+              LCCore.projects[idxTo[0]].holes[idxTo[1]].sections[idxTo[2]]
+                .markers[idxTo[3]][objOpts.canvas.depth_scale];
+
+            if (connectedMarker_top == null) {
+              //console.log("Connected marker position is null.");
+              continue;
+            }
+            //get connector position
+            const cn_x0 =
+              (hole_x0 + shift_x + objOpts.marker.width) * xMag + pad_x;
+            const cn_y0 = (marker_top + shift_y) * yMag + pad_y;
+            const cn_x1 = cn_x0 + objOpts.connection.indexWidth;
+            const cn_y1 = cn_y0;
+            const cn_x3 = (connectedHole_x0 + shift_x) * xMag + pad_x;
+            const cn_y3 = (connectedMarker_top + shift_y) * yMag + pad_y;
+            const cn_x2 = cn_x3 - objOpts.connection.indexWidth;
+            const cn_y2 = cn_y3;
+
+            //get style
+            offScreenCtx.setLineDash([]);
+            offScreenCtx.lineWidth = objOpts.connection.line_width;
+            offScreenCtx.strokeStyle = objOpts.connection.line_colour;
+            if (cn_y0 !== cn_y3) {
+              if (objOpts.canvas.depth_scale !== "drilling_depth") {
+                //not horizontal
+                offScreenCtx.strokeStyle = "red";
+              }
+            }
+            if (!connectionData.isNext) {
+              //connected core is not located at the next
+              offScreenCtx.setLineDash([3, 3]);
+            }
+
+            if (connectionData.is_master_connection > 1) {
+              //if connection of master section
+              offScreenCtx.strokeStyle = "blue";
+            }
+
+            //draw connection---------------------------------------------
+            offScreenCtx.beginPath();
+            offScreenCtx.moveTo(cn_x0, cn_y0); //start point
+            offScreenCtx.lineTo(cn_x1, cn_y1); //index left
+            offScreenCtx.lineTo(cn_x2, cn_y2); //index right
+            offScreenCtx.lineTo(cn_x3, cn_y3); //index left
+            offScreenCtx.stroke();
+            //=====================================================================================================
           }
-
-          //add marker distance----------------------------------------
-          offScreenCtx.fillStyle = objOpts.marker.font_colour;
-          offScreenCtx.font =
-            objOpts.marker.font_size.toString() + "px " + objOpts.marker.font;
-          offScreenCtx.beginPath();
-          offScreenCtx.fillText(
-            (Math.round(marker.distance * 10) / 10).toFixed(1).toString(),
-            (hole_x0 + shift_x) * xMag +
-              pad_x +
-              objOpts.marker.width * xMag +
-              5,
-            (marker_top + shift_y) * yMag + pad_y - 2
-          );
-          //make connection objects=================================================================================
-          //add connection
-          const [idxTo, isNext, numDisable] = this.getNearestConnectedMarkerIdx(
-            LCCore,
-            marker.id
-          );
-
-          //check connection
-          if (idxTo == null) {
-            //there is no connection
-            continue;
-          }
-
-          //get connectied hole position
-          const connectedHole_x0 =
-            (objOpts.hole.distance + objOpts.hole.width) *
-            (LCCore.holes[idxTo[1]].order - num_disable.hole - numDisable);
-          const connectedMarker_top =
-            LCCore.holes[idxTo[1]].sections[idxTo[2]].markers[idxTo[3]][
-              objOpts.canvas.depth_scale
-            ];
-
-          //get connector position
-          const cn_x0 =
-            (hole_x0 + shift_x + objOpts.marker.width) * xMag + pad_x;
-          const cn_y0 = (marker_top + shift_y) * yMag + pad_y;
-          const cn_x1 = cn_x0 + objOpts.connection.indexWidth;
-          const cn_y1 = cn_y0;
-          const cn_x3 = (connectedHole_x0 + shift_x) * xMag + pad_x;
-          const cn_y3 = (connectedMarker_top + shift_y) * yMag + pad_y;
-          const cn_x2 = cn_x3 - objOpts.connection.indexWidth;
-          const cn_y2 = cn_y3;
-
-          //get style
-          offScreenCtx.setLineDash([]);
-          offScreenCtx.lineWidth = objOpts.connection.line_width;
-          offScreenCtx.strokeStyle = objOpts.connection.line_colour;
-          if (cn_y0 !== cn_y3) {
-            //not horizontal
-            //offScreenCtx.strokeStyle = "red";
-          }
-          if (!isNext) {
-            //connected core is not located at the next
-            offScreenCtx.setLineDash([3, 3]);
-          }
-
-          if (
-            marker.isMaster &&
-            LCCore.holes[idxTo[1]].sections[idxTo[2]].markers[idxTo[3]].isMaster
-          ) {
-            //if connection of master section
-            offScreenCtx.strokeStyle = "blue";
-          }
-
-          //draw connection---------------------------------------------
-          offScreenCtx.beginPath();
-          offScreenCtx.moveTo(cn_x0, cn_y0); //start point
-          offScreenCtx.lineTo(cn_x1, cn_y1); //index left
-          offScreenCtx.lineTo(cn_x2, cn_y2); //index right
-          offScreenCtx.lineTo(cn_x3, cn_y3); //index left
-          offScreenCtx.stroke();
-          //=====================================================================================================
         }
       }
+      num_disable.total += project.holes.length + 1;
     }
+
     //==========================================================================================
     //draw age points
     if (LCplot == null || LCplot.age_collections.length == 0) {
@@ -1987,9 +2188,9 @@ document.addEventListener("DOMContentLoaded", () => {
       LCplot.age_collections[age_plot_idx].datasets[0].data_series;
 
     //plot
-
     for (let a = 0; a < ageSeries.length; a++) {
       num_disable = {
+        total: 0,
         hole: 0,
       };
       let posX;
@@ -2000,19 +2201,22 @@ document.addEventListener("DOMContentLoaded", () => {
         let hole = null;
         let isSkip = false;
 
-        for (let i = 0; i < LCCore.holes.length; i++) {
-          const hole_temp = LCCore.holes[i];
-          if (hole_temp.name == ageSeries[a].trinity.hole_name) {
-            if (hole_temp.enable == false) {
-              isSkip = true;
-            }
-            hole = hole_temp;
-            break;
-          } else {
-            if (hole_temp.enable == false) {
-              num_disable.hole += 1;
+        breakMarker: for (let p = 0; p < LCCore.projects.length; p++) {
+          for (let h = 0; h < LCCore.projects[p].holes.length; h++) {
+            const hole_temp = LCCore.projects[p].holes[h];
+            if (hole_temp.name == ageSeries[a].trinity.hole_name) {
+              if (hole_temp.enable == false) {
+                isSkip = true;
+              }
+              hole = hole_temp;
+              break breakMarker;
+            } else {
+              if (hole_temp.enable == false) {
+                num_disable.hole += 1;
+              }
             }
           }
+          num_disable.total += LCCore.projects[p].holes.length + 1;
         }
 
         if (isSkip || hole == null) {
@@ -2023,18 +2227,18 @@ document.addEventListener("DOMContentLoaded", () => {
         //calc position
         posX =
           ((objOpts.hole.distance + objOpts.hole.width) *
-            (hole.order - num_disable.hole) +
+            (num_disable.total + hole.order - num_disable.hole) +
             shift_x) *
             xMag +
           pad_x +
           objOpts.hole.width * xMag -
           objOpts.age.incon_size * 1.2;
+
         posY =
           (ageSeries[a][objOpts.canvas.depth_scale] + shift_y) * yMag +
           pad_y -
           objOpts.age.incon_size / 2;
 
-        //console.log(posX + "/" + posY);
         //------------------------------------------------
       } else {
         //plot 0
@@ -2439,32 +2643,50 @@ document.addEventListener("DOMContentLoaded", () => {
     correlation_model_list.push(results); //{id,name,path}
 
     console.log("Correlation model is registered.");
-    console.log(results);
+    //console.log(results);
   }
 
-  async function loadModel(model_id) {
-    model_id = 1;
+  async function loadModel() {
     //load model into LCCore
     //now, LC is able to hold one project file, model_id is dummy
-    LCCore = await window.LCapi.LoadModelFromLCCore(model_id);
+    LCCore = await window.LCapi.LoadModelFromLCCore();
 
     if (LCCore) {
       //add hole list
-      LCCore.holes.forEach((hole) => {
+      LCCore.projects.forEach((project, p) => {
         const container = document.getElementById("hole_list");
-        const checkboxDiv = document.createElement("div");
-        const checkbox = document.createElement("input");
-        checkbox.type = "checkbox";
-        checkbox.id = hole.id.toString();
-        checkbox.name = hole.name;
-        checkbox.checked = true;
-        const label = document.createElement("label");
-        label.htmlFor = hole.id.toString();
-        label.textContent = hole.name;
+        const projItemDiv = document.createElement("div");
+        const projListCheck = document.createElement("input");
+        projListCheck.type = "checkbox";
+        projListCheck.id = project.id;
+        projListCheck.checked = true;
+        const projListlabel = document.createElement("label");
+        projListlabel.htmlFor = projListCheck.id;
+        projListlabel.textContent = project.name;
+        projItemDiv.style.paddingLeft = "0px";
 
-        checkboxDiv.appendChild(checkbox);
-        checkboxDiv.appendChild(label);
-        container.appendChild(checkboxDiv);
+        projItemDiv.appendChild(projListCheck);
+        projItemDiv.appendChild(projListlabel);
+
+        project.holes.forEach((hole) => {
+          const checkboxDiv = document.createElement("div");
+          const checkbox = document.createElement("input");
+          checkbox.type = "checkbox";
+          checkbox.id = hole.id.toString();
+          checkbox.name = hole.name;
+          checkbox.checked = true;
+          const label = document.createElement("label");
+          label.htmlFor = hole.id.toString();
+          label.textContent = hole.name;
+          checkboxDiv.style.paddingLeft = "20px";
+
+          checkboxDiv.appendChild(checkbox);
+          checkboxDiv.appendChild(label);
+
+          projItemDiv.appendChild(checkboxDiv);
+        });
+
+        container.appendChild(projItemDiv);
       });
 
       //calc composite depth
@@ -2474,14 +2696,14 @@ document.addEventListener("DOMContentLoaded", () => {
       LCCore = await window.LCapi.CalcEventFreeDepth();
 
       //sort
-      sortHoleByRank(LCCore);
+      sortHoleByOrder(LCCore);
 
       //shwo model summary
-      //console.log(LCCore);
+      console.log(LCCore);
       console.log("Correlation model Loaded.");
       console.log({ ID: LCCore.id, Name: LCCore.name });
 
-      updateView();
+      //updateView();
     }
   }
 
@@ -2492,7 +2714,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     //load age model
     const results = await window.LCapi.RegisterAgeFromCsv(in_path);
-    console.log(results);
+    //console.log(results);
 
     if (results) {
       //add list
@@ -2505,7 +2727,7 @@ document.addEventListener("DOMContentLoaded", () => {
       document.getElementById("AgeModelSelect").appendChild(newOption);
 
       console.log("Age model is registered.");
-      console.log(results);
+      //console.log(results);
     }
   }
 
@@ -2708,37 +2930,95 @@ function fitScaler(zoom_level, mag) {
   return step;
 }
 function getNearestConnectedMarkerIdx(LCCore, idFrom) {
-  //get first step data
+  //temp function
+  const getListIdx = (list, p, h) => {
+    let output = null;
+    list.forEach((hl) => {
+      if (hl[3] == p && hl[4] == h) {
+        output = hl[0];
+      }
+    });
+    return output;
+  };
+  //list of holes
+  let holeList = [];
+  for (let p = 0; p < LCCore.projects.length; p++) {
+    for (let h = 0; h < LCCore.projects[p].holes.length; h++) {
+      holeList.push([
+        null, //0
+        LCCore.projects[p].order, //1
+        LCCore.projects[p].holes[h].order, //2
+        p, //3
+        h, //4
+        LCCore.projects[p].enable, //5
+        LCCore.projects[p].holes[h].enable, //6
+      ]);
+    }
+  }
+
+  //sort by oreder
+  holeList.sort((a, b) => (a[2] < b[2] ? -1 : 1));
+  holeList.sort((a, b) => (a[1] < b[1] ? -1 : 1));
+
+  holeList.forEach((h, i) => {
+    h[0] = i;
+  });
+
+  //get start marker data
   const idxFrom = this.getIdxById(LCCore, idFrom);
+  const listFrom = getListIdx(holeList, idxFrom[0], idxFrom[1]);
+  const currentTotalOrder = holeList[listFrom][0];
   const currentMarkerData =
-    LCCore.holes[idxFrom[1]].sections[idxFrom[2]].markers[idxFrom[3]];
-  const currentHoleData = LCCore.holes[idxFrom[1]];
+    LCCore.projects[idxFrom[0]].holes[idxFrom[1]].sections[idxFrom[2]].markers[
+      idxFrom[3]
+    ];
+  const currentHoleData = LCCore.projects[idxFrom[0]].holes[idxFrom[1]];
+  const currentProjectData = LCCore.projects[idxFrom[0]];
 
   //check first data
+  let isMasterConnection = 0;
   if (
     currentMarkerData.h_connection == null ||
     currentMarkerData.h_connection.length == 0
   ) {
-    return [null, null, null];
+    //case there is no connection
+    return null;
+  } else {
+    currentMarkerData.h_connection.forEach((c) => {
+      const idx = this.getIdxById(LCCore, c);
+      if (
+        LCCore.projects[idx[0]].holes[idx[1]].sections[idx[2]].markers[idx[3]]
+          .isMaster
+      ) {
+        isMasterConnection += 1;
+      }
+    });
   }
 
   //get first connection data
   let connectedMarkerData = null;
   let connectedHoleData = null;
+  let connectedProjectData = null;
 
-  //check and replace---------------------------------------------------------------------------
+  //check and replace connection---------------------------------------------------------------------------
+
   //get first data beacause some case include only single connection
   let idTo = currentMarkerData.h_connection[0];
   let idxTo = this.getIdxById(LCCore, idTo);
+  let listTo = getListIdx(holeList, idxTo[0], idxTo[1]);
+  let connectedTotalOrder = holeList[listTo][0];
 
   //if next marker order is large and enable, get
   if (
-    LCCore.holes[idxTo[1]].order > currentHoleData.order &&
-    LCCore.holes[idxTo[1]].enable
+    connectedTotalOrder > currentTotalOrder &&
+    LCCore.projects[idxTo[0]].holes[idxTo[1]].enable
   ) {
     connectedMarkerData =
-      LCCore.holes[idxTo[1]].sections[idxTo[2]].markers[idxTo[3]];
-    connectedHoleData = LCCore.holes[idxTo[1]];
+      LCCore.projects[idxTo[0]].holes[idxTo[1]].sections[idxTo[2]].markers[
+        idxTo[3]
+      ];
+    connectedHoleData = LCCore.projects[idxTo[0]].holes[idxTo[1]];
+    connectedProjectData = LCCore.projects[idxTo[0]];
   } else {
     //case lost connected marker and remains only connection (unsuspected error)
   }
@@ -2749,104 +3029,145 @@ function getNearestConnectedMarkerIdx(LCCore, idFrom) {
       //get 2nd or later index
       idTo = currentMarkerData.h_connection[i];
       idxTo = this.getIdxById(LCCore, idTo);
+      let listTo = getListIdx(holeList, idxTo[0], idxTo[1]);
 
       //new connection available
       if (connectedHoleData !== null) {
         if (
-          LCCore.holes[idxTo[1]].order - currentHoleData.order > 0 &&
-          LCCore.holes[idxTo[1]].order < connectedHoleData.order &&
-          LCCore.holes[idxTo[1]].enable
+          holeList[listTo][0] > currentTotalOrder &&
+          holeList[listTo][0] < connectedTotalOrder &&
+          LCCore.projects[idxTo[0]].holes[idxTo[1]].enable
         ) {
           //if connected hole has large order, enable but the order smaller (nearer place in canvas) than stocked one.
           connectedMarkerData =
-            LCCore.holes[idxTo[1]].sections[idxTo[2]].markers[idxTo[3]];
-          connectedHoleData = LCCore.holes[idxTo[1]];
+            LCCore.projects[idxTo[0]].holes[idxTo[1]].sections[idxTo[2]]
+              .markers[idxTo[3]];
+          connectedHoleData = LCCore.projects[idxTo[0]].holes[idxTo[1]];
+          connectedProjectData = LCCore.projects[idxTo[0]];
+          connectedTotalOrder = holeList[listTo][0];
         }
       } else {
         //previously checked connection is died (unsuspected error)
         if (
-          LCCore.holes[idxTo[1]].order > currentHoleData.order &&
-          LCCore.holes[idxTo[1]].enable
+          holeList[listTo][0] > currentTotalOrder &&
+          LCCore.projects[idxTo[0]].holes[idxTo[1]].enable
         ) {
           connectedMarkerData =
-            LCCore.holes[idxTo[1]].sections[idxTo[2]].markers[idxTo[3]];
-          connectedHoleData = LCCore.holes[idxTo[1]];
+            LCCore.projects[idxTo[0]].holes[idxTo[1]].sections[idxTo[2]]
+              .markers[idxTo[3]];
+          connectedHoleData = LCCore.projects[idxTo[0]].holes[idxTo[1]];
+          connectedProjectData = LCCore.projects[idxTo[0]];
+          connectedTotalOrder = holeList[listTo][0];
         }
       }
     }
   }
 
   //count num disable holes between connection for plot x position------------------------------
-  let numDisable = 0;
-  if (connectedHoleData !== null) {
-    //get all disable list of holes
-    let disableList = [];
-    for (let i = 0; i < LCCore.holes.length; i++) {
-      disableList.push([LCCore.holes[i].order, LCCore.holes[i].enable]);
-    }
+  if (connectedHoleData == null) {
+    return null;
+  }
 
-    //sort by oreder
-    disableList.sort((a, b) => (a[0] < b[0] ? -1 : 1));
-
-    //count enable holes between current and connected holes
-    for (let i = currentHoleData.order + 1; i < connectedHoleData.order; i++) {
-      if (disableList[i][1] == false) {
-        numDisable += 1;
+  //get index between current and connected
+  let betweenRange = [];
+  holeList.forEach((btl, b) => {
+    if (btl[1] == currentProjectData.order) {
+      if (btl[2] == currentHoleData.order) {
+        betweenRange[0] = b;
       }
     }
+    if (btl[1] == connectedProjectData.order) {
+      if (btl[2] == connectedHoleData.order) {
+        betweenRange[1] = b;
+      }
+    }
+  });
+
+  //count enable holes between current and connected holes
+  const numBetween = betweenRange[1] - betweenRange[0];
+  const numTotal = betweenRange[1] - 0;
+  let numProject = 0;
+  let numBetweenDisable = 0;
+  let numTotalDisable = 0;
+  for (let i = 0; i < betweenRange[1]; i++) {
+    if (holeList[i][6] == false) {
+      numTotalDisable += 1;
+    }
   }
+
+  let projList = new Set();
+  for (let b = betweenRange[0]; b < betweenRange[1] + 1; b++) {
+    if (!projList.has(holeList[b][1])) {
+      projList.add(holeList[b][1]);
+      numProject += 1;
+    }
+    if (!holeList[b][6]) {
+      numBetweenDisable += 1;
+    }
+  }
+
+  //console.log(    "total: " + numTotal + "|proj: " + numProject + "|diable: " + numDisable  );
 
   //check and output---------------------------------------------------------------------------
   if (connectedMarkerData == null) {
     //if all connected markers are died(unsuspected error)
-    return [null, null, null];
+    return null;
   } else {
     //check is ringht next for plot style
     let isNext = false;
     const idxTo = this.getIdxById(LCCore, connectedMarkerData.id);
-    if (
-      Math.abs(
-        LCCore.holes[idxTo[1]].order -
-          LCCore.holes[idxFrom[1]].order -
-          numDisable
-      ) == 1
-    ) {
+    if (betweenRange[1] - betweenRange[0] - numBetweenDisable == 1) {
       isNext = true;
     }
-    return [idxTo, isNext, numDisable];
+
+    const output = {
+      num_total: numTotal,
+      num_projects: numProject,
+      num_total_disable: numTotalDisable,
+      num_between: numBetween,
+      num_between_disable: numBetweenDisable,
+      connected_id: connectedMarkerData.id,
+      connected_idx: idxTo,
+      isNext: isNext,
+      is_master_connection: isMasterConnection,
+    };
+
+    return output;
   }
 }
 function getIdxById(LCCore, id) {
-  const num_id = id.length;
-  if (num_id < 2) {
-    return;
-  }
-  let relative_idxs = [1];
+  let relative_idxs = [null, null, null];
 
-  if (num_id >= 2) {
-    const num_holes = LCCore.holes.length;
-    for (let h = 0; h < num_holes; h++) {
-      const holeData = LCCore.holes[h];
-      if (holeData.id[1] == id[1]) {
-        relative_idxs.push(h);
+  if (id[0] !== null || id[0] !== "") {
+    for (let p = 0; p < LCCore.projects.length; p++) {
+      const projectData = LCCore.projects[p];
+      if (projectData.id[0] == id[0]) {
+        relative_idxs[0] = p;
+        if (id[1] !== null || id[1] !== "") {
+          const num_holes = projectData.holes.length;
+          for (let h = 0; h < num_holes; h++) {
+            const holeData = projectData.holes[h];
+            if (holeData.id[1] == id[1]) {
+              relative_idxs[1] = h;
 
-        if (num_id >= 3) {
-          const num_sections = holeData.sections.length;
-          for (let s = 0; s < num_sections; s++) {
-            const sectionData = holeData.sections[s];
-            if (sectionData.id[2] == id[2]) {
-              relative_idxs.push(s);
+              if (id[2] !== null || id[2] !== "") {
+                const num_sections = holeData.sections.length;
+                for (let s = 0; s < num_sections; s++) {
+                  const sectionData = holeData.sections[s];
+                  if (sectionData.id[2] == id[2]) {
+                    relative_idxs[2] = s;
 
-              if (num_id == 4) {
-                const num_markers = sectionData.markers.length;
-                for (let m = 0; m < num_markers; m++) {
-                  const markerData = sectionData.markers[m];
-                  if (markerData.id[3] == id[3]) {
-                    relative_idxs.push(m);
+                    if (id[3] !== null || id[3] !== "") {
+                      const num_markers = sectionData.markers.length;
+                      for (let m = 0; m < num_markers; m++) {
+                        const markerData = sectionData.markers[m];
+                        if (markerData.id[3] == id[3]) {
+                          relative_idxs[3] = m;
+                        }
+                      }
+                    }
                   }
                 }
-              } else if (num_id > 5) {
-                console.log("Too long undefined id.");
               }
             }
           }
@@ -2854,6 +3175,7 @@ function getIdxById(LCCore, id) {
       }
     }
   }
+
   return relative_idxs;
 }
 
@@ -2865,9 +3187,13 @@ function isPointInRect(point, rect) {
     point[1] <= rect[1] + rect[3]
   );
 }
-async function getFooterInfo(y, objOpts) {
-  let txt = "";
+async function getFooterInfo(LCCore, y, objOpts) {
+  let txt = "...";
   let age = "";
+
+  if (!LCCore) {
+    return txt;
+  }
 
   if (objOpts.canvas.depth_scale == "age") {
     txt = "Age: " + Math.round(y).toLocaleString() + " calBP";
@@ -2904,20 +3230,13 @@ function getEventPosiotion(LCCore, event, marker_top, objOpts) {
       if (event[2] !== null) {
         const conIdx = this.getIdxById(LCCore, event[2]); //event layer connected MarkerId
         lowerDepth =
-          LCCore.holes[conIdx[1]].sections[conIdx[2]].markers[conIdx[3]][
-            objOpts.canvas.depth_scale
-          ];
+          LCCore.projects[conIdx[0]].holes[conIdx[1]].sections[conIdx[2]]
+            .markers[conIdx[3]][objOpts.canvas.depth_scale];
 
         eventThickness = marker_top - lowerDepth;
       } else {
         console.group(
-          "Null detected on the Event connection at the idx of [" +
-            h +
-            "," +
-            s +
-            "," +
-            m +
-            "]."
+          "Null detected on the Event connection at the idx of [" + event + "]."
         );
       }
     } else if (event[0] == "erosion") {
@@ -2957,19 +3276,25 @@ function calcCanvasBaseSize(LCCore, objOpts) {
   if (LCCore == null) {
     return;
   }
-  for (let h = 0; h < LCCore.holes.length; h++) {
-    let hole_top =
-      LCCore.holes[h].sections[0].markers[0][objOpts.canvas.depth_scale];
-    let hole_bottom = LCCore.holes[h].sections
-      .slice(-1)[0]
-      .markers.slice(-1)[0][objOpts.canvas.depth_scale];
-    if (holes_top > hole_top) {
-      holes_top = hole_top;
-    }
-    if (holes_bottom < hole_bottom) {
-      holes_bottom = hole_bottom;
+
+  for (let p = 0; p < LCCore.projects.length; p++) {
+    for (let h = 0; h < LCCore.projects[p].holes.length; h++) {
+      let hole_top =
+        LCCore.projects[p].holes[h].sections[0].markers[0][
+          objOpts.canvas.depth_scale
+        ];
+      let hole_bottom = LCCore.projects[p].holes[h].sections
+        .slice(-1)[0]
+        .markers.slice(-1)[0][objOpts.canvas.depth_scale];
+      if (holes_top > hole_top) {
+        holes_top = hole_top;
+      }
+      if (holes_bottom < hole_bottom) {
+        holes_bottom = hole_bottom;
+      }
     }
   }
+
   objOpts.canvas.shift_y = holes_top;
 
   //scale factor
@@ -2987,9 +3312,20 @@ function calcCanvasBaseSize(LCCore, objOpts) {
   const shift_y = objOpts.canvas.shift_y;
 
   //initiarise off screan canvas
+  let num_total_holes = 0;
+  LCCore.projects.forEach((project) => {
+    if (project.enable) {
+      project.holes.forEach((hole) => {
+        if (hole.enable) {
+          num_total_holes += 1;
+        }
+      });
+    }
+  });
+
   let canvasBaseWidth = parseInt(
     (objOpts.hole.distance + objOpts.hole.width + shift_x) *
-      (LCCore.holes.length + 1) *
+      (num_total_holes + 1) *
       xMag +
       pad_x
   );
@@ -2999,6 +3335,7 @@ function calcCanvasBaseSize(LCCore, objOpts) {
   );
   return [canvasBaseWidth, canvasBaseHeight];
 }
+
 async function createRasterCircleImage(canvasSize, radius, color) {
   let canvas = document.createElement("canvas");
   let ctx = canvas.getContext("2d");
@@ -3073,9 +3410,15 @@ async function createVectorCircleImage(p, canvasSize, radius, color) {
   return fallbackImg;
 }
 
-function sortHoleByRank(LCCore) {
-  LCCore.holes.sort((a, b) => {
+function sortHoleByOrder(LCCore) {
+  LCCore.projects.sort((a, b) => {
     a.order < b.order ? -1 : 1;
+  });
+
+  LCCore.projects.forEach((project) => {
+    project.holes.sort((a, b) => {
+      a.order < b.order ? -1 : 1;
+    });
   });
 }
 //============================================================================================

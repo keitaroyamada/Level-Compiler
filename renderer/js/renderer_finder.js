@@ -108,8 +108,14 @@ document.addEventListener("DOMContentLoaded", () => {
       sectionList[document.getElementById("holeOptions").value][
         document.getElementById("sectionOptions").value
       ][2];
+    const sectionId =
+      sectionList[document.getElementById("holeOptions").value][
+        document.getElementById("sectionOptions").value
+      ];
 
+    console.log();
     const secLimit = await window.FinderApi.getSectionLimit(
+      [sectionId[1][0], null, null, null],
       holeName,
       sectionName
     );
@@ -184,6 +190,10 @@ document.addEventListener("DOMContentLoaded", () => {
       const distance = parseFloat(
         document.getElementById("distanceInput").value
       );
+      const sectionId =
+        sectionList[document.getElementById("holeOptions").value][
+          document.getElementById("sectionOptions").value
+        ][1];
 
       //calc
       calcedData = await window.FinderApi.finderConvert(
@@ -237,16 +247,27 @@ document.addEventListener("DOMContentLoaded", () => {
       updateSectionList();
       document.getElementById("sectionOptions").value = sec_idx;
 
-      document.getElementById("distanceInput").value =
-        Math.round(calcedData.distance * 10) / 10;
-      document.getElementById("efdInput").value =
-        Math.round(calcedData.efd * 10) / 10;
-      document.getElementById("ageInput").value =
-        Math.round(calcedData.age_mid * 10) / 10;
-      document.getElementById("ageUpperInput").value =
-        Math.round(calcedData.age_upper * 10) / 10;
-      document.getElementById("ageLowerInput").value =
-        Math.round(calcedData.age_lower * 10) / 10;
+      document.getElementById("distanceInput").value = isNaN(
+        calcedData.distance
+      )
+        ? ""
+        : Math.round(calcedData.distance * 10) / 10;
+      document.getElementById("efdInput").value = isNaN(calcedData.efd)
+        ? ""
+        : Math.round(calcedData.efd * 10) / 10;
+      document.getElementById("ageInput").value = isNaN(calcedData.age_mid)
+        ? ""
+        : Math.round(calcedData.age_mid * 10) / 10;
+      document.getElementById("ageUpperInput").value = isNaN(
+        calcedData.age_upper
+      )
+        ? ""
+        : Math.round(calcedData.age_upper * 10) / 10;
+      document.getElementById("ageLowerInput").value = isNaN(
+        calcedData.age_lower
+      )
+        ? ""
+        : Math.round(calcedData.age_lower * 10) / 10;
     } else if (calcType == "event_free_depth") {
       let efd = null;
       if (depth == null) {
@@ -281,16 +302,27 @@ document.addEventListener("DOMContentLoaded", () => {
       updateSectionList();
       document.getElementById("sectionOptions").value = sec_idx;
 
-      document.getElementById("distanceInput").value =
-        Math.round(calcedData.distance * 10) / 10;
-      document.getElementById("cdInput").value =
-        Math.round(calcedData.cd * 10) / 10;
-      document.getElementById("ageInput").value =
-        Math.round(calcedData.age_mid * 10) / 10;
-      document.getElementById("ageUpperInput").value =
-        Math.round(calcedData.age_upper * 10) / 10;
-      document.getElementById("ageLowerInput").value =
-        Math.round(calcedData.age_lower * 10) / 10;
+      document.getElementById("distanceInput").value = isNaN(
+        calcedData.distance
+      )
+        ? ""
+        : Math.round(calcedData.distance * 10) / 10;
+      document.getElementById("cdInput").value = isNaN(calcedData.cd)
+        ? ""
+        : Math.round(calcedData.cd * 10) / 10;
+      document.getElementById("ageInput").value = isNaN(calcedData.age_mid)
+        ? ""
+        : Math.round(calcedData.age_mid * 10) / 10;
+      document.getElementById("ageUpperInput").value = isNaN(
+        calcedData.age_upper
+      )
+        ? ""
+        : Math.round(calcedData.age_upper * 10) / 10;
+      document.getElementById("ageLowerInput").value = isNaN(
+        calcedData.age_lower
+      )
+        ? ""
+        : Math.round(calcedData.age_lower * 10) / 10;
     } else if (calcType == "age") {
       let age = null;
       if (depth == null) {
@@ -329,21 +361,31 @@ document.addEventListener("DOMContentLoaded", () => {
       updateSectionList();
       document.getElementById("sectionOptions").value = selected_sec_id;
 
-      document.getElementById("distanceInput").value =
-        Math.round(calcedData.distance * 10) / 10;
-      document.getElementById("efdInput").value =
-        Math.round(calcedData.efd * 10) / 10;
-      document.getElementById("cdInput").value =
-        Math.round(calcedData.cd * 10) / 10;
-      document.getElementById("ageInput").value =
-        Math.round(calcedData.age_mid * 10) / 10;
-      document.getElementById("ageUpperInput").value =
-        Math.round(calcedData.age_upper * 10) / 10;
-      document.getElementById("ageLowerInput").value =
-        Math.round(calcedData.age_lower * 10) / 10;
+      document.getElementById("distanceInput").value = isNaN(
+        calcedData.distance
+      )
+        ? ""
+        : Math.round(calcedData.distance * 10) / 10;
+      document.getElementById("efdInput").value = isNaN(calcedData.efd)
+        ? ""
+        : Math.round(calcedData.efd * 10) / 10;
+      document.getElementById("cdInput").value = isNaN(calcedData.cd)
+        ? ""
+        : Math.round(calcedData.cd * 10) / 10;
+      document.getElementById("ageInput").value = isNaN(calcedData.age_mid)
+        ? ""
+        : Math.round(calcedData.age_mid * 10) / 10;
+      document.getElementById("ageUpperInput").value = isNaN(
+        calcedData.age_upper
+      )
+        ? ""
+        : Math.round(calcedData.age_upper * 10) / 10;
+      document.getElementById("ageLowerInput").value = isNaN(
+        calcedData.age_lower
+      )
+        ? ""
+        : Math.round(calcedData.age_lower * 10) / 10;
     }
-
-    // /      console.log(calcedData);
 
     //move position
     if (isLink && isCalledFinder) {
