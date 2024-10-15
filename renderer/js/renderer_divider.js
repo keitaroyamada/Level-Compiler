@@ -1,338 +1,47 @@
 document.addEventListener("DOMContentLoaded", () => {
-  let n_r = null;
-  let n_c = null;
+  let holeList = [];
+  let sectionList = [];
   //-------------------------------------------------------------------------------------------
+  //initiarise
   window.DividerApi.receive("DividerToolClicked", async (data) => {
+    await getList();
+    await updateHoleList();
+    await updateSectionList();
+    await updateMarkerList();
+    updatePlot();
     console.log("Divider making");
-    //make model chooser
-
-    document
-      .getElementById("dv_source_type")
-      .dispatchEvent(new Event("change"));
   });
   //-------------------------------------------------------------------------------------------
+
+  //hole
   document
-    .getElementById("dv_source_type")
-    .addEventListener("change", (event) => {
-      //clear
-      const parentElement = document.getElementById("dv_source_chooser");
+    .getElementById("holeOptions")
+    .addEventListener("change", async (event) => {
+      console.log(`Hole: ${event.target.value}`);
 
-      while (parentElement.firstChild) {
-        parentElement.removeChild(parentElement.firstChild);
-      }
-
-      //add
-      const select = event.target.value;
-
-      console.log(select);
-      if (select == "trinity") {
-        //-----------------------------------------------------
-        const disp = ["Name", "Hole", "Section", "Distance"];
-        const key = ["name", "hole", "sec", "dist"];
-
-        for (let n = 0; n < 4; n++) {
-          const div = document.createElement("div");
-          const p = document.createElement("p");
-          p.textContent = disp[n];
-          div.appendChild(p);
-
-          const selectElement = document.createElement("select");
-
-          selectElement.id = "depth_chooser" + n.toString();
-          for (let i = 0; i < n_c; i++) {
-            const option = document.createElement("option");
-            option.textContent = source_data[0][i];
-            option.value = i;
-            if (source_data[0][i].toLowerCase().includes(key[n])) {
-              option.selected = true;
-            }
-            selectElement.appendChild(option);
-          }
-          div.appendChild(selectElement);
-          document.getElementById("dv_source_chooser").appendChild(div);
-        }
-      } else if (select == "drilling_depth") {
-        //-----------------------------------------------------
-        if (source_data !== null) {
-          const disp = ["Name", "Drilling depth"];
-          const key = ["name", "drilling"];
-
-          for (let n = 0; n < 2; n++) {
-            const div = document.createElement("div");
-            const p = document.createElement("p");
-            p.textContent = disp[n];
-            div.appendChild(p);
-
-            const selectElement = document.createElement("select");
-            selectElement.id = "depth_chooser" + n.toString();
-            for (let i = 0; i < n_c; i++) {
-              const option = document.createElement("option");
-              option.textContent = source_data[0][i];
-              option.value = i;
-              if (source_data[0][i].toLowerCase().includes(key[n])) {
-                option.selected = true;
-              }
-              selectElement.appendChild(option);
-            }
-            div.appendChild(selectElement);
-            document.getElementById("dv_source_chooser").appendChild(div);
-          }
-        }
-      } else if (select == "composite_depth") {
-        //-----------------------------------------------------
-        if (source_data !== null) {
-          const disp = ["Name", "Composite depth"];
-          const key = ["name", "composite"];
-
-          for (let n = 0; n < 2; n++) {
-            const div = document.createElement("div");
-            const p = document.createElement("p");
-            p.textContent = disp[n];
-            div.appendChild(p);
-
-            const selectElement = document.createElement("select");
-            selectElement.id = "depth_chooser" + n.toString();
-            for (let i = 0; i < n_c; i++) {
-              const option = document.createElement("option");
-              option.textContent = source_data[0][i];
-              option.value = i;
-              if (source_data[0][i].toLowerCase().includes(key[n])) {
-                option.selected = true;
-              }
-              selectElement.appendChild(option);
-            }
-            div.appendChild(selectElement);
-            document.getElementById("dv_source_chooser").appendChild(div);
-          }
-        }
-      } else if (select == "event_free_depth") {
-        //-----------------------------------------------------
-        if (source_data !== null) {
-          const disp = ["Name", "Event free depth"];
-          const key = ["name", "free"];
-
-          for (let n = 0; n < 2; n++) {
-            const div = document.createElement("div");
-            const p = document.createElement("p");
-            p.textContent = disp[n];
-            div.appendChild(p);
-
-            const selectElement = document.createElement("select");
-            selectElement.id = "depth_chooser" + n.toString();
-            for (let i = 0; i < n_c; i++) {
-              const option = document.createElement("option");
-              option.textContent = source_data[0][i];
-              option.value = i;
-              if (source_data[0][i].toLowerCase().includes(key[n])) {
-                option.selected = true;
-              }
-              selectElement.appendChild(option);
-            }
-            div.appendChild(selectElement);
-            document.getElementById("dv_source_chooser").appendChild(div);
-          }
-        }
-      } else if (select == "age") {
-        //-----------------------------------------------------
-        if (source_data !== null) {
-          const disp = ["Name", "Age"];
-          const key = ["name", "age"];
-
-          for (let n = 0; n < 2; n++) {
-            const div = document.createElement("div");
-            const p = document.createElement("p");
-            p.textContent = disp[n];
-            div.appendChild(p);
-
-            const selectElement = document.createElement("select");
-            selectElement.id = "depth_chooser" + n.toString();
-            for (let i = 0; i < n_c; i++) {
-              const option = document.createElement("option");
-              option.textContent = source_data[0][i];
-              option.value = i;
-              if (source_data[0][i].toLowerCase().includes(key[n])) {
-                option.selected = true;
-              }
-              selectElement.appendChild(option);
-            }
-            div.appendChild(selectElement);
-            document.getElementById("dv_source_chooser").appendChild(div);
-          }
-        }
-      }
+      //calc
+      //change sec list
+      await updateSectionList();
+      await updateMarkerList();
+      updatePlot();
     });
   //-------------------------------------------------------------------------------------------
+  //section
   document
-    .getElementById("dv_source_type")
-    .addEventListener("change", (event) => {
-      //clear
-      const parentElement = document.getElementById("dv_source_chooser");
-
-      while (parentElement.firstChild) {
-        parentElement.removeChild(parentElement.firstChild);
-      }
-
-      //add
-      const select = event.target.value;
-
-      console.log(select);
-      if (select == "trinity") {
-        //-----------------------------------------------------
-        if (source_data !== null) {
-          const disp = ["Name", "Hole", "Section", "Distance"];
-          const key = ["name", "hole", "sec", "dist"];
-
-          for (let n = 0; n < 4; n++) {
-            const div = document.createElement("div");
-            const p = document.createElement("p");
-            p.textContent = disp[n];
-            div.appendChild(p);
-
-            const selectElement = document.createElement("select");
-            selectElement.id = "depth_chooser" + n.toString();
-            for (let i = 0; i < n_c; i++) {
-              const option = document.createElement("option");
-              option.textContent = source_data[0][i];
-              option.value = i;
-              if (source_data[0][i].toLowerCase().includes(key[n])) {
-                option.selected = true;
-              }
-              selectElement.appendChild(option);
-            }
-            div.appendChild(selectElement);
-            document.getElementById("dv_source_chooser").appendChild(div);
-          }
-        }
-      } else if (select == "drilling_depth") {
-        //-----------------------------------------------------
-        if (source_data !== null) {
-          const disp = ["Name", "Drilling depth"];
-          const key = ["name", "drilling"];
-
-          for (let n = 0; n < 2; n++) {
-            const div = document.createElement("div");
-            const p = document.createElement("p");
-            p.textContent = disp[n];
-            div.appendChild(p);
-
-            const selectElement = document.createElement("select");
-            selectElement.id = "depth_chooser" + n.toString();
-            for (let i = 0; i < n_c; i++) {
-              const option = document.createElement("option");
-              option.textContent = source_data[0][i];
-              option.value = i;
-              if (source_data[0][i].toLowerCase().includes(key[n])) {
-                option.selected = true;
-              }
-              selectElement.appendChild(option);
-            }
-            div.appendChild(selectElement);
-            document.getElementById("dv_source_chooser").appendChild(div);
-          }
-        }
-      } else if (select == "composite_depth") {
-        //-----------------------------------------------------
-        if (source_data !== null) {
-          const disp = ["Name", "Composite depth"];
-          const key = ["name", "composite"];
-
-          for (let n = 0; n < 2; n++) {
-            const div = document.createElement("div");
-            const p = document.createElement("p");
-            p.textContent = disp[n];
-            div.appendChild(p);
-
-            const selectElement = document.createElement("select");
-            selectElement.id = "depth_chooser" + n.toString();
-            for (let i = 0; i < n_c; i++) {
-              const option = document.createElement("option");
-              option.textContent = source_data[0][i];
-              option.value = i;
-              if (source_data[0][i].toLowerCase().includes(key[n])) {
-                option.selected = true;
-              }
-              selectElement.appendChild(option);
-            }
-            div.appendChild(selectElement);
-            document.getElementById("dv_source_chooser").appendChild(div);
-          }
-        }
-      } else if (select == "event_free_depth") {
-        //-----------------------------------------------------
-        if (source_data !== null) {
-          const disp = ["Name", "Event free depth"];
-          const key = ["name", "free"];
-
-          for (let n = 0; n < 2; n++) {
-            const div = document.createElement("div");
-            const p = document.createElement("p");
-            p.textContent = disp[n];
-            div.appendChild(p);
-
-            const selectElement = document.createElement("select");
-            selectElement.id = "depth_chooser" + n.toString();
-            for (let i = 0; i < n_c; i++) {
-              const option = document.createElement("option");
-              option.textContent = source_data[0][i];
-              option.value = i;
-              if (source_data[0][i].toLowerCase().includes(key[n])) {
-                option.selected = true;
-              }
-              selectElement.appendChild(option);
-            }
-            div.appendChild(selectElement);
-            document.getElementById("dv_source_chooser").appendChild(div);
-          }
-        }
-      } else if (select == "age") {
-        //-----------------------------------------------------
-        if (source_data !== null) {
-          const disp = ["Name", "Age"];
-          const key = ["name", "age"];
-
-          for (let n = 0; n < 2; n++) {
-            const div = document.createElement("div");
-            const p = document.createElement("p");
-            p.textContent = disp[n];
-            div.appendChild(p);
-
-            const selectElement = document.createElement("select");
-            selectElement.id = "depth_chooser" + n.toString();
-            for (let i = 0; i < n_c; i++) {
-              const option = document.createElement("option");
-              option.textContent = source_data[0][i];
-              option.value = i;
-              if (source_data[0][i].toLowerCase().includes(key[n])) {
-                option.selected = true;
-              }
-              selectElement.appendChild(option);
-            }
-            div.appendChild(selectElement);
-            document.getElementById("dv_source_chooser").appendChild(div);
-          }
-        }
-      }
+    .getElementById("sectionOptions")
+    .addEventListener("change", async (event) => {
+      console.log(`Section: ${event.target.value}`);
+      //calc
+      await updateMarkerList();
+      updatePlot();
     });
   //-------------------------------------------------------------------------------------------
-  async function limitDistance() {
-    const holeName = holeList[document.getElementById("holeOptions").value][2];
-    const sectionName =
-      sectionList[document.getElementById("holeOptions").value][
-        document.getElementById("sectionOptions").value
-      ][2];
+  //-------------------------------------------------------------------------------------------
 
-    const secLimit = await window.FinderApi.getSectionLimit(
-      holeName,
-      sectionName
-    );
-
-    document.getElementById("distanceInput").max = parseFloat(secLimit[1]);
-    document.getElementById("distanceInput").min = parseFloat(secLimit[0]);
-  }
   //-------------------------------------------------------------------------------------------
   async function getList() {
     //get hole list
-    [holeList, sectionList] = await window.FinderApi.finderGetCoreList();
+    [holeList, sectionList] = await window.DividerApi.dividerGetCoreList();
   }
   //-------------------------------------------------------------------------------------------
   async function updateHoleList() {
@@ -375,87 +84,132 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     }
   }
-
   //-------------------------------------------------------------------------------------------
+  async function updateMarkerList() {
+    var table = document.getElementById("depth_table");
+    var rows = table.rows;
 
-  //-------------------------------------------------------------------------------------------
-
-  //-------------------------------------------------------------------------------------------
-  document
-    .getElementById("dv_bt_divide")
-    .addEventListener("click", async (event) => {
-      console.log("Dividing...");
-
-      //get source type
-      const sourceType = document.getElementById("dv_source_type").value;
-
-      //make data
-      let indata = [];
-      if (document.getElementById("dv_source_type").value == "trinity") {
-        const nameIdx = document.getElementById("depth_chooser0").value;
-        const holeIdx = document.getElementById("depth_chooser1").value;
-        const sectionIdx = document.getElementById("depth_chooser2").value;
-        const distanceIdx = document.getElementById("depth_chooser3").value;
-        for (let i = 0; i < source_data.length; i++) {
-          indata.push([
-            source_data[i][nameIdx],
-            source_data[i][holeIdx],
-            source_data[i][sectionIdx],
-            source_data[i][distanceIdx],
-          ]);
-        }
-      } else if (
-        document.getElementById("dv_source_type").value == "composite_depth"
-      ) {
-        const nameIdx = document.getElementById("depth_chooser0").value;
-        const cdIdx = document.getElementById("depth_chooser1").value;
-        for (let i = 0; i < source_data.length; i++) {
-          indata.push([source_data[i][nameIdx], source_data[i][cdIdx]]);
-        }
-      } else if (
-        document.getElementById("dv_source_type").value == "event_free_depth"
-      ) {
-        const nameIdx = document.getElementById("depth_chooser0").value;
-        const efdIdx = document.getElementById("depth_chooser1").value;
-        for (let i = 0; i < source_data.length; i++) {
-          indata.push([source_data[i][nameIdx], source_data[i][efdIdx]]);
-        }
-      } else if (
-        document.getElementById("dv_source_type").value == "drilling_depth"
-      ) {
-        const nameIdx = document.getElementById("depth_chooser0").value;
-        const ddIdx = document.getElementById("depth_chooser1").value;
-        for (let i = 0; i < source_data.length; i++) {
-          indata.push([source_data[i][nameIdx], source_data[i][ddIdx]]);
-        }
-      } else if (document.getElementById("dv_source_type").value == "age") {
-        const nameIdx = document.getElementById("depth_chooser0").value;
-        const ageIdx = document.getElementById("depth_chooser1").value;
-        for (let i = 0; i < source_data.length; i++) {
-          indata.push([source_data[i][nameIdx], source_data[i][ageIdx]]);
-        }
+    if (rows.length > 1) {
+      var userResponse = confirm("Do you want to update the definition table?");
+      if (userResponse == false) {
+        return;
       }
+    }
 
-      console.log(indata);
+    //if true
+    const selectedHole = document.getElementById("holeOptions").value;
+    const selectedSection = document.getElementById("sectionOptions").value;
+    const markerList = sectionList[selectedHole][selectedSection][5];
 
-      //calc
-      /*
-      let convertedData = [];
-      if (source_data !== null) {
-        convertedData = await window.ConverterApi.cvtConvert(
-          modelIds,
-          indata,
-          sourceType,
-          "linear"
-        );
+    //apply data into table
+    //initiarise table
+    for (var i = rows.length - 1; i > 0; i--) {
+      table.deleteRow(i);
+    }
+
+    //add data
+    for (let i = 0; i < markerList.length; i++) {
+      //make new row
+      var row = table.insertRow();
+      var cell1 = row.insertCell();
+      cell1.textContent = markerList[i].name;
+      var cell2 = row.insertCell();
+      cell2.textContent = markerList[i].distance;
+      var cell3 = row.insertCell();
+
+      cell3.textContent = "";
+      makeCellNumericOnly(cell3);
+    }
+  }
+  //-------------------------------------------------------------------------------------------
+  function makeCellNumericOnly(cell) {
+    cell.setAttribute("contenteditable", "true");
+    cell.addEventListener("input", function (e) {
+      if (isNaN(e.target.innerText)) {
+        e.target.innerText = e.target.innerText.replace(/[^0-9]/g, "");
       }
-
-      //export
-      await window.ConverterApi.cvtExport(convertedData);
-      console.log("done");
-      //console.log(convertedData);
-      */
     });
+    cell.addEventListener("keydown", function (e) {
+      if (e.key === "Enter") {
+        e.preventDefault();
+      }
+    });
+  }
+  //-------------------------------------------------------------------------------------------
+  function delay(ms) {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+  //-------------------------------------------------------------------------------------------
+  function updatePlot() {
+    const canvas = document.getElementById("plot_canvas");
+    canvas.width = 200;
+    canvas.height = 500;
+    let ctx = canvas.getContext("2d");
+    const padding_left = 50;
+    const padding_top = 10;
 
+    //get depth definition data from table
+    var table = document.getElementById("depth_table");
+    var rows = table.rows;
+    //plot section
+    const section_height =
+      parseFloat(rows[rows.length - 1].cells[1].innerText) -
+      parseFloat(rows[1].cells[1].innerText);
+    const plot_height_rate = canvas.height / (section_height + padding_top * 2);
+
+    //calc pos
+    const y0 =
+      (parseFloat(rows[1].cells[1].innerText) + padding_top) * plot_height_rate;
+    const h = section_height * plot_height_rate;
+    const x0 = padding_left;
+    const w = 100;
+
+    //plot
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = "black";
+    ctx.fillStyle = "lightgray";
+    ctx.beginPath();
+    ctx.strokeRect(x0, y0, w, h);
+    ctx.fillRect(x0, y0, w, h);
+    ctx.stroke();
+    ctx.fillStyle = "black";
+    ctx.font = "15px Arial";
+    //ctx.fillText(           );
+
+    for (let r = 1; r < rows.length; r++) {
+      const marker_name = rows[r].cells[0].innerText;
+      const marker_def = parseFloat(rows[r].cells[1].innerText);
+      const marker_act = parseFloat(rows[r].cells[2].innerText);
+
+      let marker_act_exist = false;
+
+      if (!isNaN(marker_act)) {
+        console.log(marker_act);
+        marker_act_exist = true;
+      }
+
+      //plot
+      ctx.lineWidth = 1;
+      ctx.strokeStyle = "black";
+      if (marker_act_exist) {
+        ctx.strokeStyle = "blue";
+      }
+      ctx.beginPath();
+      ctx.moveTo(x0, (marker_def + padding_top) * plot_height_rate); //start point
+      ctx.lineTo(x0 + w, (marker_def + padding_top) * plot_height_rate); //end point
+      ctx.stroke();
+      ctx.fillText(
+        marker_name,
+        x0 + w + 5,
+        (marker_def + padding_top) * plot_height_rate
+      );
+      ctx.fillText(
+        marker_def,
+        x0 - 40,
+        (marker_def + padding_top) * plot_height_rate
+      );
+    }
+  }
+  //-------------------------------------------------------------------------------------------
   //-------------------------------------------------------------------------------------------
 });

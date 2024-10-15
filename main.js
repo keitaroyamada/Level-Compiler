@@ -9,17 +9,20 @@
 //portable: npx electron-builder --win --x64 --dir
 
 const path = require("path");
+const fs = require("fs");
+const sharp = require("sharp");
+const { mode } = require("simple-statistics");
+const { parse } = require("csv-parse/sync");
+const { stringify } = require("csv-stringify/sync");
+const ProgressBar = require("electron-progressbar");
+
 const { app, BrowserWindow, Menu, ipcMain, dialog } = require("electron");
 const { LevelCompilerCore } = require("./LC_modules/LevelCompilerCore.js");
 const { Project } = require("./LC_modules/Project.js");
 const { lcfnc } = require("./LC_modules/lcfnc.js");
 const { LevelCompilerAge } = require("./LC_modules/LevelCompilerAge.js");
 const { LevelCompilerPlot } = require("./LC_modules/LevelCompilerPlot.js");
-const fs = require("fs");
-const { parse } = require("csv-parse/sync");
-const { stringify } = require("csv-stringify/sync");
 const { Trinity } = require("./LC_modules/Trinity.js");
-const { mode } = require("simple-statistics");
 
 //properties
 const isMac = process.platform === "darwin";
@@ -33,6 +36,7 @@ const LCPlot = new LevelCompilerPlot();
 //
 let finderWindow = null;
 let dividerWindow = null;
+let progressBar = null;
 
 //const isDev = false;
 
@@ -46,7 +50,7 @@ function createMainWIndow() {
       //contextIsolation: true, //Do not change for security reason
       preload: path.join(__dirname, "preload.js"),
     },
-    icon: "./icon/levelcompiler.ico",
+    icon: "./icon/levelcompiler.png",
   });
 
   //open devtools if in dev env
@@ -139,12 +143,12 @@ function createMainWIndow() {
         {
           label: "Vector mode",
           type: "checkbox",
-          checked: false,
+          checked: true,
           click: () => {
             lcmenu.forEach((m1) => {
               if (m1.label == "Mode") {
-                m1.submenu[0].checked = true;
-                m1.submenu[1].checked = false;
+                m1.submenu[0].checked = false;
+                m1.submenu[1].checked = true;
                 menuRebuild();
               }
             });
@@ -154,12 +158,12 @@ function createMainWIndow() {
         {
           label: "Raster mode",
           type: "checkbox",
-          checked: true,
+          checked: false,
           click: () => {
             lcmenu.forEach((m1) => {
               if (m1.label == "Mode") {
-                m1.submenu[0].checked = false;
-                m1.submenu[1].checked = true;
+                m1.submenu[0].checked = true;
+                m1.submenu[1].checked = false;
                 menuRebuild();
               }
             });
@@ -257,6 +261,191 @@ function createMainWIndow() {
     console.log("MAIN: Load correlation model.");
     return LCCore;
   });
+
+  ipcMain.handle("LoadRasterImage", async (_e, im_path, Resize) => {
+    try {
+      //path.join(__dirname.replace(/\\/g, "/"), im_path)
+      const imageBuffer = fs.readFileSync(im_path);
+
+      if (Resize != 0) {
+        const metadata = await sharp(imageBuffer).metadata();
+        const new_size = { height: Resize, width: 1 };
+
+        if (metadata.height > new_size.height) {
+          const resizedBuffer = await sharp(imageBuffer)
+            .resize({ height: new_size.height })
+            .toBuffer();
+
+          //console.log("resized");
+          return resizedBuffer.toString("base64");
+        } else {
+          //console.log("original");
+          return imageBuffer.toString("base64");
+        }
+      } else {
+        return imageBuffer.toString("base64");
+      }
+    } catch (error) {
+      if (error.code === "ENOENT") {
+        //case there is no such a file.
+      } else {
+        throw error;
+      }
+    }
+  });
+
+  ipcMain.handle("progressbar", async (_e, tit, txt) => {
+    progressBar = new ProgressBar({
+      title: tit,
+      icon: "./icon/levelcompiler.png",
+      indeterminate: false,
+      text: txt,
+      detail: "Please wait...(0%)",
+      browserWindow: {
+        parent: mainWindow,
+        modal: true,
+        resizable: false,
+        webPreferences: {
+          nodeIntegration: true,
+          contextIsolation: false,
+        },
+      },
+    });
+
+    progressBar
+      .on("completed", () => {
+        //console.info("Task completed.");
+        progressBar.detail = "Task completed. Exiting...";
+      })
+      .on("aborted", (value) => {
+        console.info(`Task aborted... ${value}`);
+      });
+  });
+
+  ipcMain.handle(
+    "makeModelImage",
+    async (_e, imageData, sectionData, depthScale) => {
+      //if no image data
+      if (imageData == undefined) return undefined;
+
+      const imageBuffer = Buffer.from(
+        imageData.split(";base64,").pop(),
+        "base64"
+      );
+
+      const undifBuffer = Buffer.from([0xba, 0x77, 0x5e, 0x7e, 0x29, 0xde]);
+      if (imageBuffer.equals(undifBuffer)) {
+        //if no image data
+        return undefined;
+      }
+
+      const im = sharp(imageBuffer);
+      const metadata = await im.metadata();
+      const pixPerCm =
+        metadata.height /
+        (sectionData.markers[sectionData.markers.length - 1].distance -
+          sectionData.markers[0].distance);
+
+      //get operations
+      let newHeight = 0;
+      let operations = [];
+      const d0 = sectionData.markers[0].distance;
+      const m0 = sectionData.markers[0][depthScale];
+      for (let i = 0; i < sectionData.markers.length - 1; i++) {
+        const dTop = sectionData.markers[i].distance;
+        const dBottom = sectionData.markers[i + 1].distance;
+        const mTop = sectionData.markers[i][depthScale];
+        const mBottom = sectionData.markers[i + 1][depthScale];
+
+        const fromP0 = (dTop - d0) * pixPerCm;
+        const fromP1 = (dBottom - d0) * pixPerCm;
+        const toP0 = (mTop - m0) * pixPerCm;
+        const toP1 = (mBottom - m0) * pixPerCm;
+
+        operations.push({
+          fromTop: fromP0,
+          fromBottom: fromP1,
+          toTop: toP0,
+          toBottom: toP1,
+        });
+        newHeight += toP1 - toP0;
+      }
+
+      //make blank base
+      if (newHeight < 0.5) return [];
+      let newIm = sharp({
+        create: {
+          width: metadata.width,
+          height: round(newHeight, 0),
+          channels: 3,
+          background: { r: 0, g: 0, b: 0 },
+        },
+      }).jpeg();
+
+      //extract and resize
+      let compositeOperations = [];
+      for (const ope of operations) {
+        if (
+          round(ope.fromBottom - ope.fromTop, 0) === 0 ||
+          round(ope.toBottom - ope.toTop, 0) === 0
+        )
+          continue; // if 0cm thick(event layer), skip
+        const baseIm = sharp(imageBuffer);
+        const currSection = await baseIm
+          .extract({
+            left: 0,
+            top: round(ope.fromTop, 0),
+            width: metadata.width,
+            height: round(ope.fromBottom - ope.fromTop, 0),
+          })
+          .resize({
+            width: metadata.width,
+            height: round(ope.toBottom - ope.toTop, 0),
+            fit: "fill",
+          })
+          .toBuffer();
+
+        compositeOperations.push({
+          input: currSection,
+          top: round(ope.toTop, 0),
+          left: 0,
+        });
+      }
+
+      if (compositeOperations.length > 0) {
+        newIm = await newIm.composite(compositeOperations).toBuffer();
+      }
+
+      //to base64
+      return newIm.toString("base64");
+    }
+  );
+
+  ipcMain.handle("updateProgressbar", (_e, n, N) => {
+    if (progressBar) {
+      progressBar.value = (n / N) * 100;
+      progressBar.detail =
+        "Please wait..." + n + "/" + N + "  (" + round((n / N) * 100, 2) + "%)";
+
+      if (n / N >= 1) {
+        progressBar.setCompleted();
+      }
+    }
+  });
+
+  ipcMain.handle("askdialog", (_e, tit, txt) => {
+    const options = {
+      type: "question",
+      buttons: ["No", "Yes"],
+      defaultId: 0,
+      title: tit,
+      message: txt,
+    };
+
+    const response = dialog.showMessageBox(null, options);
+    return response;
+  });
+
   ipcMain.handle("RegistertAgeFromCsv", async (_e, age_path) => {
     try {
       //import model
@@ -416,7 +605,7 @@ function createMainWIndow() {
     //create finder window
     dividerWindow = new BrowserWindow({
       title: "Divider",
-      width: 1000,
+      width: 1500,
       height: 1000,
       webPreferences: {
         preload: path.join(__dirname, "preload_divider.js"),
@@ -434,7 +623,7 @@ function createMainWIndow() {
     dividerWindow.once("ready-to-show", () => {
       dividerWindow.show();
       dividerWindow.webContents.openDevTools();
-      dividerWindow.setAlwaysOnTop(true, "normal");
+      // /dividerWindow.setAlwaysOnTop(true, "normal");
       dividerWindow.webContents.send("DividerToolClicked", "");
     });
   });
@@ -810,10 +999,12 @@ function createMainWIndow() {
     let holeList = [];
     let sectionList = [];
 
+    nh = -1;
     for (let p = 0; p < LCCore.projects.length; p++) {
       for (let h = 0; h < LCCore.projects[p].holes.length; h++) {
+        nh += 1;
         const hole = LCCore.projects[p].holes[h];
-        holeList.push([h, hole.id, hole.name]);
+        holeList.push([nh, hole.id, hole.name]);
         let secTmep = [];
         for (let s = 0; s < hole.sections.length; s++) {
           const section = hole.sections[s];
@@ -823,6 +1014,7 @@ function createMainWIndow() {
             section.name,
             section.markers[0].distance,
             section.markers[section.markers.length - 1].distance,
+            section.markers,
           ]);
         }
         sectionList.push(secTmep);
@@ -1101,6 +1293,7 @@ function createMainWIndow() {
   //--------------------------------------------------------------------------------------------------
 }
 //===================================================================================================================================
+
 //--------------------------------------------------------------------------------------------------
 async function getfile(mainWindow, title, ext) {
   const options = {
@@ -1155,7 +1348,10 @@ function createNewWindow(title, htmlPath, preloadPath) {
   return newWindow;
 }
 //--------------------------------------------------------------------------------------------------
-
+function round(num, digits) {
+  const multiplier = Math.pow(10, digits);
+  return Math.round(num * multiplier) / multiplier;
+}
 //--------------------------------------------------------------------------------------------------
 //create about window
 function createAboutWindow() {

@@ -3,9 +3,10 @@ const { contextBridge, ipcRenderer } = require("electron");
 
 contextBridge.exposeInMainWorld("DividerApi", {
   //rederer <-> main
-  changeFix: (args) => ipcRenderer.invoke("changeFix", args),
+  //renderer name: (main name)
+  dividerGetCoreList: () => ipcRenderer.invoke("finderGetCoreList"),
 
-  dividerGetCoreList: () => ipcRenderer.invoke("dividerGetCoreList"),
+  changeFix: (args) => ipcRenderer.invoke("changeFix", args),
 
   finderConvert: (args1, args2, args3) =>
     ipcRenderer.invoke("finderConvert", args1, args2, args3),

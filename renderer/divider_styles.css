@@ -1,39 +1,87 @@
-.about {
-  text-align: center;
-}
-
-.depth {
-  display: flex;
-  flex-direction: row;
-  flex-wrap: nowrap;
-}
-
-#depth_definition {
-  display: flex;
-  flex-direction: row;
-  flex-wrap: nowrap;
-}
-
-#dv_source_chooser {
+#options {
   display: flex;
   flex-direction: row;
 }
-#dv_source_chooser div {
-  padding-left: 20px;
+
+#holeDiv {
+  width: 120px;
 }
 
-#dv_data__table {
-  padding-top: 20px;
-  width: 100%;
-  height: 350px;
-  overflow: auto;
+#sectionDiv {
+  width: 120px;
 }
 
-.export_row {
-  padding-top: 20px;
+#directionDiv {
+  width: 140px;
 }
 
-#dv_bt_convert {
+#exportButton {
   width: 100px;
-  height: 30px;
+  height: 20px;
+}
+
+#table_container {
+  display: flex;
+  flex-direction: row;
+  padding-top: 20px;
+}
+
+#depth_table_div {
+  height: 500px;
+  width: 400px;
+  overflow-y: scroll;
+  overflow-x: hidden;
+}
+#depth_table {
+  border-collapse: collapse;
+  width: 380px;
+  font-size: small;
+}
+
+th,
+td {
+  border: 1px solid black;
+  padding: 8px;
+  user-select: auto;
+  height: 10px;
+}
+
+#target_table_div {
+  padding-left: 20px;
+  height: 500px;
+  overflow-y: scroll;
+  overflow-x: hidden;
+  font-size: small;
+}
+
+#target_table {
+  width: 50px;
+}
+
+#add_menu {
+  display: flex;
+  flex-direction: row;
+}
+
+#add_in_position {
+  width: 50%;
+}
+
+#result_table_div {
+  padding-left: 20px;
+  height: 500px;
+  overflow-y: scroll;
+  overflow-x: hidden;
+  font-size: small;
+}
+#result_table {
+  width: 50px;
+}
+
+#plot_canvas_div {
+  padding-left: 20px;
+  height: 100%;
+}
+#plot_canvas {
+  background-color: white;
 }

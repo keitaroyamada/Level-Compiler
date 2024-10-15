@@ -28,7 +28,9 @@ core.loadModelFromCsv(model_path2);
 
 core.calcCompositeDepth();
 core.calcEventFreeDepth();
-core.checkModel();
+//core.checkModel();
+console.log("-----------------------");
+console.log(core.getDataByIdx(core.search_idx_list[[2, 1, 19, 5]]));
 
 //console.log(core.projects[1].duo_connection);
 //console.log(core.projects[0].holes[0].sections[2].markers[15]);

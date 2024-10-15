@@ -42,6 +42,15 @@ contextBridge.exposeInMainWorld("LCapi", {
   FileChoseDialog: (args1, args2) =>
     ipcRenderer.invoke("FileChoseDialog", args1, args2),
   Confirm: (args1, args2) => ipcRenderer.invoke("Confirm", args1, args2),
+  LoadRasterImage: (args1, args2) =>
+    ipcRenderer.invoke("LoadRasterImage", args1, args2),
+  progressbar: (args1, args2) =>
+    ipcRenderer.invoke("progressbar", args1, args2),
+  updateProgressbar: (args1, args2) =>
+    ipcRenderer.invoke("updateProgressbar", args1, args2),
+  askdialog: (args1, args2) => ipcRenderer.invoke("askdialog", args1, args2),
+  makeModelImage: (args1, args2, args3) =>
+    ipcRenderer.invoke("makeModelImage", args1, args2, args3),
 
   //main -> renderer
   receive: (channel, func) => {

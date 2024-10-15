@@ -217,6 +217,31 @@ html {
   width: 100%;
 }
 
+#bt_event_layer {
+  box-sizing: border-box;
+  width: 40px;
+  height: 40px;
+  border: 1px solid gray;
+  background-color: lightgray;
+}
+
+#bt_event_layer img {
+  height: 75%;
+  width: 100%;
+}
+
+#bt_core_photo {
+  box-sizing: border-box;
+  width: 40px;
+  height: 40px;
+  border: 1px solid gray;
+}
+
+#bt_core_photo img {
+  height: 75%;
+  width: 100%;
+}
+
 footer {
   display: flex;
   justify-content: space-between;

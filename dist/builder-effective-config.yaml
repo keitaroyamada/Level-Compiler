@@ -9,4 +9,4 @@ mac:
 linux:
   icon: ./icon/levelcompiler.png
 files: []
-electronVersion: 27.0.3
+electronVersion: 32.2.0

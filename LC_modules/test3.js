@@ -1,7 +1,7 @@
-let v = new Set();
-v.add([1, 1, 1, null].join("-"));
-v.add([1, 1, 2].join("-"));
-v.forEach((s) => {
-  console.log(parseFloat(s.split("-")[3]));
-  console.log();
-});
+const v1 = null;
+const v2 = 1;
+if (v1 < v2 && v1 !== null) {
+  console.log("aaaa");
+} else {
+  console.log("bbbb");
+}

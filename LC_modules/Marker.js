@@ -17,7 +17,7 @@ class Marker {
     this.reliability = 1; //use calculation for CD and EFD. Core with smaller value is used preferenticall.
     this.order = null;
     this.enable = true;
-    this.depth_source = ["master", null, null];
+    this.depth_source = ["", null, null];
   }
 }
 

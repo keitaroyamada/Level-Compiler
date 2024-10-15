@@ -614,11 +614,11 @@ class LevelCompilerCore {
     }
 
     //calc composite depth of 2nd degree connection node/extrapolation
-    this.applyMarkerInterpolation(0, "composite_depth", true);
-
-    for (let i = 1; i < 10; i++) {
-      this.applyMarkerInterpolation(i, "composite_depth", true);
+    for (let i = 0; i < 20; i++) {
+      this.applyMarkerInterpolation(i, "composite_depth");
     }
+
+    this.applyMarkerExtrapolation(Infinity, "composite_depth");
 
     console.log("LCCore: Calced composite depth.");
   }
@@ -627,6 +627,17 @@ class LevelCompilerCore {
     //1st degree connection: [Master Section]-[Parallel Section * ]
     //2nd degree connection: [Master Section]-[Parallel Section]-[Parallel Section * ]
     //3rd degree connection: [Master Section]-[Parallel Section]-[Parallel Section]-[Parallel Section * ] and extrapolation
+
+    //initiarise connection rank
+    this.projects.forEach((project) => {
+      project.holes.forEach((hole) => {
+        hole.sections.forEach((section) => {
+          section.markers.forEach((marker) => {
+            marker.connection_rank = null;
+          });
+        });
+      });
+    });
 
     //get idx
     let projectIdx = null;
@@ -674,10 +685,14 @@ class LevelCompilerCore {
       }
     }
     //calc composite depth of 2nd degree connection node/extrapolation
-    this.applyMarkerInterpolation(0, "event_free_depth", true);
+    this.applyMarkerInterpolation(0, "event_free_depth");
+    this.applyMarkerExtrapolation(Infinity, "event_free_depth");
+
+    /*
     for (let i = 1; i < 10; i++) {
       this.applyMarkerInterpolation(i, "event_free_depth", true);
     }
+    */
 
     console.log("LCCore: Calced event free depth.");
   }
@@ -2147,7 +2162,7 @@ class LevelCompilerCore {
     }
     return output;
   }
-  applyMarkerInterpolation(MaxSourceDegree, calcType, isExtrapolation) {
+  applyMarkerInterpolation(MaxSourceDegree, calcType) {
     for (let p = 0; p < this.projects.length; p++) {
       for (let h = 0; h < this.projects[p].holes.length; h++) {
         //
@@ -2206,15 +2221,14 @@ class LevelCompilerCore {
                     upperMarkerDepth.nearest_data.id,
                     lowerMarkerDepth.nearest_data.id,
                   ];
-                if (calcType == "composite_depth") {
-                  this.projects[p].holes[h].sections[s].markers[
-                    m
-                  ].connection_rank = ref_max_rank + 1;
-                }
+
+                this.projects[p].holes[h].sections[s].markers[
+                  m
+                ].connection_rank = ref_max_rank + 1;
               } else {
                 if (
                   targetMarkerData.connection_rank == null ||
-                  targetMarkerData.connection_rank > ref_max_rank
+                  targetMarkerData.connection_rank > ref_max_rank + 1
                 ) {
                   this.projects[p].holes[h].sections[s].markers[m][calcType] =
                     interpolatedDepth;
@@ -2225,62 +2239,24 @@ class LevelCompilerCore {
                     upperMarkerDepth.nearest_data.id,
                     lowerMarkerDepth.nearest_data.id,
                   ];
-                  if (calcType == "composite_depth") {
-                    this.projects[p].holes[h].sections[s].markers[
-                      m
-                    ].connection_rank = ref_max_rank + 1;
-                  }
-                }
-              }
-            }
 
-            //apply extrapolation
-            if (isExtrapolation == true) {
-              //switch extrapolation by direction
-              let extrapolatedDepth = null;
-              if (upperMarkerDepth == null) {
-                extrapolatedDepth = lowerMarkerDepth;
-                ref_max_rank = extrapolatedDepth.nearest_data.connection_rank;
-              } else if (lowerMarkerDepth == null) {
-                extrapolatedDepth = upperMarkerDepth;
-                ref_max_rank = extrapolatedDepth.nearest_data.connection_rank;
-              }
-
-              if (extrapolatedDepth !== null) {
-                //set depth
-                if (targetMarkerData[calcType] == null) {
-                  this.projects[p].holes[h].sections[s].markers[m][calcType] =
-                    extrapolatedDepth.nearest_data[calcType] -
-                    extrapolatedDepth.cumulate_distance;
                   this.projects[p].holes[h].sections[s].markers[
                     m
-                  ].depth_source = [
-                    "extrapolation",
-                    extrapolatedDepth.nearest_data.id,
-                    null,
-                  ];
-
-                  if (calcType == "composite_depth") {
-                    this.projects[p].holes[h].sections[s].markers[
-                      m
-                    ].connection_rank = ref_max_rank + 2;
-                  }
+                  ].connection_rank = ref_max_rank + 1;
                 }
               }
             }
 
             //if reliability is low
             if (
-              this.projects[p].holes[h].sections[s].markers[m].reliability ==
-                2 &&
-              calcType == "composite_depth"
+              this.projects[p].holes[h].sections[s].markers[m].reliability == 2
             ) {
               this.projects[p].holes[h].sections[s].markers[
                 m
               ].connection_rank += 1;
             }
 
-            //apply cd/efd to connected other markers based on reliability and rank
+            //transfer cd/efd to connected other markers based on reliability and rank
             const curret_reliability =
               this.projects[p].holes[h].sections[s].markers[m].reliability;
             const h_connection =
@@ -2296,21 +2272,37 @@ class LevelCompilerCore {
               const current_rank =
                 this.projects[p].holes[h].sections[s].markers[m]
                   .connection_rank;
+              const connected_order = hc_idx[0] * 10 + hc_idx[1];
+              const current_order = p * 10 + h;
 
               //if connected marker is lower rank, write cd
               if (connected_rliability >= curret_reliability) {
-                if (connected_rank >= current_rank || connected_rank == null) {
+                if (
+                  connected_rank == null ||
+                  connected_rank > current_rank ||
+                  (connected_order > current_order &&
+                    connected_rank == current_rank)
+                ) {
                   if (
                     this.projects[p].holes[h].sections[s].markers[m][
                       calcType
                     ] !== null
                   ) {
+                    //depth
                     this.projects[hc_idx[0]].holes[hc_idx[1]].sections[
                       hc_idx[2]
                     ].markers[hc_idx[3]][calcType] =
                       this.projects[p].holes[h].sections[s].markers[m][
                         calcType
                       ];
+                    //rank
+                    this.projects[hc_idx[0]].holes[hc_idx[1]].sections[
+                      hc_idx[2]
+                    ].markers[hc_idx[3]].connection_rank =
+                      this.projects[p].holes[h].sections[s].markers[
+                        m
+                      ].connection_rank;
+                    //source
                     this.projects[hc_idx[0]].holes[hc_idx[1]].sections[
                       hc_idx[2]
                     ].markers[hc_idx[3]].depth_source = [
@@ -2318,14 +2310,151 @@ class LevelCompilerCore {
                       this.projects[p].holes[h].sections[s].markers[m].id,
                       null,
                     ];
-                    if (calcType == "composite_depth") {
-                      this.projects[hc_idx[0]].holes[hc_idx[1]].sections[
-                        hc_idx[2]
-                      ].markers[hc_idx[3]].connection_rank =
-                        this.projects[p].holes[h].sections[s].markers[
-                          m
-                        ].connection_rank;
-                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  applyMarkerExtrapolation(MaxSourceDegree, calcType) {
+    for (let p = 0; p < this.projects.length; p++) {
+      for (let h = 0; h < this.projects[p].holes.length; h++) {
+        //
+        for (let s = 0; s < this.projects[p].holes[h].sections.length; s++) {
+          //;
+          for (
+            let m = 0;
+            m < this.projects[p].holes[h].sections[s].markers.length;
+            m++
+          ) {
+            //find marker without composite depth
+            const targetMarkerData =
+              this.projects[p].holes[h].sections[s].markers[m];
+
+            //get nearest cd/efd data
+            const upperMarkerDepth = this.searchNearestMarker(
+              MaxSourceDegree,
+              targetMarkerData,
+              "above",
+              calcType
+            );
+            const lowerMarkerDepth = this.searchNearestMarker(
+              MaxSourceDegree,
+              targetMarkerData,
+              "below",
+              calcType
+            );
+
+            if (upperMarkerDepth == null && lowerMarkerDepth == null) {
+              continue;
+            }
+
+            //calc new rank
+            let ref_max_rank = null;
+            if (upperMarkerDepth !== null && lowerMarkerDepth !== null) {
+              ref_max_rank = ss.max([
+                upperMarkerDepth.nearest_data.connection_rank,
+                lowerMarkerDepth.nearest_data.connection_rank,
+              ]);
+            }
+
+            //apply extrapolation
+            //switch extrapolation by direction
+            let extrapolatedDepth = null;
+            if (upperMarkerDepth == null) {
+              extrapolatedDepth = lowerMarkerDepth;
+              ref_max_rank = extrapolatedDepth.nearest_data.connection_rank;
+            } else if (lowerMarkerDepth == null) {
+              extrapolatedDepth = upperMarkerDepth;
+              ref_max_rank = extrapolatedDepth.nearest_data.connection_rank;
+            } else {
+              //case extrapolation but above and below marker already extrapolated
+              extrapolatedDepth = lowerMarkerDepth;
+            }
+
+            if (extrapolatedDepth !== null) {
+              //set depth
+              if (targetMarkerData[calcType] == null) {
+                this.projects[p].holes[h].sections[s].markers[m][calcType] =
+                  extrapolatedDepth.nearest_data[calcType] -
+                  extrapolatedDepth.cumulate_distance;
+
+                this.projects[p].holes[h].sections[s].markers[m].depth_source =
+                  ["extrapolation", extrapolatedDepth.nearest_data.id, null];
+
+                this.projects[p].holes[h].sections[s].markers[
+                  m
+                ].connection_rank = ref_max_rank + 2;
+              }
+            }
+
+            //if reliability is low
+            if (
+              this.projects[p].holes[h].sections[s].markers[m].reliability == 2
+            ) {
+              this.projects[p].holes[h].sections[s].markers[
+                m
+              ].connection_rank += 1;
+            }
+
+            //transfer cd/efd to connected other markers based on reliability and rank
+            const curret_reliability =
+              this.projects[p].holes[h].sections[s].markers[m].reliability;
+            const h_connection =
+              this.projects[p].holes[h].sections[s].markers[m].h_connection;
+            for (let c = 0; c < h_connection.length; c++) {
+              const hc_idx = this.search_idx_list[h_connection[c]];
+              const connected_rliability =
+                this.projects[hc_idx[0]].holes[hc_idx[1]].sections[hc_idx[2]]
+                  .markers[hc_idx[3]].reliability;
+              const connected_rank =
+                this.projects[hc_idx[0]].holes[hc_idx[1]].sections[hc_idx[2]]
+                  .markers[hc_idx[3]].connection_rank;
+              const current_rank =
+                this.projects[p].holes[h].sections[s].markers[m]
+                  .connection_rank;
+              const connected_order = hc_idx[0] * 10 + hc_idx[1];
+              const current_order = p * 10 + h;
+
+              //if connected marker is lower rank, write cd
+              if (connected_rliability >= curret_reliability) {
+                if (
+                  connected_rank == null ||
+                  connected_rank > current_rank ||
+                  (connected_order > current_order &&
+                    connected_rank == current_rank)
+                ) {
+                  if (
+                    this.projects[p].holes[h].sections[s].markers[m][
+                      calcType
+                    ] !== null
+                  ) {
+                    //depth
+                    this.projects[hc_idx[0]].holes[hc_idx[1]].sections[
+                      hc_idx[2]
+                    ].markers[hc_idx[3]][calcType] =
+                      this.projects[p].holes[h].sections[s].markers[m][
+                        calcType
+                      ];
+                    //rank
+                    this.projects[hc_idx[0]].holes[hc_idx[1]].sections[
+                      hc_idx[2]
+                    ].markers[hc_idx[3]].connection_rank =
+                      this.projects[p].holes[h].sections[s].markers[
+                        m
+                      ].connection_rank;
+                    //source
+                    this.projects[hc_idx[0]].holes[hc_idx[1]].sections[
+                      hc_idx[2]
+                    ].markers[hc_idx[3]].depth_source = [
+                      "transfer",
+                      this.projects[p].holes[h].sections[s].markers[m].id,
+                      null,
+                    ];
                   }
                 }
               }
@@ -2338,31 +2467,16 @@ class LevelCompilerCore {
 
   searchNearestMarker(nth, startMarkerData, searchDirection, calcType) {
     //nth: max data source of n degree connection
-
-    let flagDirection;
-    null;
-    if (searchDirection == "above") {
-      flagDirection = false;
-    } else if (searchDirection == "below") {
-      flagDirection = true;
-    } else {
-      console.log("Search nearest marker direction is not correct.");
-      return null;
-    }
-
+    //search markers based on each rank level
+    let isSuccess = false;
     let flagSearch = true;
     let visitedId = new Set();
     visitedId.add(startMarkerData.id.toString());
     let nextIds = startMarkerData.v_connection;
     let distanceFromStartMarker = 0; //cumulate distance
-    let cdAtStartMarker = startMarkerData.composite_depth; //composite depth
-    let cdAtNearestMarker = null;
-    let efdAtStartMarker = startMarkerData.event_free_depth;
-    let efdAtNearestMarker = null;
     let currMarkerData = startMarkerData;
     let nextMarkerData = null;
     let roopCounts = 0;
-    let isSuccess = false;
 
     while (flagSearch) {
       roopCounts += 1;
@@ -2380,6 +2494,9 @@ class LevelCompilerCore {
 
           //get distance between markers
           let distanceBetweenMarkers = null;
+          const rowDistanceBetweenMarkers =
+            nextMarkerData.distance - currMarkerData.distance;
+
           if (calcType == "composite_depth") {
             distanceBetweenMarkers =
               nextMarkerData.distance - currMarkerData.distance;
@@ -2392,8 +2509,8 @@ class LevelCompilerCore {
 
           //check connected direction
           if (
-            (flagDirection && distanceBetweenMarkers >= 0) ||
-            (!flagDirection && distanceBetweenMarkers <= 0)
+            (searchDirection == "below" && rowDistanceBetweenMarkers > 0) ||
+            (searchDirection == "above" && rowDistanceBetweenMarkers < 0)
           ) {
             //add cumlate distance
             distanceFromStartMarker += distanceBetweenMarkers;
@@ -2434,11 +2551,6 @@ class LevelCompilerCore {
     let output = null;
     if (isSuccess == true) {
       //case successfull
-      cdAtNearestMarker = nextMarkerData.composite_depth;
-      cdAtStartMarker = startMarkerData.composite_depth;
-      efdAtNearestMarker = nextMarkerData.event_free_depth;
-      efdAtStartMarker = startMarkerData.event_free_depth;
-
       output = {
         direction: searchDirection,
         cumulate_distance: distanceFromStartMarker,
@@ -2448,14 +2560,13 @@ class LevelCompilerCore {
           connection_rank: startMarkerData.connection_rank,
         },
         nearest_data: {
-          composite_depth: cdAtNearestMarker,
-          event_free_depth: efdAtNearestMarker,
+          composite_depth: nextMarkerData.composite_depth,
+          event_free_depth: nextMarkerData.event_free_depth,
           id: nextMarkerData.id,
           connection_rank: nextMarkerData.connection_rank,
         },
       };
     }
-
     return output;
   }
 
@@ -2516,8 +2627,8 @@ class LevelCompilerCore {
     //if both connected
     if (isConnectCur2Neb && isConnectNeb2Cur) {
       //if event data linked, all thickness is event layer
-      deposition_thickness =
-        neighborMarkerData.distance - currentMarkerData.distance;
+      //deposition_thickness = neighborMarkerData.distance - currentMarkerData.distance;
+      deposition_thickness = distanceMarkers; //force zero thickness
     } else if (
       currentMarkerData.event.length !== 0 &&
       neighborMarkerData.event.length !== 0

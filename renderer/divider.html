@@ -9,24 +9,58 @@
     <script src="js/renderer_divider.js" defer></script>
   </head>
   <body>
-    <div class="depth">
-      <div>
-        <p>Select source columns</p>
-        <select id="dv_source_type">
-          <option value="trinity" selected>Trinity depth</option>
-          <option value="composite_depth">Composite depth</option>
-          <option value="event_free_depth">Event free depth</option>
-          <option value="age">Age</option>
+    <div id="options">
+      <div id="holeDiv">
+        <p>Hole</p>
+        <select id="holeOptions"></select>
+      </div>
+      <div id="sectionDiv">
+        <p>Section</p>
+        <select id="sectionOptions"></select>
+      </div>
+      <div id="directionDiv">
+        <p>Direction</p>
+        <select id="directionOptions">
+          <option value="actual2definition" selected>Actual->Definition</option>
+          <option value="definition2actual">Definition->Actual</option>
         </select>
       </div>
-      <div id="depth_definition"></div>
+      <div id="exportDiv">
+        <p>Export</p>
+        <button id="exportButton">Export</button>
+      </div>
     </div>
-    <div id="dv_source_chooser"></div>
-    <div id="dv_data__table">
-      <table id="data_table"></table>
-    </div>
-    <div class="export_row">
-      <button id="dv_bt_divide" title="divide">Divide</button>
+
+    <div id="table_container">
+      <div id="depth_table_div">
+        <table id="depth_table">
+          <tr>
+            <th class="depth_name">Marker name</th>
+            <th class="depth_definition">Definition (cm)</th>
+            <th class="depth_actual">Actual (cm)</th>
+          </tr>
+        </table>
+      </div>
+      <div id="target_table_div">
+        <table id="target_table">
+          <tr>
+            <th class="in_position">Target(cm)</th>
+          </tr>
+        </table>
+        <div id="add_menu">
+          <button id="add_in_position">Add</button>
+        </div>
+      </div>
+      <div id="result_table_div">
+        <table id="result_table">
+          <tr>
+            <th class="out_position">Result(cm)</th>
+          </tr>
+        </table>
+      </div>
+      <div id="plot_canvas_div">
+        <canvas id="plot_canvas"></canvas>
+      </div>
     </div>
   </body>
 </html>

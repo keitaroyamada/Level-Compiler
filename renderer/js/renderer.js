@@ -15,7 +15,7 @@ document.addEventListener("DOMContentLoaded", () => {
   let age_model_list = []; //for reload
 
   //p5(vector) canvas
-  let isDrawVector = false; //plot p5 or canvas
+  let isDrawVector = true; //plot p5 or canvas
   let vectorObjects = null; //p5 instance data
   document.getElementById("p5Canvas").style.display = "none"; //disable
 
@@ -70,6 +70,8 @@ document.addEventListener("DOMContentLoaded", () => {
   objOpts.canvas.grid_width = 0.8;
   objOpts.canvas.grid_colour = "gray";
   objOpts.canvas.is_target = false;
+  objOpts.canvas.is_event = true;
+  objOpts.canvas.draw_core_photo = false;
 
   objOpts.hole.distance = 20;
   objOpts.hole.width = 20;
@@ -116,28 +118,53 @@ document.addEventListener("DOMContentLoaded", () => {
   objOpts.event.line_colour = "gray"; //rate
 
   objOpts.connection.line_colour = "gray";
-  objOpts.connection.line_width = 1;
-  objOpts.connection.indexWidth = 30;
+  objOpts.connection.line_width = 1.5;
+  objOpts.connection.indexWidth = objOpts.hole.distance * 0.7; //20;
 
   objOpts.pen.colour = "red";
 
   objOpts.age.incon_size = 20;
   objOpts.age.alt_radius = 3;
   objOpts.age.incon_list = {
-    terrestrial: ["../resources/plot/terrestrial.png", "green"],
-    marine: ["../resources/plot/marine.png", "blue"],
-    tephra: ["../resources/plot/tephra.png", "red"],
-    climate: ["../resources/plot/climate.png", "yellow"],
-    orbital: ["../resources/plot/orbital.png", "orange"],
-    general: ["../resources/plot/general.png", "black"],
+    terrestrial: [
+      "C:/Users/slinn/source/repos/LevelCompiler/resources/plot/terrestrial.png",
+      "green",
+    ],
+    marine: [
+      "C:/Users/slinn/source/repos/LevelCompiler/resources/plot/marine.png",
+      "blue",
+    ],
+    tephra: [
+      "C:/Users/slinn/source/repos/LevelCompiler/resources/plot/tephra.png",
+      "red",
+    ],
+    climate: [
+      "C:/Users/slinn/source/repos/LevelCompiler/resources/plot/climate.png",
+      "yellow",
+    ],
+    orbital: [
+      "C:/Users/slinn/source/repos/LevelCompiler/resources/plot/orbital.png",
+      "orange",
+    ],
+    general: [
+      "C:/Users/slinn/source/repos/LevelCompiler/resources/plot/general.png",
+      "black",
+    ],
   };
-
   //============================================================================================
   //resources
   //get plot image data
-  let agePlotIcons = {};
-  loadRasterPlotIcons(agePlotIcons, objOpts);
   let ageVectorPlotIcons = {};
+  let modelImages = {
+    image_dir: [],
+    drilling_depth: {},
+    composite_depth: {},
+    event_free_depth: {},
+  };
+
+  let agePlotIcons = {};
+
+  LoadRasterIcons(agePlotIcons, objOpts);
   loadVectorPlotIcons(ageVectorPlotIcons, objOpts);
 
   //============================================================================================
@@ -158,16 +185,19 @@ document.addEventListener("DOMContentLoaded", () => {
 
     //get model path
     const model_path1 =
-      "C:/Users/slinn/Dropbox/Prj_LevelCompiler/_LC test data/[correlation]SG Correlation model for LC (24 Nov. 2023).csv";
+      "C:/Users/slinn/Dropbox/Prj_LevelCompiler/_LC test data/[correlation]SG06 Correlation(24 Nov. 2023).csv";
 
     const model_path2 =
-      "C:/Users/slinn/Dropbox/Prj_LevelCompiler/_LC test data/[duo]SG14 LC test model with event(temp).csv";
+      "C:/Users/slinn/Dropbox/Prj_LevelCompiler/_LC test data/[duo]SG14 Correlation(temp).csv";
     //const model_path =     "C:/Users/slinn/Dropbox/Prj_LevelCompiler/_LC test data/[correlation]SG14 LC test model with event(temp).csv";
     const age1_path =
       "C:/Users/slinn/Dropbox/Prj_LevelCompiler/_LC test data/[age]SG IntCal20 yr BP chronology for LC (01 Jun. 2021).csv";
 
     const age2_path =
       "C:/Users/slinn/Dropbox/Prj_LevelCompiler/_LC test data/[age]SG IntCal13 yr BP chronology for LC (06 Apr. 2020).csv";
+
+    const photo_path = "C:/Users/slinn/Dropbox/Prj_LevelCompiler/_core photo";
+
     //register correlation model
     await registerModel(model_path1);
     await registerModel(model_path2);
@@ -184,6 +214,27 @@ document.addEventListener("DOMContentLoaded", () => {
 
     //register age into LCplot
     await registerPlotFromLCAge();
+
+    //load core images
+    const response = await window.LCapi.askdialog(
+      "Load core images",
+      "Do you want to load the core images?"
+    );
+    if (response.response) {
+      modelImages.image_dir = photo_path;
+
+      //恐らく同期に問題
+      loadVectorImages(modelImages, LCCore, "drilling_depth").then((res) => {
+        modelImages["drilling_depth"] = res;
+        console.log(modelImages.drilling_depth["A-01"]);
+      });
+      console.log("ssssssssssssssss");
+      //modelImages = await loadVectorImages(        modelImages,        LCCore,        "composite_depth"      );
+
+      //await loadModelImages(coreImages, photo_path);
+      //await loadCalcedImages(CDImages, coreImages, LCCore, "composite_depth");
+      //await loadCalcedImages(EFDImages, coreImages, LCCore, "event_free_depth");
+    }
 
     //load LCplot
     await loadPlotData();
@@ -231,6 +282,63 @@ document.addEventListener("DOMContentLoaded", () => {
         objOpts.canvas.is_target = true;
         document.getElementById("bt_target").style.backgroundColor = "#ccc";
         target_line.style.display = "block";
+      }
+      updateView();
+    });
+  //============================================================================================
+  //show event layers
+  document
+    .getElementById("bt_event_layer")
+    .addEventListener("click", async (event) => {
+      if (objOpts.canvas.is_event) {
+        objOpts.canvas.is_event = false;
+        document.getElementById("bt_event_layer").style.backgroundColor =
+          "#f0f0f0";
+      } else {
+        objOpts.canvas.is_event = true;
+        document.getElementById("bt_event_layer").style.backgroundColor =
+          "#ccc";
+      }
+      updateView();
+    });
+  //============================================================================================
+  //show core images
+  document
+    .getElementById("bt_core_photo")
+    .addEventListener("click", async (event) => {
+      if (Object.keys(modelImages[objOpts.canvas.depth_scale]).length === 0) {
+        const response = await window.LCapi.askdialog(
+          "Load core images",
+          "Core images are not loaded. Do you want to load the core images?"
+        );
+        if (response.response) {
+          const photo_path =
+            "C:/Users/slinn/Dropbox/Prj_LevelCompiler/core photo";
+          await loadModelImages(coreImages, photo_path);
+          await loadCalcedImages(
+            CDImages,
+            coreImages,
+            LCCore,
+            "composite_depth"
+          );
+          await loadCalcedImages(
+            EFDImages,
+            coreImages,
+            LCCore,
+            "event_free_depth"
+          );
+        } else {
+          return;
+        }
+      }
+
+      if (objOpts.canvas.draw_core_photo) {
+        objOpts.canvas.draw_core_photo = false;
+        document.getElementById("bt_core_photo").style.backgroundColor =
+          "#f0f0f0";
+      } else {
+        objOpts.canvas.draw_core_photo = true;
+        document.getElementById("bt_core_photo").style.backgroundColor = "#ccc";
       }
       updateView();
     });
@@ -815,23 +923,51 @@ document.addEventListener("DOMContentLoaded", () => {
   document.addEventListener(
     "wheel",
     function (event) {
+      //wheel event
+      var deltaX = event.deltaX;
+      var deltaY = event.deltaY;
+
+      if (event.ctrlKey) {
+        //scroll lateral
+        event.preventDefault();
+        scroller.scrollBy({ left: deltaY * 1, behavior: "auto" });
+      }
+
+      if (event.shiftKey) {
+        //change hole distance
+        event.preventDefault();
+        objOpts.hole.distance += 0.01 * deltaY;
+        objOpts.connection.indexWidth = objOpts.hole.distance * 0.7;
+        //objOpts.connection.indexWidth += 0.015 * deltaY;
+        if (objOpts.connection.indexWidth < 0) {
+          objOpts.connection.indexWidth = 0;
+        }
+        if (objOpts.connection.indexWidth > 20) {
+          objOpts.connection.indexWidth = 20;
+        }
+
+        //update plot
+        updateView();
+      }
+
       if (event.altKey) {
         event.preventDefault();
-
-        //wheel event
-        var deltaX = event.deltaX;
-        var deltaY = event.deltaY;
-
         //add zoom level
         objOpts.canvas.zoom_level[0] += 0.01 * deltaX;
-        objOpts.canvas.zoom_level[1] += 0.01 * deltaY;
+        if (event.ctrlKey) {
+          //If ctrl key, x scroll
+          objOpts.canvas.zoom_level[0] += 0.01 * deltaY;
+        } else {
+          //if no ctrl key, yscroll
+          objOpts.canvas.zoom_level[1] += 0.01 * deltaY;
+        }
 
         //limit of smaller
-        if (objOpts.canvas.zoom_level[0] < 0.1) {
-          objOpts.canvas.zoom_level[0] = 0.1;
-        }
         if (objOpts.canvas.zoom_level[1] < 0.1) {
           objOpts.canvas.zoom_level[1] = 0.1;
+        }
+        if (objOpts.canvas.zoom_level[0] < 0.1) {
+          objOpts.canvas.zoom_level[0] = 0.1;
         }
 
         //mouse position
@@ -1207,6 +1343,13 @@ document.addEventListener("DOMContentLoaded", () => {
             //load section data
             const section = hole.sections[s];
 
+            const view_rect = {
+              x: scroller.scrollLeft,
+              y: scroller.scrollTop,
+              width: offScreenCanvas.width,
+              height: offScreenCanvas.height,
+            };
+
             //calc position----------------------------------------------------
             let section_top = section.markers[0][objOpts.canvas.depth_scale];
             let section_bottom =
@@ -1224,8 +1367,17 @@ document.addEventListener("DOMContentLoaded", () => {
             const sec_y0 = (section_top + shift_y) * yMag + pad_y;
             const sec_w = objOpts.section.width * xMag;
             const sec_h = (section_bottom - section_top) * yMag;
+            const sec_rect = {
+              x: sec_x0,
+              y: sec_y0,
+              width: sec_w,
+              height: sec_h,
+            };
 
             //draw section-----------------------------------------------------
+            if (!isInside(view_rect, sec_rect, 500)) {
+              continue;
+            }
             //sketch.drawingContext.setLineDash([]);
             sketch.strokeWeight(objOpts.section.line_width);
             sketch.stroke(objOpts.section.line_colour);
@@ -1238,6 +1390,38 @@ document.addEventListener("DOMContentLoaded", () => {
             ) {
               continue;
             }
+
+            //add section photo-------------------------------------------------
+            if (objOpts.canvas.draw_core_photo) {
+              try {
+                if (
+                  modelImages[objOpts.canvas.depth_scale][
+                    hole.name + "-" + section.name
+                  ] !== undefined
+                ) {
+                  try {
+                    sketch.image(
+                      modelImages[objOpts.canvas.depth_scale][
+                        hole.name + "-" + section.name
+                      ],
+                      sec_x0,
+                      sec_y0,
+                      sec_w,
+                      sec_h
+                    );
+                  } catch (error) {
+                    console.error(error);
+                    console.log(
+                      modelImages[objOpts.canvas.depth_scale][
+                        hole.name + "-" + section.name
+                      ]
+                    );
+                  }
+                }
+              } catch (err) {}
+            }
+
+            //
 
             //add section name-------------------------------------------------
             sketch.fill(objOpts.section.font_colour);
@@ -1268,6 +1452,12 @@ document.addEventListener("DOMContentLoaded", () => {
               }
 
               //first, draw event
+              let ew = 0;
+              if (objOpts.canvas.is_event) {
+                ew = objOpts.section.width * xMag - 6;
+              } else {
+                ew = 8;
+              }
               for (let e = 0; e < marker.event.length; e++) {
                 //make marker objects=================================================================================
                 //get position
@@ -1289,11 +1479,12 @@ document.addEventListener("DOMContentLoaded", () => {
                   sketch.rect(
                     (hole_x0 + shift_x) * xMag + pad_x + 3,
                     (lowerDepth + shift_y) * yMag + pad_y,
-                    objOpts.section.width * xMag - 6,
+                    ew,
                     eventThickness * yMag
                   );
                 }
               }
+
               //make marker objects=================================================================================
               // remove top and bottom markers
               let topBot = 0;
@@ -1789,6 +1980,14 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     //-----------------------------------------------------------------------------------------------------------------------
+    //draw area
+    const view_rect = {
+      x: scroller.scrollLeft,
+      y: scroller.scrollTop,
+      width: offScreenCanvas.width,
+      height: offScreenCanvas.height,
+    };
+
     //draw model
     let num_disable = {
       hole: 0,
@@ -1893,8 +2092,17 @@ document.addEventListener("DOMContentLoaded", () => {
           const sec_y0 = (section_top + shift_y) * yMag + pad_y;
           const sec_w = objOpts.section.width * xMag;
           const sec_h = (section_bottom - section_top) * yMag;
+          const sec_rect = {
+            x: sec_x0,
+            y: sec_y0,
+            width: sec_w,
+            height: sec_h,
+          };
 
           //draw section-----------------------------------------------------
+          if (!isInside(view_rect, sec_rect, 500)) {
+            continue;
+          }
           offScreenCtx.setLineDash([]);
           offScreenCtx.lineWidth = objOpts.section.line_width;
           offScreenCtx.strokeStyle = objOpts.section.line_colour;
@@ -1906,6 +2114,30 @@ document.addEventListener("DOMContentLoaded", () => {
           //check zoom level for ignoring plot markers
           if (objOpts.canvas.zoom_level[1] < objOpts.marker.ignore_zoom_level) {
             continue;
+          }
+
+          //add section photo-------------------------------------------------
+          if (objOpts.canvas.draw_core_photo) {
+            try {
+              if (coreImages[hole.name + "-" + section.name] != undefined) {
+                const sec_im = new Image();
+                if (objOpts.canvas.depth_scale == "drilling_depth") {
+                  try {
+                    sec_im.src = coreImages[hole.name + "-" + section.name];
+                  } catch (error) {}
+                } else if (objOpts.canvas.depth_scale == "composite_depth") {
+                  try {
+                    sec_im.src = CDImages[hole.name + "-" + section.name];
+                  } catch (error) {}
+                } else if (objOpts.canvas.depth_scale == "event_free_depth") {
+                  try {
+                    sec_im.src = EFDImages[hole.name + "-" + section.name];
+                  } catch (error) {}
+                }
+
+                offScreenCtx.drawImage(sec_im, sec_x0, sec_y0, sec_w, sec_h);
+              }
+            } catch (err) {}
           }
 
           //add section name-------------------------------------------------
@@ -1938,6 +2170,7 @@ document.addEventListener("DOMContentLoaded", () => {
             }
 
             //first, draw event
+
             for (let e = 0; e < marker.event.length; e++) {
               //make marker objects=================================================================================
               //get position
@@ -1958,8 +2191,13 @@ document.addEventListener("DOMContentLoaded", () => {
                 offScreenCtx.beginPath();
                 const ex0 = (hole_x0 + shift_x) * xMag + pad_x + 3;
                 const ey0 = (lowerDepth + shift_y) * yMag + pad_y;
-                const ew = objOpts.section.width * xMag - 6;
-                const eh = eventThickness * yMag;
+                let ew = 0;
+                let eh = eventThickness * yMag;
+                if (objOpts.canvas.is_event) {
+                  ew = objOpts.section.width * xMag - 6;
+                } else {
+                  ew = 8;
+                }
                 offScreenCtx.fillRect(ex0, ey0, ew, eh);
                 offScreenCtx.stroke();
               }
@@ -2068,6 +2306,7 @@ document.addEventListener("DOMContentLoaded", () => {
             offScreenCtx.beginPath();
             offScreenCtx.fillText(
               (Math.round(marker.distance * 10) / 10).toFixed(1).toString(),
+              //(Math.round(marker.event_free_depth * 10) / 10).toFixed(1).toString(),
               (hole_x0 + shift_x) * xMag +
                 pad_x +
                 objOpts.marker.width * xMag +
@@ -2271,8 +2510,10 @@ document.addEventListener("DOMContentLoaded", () => {
         ageSeries[a].source_type == "tephra" ||
         ageSeries[a].source_type == "general"
       ) {
+        const ageicon = new Image();
+        ageicon.src = agePlotIcons[ageSeries[a].source_type];
         offScreenCtx.drawImage(
-          agePlotIcons[ageSeries[a].source_type],
+          ageicon,
           posX,
           posY,
           objOpts.age.incon_size,
@@ -2705,6 +2946,95 @@ document.addEventListener("DOMContentLoaded", () => {
 
       //updateView();
     }
+  }
+
+  async function loadModelImages(modelImages, dir_path) {
+    if (LCCore != null) {
+      let N = 0;
+      LCCore.projects.forEach((p) => {
+        p.holes.forEach((h) => {
+          h.sections.forEach((s) => {
+            N += 1;
+          });
+        });
+      });
+
+      window.LCapi.progressbar(
+        "Loading Core images",
+        "Converting section images..."
+      );
+      let n = 0;
+
+      for (project of LCCore.projects) {
+        for (hole of project.holes) {
+          for (section of hole.sections) {
+            const im_name = hole.name + "-" + section.name;
+            let img = new Image();
+            try {
+              const imageBase64 = await window.LCapi.LoadRasterImage(
+                dir_path + "/" + project.name + "/" + im_name + ".jpg",
+                3000
+              );
+
+              modelImages[im_name] = "data:image/jpeg;base64," + imageBase64;
+              //modelImages[im_name] =  dir_path + "/" + project.name + "/" + im_name + ".jpg";
+            } catch (error) {
+              //console.log(error);
+              modelImages[im_name] = [];
+            }
+
+            //update progressbar
+            n += 1;
+            window.LCapi.updateProgressbar(n, N);
+          }
+        }
+      }
+    }
+    console.log("Core images loaded.");
+  }
+
+  async function loadCalcedImages(calcedImages, imageData, LCCore, depthScale) {
+    if (LCCore != null) {
+      const keys = Object.keys(imageData);
+      const N = keys.length;
+      let n = 0;
+      window.LCapi.progressbar(
+        "Loading Core images",
+        "Converting section images to " + depthScale + "..."
+      );
+
+      for (project of LCCore.projects) {
+        for (hole of project.holes) {
+          for (section of hole.sections) {
+            const im_name = hole.name + "-" + section.name;
+            try {
+              console.log(im_name);
+              const imageBase64 = await window.LCapi.makeModelImage(
+                imageData[im_name],
+                section,
+                depthScale
+              );
+              calcedImages[im_name] = "data:image/jpeg;base64," + imageBase64;
+            } catch (err) {
+              console.log(err);
+              calcedImages[im_name] = [];
+            }
+
+            n += 1;
+            window.LCapi.updateProgressbar(n, N);
+          }
+        }
+      }
+    }
+  }
+
+  function loadImage(path) {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => resolve(img);
+      img.onerror = () => reject(console.log("aaaaaaaa"));
+      img.src = path;
+    });
   }
 
   async function registerAge(in_path) {
@@ -3336,42 +3666,6 @@ function calcCanvasBaseSize(LCCore, objOpts) {
   return [canvasBaseWidth, canvasBaseHeight];
 }
 
-async function createRasterCircleImage(canvasSize, radius, color) {
-  let canvas = document.createElement("canvas");
-  let ctx = canvas.getContext("2d");
-  canvas.width = canvas.height = canvasSize;
-  ctx.beginPath();
-  ctx.arc(canvasSize / 2, canvasSize / 2, radius, 0, 2 * Math.PI);
-  ctx.fillStyle = color;
-  ctx.fill();
-  return canvas.toDataURL();
-}
-async function loadRasterPlotIcons(agePlotIcons, objOpts) {
-  for (let key in objOpts.age.incon_list) {
-    const path = objOpts.age.incon_list[key][0];
-    const colour = objOpts.age.incon_list[key][1];
-
-    let img = new Image();
-    img.src = path;
-    img.onerror = async () => {
-      img.src = await createRasterCircleImage(
-        objOpts.age.incon_size,
-        objOpts.age.alt_radius,
-        colour
-      );
-    };
-    agePlotIcons[key] = img;
-  }
-
-  let img = new Image();
-  img.src = await createRasterCircleImage(
-    objOpts.age.incon_size,
-    objOpts.age.alt_radius,
-    "black"
-  );
-  agePlotIcons["none"] = img;
-}
-
 async function loadVectorPlotIcons(ageVectorPlotIcons, objOpts) {
   new p5(async (p) => {
     ageVectorPlotIcons["none"] = await createVectorCircleImage(
@@ -3383,13 +3677,14 @@ async function loadVectorPlotIcons(ageVectorPlotIcons, objOpts) {
     for (let key in objOpts.age.incon_list) {
       const path = objOpts.age.incon_list[key][0];
       const colour = objOpts.age.incon_list[key][1];
+      const imageBase64 = await window.LCapi.LoadRasterImage(path, 0);
       ageVectorPlotIcons[key] = await p.loadImage(
-        path,
+        "data:image/png;base64," + imageBase64,
         async () => {
           //console.log("");
         },
         async () => {
-          console.log("fail to load image of " + key);
+          console.log("Fail to load image of " + key);
           ageVectorPlotIcons[key] = await createVectorCircleImage(
             p,
             objOpts.age.incon_size,
@@ -3400,14 +3695,6 @@ async function loadVectorPlotIcons(ageVectorPlotIcons, objOpts) {
       );
     }
   });
-}
-
-async function createVectorCircleImage(p, canvasSize, radius, color) {
-  let fallbackImg = p.createGraphics(canvasSize, canvasSize);
-  fallbackImg.clear();
-  fallbackImg.fill(color);
-  fallbackImg.ellipse(canvasSize / 2, canvasSize / 2, radius * 2, radius * 2);
-  return fallbackImg;
 }
 
 function sortHoleByOrder(LCCore) {
@@ -3421,4 +3708,205 @@ function sortHoleByOrder(LCCore) {
     });
   });
 }
+//--------------------------------------------------------------------------------------------------
+async function createRasterCircleImage(canvasSize, radius, color) {
+  let canvas = document.createElement("canvas");
+  let ctx = canvas.getContext("2d");
+  canvas.width = canvas.height = canvasSize;
+  ctx.beginPath();
+  ctx.arc(canvasSize / 2, canvasSize / 2, radius, 0, 2 * Math.PI);
+  ctx.fillStyle = color;
+  ctx.fill();
+  return canvas.toDataURL();
+}
+//--------------------------------------------------------------------------------------------------
+async function createVectorCircleImage(p, canvasSize, radius, color) {
+  let fallbackImg = p.createGraphics(canvasSize, canvasSize);
+  fallbackImg.clear();
+  fallbackImg.fill(color);
+  fallbackImg.ellipse(canvasSize / 2, canvasSize / 2, radius * 2, radius * 2);
+  return fallbackImg;
+}
+//--------------------------------------------------------------------------------------------------
+async function LoadRasterIcons(agePlotIcons, objOpts) {
+  for (let key in objOpts.age.incon_list) {
+    const path = objOpts.age.incon_list[key][0];
+    const colour = objOpts.age.incon_list[key][1];
+
+    let img = new Image();
+    try {
+      const imageBase64 = await window.LCapi.LoadRasterImage(path, 0);
+      agePlotIcons[key] = "data:image/png;base64," + imageBase64;
+    } catch (error) {
+      console.log(error);
+      agePlotIcons[key] = await createRasterCircleImage(
+        objOpts.age.incon_size,
+        objOpts.age.alt_radius,
+        colour
+      );
+    }
+  }
+
+  let img = new Image();
+  img.src = await createRasterCircleImage(
+    objOpts.age.incon_size,
+    objOpts.age.alt_radius,
+    "black"
+  );
+
+  agePlotIcons["none"] = img;
+  return agePlotIcons;
+}
+
+function isInside(rectA, rectB, pad) {
+  if (
+    rectA.x + rectA.width + pad < rectB.x ||
+    rectB.x + rectB.width < rectA.x - pad
+  ) {
+    return false;
+  }
+  if (
+    rectA.y + rectA.height + pad < rectB.y ||
+    rectB.y + rectB.height < rectA.y - pad
+  ) {
+    return false;
+  }
+  return true;
+}
+
+async function loadVectorImages(modelImages, LCCore, depthScale) {
+  const prom = new Promise((resolve, reject) => {
+    let results = {};
+    console.log(depthScale);
+    //check
+    if (modelImages.image_dir.length == 0) {
+      console.log("There is no image path.");
+      resolve(results);
+    }
+    if (LCCore == null) {
+      console.log("There is no LCCore.");
+      resolve(results);
+    }
+
+    console.log(Object.keys(modelImages.drilling_depth));
+    if (depthScale == "composite_depth" || depthScale == "event_free_depth") {
+      if (Object.keys(modelImages.drilling_depth).length == 0) {
+        console.log("There is no original image.");
+        resolve(results);
+      }
+    }
+
+    //main
+    //get num images
+    let N = 0;
+    LCCore.projects.forEach((p) => {
+      p.holes.forEach((h) => {
+        h.sections.forEach((s) => {
+          N += 1;
+        });
+      });
+    });
+
+    //main
+    //Progress
+    let txt = "Converting to " + depthScale + " section images...";
+    if (depthScale == "drilling_depth") {
+      txt = "Loading original section images...";
+    }
+    window.LCapi.progressbar("Load images", txt);
+    let n = 0;
+
+    new p5(async (p) => {
+      let n = 0;
+
+      for (project of LCCore.projects) {
+        for (hole of project.holes) {
+          for (section of hole.sections) {
+            const im_name = hole.name + "-" + section.name;
+            if (depthScale == "drilling_depth") {
+              //case original image
+              const dpcm = 30; //pix/cm}
+              const im_height = Math.round(
+                dpcm *
+                  (section.markers[section.markers.length - 1].distance -
+                    section.markers[0].distance),
+                0
+              );
+              //load image
+              try {
+                const imageBase64 = await window.LCapi.LoadRasterImage(
+                  modelImages.image_dir +
+                    "/" +
+                    project.name +
+                    "/" +
+                    im_name +
+                    ".jpg",
+                  im_height
+                );
+
+                if (imageBase64 !== undefined) {
+                  results[im_name] = await p.loadImage(
+                    "data:image/png;base64," + imageBase64,
+                    async () => {
+                      //console.log("");
+                    },
+                    async () => {
+                      console.log("Fail to load image of " + im_name);
+                    }
+                  );
+                } else {
+                  results[im_name] = undefined;
+                }
+              } catch (error) {
+                //console.log(error);
+                results[im_name] = undefined;
+              }
+            } else if (
+              depthScale == "composite_depth" ||
+              depthScale == "event_free_depth"
+            ) {
+              //case CD, EF, convert original to CD EFD image
+              try {
+                if (modelImages.drilling_depth[im_name] == undefined) {
+                  const imageBase64 = await window.LCapi.makeModelImage(
+                    modelImages.drilling_depth[im_name],
+                    section,
+                    depthScale
+                  );
+                  console.log(imageBase64);
+                  if (imageBase64 !== undefined) {
+                    results[im_name] = await p.loadImage(
+                      "data:image/png;base64," + imageBase64,
+                      async () => {
+                        //console.log("");
+                      },
+                      async () => {
+                        //console.log("Fail to load image of " + im_name);
+                      }
+                    );
+                  } else {
+                    results[im_name] = undefined;
+                  }
+                }
+              } catch (err) {
+                console.log(err);
+                results[im_name] = undefined;
+              }
+            }
+
+            n += 1;
+            window.LCapi.updateProgressbar(n, N);
+          }
+        }
+      }
+    });
+    resolve(results);
+  });
+
+  return Promise.all([prom]).then((pr) => {
+    console.log(depthScale + " images loaded.");
+    return pr[0];
+  });
+}
+
 //============================================================================================
