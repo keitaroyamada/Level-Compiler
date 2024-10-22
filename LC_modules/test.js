@@ -5,9 +5,10 @@ const lcfnc = require("./lcfnc.js");
 const { Age } = require("./Age.js");
 const { LevelCompilerPlot } = require("./LevelCompilerPlot.js");
 
-let model_path =
-  "C:/Users/slinn/Dropbox/Prj_LevelCompiler/_LC test data/[correlation]SG14 LC test model with event(temp).csv";
-
+let model_path ="C:/Users/slinn/Dropbox/Prj_LevelCompiler/_LC test data/[correlation]SG06 Correlation(24 Nov. 2023).csv";
+  //"C:\Users\slinn\Dropbox\Prj_LevelCompiler\_LC test data Beppu\[correlation]BP15 Correlation (26 Aug. 2023).csv"
+  
+/*
 const age_path =
   "C:/Users/slinn/Dropbox/Prj_LevelCompiler/_LC test data/[age]SG IntCal20 yr BP chronology for LC (01 Jun. 2021).csv";
 
@@ -16,10 +17,11 @@ let model_path1 =
 
 let model_path2 =
   "C:/Users/slinn/Dropbox/Prj_LevelCompiler/_LC test data/[duo]SG14 LC test model with event(temp).csv";
+*/
 
 const core = new LevelCompilerCore();
-core.loadModelFromCsv(model_path1);
-core.loadModelFromCsv(model_path2);
+core.loadModelFromCsv(model_path);
+//core.loadModelFromCsv(model_path2);
 //core.getModelSummary();
 //core.connectDuoModel();
 //console.log("-----------------h connections ------------------");
@@ -27,10 +29,12 @@ core.loadModelFromCsv(model_path2);
 //console.log(core.projects[1].holes[0].sections[2].markers[6].h_connection);
 
 core.calcCompositeDepth();
-core.calcEventFreeDepth();
+console.log(core.projects[0].holes[4].sections[15]);
+
+//core.calcEventFreeDepth();
 //core.checkModel();
-console.log("-----------------------");
-console.log(core.getDataByIdx(core.search_idx_list[[2, 1, 19, 5]]));
+//console.log("-----------------------");
+//console.log(core.getDataByIdx(core.search_idx_list[[2, 1, 19, 5]]));
 
 //console.log(core.projects[1].duo_connection);
 //console.log(core.projects[0].holes[0].sections[2].markers[15]);

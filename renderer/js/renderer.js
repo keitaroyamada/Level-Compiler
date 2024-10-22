@@ -60,7 +60,7 @@ document.addEventListener("DOMContentLoaded", () => {
   objOpts.canvas.dpir = 1; //window.devicePixelRatio || 1;
   objOpts.canvas.mouse_over_colour = "red";
   objOpts.canvas.pad_x = 200; //[px]
-  objOpts.canvas.pad_y = 150; //[px]
+  objOpts.canvas.pad_y = 800; //[px]
   objOpts.canvas.shift_x = 0; //[cm]
   objOpts.canvas.shift_y = 0; //[cm]
   objOpts.canvas.bottom_pad = 100; //[cm]
@@ -110,46 +110,58 @@ document.addEventListener("DOMContentLoaded", () => {
     general: "Gold",
     erosion: "Teal",
     tephra: "Crimson",
-    void: "purple",
+    void: "Purple",
     disturbed: "SlateGray",
     earthquake: "green",
   };
   objOpts.event.line_width = 1;
-  objOpts.event.line_colour = "gray"; //rate
+  objOpts.event.line_colour = "Gray"; //rate
+  objOpts.event.face_wodth  = 0.93;//rate
+  objOpts.event.face_height = 0.98;//rate
 
-  objOpts.connection.line_colour = "gray";
+  objOpts.connection.line_colour = "Gray";
   objOpts.connection.line_width = 1.5;
   objOpts.connection.indexWidth = objOpts.hole.distance * 0.7; //20;
+  objOpts.connection.emphasize_non_horizontal = true;
+  objOpts.connection.show_remote_connections = false;
 
-  objOpts.pen.colour = "red";
+  objOpts.pen.colour = "Red";
 
   objOpts.age.incon_size = 20;
   objOpts.age.alt_radius = 3;
   objOpts.age.incon_list = {
     terrestrial: [
-      "C:/Users/slinn/source/repos/LevelCompiler/resources/plot/terrestrial.png",
-      "green",
+      "./resources/plot/terrestrial.png",
+      "Green",
     ],
     marine: [
-      "C:/Users/slinn/source/repos/LevelCompiler/resources/plot/marine.png",
-      "blue",
+      "./resources/plot/marine.png",
+      "Blue",
     ],
     tephra: [
-      "C:/Users/slinn/source/repos/LevelCompiler/resources/plot/tephra.png",
-      "red",
+      "./resources/plot/tephra.png",
+      "Red",
     ],
     climate: [
-      "C:/Users/slinn/source/repos/LevelCompiler/resources/plot/climate.png",
-      "yellow",
+      "./resources/plot/climate.png",
+      "Yellow",
     ],
     orbital: [
-      "C:/Users/slinn/source/repos/LevelCompiler/resources/plot/orbital.png",
-      "orange",
+      "./resources/plot/orbital.png",
+      "Orange",
     ],
     general: [
-      "C:/Users/slinn/source/repos/LevelCompiler/resources/plot/general.png",
-      "black",
+      "./resources/plot/general.png",
+      "Gray",
     ],
+    historical: [
+      "./resources/plot/historical.png",
+      "Black"
+    ],
+    interpolation: [
+      "./resources/plot/interpolation.png",
+      "Gray"
+    ]
   };
   //============================================================================================
   //resources
@@ -184,7 +196,7 @@ document.addEventListener("DOMContentLoaded", () => {
     await initiarisePlot();
 
     //get model path
-    const model_path1 =
+    const model_path1 = 
       "C:/Users/slinn/Dropbox/Prj_LevelCompiler/_LC test data/[correlation]SG06 Correlation(24 Nov. 2023).csv";
 
     const model_path2 =
@@ -196,7 +208,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const age2_path =
       "C:/Users/slinn/Dropbox/Prj_LevelCompiler/_LC test data/[age]SG IntCal13 yr BP chronology for LC (06 Apr. 2020).csv";
 
-    const photo_path = "C:/Users/slinn/Dropbox/Prj_LevelCompiler/_core photo";
+    const photo_path = "C:/Users/slinn/Dropbox/Prj_LevelCompiler/_LC test data/core photo";
 
     //register correlation model
     await registerModel(model_path1);
@@ -223,17 +235,14 @@ document.addEventListener("DOMContentLoaded", () => {
     if (response.response) {
       modelImages.image_dir = photo_path;
 
-      //恐らく同期に問題
-      loadVectorImages(modelImages, LCCore, "drilling_depth").then((res) => {
-        modelImages["drilling_depth"] = res;
-        console.log(modelImages.drilling_depth["A-01"]);
-      });
-      console.log("ssssssssssssssss");
-      //modelImages = await loadVectorImages(        modelImages,        LCCore,        "composite_depth"      );
+      //load images
+      let originalImages = await loadVectorImages(modelImages, LCCore, "drilling_depth");
+      modelImages["drilling_depth"] = originalImages;
+      let compositeImages = await loadVectorImages(modelImages, LCCore, "composite_depth");
+      modelImages["composite_depth"] = compositeImages;
+      let eventFreeImages = await loadVectorImages(modelImages, LCCore, "event_free_depth");
+      modelImages["event_free_depth"] = eventFreeImages;
 
-      //await loadModelImages(coreImages, photo_path);
-      //await loadCalcedImages(CDImages, coreImages, LCCore, "composite_depth");
-      //await loadCalcedImages(EFDImages, coreImages, LCCore, "event_free_depth");
     }
 
     //load LCplot
@@ -270,9 +279,7 @@ document.addEventListener("DOMContentLoaded", () => {
   });
   //============================================================================================
   //target
-  document
-    .getElementById("bt_target")
-    .addEventListener("click", async (event) => {
+  document.getElementById("bt_target").addEventListener("click", async (event) => {
       var target_line = document.getElementById("horizontal_target");
       if (objOpts.canvas.is_target) {
         objOpts.canvas.is_target = false;
@@ -287,9 +294,7 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   //============================================================================================
   //show event layers
-  document
-    .getElementById("bt_event_layer")
-    .addEventListener("click", async (event) => {
+  document.getElementById("bt_event_layer").addEventListener("click", async (event) => {
       if (objOpts.canvas.is_event) {
         objOpts.canvas.is_event = false;
         document.getElementById("bt_event_layer").style.backgroundColor =
@@ -303,9 +308,21 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   //============================================================================================
   //show core images
-  document
-    .getElementById("bt_core_photo")
-    .addEventListener("click", async (event) => {
+  document.getElementById("bt_core_photo").addEventListener("click", async (event) => {
+    if (Object.keys(modelImages[objOpts.canvas.depth_scale]).length === 0) {
+      return
+    }
+    if (objOpts.canvas.draw_core_photo) {
+      objOpts.canvas.draw_core_photo = false;
+      document.getElementById("bt_core_photo").style.backgroundColor = "#f0f0f0";
+    } else {
+      objOpts.canvas.draw_core_photo = true;
+      document.getElementById("bt_core_photo").style.backgroundColor = "#ccc";
+    }
+    updateView();
+
+
+    /*
       if (Object.keys(modelImages[objOpts.canvas.depth_scale]).length === 0) {
         const response = await window.LCapi.askdialog(
           "Load core images",
@@ -341,12 +358,11 @@ document.addEventListener("DOMContentLoaded", () => {
         document.getElementById("bt_core_photo").style.backgroundColor = "#ccc";
       }
       updateView();
+      */
     });
   //============================================================================================
   //rank
-  document
-    .getElementById("bt_rank")
-    .addEventListener("click", async (event) => {
+  document.getElementById("bt_rank").addEventListener("click", async (event) => {
       if (objOpts.marker.is_rank) {
         objOpts.marker.is_rank = false;
         document.getElementById("bt_rank").style.backgroundColor = "#f0f0f0";
@@ -358,9 +374,7 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   //============================================================================================
   //grid
-  document
-    .getElementById("bt_grid")
-    .addEventListener("click", async (event) => {
+  document.getElementById("bt_grid").addEventListener("click", async (event) => {
       if (objOpts.canvas.is_grid) {
         objOpts.canvas.is_grid = false;
         document.getElementById("bt_grid").style.backgroundColor = "#f0f0f0";
@@ -392,9 +406,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   //============================================================================================
   //age model chooser
-  document
-    .getElementById("AgeModelSelect")
-    .addEventListener("change", async (event) => {
+  document.getElementById("AgeModelSelect").addEventListener("change", async (event) => {
       const ageId = event.target.value;
       console.log(`Selected: ${ageId}`);
 
@@ -408,9 +420,7 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   //============================================================================================
   //snapshot
-  document
-    .getElementById("bt_snapshot")
-    .addEventListener("click", async (event) => {
+  document.getElementById("bt_snapshot").addEventListener("click", async (event) => {
       if (isDrawVector) {
         //download vector image from p5 canvas
         isSVG = true;
@@ -432,9 +442,7 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   //============================================================================================
   //measure
-  document
-    .getElementById("bt_measure")
-    .addEventListener("click", async (event) => {
+  document.getElementById("bt_measure").addEventListener("click", async (event) => {
       if (LCCore) {
         if (!measureObject.isMeasure) {
           measureObject.isMeasure = true;
@@ -509,6 +517,36 @@ document.addEventListener("DOMContentLoaded", () => {
     updateView();
   });
   //============================================================================================
+  //load age model
+  window.LCapi.receive("LoadCoreImagesMenuClicked", async () => {
+    if (correlation_model_list.length == 0) {
+      return;
+    }
+    //call from main process
+    let path = "";
+    try {
+      path = await window.LCapi.FolderChoseDialog("Chose Core images folder");
+      if (path == null) {
+        return;
+      }
+    } catch (error) {
+      console.error("ERROR: File load error", error);
+      return;
+    }
+
+    //load images
+    modelImages.image_dir = path;
+    let originalImages = await loadVectorImages(modelImages, LCCore, "drilling_depth");
+    modelImages["drilling_depth"] = originalImages;
+    let compositeImages = await loadVectorImages(modelImages, LCCore, "composite_depth");
+    modelImages["composite_depth"] = compositeImages;
+    let eventFreeImages = await loadVectorImages(modelImages, LCCore, "event_free_depth");
+    modelImages["event_free_depth"] = eventFreeImages;
+
+    //update plot
+    updateView();
+  });
+  //============================================================================================
   //load correlation model
   window.LCapi.receive("LoadCorrelationModelMenuClicked", async () => {
     //call from main process
@@ -529,7 +567,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     //initiarise
-    await initiariseCorrelationModel();
+    //await initiariseCorrelationModel();
     await initiariseAgeModel();
     await initiariseCanvas();
     await initiarisePlot();
@@ -559,9 +597,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   //============================================================================================
   //check hole list
-  document
-    .querySelector("#hole_list")
-    .addEventListener("change", function (event) {
+  document.querySelector("#hole_list").addEventListener("change", function (event) {
       if (event.target.type === "checkbox") {
         //get id
         const target_id = event.target.id.split(",");
@@ -593,9 +629,7 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   //============================================================================================
   //reload
-  document
-    .getElementById("bt_reload")
-    .addEventListener("click", async (event) => {
+  document.getElementById("bt_reload").addEventListener("click", async (event) => {
       if (correlation_model_list.length == 0) {
         return;
       }
@@ -1454,7 +1488,8 @@ document.addEventListener("DOMContentLoaded", () => {
               //first, draw event
               let ew = 0;
               if (objOpts.canvas.is_event) {
-                ew = objOpts.section.width * xMag - 6;
+                //ew = objOpts.section.width * xMag - 6;
+                ew = objOpts.section.width * xMag * objOpts.event.face_wodth
               } else {
                 ew = 8;
               }
@@ -1479,8 +1514,9 @@ document.addEventListener("DOMContentLoaded", () => {
                   sketch.rect(
                     (hole_x0 + shift_x) * xMag + pad_x + 3,
                     (lowerDepth + shift_y) * yMag + pad_y,
-                    ew,
-                    eventThickness * yMag
+                    ew ,
+                    eventThickness * yMag * objOpts.event.face_height,
+                    1,1,1,1 //rounded option
                   );
                 }
               }
@@ -1512,8 +1548,12 @@ document.addEventListener("DOMContentLoaded", () => {
                 sketch.noStroke();
                 sketch.textFont("Arial");
                 sketch.textSize(15);
+                let rank_name = "null";
+                if (marker.connection_rank != null){
+                  rank_name = marker.connection_rank.toString();
+                }
                 sketch.text(
-                  marker.connection_rank,
+                  rank_name,
                   (hole_x0 + shift_x) * xMag + pad_x - 23,
                   (marker_top + shift_y) * yMag + pad_y + 5
                 );
@@ -1583,10 +1623,7 @@ document.addEventListener("DOMContentLoaded", () => {
               //-----------------------------------------------------------
               //make connection objects=================================================================================
               //add connection
-              const connectionData = this.getNearestConnectedMarkerIdx(
-                LCCore,
-                marker.id
-              );
+              const connectionData = this.getNearestConnectedMarkerIdx( LCCore, marker.id );
 
               //check connection
               if (connectionData == null) {
@@ -1598,22 +1635,16 @@ document.addEventListener("DOMContentLoaded", () => {
 
               //get connectied hole position
               const connectedHole_x0 =
-                (objOpts.hole.distance + objOpts.hole.width) *
-                (1 * LCCore.projects[idxTo[0]].order +
-                  connectionData.num_total -
-                  connectionData.num_total_disable); //LCCore.projects[idxTo[0]].holes[idxTo[1]].order
+                (objOpts.hole.distance + objOpts.hole.width) * (1 * LCCore.projects[idxTo[0]].order + connectionData.num_total - connectionData.num_total_disable); //LCCore.projects[idxTo[0]].holes[idxTo[1]].order
 
-              const connectedMarker_top =
-                LCCore.projects[idxTo[0]].holes[idxTo[1]].sections[idxTo[2]]
-                  .markers[idxTo[3]][objOpts.canvas.depth_scale];
+              const connectedMarker_top = LCCore.projects[idxTo[0]].holes[idxTo[1]].sections[idxTo[2]].markers[idxTo[3]][objOpts.canvas.depth_scale];
 
               if (connectedMarker_top == null) {
                 //console.log("Connected marker position is null.");
                 continue;
               }
               //get connector position
-              const cn_x0 =
-                (hole_x0 + shift_x + objOpts.marker.width) * xMag + pad_x;
+              const cn_x0 = (hole_x0 + shift_x + objOpts.marker.width) * xMag + pad_x;
               const cn_y0 = (marker_top + shift_y) * yMag + pad_y;
               const cn_x1 = cn_x0 + objOpts.connection.indexWidth;
               const cn_y1 = cn_y0;
@@ -1621,31 +1652,37 @@ document.addEventListener("DOMContentLoaded", () => {
               const cn_y3 = (connectedMarker_top + shift_y) * yMag + pad_y;
               const cn_x2 = cn_x3 - objOpts.connection.indexWidth;
               const cn_y2 = cn_y3;
-
+              let  connection_colour = objOpts.connection.line_colour;
+              let connection_line_width = objOpts.connection.line_width;
+              
               //get style
               if (cn_y0 !== cn_y3) {
                 //not horizontal
-                //offScreenCtx.strokeStyle = "red";
+                if (objOpts.connection.emphasize_non_horizontal && objOpts.canvas.depth_scale !== "drilling_depth"){
+                  connection_colour = "Red";
+                }
               }
               if (!connectionData.isNext) {
                 //connected core is not located at the next
-                sketch.drawingContext.setLineDash([5, 5]);
+                if (objOpts.connection.show_remote_connections){
+                  sketch.drawingContext.setLineDash([5, 5]);
+                }
               } else {
                 sketch.drawingContext.setLineDash([]);
               }
 
-              if (
-                marker.isMaster &&
-                LCCore.projects[idxTo[0]].holes[idxTo[1]].sections[idxTo[2]]
-                  .markers[idxTo[3]].isMaster
-              ) {
+              if ( marker.isMaster && 
+                   LCCore.projects[idxTo[0]].holes[idxTo[1]].sections[idxTo[2]].markers[idxTo[3]].isMaster &&
+                   LCCore.projects[idxTo[0]].id[0] == marker.id[0]
+                  ) {
                 //if connection of master section
-                sketch.stroke("blue");
+                connection_colour = "Blue";
+                connection_line_width = objOpts.connection.line_width * 1.3
               }
 
               //draw connection---------------------------------------------
-              sketch.strokeWeight(objOpts.connection.line_width);
-              sketch.stroke(markerLineColour);
+              sketch.strokeWeight(connection_line_width);
+              sketch.stroke(connection_colour);
 
               sketch.line(cn_x0, cn_y0, cn_x1, cn_y1); //start point
               sketch.line(cn_x1, cn_y1, cn_x2, cn_y2); //index left
@@ -1660,7 +1697,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
       //==========================================================================================
       //draw age points
-      if (LCplot == null) {
+      if (LCplot == null || LCplot.age_collections.length == 0) {
         return;
       }
 
@@ -1673,8 +1710,7 @@ document.addEventListener("DOMContentLoaded", () => {
       });
 
       //get age data(because age data, age series is single)
-      const ageSeries =
-        LCplot.age_collections[age_plot_idx].datasets[0].data_series;
+      const ageSeries = LCplot.age_collections[age_plot_idx].datasets[0].data_series;
 
       //get position & plot
 
@@ -2377,11 +2413,11 @@ document.addEventListener("DOMContentLoaded", () => {
             //get style
             offScreenCtx.setLineDash([]);
             offScreenCtx.lineWidth = objOpts.connection.line_width;
-            offScreenCtx.strokeStyle = objOpts.connection.line_colour;
+            offScreenCtx.strokeStyle  = objOpts.connection.line_colour;
             if (cn_y0 !== cn_y3) {
               if (objOpts.canvas.depth_scale !== "drilling_depth") {
                 //not horizontal
-                offScreenCtx.strokeStyle = "red";
+                connection_colour = "red";
               }
             }
             if (!connectionData.isNext) {
@@ -2939,6 +2975,10 @@ document.addEventListener("DOMContentLoaded", () => {
       //sort
       sortHoleByOrder(LCCore);
 
+      //update position
+      let newPad_y = 20 - LCCore.projects[0].composite_depth_top * 10;
+      objOpts.canvas.pad_y = newPad_y;
+
       //shwo model summary
       console.log(LCCore);
       console.log("Correlation model Loaded.");
@@ -3032,7 +3072,7 @@ document.addEventListener("DOMContentLoaded", () => {
     return new Promise((resolve, reject) => {
       const img = new Image();
       img.onload = () => resolve(img);
-      img.onerror = () => reject(console.log("aaaaaaaa"));
+      img.onerror = () => reject(console.log("Load image rejected."));
       img.src = path;
     });
   }
@@ -3170,7 +3210,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
         document.getElementById("p5Canvas").style.display = "block";
         document.getElementById("rasterCanvas").style.display = "none";
+
         makeP5CanvasBase();
+        //vectorObjects.clear();
         vectorObjects.redraw();
       } else {
         document.getElementById("p5Canvas").style.display = "none";
@@ -3559,10 +3601,7 @@ function getEventPosiotion(LCCore, event, marker_top, objOpts) {
     if (event[0] == "deposition" || event[0] == "markup") {
       if (event[2] !== null) {
         const conIdx = this.getIdxById(LCCore, event[2]); //event layer connected MarkerId
-        lowerDepth =
-          LCCore.projects[conIdx[0]].holes[conIdx[1]].sections[conIdx[2]]
-            .markers[conIdx[3]][objOpts.canvas.depth_scale];
-
+        lowerDepth = LCCore.projects[conIdx[0]].holes[conIdx[1]].sections[conIdx[2]].markers[conIdx[3]][objOpts.canvas.depth_scale];
         eventThickness = marker_top - lowerDepth;
       } else {
         console.group(
@@ -3572,31 +3611,20 @@ function getEventPosiotion(LCCore, event, marker_top, objOpts) {
     } else if (event[0] == "erosion") {
       if (
         objOpts.canvas.depth_scale == "event_free_depth" ||
-        objOpts.canvas.depth_scale == "composite_depth" ||
+        //objOpts.canvas.depth_scale == "composite_depth" ||
         objOpts.canvas.depth_scale == "age"
       ) {
-        lowerDepth = marker_top + event[2];
-        eventThickness = -event[2];
+        const conIdx = this.getIdxById(LCCore, event[2]); //event layer connected MarkerId
+        lowerDepth = LCCore.projects[conIdx[0]].holes[conIdx[1]].sections[conIdx[2]].markers[conIdx[3]][objOpts.canvas.depth_scale];
+        eventThickness = marker_top - lowerDepth;
+        //lowerDepth = marker_top + event[4];
+        //eventThickness = -event[4];
       } else {
         lowerDepth = null;
         eventThickness = 0;
       }
     }
-  } else if (event[1] == "upward") {
-    if (event[0] == "erosion") {
-      if (
-        objOpts.canvas.depth_scale == "event_free_depth" ||
-        objOpts.canvas.depth_scale == "composite_depth" ||
-        objOpts.canvas.depth_scale == "age"
-      ) {
-        lowerDepth = marker_top;
-        eventThickness = -event[2];
-      } else {
-        lowerDepth = null;
-        eventThickness = 0;
-      }
-    }
-  }
+  } 
   return [lowerDepth, eventThickness];
 }
 
@@ -3775,9 +3803,12 @@ function isInside(rectA, rectB, pad) {
 }
 
 async function loadVectorImages(modelImages, LCCore, depthScale) {
-  const prom = new Promise((resolve, reject) => {
+  return new Promise(async (resolve, reject) => {
+  //const prom = new Promise((resolve, reject) => {
     let results = {};
-    console.log(depthScale);
+
+    console.log("Load images in " + depthScale + " scale.");
+
     //check
     if (modelImages.image_dir.length == 0) {
       console.log("There is no image path.");
@@ -3788,7 +3819,7 @@ async function loadVectorImages(modelImages, LCCore, depthScale) {
       resolve(results);
     }
 
-    console.log(Object.keys(modelImages.drilling_depth));
+    
     if (depthScale == "composite_depth" || depthScale == "event_free_depth") {
       if (Object.keys(modelImages.drilling_depth).length == 0) {
         console.log("There is no original image.");
@@ -3809,71 +3840,32 @@ async function loadVectorImages(modelImages, LCCore, depthScale) {
 
     //main
     //Progress
-    let txt = "Converting to " + depthScale + " section images...";
+    let txt = "Converting section images to " + depthScale + " scale...";
     if (depthScale == "drilling_depth") {
       txt = "Loading original section images...";
     }
     window.LCapi.progressbar("Load images", txt);
     let n = 0;
 
-    new p5(async (p) => {
-      let n = 0;
-
-      for (project of LCCore.projects) {
-        for (hole of project.holes) {
-          for (section of hole.sections) {
-            const im_name = hole.name + "-" + section.name;
-            if (depthScale == "drilling_depth") {
-              //case original image
-              const dpcm = 30; //pix/cm}
-              const im_height = Math.round(
-                dpcm *
-                  (section.markers[section.markers.length - 1].distance -
-                    section.markers[0].distance),
-                0
-              );
-              //load image
-              try {
-                const imageBase64 = await window.LCapi.LoadRasterImage(
-                  modelImages.image_dir +
-                    "/" +
-                    project.name +
-                    "/" +
-                    im_name +
-                    ".jpg",
-                  im_height
+    await new Promise((p5resolve)=>{
+      new p5(async (p) => {
+        let n = 0;
+  
+        for (project of LCCore.projects) {
+          for (hole of project.holes) {
+            for (section of hole.sections) {
+              const im_name = hole.name + "-" + section.name;
+              if (depthScale == "drilling_depth") {
+                //case original image
+                const dpcm = 30; //pix/cm}
+                const im_height = Math.round(
+                  dpcm * (section.markers[section.markers.length - 1].distance - section.markers[0].distance),
+                  0
                 );
-
-                if (imageBase64 !== undefined) {
-                  results[im_name] = await p.loadImage(
-                    "data:image/png;base64," + imageBase64,
-                    async () => {
-                      //console.log("");
-                    },
-                    async () => {
-                      console.log("Fail to load image of " + im_name);
-                    }
-                  );
-                } else {
-                  results[im_name] = undefined;
-                }
-              } catch (error) {
-                //console.log(error);
-                results[im_name] = undefined;
-              }
-            } else if (
-              depthScale == "composite_depth" ||
-              depthScale == "event_free_depth"
-            ) {
-              //case CD, EF, convert original to CD EFD image
-              try {
-                if (modelImages.drilling_depth[im_name] == undefined) {
-                  const imageBase64 = await window.LCapi.makeModelImage(
-                    modelImages.drilling_depth[im_name],
-                    section,
-                    depthScale
-                  );
-                  console.log(imageBase64);
+                //load image
+                try {
+                  const imageBase64 = await window.LCapi.LoadRasterImage(modelImages.image_dir +"/" +project.name +"/" +im_name +".jpg", im_height);
+  
                   if (imageBase64 !== undefined) {
                     results[im_name] = await p.loadImage(
                       "data:image/png;base64," + imageBase64,
@@ -3881,25 +3873,62 @@ async function loadVectorImages(modelImages, LCCore, depthScale) {
                         //console.log("");
                       },
                       async () => {
-                        //console.log("Fail to load image of " + im_name);
+                        console.log("Fail to load image of " + im_name);
                       }
                     );
                   } else {
                     results[im_name] = undefined;
                   }
+                } catch (error) {
+                  //console.log(error);
+                  results[im_name] = undefined;
                 }
-              } catch (err) {
-                console.log(err);
-                results[im_name] = undefined;
-              }
-            }
+              } else if ( depthScale == "composite_depth" ||  depthScale == "event_free_depth"  ) {
+                //case CD, EF, convert original to CD EFD image
+                const dpcm = 30; //pix/cm}
+                const im_height = Math.round(
+                  dpcm * (section.markers[section.markers.length - 1].distance - section.markers[0].distance),
+                  0
+                );
 
-            n += 1;
-            window.LCapi.updateProgressbar(n, N);
+                //load image
+                try {
+                  const imageBase64 = await window.LCapi.makeModelImage(
+                    modelImages.image_dir +"/" +project.name +"/" +im_name +".jpg", 
+                    section,
+                    im_height,
+                    depthScale
+                  );//[imPath, sectionData, imHeight, depthScale]
+ 
+                  if (imageBase64 !== undefined) {
+                    results[im_name] = await p.loadImage(
+                      "data:image/png;base64," + imageBase64,
+                      async () => {
+                        //console.log("");
+                      },
+                      async () => {
+                        console.log("Fail to load image of " + im_name);
+                      }
+                    );
+                  } else {
+                    results[im_name] = undefined;
+                  }
+                } catch (error) {
+                  //console.log(error);
+                  results[im_name] = undefined;
+                }
+
+              }
+  
+              n += 1;
+              window.LCapi.updateProgressbar(n, N);
+            }
           }
         }
-      }
-    });
+        p5resolve();
+      });
+    })
+    
     resolve(results);
   });
 

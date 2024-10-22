@@ -7,6 +7,7 @@
 //portable: npx electron-builder --mac --x64 --dir
 //installer: npx electron-builder --win --x64
 //portable: npx electron-builder --win --x64 --dir
+//npm run build:win
 
 const path = require("path");
 const fs = require("fs");
@@ -93,6 +94,12 @@ function createMainWIndow() {
           label: "Load Age model",
           click: () => {
             mainWindow.webContents.send("LoadAgeModelMenuClicked");
+          },
+        },
+        {
+          label: "Load Core Images",
+          click: () => {
+            mainWindow.webContents.send("LoadCoreImagesMenuClicked");
           },
         },
         {
@@ -241,9 +248,7 @@ function createMainWIndow() {
     try {
       //register model
       LCCore.loadModelFromCsv(model_path);
-      console.log(
-        'MAIN: Registered correlation model from "' + model_path + '"'
-      );
+      console.log('MAIN: Registered correlation model from "' + model_path + '"' );
       return {
         id: LCCore.projects[LCCore.projects.length - 1].id,
         name: LCCore.projects[LCCore.projects.length - 1].name,
@@ -322,29 +327,31 @@ function createMainWIndow() {
       });
   });
 
-  ipcMain.handle(
-    "makeModelImage",
-    async (_e, imageData, sectionData, depthScale) => {
-      //if no image data
-      if (imageData == undefined) return undefined;
+  ipcMain.handle("makeModelImage", async (_e, imPath, sectionData, imHeight, depthScale) => {
+    try {
+      //path.join(__dirname.replace(/\\/g, "/"), im_path)
+      let imageBuffer = fs.readFileSync(imPath);
+      if (imHeight != 0) {
+        const metadata = await sharp(imageBuffer).metadata();
+        const new_size = { height: imHeight, width: 1 };
 
-      const imageBuffer = Buffer.from(
-        imageData.split(";base64,").pop(),
-        "base64"
-      );
+        imageBuffer = await sharp(imageBuffer)
+            .resize({ height: new_size.height })
+            .toBuffer();
+      }
 
+      //check
       const undifBuffer = Buffer.from([0xba, 0x77, 0x5e, 0x7e, 0x29, 0xde]);
       if (imageBuffer.equals(undifBuffer)) {
         //if no image data
         return undefined;
       }
 
+      //get image info
       const im = sharp(imageBuffer);
       const metadata = await im.metadata();
-      const pixPerCm =
-        metadata.height /
-        (sectionData.markers[sectionData.markers.length - 1].distance -
-          sectionData.markers[0].distance);
+      const pixPerCm = imHeight / (sectionData.markers[sectionData.markers.length - 1].distance - sectionData.markers[0].distance);
+      //const pixPerCm = metadata.height / (sectionData.markers[sectionData.markers.length - 1].distance - sectionData.markers[0].distance);//original size
 
       //get operations
       let newHeight = 0;
@@ -418,8 +425,18 @@ function createMainWIndow() {
 
       //to base64
       return newIm.toString("base64");
+
+      //-------------------------------------------------------
+      
+    } catch (error) {
+      if (error.code === "ENOENT") {
+        //case there is no such a file.
+      } else {
+        throw error;
+      }
     }
-  );
+
+  });
 
   ipcMain.handle("updateProgressbar", (_e, n, N) => {
     if (progressBar) {
@@ -561,6 +578,10 @@ function createMainWIndow() {
 
   ipcMain.handle("FileChoseDialog", async (_e, title, ext) => {
     const result = await getfile(mainWindow, title, ext);
+    return result;
+  });
+  ipcMain.handle("FolderChoseDialog", async (_e, title) => {
+    const result = await getDirectory(mainWindow, title);
     return result;
   });
 
@@ -1030,9 +1051,7 @@ function createMainWIndow() {
       finderWindow.setAlwaysOnTop(true, "normal");
     }
   });
-  ipcMain.handle(
-    "getSectionLimit",
-    async (_e, projectId, holeName, sectionName) => {
+  ipcMain.handle("getSectionLimit", async (_e, projectId, holeName, sectionName) => {
       const idx = LCCore.getIdxFromTrinity(projectId, [
         holeName,
         sectionName,
@@ -1308,6 +1327,24 @@ async function getfile(mainWindow, title, ext) {
       return result.filePaths[0];
     }
     return null;
+  } catch (err) {
+    console.log(err);
+    return null;
+  }
+}
+//--------------------------------------------------------------------------------------------------
+async function getDirectory(mainWindow, title) {
+  const options = {
+    title: title,
+    properties: ["openDirectory"], 
+  };
+
+  try {
+    const result = await dialog.showOpenDialog(mainWindow, options);
+    if (!result.canceled) {
+      return result.filePaths[0]; 
+    }
+    return null; 
   } catch (err) {
     console.log(err);
     return null;
