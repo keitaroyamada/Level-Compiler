@@ -8,5 +8,10 @@ mac:
   icon: ./icon/levelcompiler.png
 linux:
   icon: ./icon/levelcompiler.png
+extraResources:
+  - from: resources/
+    to: resources
+    filter:
+      - '**/*'
 files: []
 electronVersion: 32.2.0

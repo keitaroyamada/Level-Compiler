@@ -22,16 +22,18 @@
   },
   "build": {
     "appId": "your.app.id",
-    "win": {
-      "icon": "./icon/levelcompiler.png"
-    },
-    "mac": {
-      "icon": "./icon/levelcompiler.png"
-    },
-    "linux": {
-      "icon": "./icon/levelcompiler.png"
-    }
+    "win": {"icon": "./icon/levelcompiler.png" },
+    "mac": {"icon": "./icon/levelcompiler.png" },
+    "linux": {"icon": "./icon/levelcompiler.png"},
+    "extraResources": [
+      {
+        "from": "resources/",  
+        "to": "resources",     
+        "filter": ["**/*"]    
+      }
+    ]
   },
+  
   "devDependencies": {
     "electron": "^32.2.0",
     "electron-builder": "^25.1.7",
