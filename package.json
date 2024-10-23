@@ -25,6 +25,9 @@
     "win": {"icon": "./icon/levelcompiler.png" },
     "mac": {"icon": "./icon/levelcompiler.png" },
     "linux": {"icon": "./icon/levelcompiler.png"},
+    "extraResources": [
+      "resources/"
+    ]
   },
   
   "devDependencies": {

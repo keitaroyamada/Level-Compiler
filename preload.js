@@ -7,14 +7,12 @@ contextBridge.exposeInMainWorld("LCapi", {
   //lcfnc: () => ipcRenderer.invoke("lcfnc"),
 
   //initiarise
-  InitiariseCorrelationModel: () =>
-    ipcRenderer.invoke("InitiariseCorrelationModel"),
+  InitiariseCorrelationModel: () => ipcRenderer.invoke("InitiariseCorrelationModel"),
   InitiariseAgeModel: () => ipcRenderer.invoke("InitiariseAgeModel"),
   InitiarisePlot: () => ipcRenderer.invoke("InitiarisePlot"),
 
   //register and load models
-  RegisterModelFromCsv: (args) =>
-    ipcRenderer.invoke("RegisterModelFromCsv", args),
+  RegisterModelFromCsv: (args) => ipcRenderer.invoke("RegisterModelFromCsv", args),
   LoadModelFromLCCore: () => ipcRenderer.invoke("LoadModelFromLCCore"),
   RegisterAgeFromCsv: (args) => ipcRenderer.invoke("RegistertAgeFromCsv", args),
   LoadAgeFromLCAge: (args) => ipcRenderer.invoke("LoadAgeFromLCAge", args),
@@ -24,10 +22,8 @@ contextBridge.exposeInMainWorld("LCapi", {
   //calcs
   CalcCompositeDepth: () => ipcRenderer.invoke("CalcCompositeDepth"),
   CalcEventFreeDepth: () => ipcRenderer.invoke("CalcEventFreeDepth"),
-  GetAgeFromEFD: (args0, args1) =>
-    ipcRenderer.invoke("GetAgeFromEFD", args0, args1),
-  GetAgeFromCD: (args0, args1) =>
-    ipcRenderer.invoke("GetAgeFromCD", args0, args1),
+  GetAgeFromEFD: (args0, args1) => ipcRenderer.invoke("GetAgeFromEFD", args0, args1),
+  GetAgeFromCD: (args0, args1) => ipcRenderer.invoke("GetAgeFromCD", args0, args1),
 
   //tools
   OpenFinder: () => ipcRenderer.invoke("OpenFinder"),
@@ -46,6 +42,7 @@ contextBridge.exposeInMainWorld("LCapi", {
   updateProgressbar: (args1, args2) => ipcRenderer.invoke("updateProgressbar", args1, args2),
   askdialog: (args1, args2) => ipcRenderer.invoke("askdialog", args1, args2),
   makeModelImage: (args1, args2, args3, args4) =>  ipcRenderer.invoke("makeModelImage", args1, args2, args3, args4),
+  getResourcePath: () => ipcRenderer.sendSync("getResourcePath"),
 
   //main -> renderer
   receive: (channel, func) => {

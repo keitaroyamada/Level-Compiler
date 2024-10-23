@@ -27,8 +27,7 @@ const { Trinity } = require("./LC_modules/Trinity.js");
 
 //properties
 const isMac = process.platform === "darwin";
-const isDev = process.env.NODE_ENV !== "development";
-//const isDev = false;
+const isDev = process.env.NODE_ENV !== "development"; //const isDev = false;
 //const isDev = false;
 const LCCore = new LevelCompilerCore();
 const LCAge = new LevelCompilerAge();
@@ -212,7 +211,55 @@ function createMainWIndow() {
     console.log("test handle called");
     console.log(_arg1 + _arg2);
   });
+  ipcMain.on('getResourcePath', (_e) => {
+    
+    let resourcePath;
+    if(app.isPackaged){
+      //after build
+      resourcePath = path.join(process.resourcesPath);
+    }else{
+      //dev env
+      resourcePath = path.join(__dirname);
 
+    }
+    
+    let incon_list = {};
+    incon_list = {
+      terrestrial: [
+        path.join(resourcePath, "resources","plot","terrestrial.png"),
+        "Green",
+      ],
+      marine: [
+        path.join(resourcePath, "resources","plot","marine.png"),
+        "Blue",
+      ],
+      tephra: [
+        path.join(resourcePath, "resources","plot","tephra.png"),
+        "Red",
+      ],
+      climate: [path.join(resourcePath, "resources","plot","climate.png"),
+        "Yellow",
+      ],
+      orbital: [
+        path.join(resourcePath, "resources","plot","orbital.png"),
+        "Orange",
+      ],
+      general: [
+        path.join(resourcePath, "resources","plot","general.png"),
+        "Gray",
+      ],
+      historical: [
+        path.join(resourcePath, "resources","plot","historical.png"),
+        "Black"
+      ],
+      interpolation: [
+        path.join(resourcePath, "resources","plot","interpolation.png"),
+        "Gray"
+      ]
+    };
+  
+    _e.returnValue = incon_list;
+  });
   ipcMain.handle("InitiariseCorrelationModel", async (_e) => {
     //import modeln
     console.log("MAIN: Initiarise correlation model");

@@ -1,5 +1,6 @@
 document.addEventListener("DOMContentLoaded", () => {
   //============================================================================================
+  let developerMode = true;
   //base properties
   const scroller = document.getElementById("scroller");
   let canvasBase = document.getElementById("canvasBase");
@@ -129,40 +130,44 @@ document.addEventListener("DOMContentLoaded", () => {
 
   objOpts.age.incon_size = 20;
   objOpts.age.alt_radius = 3;
+   
   objOpts.age.incon_list = {
     terrestrial: [
-      "./resources/plot/terrestrial.png",
+      "",//"./resources/plot/terrestrial.png",
       "Green",
     ],
     marine: [
-      "./resources/plot/marine.png",
+      "",//"./resources/plot/marine.png",
       "Blue",
     ],
     tephra: [
-      "./resources/plot/tephra.png",
+      "",//"./resources/plot/tephra.png",
       "Red",
     ],
     climate: [
-      "./resources/plot/climate.png",
+      "",//"./resources/plot/climate.png",
       "Yellow",
     ],
     orbital: [
-      "./resources/plot/orbital.png",
+      "",//"./resources/plot/orbital.png",
       "Orange",
     ],
     general: [
-      "./resources/plot/general.png",
+      "",//"./resources/plot/general.png",
       "Gray",
     ],
     historical: [
-      "./resources/plot/historical.png",
+      "",//"./resources/plot/historical.png",
       "Black"
     ],
     interpolation: [
-      "./resources/plot/interpolation.png",
+      "",//"./resources/plot/interpolation.png",
       "Gray"
     ]
   };
+  let res = window.LCapi.getResourcePath();
+  objOpts.age.incon_list = res;
+
   //============================================================================================
   //resources
   //get plot image data
@@ -189,72 +194,72 @@ document.addEventListener("DOMContentLoaded", () => {
   //hide test event
   const testButton = document.getElementById("footerLeftText");
   testButton.addEventListener("click", async () => {
-    //initiarise
-    await initiariseCorrelationModel();
-    await initiariseAgeModel();
-    await initiariseCanvas();
-    await initiarisePlot();
+    if(developerMode){
+      //initiarise
+      await initiariseCorrelationModel();
+      await initiariseAgeModel();
+      await initiariseCanvas();
+      await initiarisePlot();
 
-    //get model path
-    const model_path1 = 
-      "C:/Users/slinn/Dropbox/Prj_LevelCompiler/_LC test data/[correlation]SG06 Correlation(24 Nov. 2023).csv";
+      //get model path
+      const model_path1 = 
+        "C:/Users/slinn/Dropbox/Prj_LevelCompiler/_LC test data/[correlation]SG06 Correlation(24 Nov. 2023).csv";
 
-    const model_path2 =
-      "C:/Users/slinn/Dropbox/Prj_LevelCompiler/_LC test data/[duo]SG14 Correlation(temp).csv";
-    //const model_path =     "C:/Users/slinn/Dropbox/Prj_LevelCompiler/_LC test data/[correlation]SG14 LC test model with event(temp).csv";
-    const age1_path =
-      "C:/Users/slinn/Dropbox/Prj_LevelCompiler/_LC test data/[age]SG IntCal20 yr BP chronology for LC (01 Jun. 2021).csv";
+      const model_path2 =
+        "C:/Users/slinn/Dropbox/Prj_LevelCompiler/_LC test data/[duo]SG14 Correlation(temp).csv";
+      //const model_path =     "C:/Users/slinn/Dropbox/Prj_LevelCompiler/_LC test data/[correlation]SG14 LC test model with event(temp).csv";
+      const age1_path =
+        "C:/Users/slinn/Dropbox/Prj_LevelCompiler/_LC test data/[age]SG IntCal20 yr BP chronology for LC (01 Jun. 2021).csv";
 
-    const age2_path =
-      "C:/Users/slinn/Dropbox/Prj_LevelCompiler/_LC test data/[age]SG IntCal13 yr BP chronology for LC (06 Apr. 2020).csv";
+      const age2_path =
+        "C:/Users/slinn/Dropbox/Prj_LevelCompiler/_LC test data/[age]SG IntCal13 yr BP chronology for LC (06 Apr. 2020).csv";
 
-    const photo_path = "C:/Users/slinn/Dropbox/Prj_LevelCompiler/_LC test data/core photo";
+      const photo_path = "C:/Users/slinn/Dropbox/Prj_LevelCompiler/_LC test data/core photo";
 
-    //register correlation model
-    await registerModel(model_path1);
-    await registerModel(model_path2);
+      //register correlation model
+      await registerModel(model_path1);
+      await registerModel(model_path2);
 
-    //load model into renderer
-    await loadModel();
+      //load model into renderer
+      await loadModel();
 
-    //register age model
-    await registerAge(age1_path);
-    await registerAge(age2_path);
+      //register age model
+      await registerAge(age1_path);
+      await registerAge(age2_path);
 
-    //load age model into LCCore
-    await loadAge(age_model_list[0].id);
+      //load age model into LCCore
+      await loadAge(age_model_list[0].id);
 
-    //register age into LCplot
-    await registerPlotFromLCAge();
+      //register age into LCplot
+      await registerPlotFromLCAge();
 
-    //load core images
-    const response = await window.LCapi.askdialog(
-      "Load core images",
-      "Do you want to load the core images?"
-    );
-    if (response.response) {
-      modelImages.image_dir = photo_path;
+      //load core images
+      const response = await window.LCapi.askdialog(
+        "Load core images",
+        "Do you want to load the core images?"
+      );
+      if (response.response) {
+        modelImages.image_dir = photo_path;
 
-      //load images
-      let originalImages = await loadVectorImages(modelImages, LCCore, "drilling_depth");
-      modelImages["drilling_depth"] = originalImages;
-      let compositeImages = await loadVectorImages(modelImages, LCCore, "composite_depth");
-      modelImages["composite_depth"] = compositeImages;
-      let eventFreeImages = await loadVectorImages(modelImages, LCCore, "event_free_depth");
-      modelImages["event_free_depth"] = eventFreeImages;
+        //load images
+        let originalImages = await loadVectorImages(modelImages, LCCore, "drilling_depth");
+        modelImages["drilling_depth"] = originalImages;
+        let compositeImages = await loadVectorImages(modelImages, LCCore, "composite_depth");
+        modelImages["composite_depth"] = compositeImages;
+        let eventFreeImages = await loadVectorImages(modelImages, LCCore, "event_free_depth");
+        modelImages["event_free_depth"] = eventFreeImages;
 
-    }
+      }
 
-    //load LCplot
-    await loadPlotData();
+      //load LCplot
+      await loadPlotData();
 
-    //console.log(LCCore);
-    //update
-    updateView();
-    //console.log(LCCore);
-    //console.log(LCplot);
-
-    //console.log("Canvas size: " + canvas.height + "x" + canvas.width);
+      //console.log(LCCore);
+      //update
+      updateView();
+      //console.log(LCCore);
+      //console.log(LCplot);
+  }
   });
   //============================================================================================
   //open divider
@@ -673,9 +678,7 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   //============================================================================================
   //zoomout
-  document
-    .getElementById("bt_zoomout")
-    .addEventListener("click", async (event) => {
+  document.getElementById("bt_zoomout").addEventListener("click", async (event) => {
       if (LCCore) {
         if (event.altKey) {
           objOpts.canvas.zoom_level[0] -= 1;
@@ -721,9 +724,7 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   //============================================================================================
   //zoomin
-  document
-    .getElementById("bt_zoomin")
-    .addEventListener("click", async (event) => {
+  document.getElementById("bt_zoomin").addEventListener("click", async (event) => {
       if (LCCore) {
         if (event.altKey) {
           objOpts.canvas.zoom_level[0] += 1;
@@ -909,9 +910,7 @@ document.addEventListener("DOMContentLoaded", () => {
   });
   //============================================================================================
   //scroll event
-  scroller.addEventListener(
-    "scroll",
-    async function (event) {
+  scroller.addEventListener("scroll",async function (event) {
       //show depth/age
       //const xMag = objOpts.canvas.zoom_level[0] * objOpts.canvas.dpir;
       const yMag = objOpts.canvas.zoom_level[1] * objOpts.canvas.dpir;
@@ -954,9 +953,7 @@ document.addEventListener("DOMContentLoaded", () => {
   );
   //============================================================================================
   //Scroll + Alt (zoom)
-  document.addEventListener(
-    "wheel",
-    function (event) {
+  document.addEventListener( "wheel",  function (event) {
       //wheel event
       var deltaX = event.deltaX;
       var deltaY = event.deltaY;
@@ -3938,4 +3935,16 @@ async function loadVectorImages(modelImages, LCCore, depthScale) {
   });
 }
 
+async function loadResourcePath(objOpts){
+  let path = null;
+  try {
+   // path = await window.LCapi.getResourcePath();
+    objOpts.age.incon_list = path;
+    console.log(path);
+    return path;
+  } catch {
+    console.log("Failed to load resource path", error);
+
+  }
+}
 //============================================================================================
