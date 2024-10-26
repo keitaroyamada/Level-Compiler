@@ -12,7 +12,17 @@
 }
 
 #directionDiv {
+  width: 150px;
+}
+
+#calcDiv {
   width: 140px;
+  height: 20px;
+}
+
+#calcButton {
+  width: 100px;
+  height: 20px;
 }
 
 #exportButton {
@@ -25,9 +35,15 @@
   flex-direction: row;
   padding-top: 20px;
 }
+/*--------------------------------------------------------------------------------------*/
+#definition_buttons {
+  display: flex;
+  flex-direction: row;
+  padding-top: 20px;
+}
 
 #depth_table_div {
-  height: 500px;
+  height: 645px;
   width: 400px;
   overflow-y: scroll;
   overflow-x: hidden;
@@ -45,17 +61,18 @@ td {
   user-select: auto;
   height: 10px;
 }
-
+/*--------------------------------------------------------------------------------------*/
 #target_table_div {
   padding-left: 20px;
-  height: 500px;
+  height: 645px;
+  width: 750px;
   overflow-y: scroll;
   overflow-x: hidden;
   font-size: small;
 }
 
 #target_table {
-  width: 50px;
+  width: 100px;
 }
 
 #add_menu {
@@ -66,19 +83,9 @@ td {
 #add_in_position {
   width: 50%;
 }
-
-#result_table_div {
-  padding-left: 20px;
-  height: 500px;
-  overflow-y: scroll;
-  overflow-x: hidden;
-  font-size: small;
-}
-#result_table {
-  width: 50px;
-}
-
+/*--------------------------------------------------------------------------------------*/
 #plot_canvas_div {
+  width:200px;
   padding-left: 20px;
   height: 100%;
 }

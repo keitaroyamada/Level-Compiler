@@ -43,6 +43,7 @@ contextBridge.exposeInMainWorld("LCapi", {
   askdialog: (args1, args2) => ipcRenderer.invoke("askdialog", args1, args2),
   makeModelImage: (args1, args2, args3, args4) =>  ipcRenderer.invoke("makeModelImage", args1, args2, args3, args4),
   getResourcePath: () => ipcRenderer.sendSync("getResourcePath"),
+  toggleDevTools: (args1) => ipcRenderer.send('toggle-devtools',args1),
 
   //main -> renderer
   receive: (channel, func) => {

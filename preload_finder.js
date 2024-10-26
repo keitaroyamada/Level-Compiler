@@ -14,6 +14,7 @@ contextBridge.exposeInMainWorld("FinderApi", {
   terminalLog: (args1) => ipcRenderer.invoke("terminalLog", args1),
   rendererLog: (args1) => ipcRenderer.invoke("rendererLog", args1),
   getResourcePath: () => ipcRenderer.sendSync("getResourcePath"),
+  toggleDevTools: (args1) => ipcRenderer.send('toggle-devtools',args1),
 
   //main -> renderer
   receive: (channel, func) => {

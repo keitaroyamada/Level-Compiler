@@ -2495,6 +2495,31 @@ class LevelCompilerCore {
     }
     return output;
   }
+  linearExtrap(D2, D3, d3d2, d3d1, method){
+    //output(D2): target marker depth(e.g.CD/EFD)
+    //D1(target out), D2, D3
+    //d1(target in ), d2, d3
+
+    let output = null;
+    let D1 = null;
+
+    if(method == "nearest"){
+      if (d3d1 == 0) {
+        //case defined markers on the duplicated same distance marker(e.g. core top)
+        D1 = D3;
+      } else {
+        D1 = D3 - ((D3-D2)*(d3d1)/ (d3d2));
+      }
+  
+      if (!isNaN(D1) && D1 !== null) {
+        output = D1;
+      }
+    } else if(method == "linear"){
+      D1 = D3 - d3d1;
+    }
+    
+    return output;
+  }
   connectMarkers(fromId, toId, direction) {
     if(fromId.toString()==toId.toString()){
       return;

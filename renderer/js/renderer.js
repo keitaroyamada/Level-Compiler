@@ -409,6 +409,8 @@ document.addEventListener("DOMContentLoaded", () => {
         isSVG = true;
         const targetCanvas = new p5(p5Sketch);
         targetCanvas.save("model.svg");
+        const annotationCanvas = new p5(penSketch);
+        annotationCanvas.save("model_annotation.svg");
         //targetCanvas.save("model.png");
         isSVG = false;
         console.log("[Renderer]: Take snapshot as svg.");
@@ -1084,6 +1086,12 @@ document.addEventListener("DOMContentLoaded", () => {
     updateView();
   });
   //============================================================================================
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "F12") {
+      window.LCapi.toggleDevTools("main");
+    }
+  });
+  //============================================================================================
   //============================================================================================
   //main functions
   //============================================================================================
@@ -1226,7 +1234,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
       //-----------------------------------------------------------------------------------------
       //draw grid
-      if (objOpts.canvas.is_grid) {
+      if (LCCore && objOpts.canvas.is_grid) {
         //function
         const title = (tickType) => {
           if (tickType == "age") {

@@ -25,6 +25,10 @@
           <option value="definition2actual">Definition->Actual</option>
         </select>
       </div>
+      <div id="calcDiv">
+        <p>Calculation</p>
+        <button id="calcButton">Calculation</button>
+      </div>
       <div id="exportDiv">
         <p>Export</p>
         <button id="exportButton">Export</button>
@@ -34,29 +38,43 @@
     <div id="table_container">
       <div id="depth_table_div">
         <table id="depth_table">
-          <tr>
-            <th class="depth_name">Marker name</th>
-            <th class="depth_definition">Definition (cm)</th>
-            <th class="depth_actual">Actual (cm)</th>
-          </tr>
+          <thead>
+            <tr>
+              <th id="depth_name">Marker name</th>
+              <th id="depth_definition">Definition (cm)</th>
+              <th id="depth_actural">Actual (cm)</th>
+            </tr>
+          </thead>
+          <tbody id="depth_body">
+          </tbody>
         </table>
+        <div id = "definition_buttons">
+          <div id="add_menu">
+            <button id="add_definition">Add</button>
+          </div>
+        </div>
+        
       </div>
       <div id="target_table_div">
         <table id="target_table">
-          <tr>
-            <th class="in_position">Target(cm)</th>
-          </tr>
+          <thead>
+            <tr>
+              <th id="target_name">Target_name</th>
+              <th id="target_upper">Target Upper (cm)</th>
+              <th id="target_lower">Target Lower (cm)</th>
+              <th id="definition_upper">Definition Upper (cm)</th>
+              <th id="definition_lower">Definition Lower (cm)</th>
+              <th id="age_upper">Age Upper (cm)</th>
+              <th id="age_lower">Age Lower (cm)</th>
+              <th id="calc_type">Type</th>
+            </tr>
+          </thead>
+          <tbody id="target_body">
+          </tbody>
         </table>
         <div id="add_menu">
-          <button id="add_in_position">Add</button>
+          <button id="add_target">Add</button>
         </div>
-      </div>
-      <div id="result_table_div">
-        <table id="result_table">
-          <tr>
-            <th class="out_position">Result(cm)</th>
-          </tr>
-        </table>
       </div>
       <div id="plot_canvas_div">
         <canvas id="plot_canvas"></canvas>

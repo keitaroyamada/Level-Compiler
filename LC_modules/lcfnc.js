@@ -15,7 +15,18 @@ function readcsv(data_path) {
     return null;
   }
 }
-
+function writecsv(data_path, data) {
+  try {
+    const csvContent = stringify(data, {
+      header: true,
+      delimiter: ",",
+    });
+    fs.writeFileSync(data_path, csvContent, "utf8");
+    console.log("Successfully wrote CSV: " + data_path);
+  } catch (error) {
+    console.error("Failed to write csv: " + data_path);
+  }
+}
 function uuidv4() {
   return "xxxxxxxxxxxx4xxxyxxxxxxxxxxxxxxx".replace(/[xy]/g, function (c) {
     var r = (Math.random() * 16) | 0,

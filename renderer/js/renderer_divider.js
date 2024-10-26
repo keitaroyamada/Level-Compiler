@@ -1,47 +1,100 @@
 document.addEventListener("DOMContentLoaded", () => {
+  let projectList = [];
   let holeList = [];
   let sectionList = [];
+  let interpolatedData = null;
+
   //-------------------------------------------------------------------------------------------
   //initiarise
   window.DividerApi.receive("DividerToolClicked", async (data) => {
     await getList();
     await updateHoleList();
     await updateSectionList();
-    await updateMarkerList();
+    await updateMarkerTable();
     updatePlot();
-    console.log("Divider making");
+    console.log("[Divider]: Divider making");
   });
   //-------------------------------------------------------------------------------------------
 
   //hole
-  document
-    .getElementById("holeOptions")
-    .addEventListener("change", async (event) => {
+  document.getElementById("holeOptions").addEventListener("change", async (event) => {
       console.log(`Hole: ${event.target.value}`);
 
       //calc
       //change sec list
       await updateSectionList();
-      await updateMarkerList();
+      await updateMarkerTable();
       updatePlot();
     });
   //-------------------------------------------------------------------------------------------
   //section
-  document
-    .getElementById("sectionOptions")
-    .addEventListener("change", async (event) => {
+  document.getElementById("sectionOptions").addEventListener("change", async (event) => {
       console.log(`Section: ${event.target.value}`);
       //calc
-      await updateMarkerList();
+      await updateMarkerTable();
       updatePlot();
     });
+ //-------------------------------------------------------------------------------------------
+  document.getElementById("add_definition").addEventListener("click", async (event) => {
+    //add point data
+    var table = document.getElementById("depth_body");
+    
+    //make new row
+    var row = table.insertRow();
+    var cell1 = row.insertCell();
+    //Actural depth
+    cell1.textContent = ""; //target name
+    cell1.setAttribute("contenteditable", "true");
+    var cell2 = row.insertCell();
+    cell2.textContent = null; //target upper
+    makeCellNumericOnly(cell2);
+    var cell3 = row.insertCell();
+    cell3.textContent = null; //target lower
+    makeCellNumericOnly(cell3);
+    
+    sortTable('depth_table', 1);
+  });
+ //-------------------------------------------------------------------------------------------
+
+//-------------------------------------------------------------------------------------------
+  document.getElementById("add_target").addEventListener("click", async (event) => {
+    //add point data
+    var table = document.getElementById("target_body");
+    
+    //make new row
+    var row = table.insertRow();
+    var cell1 = row.insertCell();
+    //Actural depth
+    cell1.textContent = ""; //target name
+    cell1.setAttribute("contenteditable", "true");
+    var cell2 = row.insertCell();
+    cell2.textContent = null; //target upper
+    makeCellNumericOnly(cell2);
+    var cell3 = row.insertCell();
+    cell3.textContent = null; //target lower
+    makeCellNumericOnly(cell3);
+    //Definition depth
+    var cell4 = row.insertCell();
+    cell4.textContent = null; //definition depth of target upper
+    var cell5 = row.insertCell();
+    cell5.textContent = null; //definition depth of target lower
+    var cell6 = row.insertCell();
+    cell6.textContent = null; //definition age of target upper
+    var cell7 = row.insertCell();
+    cell7.textContent = null; //definition age of target lower
+    var cell8 = row.insertCell();
+    cell8.textContent = null; //polation type
+    
+    sortTable('target_table', 1);
+  });
+    
   //-------------------------------------------------------------------------------------------
   //-------------------------------------------------------------------------------------------
 
   //-------------------------------------------------------------------------------------------
   async function getList() {
     //get hole list
-    [holeList, sectionList] = await window.DividerApi.dividerGetCoreList();
+    [projectList, holeList, sectionList] = await window.DividerApi.dividerGetCoreList();
   }
   //-------------------------------------------------------------------------------------------
   async function updateHoleList() {
@@ -85,8 +138,8 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
   //-------------------------------------------------------------------------------------------
-  async function updateMarkerList() {
-    var table = document.getElementById("depth_table");
+  async function updateMarkerTable() {
+    var table = document.getElementById("depth_body");
     var rows = table.rows;
 
     if (rows.length > 1) {
@@ -114,10 +167,9 @@ document.addEventListener("DOMContentLoaded", () => {
       var cell1 = row.insertCell();
       cell1.textContent = markerList[i].name;
       var cell2 = row.insertCell();
-      cell2.textContent = markerList[i].distance;
+      cell2.textContent = parseFloat(markerList[i].distance);
       var cell3 = row.insertCell();
-
-      cell3.textContent = "";
+      cell3.textContent = parseFloat(markerList[i].distance);
       makeCellNumericOnly(cell3);
     }
   }
@@ -125,9 +177,23 @@ document.addEventListener("DOMContentLoaded", () => {
   function makeCellNumericOnly(cell) {
     cell.setAttribute("contenteditable", "true");
     cell.addEventListener("input", function (e) {
-      if (isNaN(e.target.innerText)) {
-        e.target.innerText = e.target.innerText.replace(/[^0-9]/g, "");
-      }
+      const selection = window.getSelection();
+        const range = selection.getRangeAt(0);
+        const cursorPosition = range.startOffset;
+
+        e.target.innerText = e.target.innerText
+        .replace(/(?!^)-/g, "")
+        .replace(/[^0-9\-.]/g, "");
+
+        if (!e.target.firstChild) {
+          return;
+          //e.target.appendChild(document.createTextNode(""));
+        }
+
+        range.setStart(e.target.firstChild, Math.min(cursorPosition, e.target.innerText.length));
+        range.collapse(true);
+        selection.removeAllRanges();
+        selection.addRange(range);
     });
     cell.addEventListener("keydown", function (e) {
       if (e.key === "Enter") {
@@ -143,23 +209,20 @@ document.addEventListener("DOMContentLoaded", () => {
   function updatePlot() {
     const canvas = document.getElementById("plot_canvas");
     canvas.width = 200;
-    canvas.height = 500;
+    canvas.height = 630;
     let ctx = canvas.getContext("2d");
     const padding_left = 50;
-    const padding_top = 10;
+    const padding_top = 50;
 
     //get depth definition data from table
     var table = document.getElementById("depth_table");
     var rows = table.rows;
     //plot section
-    const section_height =
-      parseFloat(rows[rows.length - 1].cells[1].innerText) -
-      parseFloat(rows[1].cells[1].innerText);
+    const section_height = parseFloat(rows[rows.length - 1].cells[1].innerText) - parseFloat(rows[1].cells[1].innerText);
     const plot_height_rate = canvas.height / (section_height + padding_top * 2);
 
     //calc pos
-    const y0 =
-      (parseFloat(rows[1].cells[1].innerText) + padding_top) * plot_height_rate;
+    const y0 = (parseFloat(rows[1].cells[1].innerText) + padding_top) * plot_height_rate;
     const h = section_height * plot_height_rate;
     const x0 = padding_left;
     const w = 100;
@@ -184,7 +247,6 @@ document.addEventListener("DOMContentLoaded", () => {
       let marker_act_exist = false;
 
       if (!isNaN(marker_act)) {
-        console.log(marker_act);
         marker_act_exist = true;
       }
 
@@ -208,8 +270,219 @@ document.addEventListener("DOMContentLoaded", () => {
         x0 - 40,
         (marker_def + padding_top) * plot_height_rate
       );
+
+      if(interpolatedData !== null){
+        for(let i=0;i<interpolatedData.length;i++){
+          const px = x0 + w * 0.3;
+          const py0 = (interpolatedData[i].definition_distance_upper + padding_top) * plot_height_rate;
+          const py1 = (interpolatedData[i].definition_distance_lower + padding_top) * plot_height_rate;
+
+          if(interpolatedData[i].calc_type_lower == "extraplation" || interpolatedData[i].calc_type_upper == "extrapolation"){
+            ctx.strokeStyle = "Red";
+          }else{
+            ctx.strokeStyle = "Black";
+          }
+          ctx.beginPath();
+          ctx.strokeRect(px, py0, 10, py1-py0);
+          //ctx.fillRect(px, py0, 10, py1-py0);
+          ctx.stroke();
+        }
+      }
     }
   }
   //-------------------------------------------------------------------------------------------
+  function sortTable(tableId, columnIndex) {
+    const table = document.getElementById(tableId);
+    const tbody = table.querySelector("tbody");
+    const rows = Array.from(tbody.rows);
+
+    rows.sort((rowA, rowB) => {
+        const cellA = rowA.cells[columnIndex].innerText;
+        const cellB = rowB.cells[columnIndex].innerText;
+        return cellA.localeCompare(cellB, undefined, { numeric: true });
+    });
+
+    rows.forEach(row => tbody.appendChild(row));  
+  }
+
+  function getTableData(targetName) {
+    const table = document.getElementById(targetName);
+    const tbody = table.querySelector("tbody");
+    const rows = Array.from(tbody.rows);
+    const data = rows.map(row => {
+        return Array.from(row.cells).map(cell => cell.innerText);
+    });
+    return data;
+}
+function updateTableCell(tableId, rowIndex, colIndex, value) {
+  const table = document.getElementById(tableId);
+  const tbody = table.querySelector("tbody");
+  if (!tbody) return; 
+  const cell = tbody.rows[rowIndex]?.cells[colIndex];
+  if (cell) {
+      cell.innerText = value;
+  }
+}
+document.getElementById("depth_name").addEventListener("click", () => {
+  //sortTable('depth_table', 0);
+  //console.group("[Divider]: Definition table is Sorted by name.");
+  //window.DividerApi.rendererLog("[Divider]: Definition table is Sorted by name.");
+});
+document.getElementById("depth_definition").addEventListener("click", () => {
+  sortTable('depth_table', 1);
+  console.group("[Divider]: Definition table is Sorted by definition depth.");
+  window.DividerApi.rendererLog("[Divider]: Definition table is Sorted by definition depth.");
+});
+document.getElementById("depth_actural").addEventListener("click", () => {
+  sortTable('depth_table', 2);
+  console.group("[Divider]: Definition table is Sorted by actural depth.");
+  window.DividerApi.rendererLog("[Divider]: Definition table is Sorted by actural depth.");
+});
+document.getElementById("target_upper").addEventListener("click", () => {
+  sortTable('target_table', 1);
+  console.group("[Divider]: Target table is Sorted by upper depth.");
+  window.DividerApi.rendererLog("[Divider]: Target table is Sorted by upper depth.");
+});
+document.getElementById("target_lower").addEventListener("click", () => {
+  sortTable('target_table', 2);
+  console.group("[Divider]: Target table is Sorted by lower depth.");
+  window.DividerApi.rendererLog("[Divider]: Target table is Sorted by lower depth.");
+});
   //-------------------------------------------------------------------------------------------
+document.getElementById("calcButton").addEventListener("click", () => {
+  //initiarise
+  interpolatedData = null
+
+  //get data
+  let targetData = getTableData("target_table");
+  let depthData  = getTableData("depth_table");
+
+  //sort data
+  targetData.sort((item1, item2) => {
+    return parseFloat(item1[1]) - parseFloat(item2[1]);
+  });
+  depthData.sort((item1, item2) => {
+    return parseFloat(item1[1]) - parseFloat(item2[1]);
+  });
+
+  //get hole/section data
+  const holeIdx = document.getElementById("holeOptions").value;
+  const sectionIdx = document.getElementById("sectionOptions").value;
+
+  const holeId = holeList[holeIdx][1];
+  const secId  = sectionList[holeIdx][sectionIdx][1];
+  
+  //calc main
+  const resultList = window.DividerApi.dividerDefinitionFromActural([holeId, secId, depthData], targetData);
+  interpolatedData = resultList;
+
+  //apply table
+  for(let i=0;i<resultList.length;i++){
+    const result = resultList[i];
+
+    updateTableCell("target_table", i, 0, result.name); //name
+    updateTableCell("target_table", i, 1, Math.round(result.target_distance_upper * 10) / 10); //actural upper
+    updateTableCell("target_table", i, 2, Math.round(result.target_distance_lower * 10) / 10); //actural lower
+    updateTableCell("target_table", i, 3, Math.round(result.definition_distance_upper * 10) / 10); //definition upper
+    updateTableCell("target_table", i, 4, Math.round(result.definition_distance_lower * 10) / 10); //definition lower
+    updateTableCell("target_table", i, 5, Math.round(result.age_mid_upper * 10) / 10); //age upper
+    updateTableCell("target_table", i, 6, Math.round(result.age_mid_lower * 10) / 10); //age lower
+    updateTableCell("target_table", i, 7, result.calc_type_upper +"/"+ result.calc_type_lower); //polation type
+
+    /*
+    name:    targetRowData[0],
+    project: depthList[0].project_name,
+    hole:    depthList[0].hole_name,
+    section: depthList[0].section_name,
+    definition_distance_lower:null,
+    definition_distance_upper:null,
+    definition_cd_upper: null,
+    definition_cd_lower: null,
+    definition_efd_upper: null,
+    definition_efd_lower: null,
+    target_distance_lower: parseFloat(targetRowData[2]),
+    target_distance_upper: parseFloat(targetRowData[1]),
+    age_mid_lower:null,
+    age_mid_upper:null,
+    age_upper_lower:null,
+    age_upper_upper:null,
+    age_lower_lower:null,
+    age_lower_upper:null,
+    calc_type_upper: null,
+    calc_type_lower: null
+    */
+  }
+
+  updatePlot();
+
+  console.log("[Divider]: Calc depth and age.");
+  window.DividerApi.rendererLog("[Divider]: Calc depth and age.");
+
+});
+document.getElementById("exportButton").addEventListener("click", () => {
+  //initiarise
+  if(interpolatedData !== null){
+    let output = [[
+      "Name", "Project","Hole", "Section","Actural distance upper (cm)","Actural distance lower (cm)",
+      "Definition distance upper (cm)", "Definition distance lower (cm)",
+      "Definition CD upper (cm)", "Definition CD lower (cm)", "Definition EFD upper (cm)", "Definition EFD lower (cm)",
+      "Definition Age upper (cm)", "Definition Age lower (cm)", "Calc method upper", "Calc method lower",
+    ]];
+
+    for(let i=0; i<interpolatedData.length; i++){
+      const data = [
+        interpolatedData[i].name,
+        interpolatedData[i].project,
+        interpolatedData[i].hole,
+        interpolatedData[i].section,
+        interpolatedData[i].target_distance_upper,
+        interpolatedData[i].target_distance_lower,
+        interpolatedData[i].definition_distance_upper,
+        interpolatedData[i].definition_distance_lower,
+        interpolatedData[i].definition_cd_upper,
+        interpolatedData[i].definition_cd_lower,
+        interpolatedData[i].definition_efd_upper,
+        interpolatedData[i].definition_efd_lower,
+        interpolatedData[i].age_mid_upper,
+        interpolatedData[i].age_mid_lower,
+        interpolatedData[i].calc_type_upper,
+        interpolatedData[i].calc_type_upper,
+      ];
+      
+      output.push(data);
+       /*
+      name:    targetRowData[0],
+      project: depthList[0].project_name,
+      hole:    depthList[0].hole_name,
+      section: depthList[0].section_name,
+      definition_distance_lower:null,
+      definition_distance_upper:null,
+      definition_cd_upper: null,
+      definition_cd_lower: null,
+      definition_efd_upper: null,
+      definition_efd_lower: null,
+      target_distance_lower: parseFloat(targetRowData[2]),
+      target_distance_upper: parseFloat(targetRowData[1]),
+      age_mid_lower:null,
+      age_mid_upper:null,
+      age_upper_lower:null,
+      age_upper_upper:null,
+      age_lower_lower:null,
+      age_lower_upper:null,
+      calc_type_upper: null,
+      calc_type_lower: null
+      */
+    }
+
+    window.DividerApi.writeCsv(output);
+    console.log("[DIvider]: Divided list is exported.");
+    window.DividerApi.rendererLog("[DIvider]: Divided list is exported.");
+  }
+});
+document.addEventListener("keydown", (e) => {
+  if (e.key === "F12") {
+    window.DividerApi.toggleDevTools("divider");
+  }
+});
+   //-------------------------------------------------------------------------------------------
 });

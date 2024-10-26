@@ -143,6 +143,7 @@ function createMainWIndow() {
         },
       ],
     },
+    /*
     {
       label: "Mode",
       submenu: [
@@ -178,6 +179,7 @@ function createMainWIndow() {
         },
       ],
     },
+    */
     // for windows ----------------------------------------------------------------------------------
     ...(!isMac
       ? [
@@ -188,7 +190,12 @@ function createMainWIndow() {
               {
                 label: "Developer tool",
                 click: () => {
-                  mainWindow.webContents.openDevTools();
+                  if (mainWindow.webContents.isDevToolsOpened()) {
+                    mainWindow.webContents.closeDevTools();
+                  } else {
+                    mainWindow.webContents.openDevTools();
+                  }
+                  //mainWindow.webContents.openDevTools();
                 },
               },
             ],
@@ -688,9 +695,212 @@ function createMainWIndow() {
       return age.age.mid;
     }
   });
+  ipcMain.on("dividerDefinitionFromActural", async (_e, depthData, targetData) => {
+    //calc 
+    //depthData: [holeId, secId, depthData], targetData
+    //targetData: [[name, data1...],[name, data2...]]
+    if (!LCCore) {
+      return null;
+    }
+
+    let result = {};
+
+    //All hole id/section id are the same.
+    const crId = depthData[1]//get section id 
+
+    let output = [];
+
+    //sort data
+    targetData.sort((item1, item2) => {
+      return parseFloat(item1[1]) - parseFloat(item2[1]);
+    });
+    depthData[2].sort((item1, item2) => {
+      return parseFloat(item1[1]) - parseFloat(item2[1]);
+    });
+
+    //make correlation list
+    let depthList = [];
+    for(let c=0; c<depthData[2].length;c++){
+      const defDist= parseFloat(depthData[2][c][1]); //correlation definition distance
+      const actDist= parseFloat(depthData[2][c][2]); //correlation actural distance 
+
+      let td_cr = new Trinity();
+      td_cr.name         = depthData[2][0];
+      td_cr.project_name = LCCore.getDataByIdx(LCCore.search_idx_list[[crId[0], null,    null,    null].toString()]).name;
+      td_cr.hole_name    = LCCore.getDataByIdx(LCCore.search_idx_list[[crId[0], crId[1], null,    null].toString()]).name;
+      td_cr.section_name = LCCore.getDataByIdx(LCCore.search_idx_list[[crId[0], crId[1], crId[2], null].toString()]).name;
+      td_cr.distance     = defDist;
+
+      //convert depth (listed for function)
+      const cd_list = LCCore.getDepthFromTrinity(crId, [td_cr], "composite_depth"); //output:[sec id, cd, rank]
+      const defCD = cd_list[0][1];
+
+      if(!isNaN(defDist) && !isNaN(actDist)){
+        depthList.push({
+          correlation_name: depthData[2][c][0],
+          section_id: depthData[1],
+          project_name: td_cr.project_name,
+          hole_name: td_cr.hole_name,
+          section_name: td_cr.section_name,
+          definition_distance: defDist,
+          actural_distance: actDist,
+          definition_cd: defCD,
+        });
+      }
+    }
+
+    //console.log(depthList);
+    let resultList = [];
+    for(let t=0; t<targetData.length;t++){
+      //D1 <- d1
+      //D2    d2
+      //D3    d4
+      
+      //initiarise
+      //each row data
+      const targetRowData = targetData[t];
+      //results contains sampling point of upper/lower info
+      result = {
+        name:    targetRowData[0],
+        project: depthList[0].project_name,
+        hole:    depthList[0].hole_name,
+        section: depthList[0].section_name,
+        definition_distance_lower:null,
+        definition_distance_upper:null,
+        definition_cd_upper: null,
+        definition_cd_lower: null,
+        definition_efd_upper: null,
+        definition_efd_lower: null,
+        target_distance_lower: parseFloat(targetRowData[2]),
+        target_distance_upper: parseFloat(targetRowData[1]),
+        age_mid_lower:null,
+        age_mid_upper:null,
+        age_upper_lower:null,
+        age_upper_upper:null,
+        age_lower_lower:null,
+        age_lower_upper:null,
+        calc_type_upper: null,
+        calc_type_lower: null
+      }
+
+      //calc upper/lower
+      for(let ul=1;ul<3;ul++){
+        //search nearest index
+        const targetActuralDist = parseFloat(targetRowData[ul]);//uppder/lower actural
+        let upperIdx = -Infinity;
+        let lowerIdx = Infinity;
+        for(let i=0;i<depthList.length;i++){
+          if(depthList[i].actural_distance - targetActuralDist <= 0 && i > upperIdx ){
+            upperIdx = i;
+          }
+          if(depthList[i].actural_distance - targetActuralDist >= 0 && i < lowerIdx){
+            lowerIdx = i;
+          }
+        }
+
+        if(upperIdx == -Infinity){
+          upperIdx = null;
+        }
+
+        if(lowerIdx == Infinity){
+          lowerIdx = null;
+        }
+
+        //check inter or extra polation using cd, because of out of section data
+        if(upperIdx == null || lowerIdx == null){
+          //case extra polation--------------------------------------
+          let D2Idx = null;
+          let D3Idx = null;
+          if(upperIdx == null && lowerIdx == null){
+            //case no polation base
+            output.push(result);
+            break;
+          } else if (upperIdx == null ){
+            //case extrapolate to upward
+            D2Idx = lowerIdx;
+            D3Idx = lowerIdx + 1;
+          } else if (lowerIdx == null){
+            //case extrapolate downward
+            D2Idx = upperIdx;
+            D3Idx = upperIdx - 1;
+          }
+
+          if(D3Idx > depthList.length && D3Idx < 0){
+            output.push(result);
+            break;
+          }
+
+          let D2     = depthList[D2Idx].definition_cd;
+          let D3     = depthList[D3Idx].definition_cd;
+          const d1   = targetActuralDist;
+          const d2   = depthList[D2Idx].actural_distance;
+          const d3   = depthList[D3Idx].actural_distance;
+          const d3d2 = d3 - d2;
+          const d3d1 = d3 - d1;
+          const D1cd = LCCore.linearExtrap(D2, D3, d3d2, d3d1, "nearest");
+
+          D2 = depthList[D2Idx].definition_distance;
+          D3 = depthList[D3Idx].definition_distance;
+          const D1dist = LCCore.linearExtrap(D2, D3, d3d2, d3d1, "nearest");
+
+
+          if(ul == 1){
+            result.definition_distance_upper = D1dist;
+            result.definition_cd_upper       = D1cd
+            result.calc_type_upper           = "extrapolation";
+          }else{
+            result.definition_distance_lower = D1dist;
+            result.definition_cd_lower       = D1cd
+            result.calc_type_lower           = "extrapolation";
+          }
+        } else {
+          //case inter polation---------------------------------------
+          let D1 = depthList[upperIdx].definition_cd;
+          let D3 = depthList[lowerIdx].definition_cd;
+          const d1 = depthList[upperIdx].actural_distance;
+          const d2 = targetActuralDist;
+          const d3 = depthList[lowerIdx].actural_distance;
+          const d2d1 = d2 - d1;
+          const d3d1 = d3 - d1;
+
+          const D2cd = LCCore.linearInterp(D1, D3, d2d1, d3d1);
+
+          D1 = depthList[upperIdx].definition_distance;
+          D3 = depthList[lowerIdx].definition_distance;
+          const D2dist = LCCore.linearInterp(D1, D3, d2d1, d3d1);
+
+          if(ul == 1){
+            result.definition_distance_upper = D2dist;
+            result.definition_cd_upper       = D2cd;
+            result.calc_type_upper           = "interpolation";
+          }else{
+            result.definition_distance_lower = D2dist;
+            result.definition_cd_lower       = D2cd;
+            result.calc_type_lower           = "interpolation";
+          }
+        }
+      }
+
+      //calc age, efd
+      result.definition_efd_upper = LCCore.getEFDfromCD(result.definition_cd_upper);
+      result.definition_efd_lower = LCCore.getEFDfromCD(result.definition_cd_lower);
+      const ageUpper = LCAge.getAgeFromEFD(result.definition_efd_upper,"linear");
+      const ageLower = LCAge.getAgeFromEFD(result.definition_efd_lower,"linear");
+      result.age_mid_upper   = ageUpper.age.mid;
+      result.age_upper_upper = ageUpper.age.upper;
+      result.age_upper_lower = ageUpper.age.lower;
+      result.age_mid_lower   = ageLower.age.mid;
+      result.age_lower_upper = ageLower.age.upper;
+      result.age_lower_lower = ageLower.age.lower;
+
+      //
+      resultList.push(result);
+    }
+
+    _e.returnValue = resultList;    
+  });
 
   ipcMain.handle("OpenDivider", async (_e) => {
-    console.log("called");
     if (dividerWindow) {
       dividerWindow.focus();
       dividerWindow.webContents.send("DividerToolClicked", "");
@@ -701,7 +911,7 @@ function createMainWIndow() {
     dividerWindow = new BrowserWindow({
       title: "Divider",
       width: 1500,
-      height: 1000,
+      height: 800,
       webPreferences: {
         preload: path.join(__dirname, "preload_divider.js"),
       },
@@ -717,7 +927,7 @@ function createMainWIndow() {
 
     dividerWindow.once("ready-to-show", () => {
       dividerWindow.show();
-      dividerWindow.webContents.openDevTools();
+      //dividerWindow.webContents.openDevTools();
       // /dividerWindow.setAlwaysOnTop(true, "normal");
       dividerWindow.webContents.send("DividerToolClicked", "");
     });
@@ -730,6 +940,10 @@ function createMainWIndow() {
     }
   });
 
+  ipcMain.on("dividerExport", async (_e, data) => {
+    putcsvfile(mainWindow, data);    
+    console.log("MAIN: Exported Divided data.");
+  });
   ipcMain.handle("OpenFinder", async (_e) => {
     if (finderWindow) {
       finderWindow.focus();
@@ -787,6 +1001,29 @@ function createMainWIndow() {
     const info = "";
     event.sender.send("mainprocess-info", info);
   });
+
+  ipcMain.on("toggle-devtools", async(_e, data) => {
+    if(data == "divider"){
+      if (dividerWindow.webContents.isDevToolsOpened()) {
+        dividerWindow.webContents.closeDevTools();
+      } else {
+        dividerWindow.webContents.openDevTools();
+      }
+    } else if(data == "finder"){
+      if (finderWindow.webContents.isDevToolsOpened()) {
+        finderWindow.webContents.closeDevTools();
+      } else {
+        finderWindow.webContents.openDevTools();
+      }
+    } else if(data == "main"){
+      if (mainWindow.webContents.isDevToolsOpened()) {
+        mainWindow.webContents.closeDevTools();
+      } else {
+        mainWindow.webContents.openDevTools();
+      }
+    } 
+    
+});
   //------------------------------------------------------------------------------------------------
   //for converter
 
