@@ -156,7 +156,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     //apply data into table
     //initiarise table
-    for (var i = rows.length - 1; i > 0; i--) {
+    for (var i = rows.length - 1; i >= 0; i--) {
       table.deleteRow(i);
     }
 
