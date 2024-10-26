@@ -28,7 +28,6 @@ const { Trinity } = require("./LC_modules/Trinity.js");
 //properties
 const isMac = process.platform === "darwin";
 const isDev = process.env.NODE_ENV !== "development"; //const isDev = false;
-//const isDev = false;
 const LCCore = new LevelCompilerCore();
 const LCAge = new LevelCompilerAge();
 const LCPlot = new LevelCompilerPlot();
@@ -36,9 +35,8 @@ const LCPlot = new LevelCompilerPlot();
 //
 let finderWindow = null;
 let dividerWindow = null;
+let converterWindow = null;
 let progressBar = null;
-
-//const isDev = false;
 
 function createMainWIndow() {
   const mainWindow = new BrowserWindow({
@@ -73,6 +71,18 @@ function createMainWIndow() {
               { role: "hide" },
               { role: "hideOthers" },
               { role: "unhide" },
+              { type: "separator" },
+              {
+                label: "Developer tool",
+                click: () => {
+                  if (mainWindow.webContents.isDevToolsOpened()) {
+                    mainWindow.webContents.closeDevTools();
+                  } else {
+                    mainWindow.webContents.openDevTools();
+                  }
+                  //mainWindow.webContents.openDevTools();
+                },
+              },
               { type: "separator" },
               { role: "quit" },
             ],
@@ -126,17 +136,13 @@ function createMainWIndow() {
         {
           label: "converter",
           click: () => {
-            const win = createNewWindow(
-              "Converter",
-              "./renderer/converter.html",
-              "preload_converter.js"
-            );
+            const win = createNewWindow("Converter", "./renderer/converter.html", "preload_converter.js");
 
             win.once("ready-to-show", () => {
               win.show();
-              win.webContents.openDevTools();
+              //win.webContents.openDevTools();
               win.setMenu(null);
-              //win.setAlwaysOnTop(true, "normal");
+              win.setAlwaysOnTop(true, "normal");
               win.webContents.send("ConverterMenuClicked", "");
             });
           },
@@ -1021,7 +1027,9 @@ function createMainWIndow() {
       } else {
         mainWindow.webContents.openDevTools();
       }
-    } 
+    } else if(data == "converter"){
+      console.log("MAIN: Changing Devtool is not supported in converter.");
+    }
     
 });
   //------------------------------------------------------------------------------------------------
@@ -1141,9 +1149,9 @@ function createMainWIndow() {
         let age_upper;
         let age_lower;
         if (age) {
-          age_mid = age.mid;
-          age_upper = age.upper;
-          age_lower = age.lower;
+          age_mid = age.age.mid;
+          age_upper = age.age.upper;
+          age_lower = age.age.lower;
         }
 
         //get age model idx
@@ -1166,15 +1174,9 @@ function createMainWIndow() {
           age_upper !== null ? age_upper : NaN,
           age_lower !== null ? age_lower : NaN,
           new_rank !== null ? new_rank : NaN,
-          LCCore.projects[model_idx].id !== null
-            ? LCCore.projects[model_idx].correlation_version
-            : NaN,
-          LCCore.projects[model_idx].id !== null
-            ? LCCore.projects[model_idx].correlation_version
-            : NaN,
-          LCAge.AgeModels[ageIdx] !== undefined
-            ? LCAge.AgeModels[ageIdx].version
-            : NaN,
+          LCCore.projects[model_idx].id !== null ? LCCore.projects[model_idx].correlation_version : NaN,
+          LCCore.projects[model_idx].id !== null ? LCCore.projects[model_idx].correlation_version : NaN,
+          LCAge.AgeModels[ageIdx] !== undefined ? LCAge.AgeModels[ageIdx].version : NaN,
         ]);
       }
     } else if (type == "composite_depth") {
@@ -1200,9 +1202,9 @@ function createMainWIndow() {
         let age_upper;
         let age_lower;
         if (age) {
-          age_mid = age_mid;
-          age_upper = age_upper;
-          age_lower = age_lower;
+          age_mid = age.age.mid;
+          age_upper = age.age.upper;
+          age_lower = age.age.lower;
         }
 
         //get age model idx
@@ -1226,12 +1228,8 @@ function createMainWIndow() {
           age_lower !== null ? age_lower : NaN,
           3,
           "Converted from composite depth",
-          LCCore.projects[model_idx].id !== null
-            ? LCCore.projects[model_idx].correlation_version
-            : NaN,
-          LCAge.AgeModels[ageIdx] !== undefined
-            ? LCAge.AgeModels[ageIdx].version
-            : NaN,
+          LCCore.projects[model_idx].id !== null ? LCCore.projects[model_idx].correlation_version : NaN,
+          LCAge.AgeModels[ageIdx] !== undefined ? LCAge.AgeModels[ageIdx].version : NaN,
         ]);
       }
     } else if (type == "event_free_depth") {
@@ -1247,9 +1245,9 @@ function createMainWIndow() {
         let age_upper;
         let age_lower;
         if (age) {
-          age_mid = age_mid;
-          age_upper = age_upper;
-          age_lower = age_lower;
+          age_mid = age.age.mid;
+          age_upper = age.age.upper;
+          age_lower = age.age.lower;
         }
 
         //get age model idx
@@ -1274,9 +1272,7 @@ function createMainWIndow() {
           3,
           "Converted from event free depth",
           "Converted from event free depth",
-          LCAge.AgeModels[ageIdx] !== undefined
-            ? LCAge.AgeModels[ageIdx].version
-            : NaN,
+          LCAge.AgeModels[ageIdx] !== undefined ? LCAge.AgeModels[ageIdx].version  : NaN,
         ]);
       }
     } else if (type == "drilling_depth") {
@@ -1313,9 +1309,7 @@ function createMainWIndow() {
           3,
           "Converted from age",
           "Converted from age",
-          LCAge.AgeModels[ageIdx] !== undefined
-            ? LCAge.AgeModels[ageIdx].version
-            : NaN,
+          LCAge.AgeModels[ageIdx] !== undefined ? LCAge.AgeModels[ageIdx].version : NaN,
         ]);
       }
     } else {

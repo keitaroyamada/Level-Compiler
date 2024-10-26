@@ -8,15 +8,12 @@ document.addEventListener("DOMContentLoaded", () => {
     //make model chooser
 
     //correlation
-    const correlation_model_list =
-      await window.ConverterApi.cvtGetCorrelationModelList();
+    const correlation_model_list = await window.ConverterApi.cvtGetCorrelationModelList();
     for (let i = 0; i < correlation_model_list.length; i++) {
       const correlationOption = document.createElement("option");
       correlationOption.value = correlation_model_list[i][0]; //id
       correlationOption.textContent = correlation_model_list[i][1]; //name
-      document
-        .getElementById("cvt_correlation_model")
-        .appendChild(correlationOption);
+      document.getElementById("cvt_correlation_model").appendChild(correlationOption);
     }
 
     //age
@@ -29,10 +26,9 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
   //-------------------------------------------------------------------------------------------
-  document
-    .getElementById("cvt_bt_import")
-    .addEventListener("click", async (event) => {
+  document.getElementById("cvt_bt_import").addEventListener("click", async (event) => {
       console.log("import");
+      source_data = null;
       let path = "";
       [source_data, path] = await window.ConverterApi.cvtLoadCsv(
         "Please select the conversion target data",
@@ -48,8 +44,15 @@ document.addEventListener("DOMContentLoaded", () => {
         n_r = source_data.length;
         n_c = source_data[0].length;
 
+        //Clear all rows within tbody
+        const table = document.getElementById("data_table");
+        const tbody = table.querySelector("tbody");
+        if (tbody) {
+            tbody.innerHTML = "";
+        }
+
         //show table
-        const table = document.createElement("table");
+        //const table = document.createElement("table");
         for (let r = 0; r < n_r; r++) {
           const tr = table.insertRow();
           for (let c = 0; c < n_c; c++) {
@@ -57,22 +60,17 @@ document.addEventListener("DOMContentLoaded", () => {
             tc.textContent = source_data[r][c];
           }
         }
-        document.getElementById("data_table").appendChild(table);
+        //document.getElementById("data_table").appendChild(table);
         document.getElementById("cvt_source_type").value = "trinity";
-        document
-          .getElementById("cvt_source_type")
-          .dispatchEvent(new Event("change"));
+        document.getElementById("cvt_source_type").dispatchEvent(new Event("change"));
 
-        document.getElementById("data_path").textContent =
-          path.match(/[^\\\/]*$/)[0];
+        document.getElementById("data_path").textContent = path.match(/[^\\\/]*$/)[0];
       }
     });
 
   //-------------------------------------------------------------------------------------------
 
-  document
-    .getElementById("cvt_source_type")
-    .addEventListener("change", (event) => {
+  document.getElementById("cvt_source_type").addEventListener("change", (event) => {
       //clear
       const parentElement = document.getElementById("cvt_source_chooser");
 
@@ -222,9 +220,7 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     });
   //-------------------------------------------------------------------------------------------
-  document
-    .getElementById("cvt_bt_convert")
-    .addEventListener("click", async (event) => {
+  document.getElementById("cvt_bt_convert").addEventListener("click", async (event) => {
       console.log("Converting...");
 
       //get model ids
@@ -294,12 +290,7 @@ document.addEventListener("DOMContentLoaded", () => {
       //calc
       let convertedData = [];
       if (source_data !== null) {
-        convertedData = await window.ConverterApi.cvtConvert(
-          modelIds,
-          indata,
-          sourceType,
-          "linear"
-        );
+        convertedData = await window.ConverterApi.cvtConvert(modelIds, indata, sourceType,"linear");
       }
 
       //export
@@ -311,4 +302,9 @@ document.addEventListener("DOMContentLoaded", () => {
   //-------------------------------------------------------------------------------------------
   //-------------------------------------------------------------------------------------------
   //-------------------------------------------------------------------------------------------
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "F12") {
+      window.ConverterApi.toggleDevTools("divider");
+    }
+  });
 });
