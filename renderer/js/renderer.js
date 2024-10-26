@@ -46,6 +46,7 @@ document.addEventListener("DOMContentLoaded", () => {
   //--------------------------------------------------------------------------------------------
   //plot properties
   let objOpts = {
+    interface:[],
     canvas: [],
     hole: [],
     section: [],
@@ -57,7 +58,7 @@ document.addEventListener("DOMContentLoaded", () => {
   };
   objOpts.canvas.depth_scale = "composite_depth";
   objOpts.canvas.zoom_level = [4, 3]; //[x, y](1pix/2cm)
-  objOpts.canvas.age_zoom_correction = 1 / 20;
+  objOpts.canvas.age_zoom_correction = [1/10, 100];//[zoom level, pad level]
   objOpts.canvas.dpir = 1; //window.devicePixelRatio || 1;
   objOpts.canvas.mouse_over_colour = "red";
   objOpts.canvas.pad_x = 200; //[px]
@@ -70,9 +71,11 @@ document.addEventListener("DOMContentLoaded", () => {
   objOpts.canvas.is_grid = false;
   objOpts.canvas.grid_width = 0.8;
   objOpts.canvas.grid_colour = "gray";
-  objOpts.canvas.is_target = false;
+  objOpts.canvas.is_target = false;//mouse target
   objOpts.canvas.is_event = true;
+  objOpts.canvas.is_connection = true;
   objOpts.canvas.draw_core_photo = false;
+  objOpts.canvas.finder_y = 0;
 
   objOpts.hole.distance = 20;
   objOpts.hole.width = 20;
@@ -165,15 +168,16 @@ document.addEventListener("DOMContentLoaded", () => {
       "Gray"
     ]
   };
-  let res = window.LCapi.getResourcePath();
-  objOpts.age.incon_list = res;
-
+  let resourcePaths = window.LCapi.getResourcePath();
+  objOpts.age.incon_list = resourcePaths.plot;
+  objOpts.interface.icon_list = resourcePaths.tool;
   //============================================================================================
   //resources
   //get plot image data
   let ageVectorPlotIcons = {};
   let modelImages = {
     image_dir: [],
+    load_target_ids: [],
     drilling_depth: {},
     composite_depth: {},
     event_free_depth: {},
@@ -183,6 +187,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   LoadRasterIcons(agePlotIcons, objOpts);
   loadVectorPlotIcons(ageVectorPlotIcons, objOpts);
+  loadToolIcons(objOpts);
 
   //============================================================================================
   //============================================================================================
@@ -240,13 +245,14 @@ document.addEventListener("DOMContentLoaded", () => {
       );
       if (response.response) {
         modelImages.image_dir = photo_path;
+        modelImages.load_target_ids = [[1,1,1,null],[1,1,2,null],[1,1,3,null],[1,2,1,null],[1,2,2,null],[1,2,3,null]]; //= [];//load all
 
         //load images
-        let originalImages = await loadVectorImages(modelImages, LCCore, "drilling_depth");
+        let originalImages = await loadCoreImages(modelImages, LCCore, "drilling_depth");
         modelImages["drilling_depth"] = originalImages;
-        let compositeImages = await loadVectorImages(modelImages, LCCore, "composite_depth");
+        let compositeImages = await loadCoreImages(modelImages, LCCore, "composite_depth");
         modelImages["composite_depth"] = compositeImages;
-        let eventFreeImages = await loadVectorImages(modelImages, LCCore, "event_free_depth");
+        let eventFreeImages = await loadCoreImages(modelImages, LCCore, "event_free_depth");
         modelImages["event_free_depth"] = eventFreeImages;
 
       }
@@ -297,17 +303,27 @@ document.addEventListener("DOMContentLoaded", () => {
       }
       updateView();
     });
+    //============================================================================================
+  //connection
+  document.getElementById("bt_connection").addEventListener("click", async (event) => {
+    if (objOpts.canvas.is_connection) {
+      objOpts.canvas.is_connection = false;
+      document.getElementById("bt_connection").style.backgroundColor = "#f0f0f0";
+    } else {
+      objOpts.canvas.is_connection = true;
+      document.getElementById("bt_connection").style.backgroundColor = "#ccc";
+    }
+    updateView();
+  });
   //============================================================================================
   //show event layers
   document.getElementById("bt_event_layer").addEventListener("click", async (event) => {
       if (objOpts.canvas.is_event) {
         objOpts.canvas.is_event = false;
-        document.getElementById("bt_event_layer").style.backgroundColor =
-          "#f0f0f0";
+        document.getElementById("bt_event_layer").style.backgroundColor = "#f0f0f0";
       } else {
         objOpts.canvas.is_event = true;
-        document.getElementById("bt_event_layer").style.backgroundColor =
-          "#ccc";
+        document.getElementById("bt_event_layer").style.backgroundColor = "#ccc";
       }
       updateView();
     });
@@ -326,44 +342,6 @@ document.addEventListener("DOMContentLoaded", () => {
     }
     updateView();
 
-
-    /*
-      if (Object.keys(modelImages[objOpts.canvas.depth_scale]).length === 0) {
-        const response = await window.LCapi.askdialog(
-          "Load core images",
-          "Core images are not loaded. Do you want to load the core images?"
-        );
-        if (response.response) {
-          const photo_path =
-            "C:/Users/slinn/Dropbox/Prj_LevelCompiler/core photo";
-          await loadModelImages(coreImages, photo_path);
-          await loadCalcedImages(
-            CDImages,
-            coreImages,
-            LCCore,
-            "composite_depth"
-          );
-          await loadCalcedImages(
-            EFDImages,
-            coreImages,
-            LCCore,
-            "event_free_depth"
-          );
-        } else {
-          return;
-        }
-      }
-
-      if (objOpts.canvas.draw_core_photo) {
-        objOpts.canvas.draw_core_photo = false;
-        document.getElementById("bt_core_photo").style.backgroundColor =
-          "#f0f0f0";
-      } else {
-        objOpts.canvas.draw_core_photo = true;
-        document.getElementById("bt_core_photo").style.backgroundColor = "#ccc";
-      }
-      updateView();
-      */
     });
   //============================================================================================
   //rank
@@ -433,7 +411,7 @@ document.addEventListener("DOMContentLoaded", () => {
         targetCanvas.save("model.svg");
         //targetCanvas.save("model.png");
         isSVG = false;
-        console.log("Take snapshot as svg.");
+        console.log("[Renderer]: Take snapshot as svg.");
       } else {
         //download raster image from canvas
         const dataURL = canvas.toDataURL("image/png");
@@ -449,16 +427,17 @@ document.addEventListener("DOMContentLoaded", () => {
   //measure
   document.getElementById("bt_measure").addEventListener("click", async (event) => {
       if (LCCore) {
-        if (!measureObject.isMeasure) {
-          measureObject.isMeasure = true;
-          measureObject.measureCanvas = new p5(measureSketch);
-          document.getElementById("bt_measure").style.backgroundColor = "#ccc";
-          measureObject.measureData.type = objOpts.canvas.depth_scale;
-        } else {
-          measureObject.isMeasure = false;
-          measureObject.measureCanvas = null;
-          document.getElementById("bt_measure").style.backgroundColor =
-            "#f0f0f0";
+        if(objOpts.canvas.depth_scale !== "drilling_depth"){
+          if (!measureObject.isMeasure) {
+            measureObject.isMeasure = true;
+            measureObject.measureCanvas = new p5(measureSketch);
+            document.getElementById("bt_measure").style.backgroundColor = "#ccc";
+            measureObject.measureData.type = objOpts.canvas.depth_scale;
+          } else {
+            measureObject.isMeasure = false;
+            measureObject.measureCanvas = null;
+            document.getElementById("bt_measure").style.backgroundColor = "#f0f0f0";
+          }
         }
       }
     });
@@ -476,6 +455,7 @@ document.addEventListener("DOMContentLoaded", () => {
       await initiariseAgeModel();
       await initiariseCanvas();
       await initiarisePlot();
+      console.log("[Renderer]: Unload Models of Correlations, Ages and Canvas.");
     } else {
       //no
       return;
@@ -541,11 +521,12 @@ document.addEventListener("DOMContentLoaded", () => {
 
     //load images
     modelImages.image_dir = path;
-    let originalImages = await loadVectorImages(modelImages, LCCore, "drilling_depth");
+    modelImages.load_target_ids = [];//load all
+    let originalImages = await loadCoreImages(modelImages, LCCore, "drilling_depth");
     modelImages["drilling_depth"] = originalImages;
-    let compositeImages = await loadVectorImages(modelImages, LCCore, "composite_depth");
+    let compositeImages = await loadCoreImages(modelImages, LCCore, "composite_depth");
     modelImages["composite_depth"] = compositeImages;
-    let eventFreeImages = await loadVectorImages(modelImages, LCCore, "event_free_depth");
+    let eventFreeImages = await loadCoreImages(modelImages, LCCore, "event_free_depth");
     modelImages["event_free_depth"] = eventFreeImages;
 
     //update plot
@@ -567,9 +548,11 @@ document.addEventListener("DOMContentLoaded", () => {
         return;
       }
     } catch (error) {
-      console.error("ERROR: File load error", error);
+      console.error("[Renderer]: Correlation model load error.", error);
       return;
     }
+
+    path
 
     //initiarise
     //await initiariseCorrelationModel();
@@ -578,13 +561,15 @@ document.addEventListener("DOMContentLoaded", () => {
     await initiarisePlot();
 
     //mount correlation model
-    await registerModel(path);
+    const isResiter = await registerModel(path);
 
-    //load model into renderer
-    await loadModel(1);
+    if(isResiter){
+      //load model into renderer
+      await loadModel();
 
-    //update plot
-    updateView();
+      //update plot
+      updateView();
+    }
   });
   //============================================================================================
   //change canvas mode
@@ -609,10 +594,13 @@ document.addEventListener("DOMContentLoaded", () => {
         const target_idx = getIdxById(LCCore, target_id);
 
         let setVal = false;
+        let setType = "";
         if (event.target.checked) {
           setVal = true;
+          setType = "Enable";
         } else {
           setVal = false;
+          setType = "Disable";
         }
 
         if (target_id[1] == "") {
@@ -622,12 +610,15 @@ document.addEventListener("DOMContentLoaded", () => {
             hole.enable = setVal;
             const el = document.getElementById(hole.id.toString());
             el.checked = setVal;
+            console.log("[Renderer]: Hole "+hole.name +" is "+setType+".");
           });
         } else {
           //case hole selected
           LCCore.projects[target_idx[0]].holes[target_idx[1]].enable = setVal;
+          console.log("[Renderer]: Hole "+LCCore.projects[target_idx[0]].holes[target_idx[1]].name +" is "+setType+".");
         }
 
+        //console.log(LCCore);
         //update plot
         updateView();
       }
@@ -722,6 +713,36 @@ document.addEventListener("DOMContentLoaded", () => {
         updateView();
       }
     });
+ //============================================================================================
+  //zoom0
+  document.getElementById("bt_zoom0").addEventListener("click", async (event) => {
+    if (LCCore) {
+      objOpts.canvas.zoom_level = [4,3];
+
+      
+      //mouse position
+      const relative_scroll_pos_x = scroller.scrollLeft / scroller.scrollWidth;
+      const relative_scroll_pos_y = scroller.scrollTop / scroller.scrollHeight;
+
+      //calc new canvas size
+      const [canvasBase_width, canvasBase_height] = calcCanvasBaseSize(LCCore, objOpts);
+
+      //get new scroll pos
+      const new_scroll_pos_x = canvasBase_width * relative_scroll_pos_x;
+      const new_scroll_pos_y = canvasBase_height * relative_scroll_pos_y;
+
+      let x = new_scroll_pos_x;
+      let y = new_scroll_pos_y;
+
+      scroller.scrollTo(x, y); //move scroll position
+
+      //update plot
+      canvasPos = [x, y];
+
+      //update plot
+      updateView();
+    }
+  });  
   //============================================================================================
   //zoomin
   document.getElementById("bt_zoomin").addEventListener("click", async (event) => {
@@ -776,17 +797,22 @@ document.addEventListener("DOMContentLoaded", () => {
         finderEnable = true;
         document.getElementById("bt_finder").style.backgroundColor = "#ccc";
         await LCapi.OpenFinder("OpenFinder", async () => {});
+        objOpts.canvas.finder_y = 0;
+        updateView();
       } else {
         finderEnable = false;
         document.getElementById("bt_finder").style.backgroundColor = "#f0f0f0";
         await LCapi.CloseFinder("CloseFinder", async () => {});
+        updateView();
       }
     }
   });
+  //============================================================================================
   //close finder
   window.LCapi.receive("FinderClosed", async () => {
     //call from main process
     finderEnable = false;
+    updateView();
     document.getElementById("bt_finder").style.backgroundColor = "#f0f0f0";
   });
   //mouse click (send depth to finder)
@@ -798,62 +824,70 @@ document.addEventListener("DOMContentLoaded", () => {
       var mouseX = mousePos[0];
       var mouseY = mousePos[1];
 
-      const xMag = objOpts.canvas.zoom_level[0] * objOpts.canvas.dpir;
-      const yMag = objOpts.canvas.zoom_level[1] * objOpts.canvas.dpir;
-      const pad_x = objOpts.canvas.pad_x;
-      const pad_y = objOpts.canvas.pad_y;
-      const shift_x = objOpts.canvas.shift_x;
-      const shift_y = objOpts.canvas.shift_y;
-
-      //mouse position
-      let x = (scroller.scrollLeft + mouseX - pad_x) / xMag - shift_x;
-      let y = (scroller.scrollTop + mouseY - pad_y) / yMag - shift_y;
-
-      await window.LCapi.SendDepthToFinder([
-        correlation_model_list[0].id,
-        y,
-        objOpts.canvas.depth_scale,
-      ]);
-      console.log("Click: Send the depth to Finder");
+      //calc position
+      let results = getClickedItemIdx(mouseX, mouseY, LCCore, objOpts);
+      //console.log(results);
+ 
+      await window.LCapi.SendDepthToFinder(results);
+      console.log("[Renderer]: Send the clicked depth to Finder", results.y, objOpts.canvas.depth_scale);
     }
   });
+  //============================================================================================
+  window.LCapi.receive("rendererLog", async (data) => {
+    console.log(data);
+  });
+  //============================================================================================
   //FInder send event (move to)
   window.LCapi.receive("MoveToHorizonFromFinder", async (data) => {
     //move position based on finder
-    if (objOpts.canvas.depth_scale !== "drilling_depth") {
       //get location
-      const pos_y = data[objOpts.canvas.depth_scale];
+    let pos_y = data[objOpts.canvas.depth_scale];
+    objOpts.canvas.finder_y = pos_y;
+    console.log("[Renderer]: Recieved data from Finder: ", pos_y, objOpts.canvas.depth_scale);
+    if(data.isMove){
+      if (objOpts.canvas.depth_scale !== "drilling_depth") {
+        var rect;
+        if (isDrawVector) {
+          rect = document.getElementById("p5Canvas").getBoundingClientRect(); // Canvas position and size
+        } else {
+          rect = document.getElementById("rasterCanvas").getBoundingClientRect(); // Canvas position and size
+        }
 
-      //convert scale from depth to pix
-      let canvasPosY = null;
-      if (objOpts.canvas.depth_scale == "age") {
-        canvasPosY =
-          (pos_y + objOpts.canvas.shift_y) *
-            (objOpts.canvas.dpir *
-              objOpts.canvas.zoom_level[1] *
-              objOpts.canvas.age_zoom_correction) +
-          objOpts.canvas.pad_y;
-      } else {
-        canvasPosY =
-          (pos_y + objOpts.canvas.shift_y) *
-            (objOpts.canvas.dpir * objOpts.canvas.zoom_level[1]) +
-          objOpts.canvas.pad_y;
+        //convert scale from depth to pix
+        //const canvasPosY =  yMag  * age_mod * (pos_y + shift_y) + pad_y - scroller.scrollTop;
+        let canvasPosY = null;
+        if (objOpts.canvas.depth_scale == "age") {
+          canvasPosY = ((pos_y + objOpts.canvas.shift_y) * (objOpts.canvas.dpir * objOpts.canvas.zoom_level[1]) + objOpts.canvas.pad_y + objOpts.canvas.age_zoom_correction[1])  * objOpts.canvas.age_zoom_correction[0];
+        } else {
+          canvasPosY = (pos_y + objOpts.canvas.shift_y) * (objOpts.canvas.dpir * objOpts.canvas.zoom_level[1]) + objOpts.canvas.pad_y;
+        }
+
+        //update footer
+        const txt = await getFooterInfo(LCCore, pos_y, objOpts);
+        document.getElementById("footerLeftText").innerText = txt;
+
+        //move scroller
+        scroller.scrollTop = canvasPosY - scroller.clientHeight / 2;
+        //scroller.moveTo(scroller.scrollLeft, pos_y);
+
+        //move canvas
+        let newPosY = canvasPosY - scroller.clientHeight / 2;
+        if(newPosY <= 0){
+          newPosY = 0;
+        }
+        canvasPos[1] = newPosY;
+
+        //window.scrollTo({top:canvasPosY})
+        
+        //update plot
+        //updateView();
+
+        //target line
+        var target_line = document.getElementById("horizontal_target");
+        target_line.style.top = scroller.clientHeight / 2 + "px";
       }
-
-      //move scroller
-      scroller.scrollTop = canvasPosY - scroller.clientHeight / 2;
-      //scroller.moveTo(scroller.scrollLeft, pos_y);
-
-      //move canvas
-      canvasPos[1] = canvasPosY - scroller.clientHeight / 2;
-
-      //update plot
-      updateView();
-
-      //target line
-      var target_line = document.getElementById("horizontal_target");
-      target_line.style.top = scroller.clientHeight / 2 + "px";
     }
+    updateView();
   });
   //============================================================================================
   //mouse move position event
@@ -868,22 +902,25 @@ document.addEventListener("DOMContentLoaded", () => {
 
     var mouseX = event.clientX - rect.left;
     var mouseY = event.clientY - rect.top;
-
-    const xMag = objOpts.canvas.zoom_level[0] * objOpts.canvas.dpir;
-    const yMag = objOpts.canvas.zoom_level[1] * objOpts.canvas.dpir;
-    const pad_x = objOpts.canvas.pad_x;
-    const pad_y = objOpts.canvas.pad_y;
-    const shift_x = objOpts.canvas.shift_x;
-    const shift_y = objOpts.canvas.shift_y;
     let age_mod = 1;
 
+    
+
+    const xMag = objOpts.canvas.zoom_level[0] * objOpts.canvas.dpir;
+    let yMag = objOpts.canvas.zoom_level[1] * objOpts.canvas.dpir;
+    const pad_x = objOpts.canvas.pad_x;
+    let pad_y = objOpts.canvas.pad_y;
+    const shift_x = objOpts.canvas.shift_x;
+    const shift_y = objOpts.canvas.shift_y;
     if (objOpts.canvas.depth_scale == "age") {
-      age_mod = objOpts.canvas.age_zoom_correction;
+      yMag = yMag * objOpts.canvas.age_zoom_correction[0];
+      pad_y = pad_y + objOpts.canvas.age_zoom_correction[1];
     }
+    
 
     //mouse position
     let x = (scroller.scrollLeft + mouseX - pad_x) / xMag - shift_x;
-    let y = (scroller.scrollTop + mouseY - pad_y) / yMag / age_mod - shift_y;
+    let y = (scroller.scrollTop + mouseY - pad_y) / yMag  - shift_y;
 
     //get text
     const txt = await getFooterInfo(LCCore, y, objOpts);
@@ -913,16 +950,21 @@ document.addEventListener("DOMContentLoaded", () => {
   scroller.addEventListener("scroll",async function (event) {
       //show depth/age
       //const xMag = objOpts.canvas.zoom_level[0] * objOpts.canvas.dpir;
-      const yMag = objOpts.canvas.zoom_level[1] * objOpts.canvas.dpir;
+      let yMag = objOpts.canvas.zoom_level[1] * objOpts.canvas.dpir;
       //const pad_x = objOpts.canvas.pad_x;
-      const pad_y = objOpts.canvas.pad_y;
+      let pad_y = objOpts.canvas.pad_y;
       //const shift_x = objOpts.canvas.shift_x;
       const shift_y = objOpts.canvas.shift_y;
+      if (objOpts.canvas.depth_scale == "age") {
+        yMag = yMag * objOpts.canvas.age_zoom_correction[0];
+        pad_y = pad_y + objOpts.canvas.age_zoom_correction[1];
+      }
 
       //mouse position
       //const mouseCanvasPosX = (scroller.scrollLeft + mousePos[0] - pad_x) / xMag - shift_x;
-      const mouseCanvasPosY =
-        (scroller.scrollTop + mousePos[1] - pad_y) / yMag - shift_y;
+      const mouseCanvasPosY =  (scroller.scrollTop + mousePos[1] - pad_y) / yMag - shift_y;
+      const txt = await getFooterInfo(LCCore, mouseCanvasPosY, objOpts);
+      document.getElementById("footerLeftText").innerText = txt;
 
       ///scroller position
       canvasPos[0] = scroller.scrollLeft; //* xMag;
@@ -930,13 +972,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
       //update plot
       updateView();
-
-      //get text
-      const txt = await getFooterInfo(LCCore, mouseCanvasPosY, objOpts);
-
-      //update footer info
-      var el = document.getElementById("footerLeftText");
-      el.innerText = txt;
 
       /*
       //send to finder
@@ -1088,11 +1123,13 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const xMag = dpir * objOpts.canvas.zoom_level[0];
     let yMag = dpir * objOpts.canvas.zoom_level[1];
-    if (objOpts.canvas.depth_scale == "age") {
-      yMag = yMag * objOpts.canvas.age_zoom_correction;
-    }
     const pad_x = objOpts.canvas.pad_x;
-    const pad_y = objOpts.canvas.pad_y;
+    let pad_y = objOpts.canvas.pad_y;
+    if (objOpts.canvas.depth_scale == "age") {
+      yMag = yMag * objOpts.canvas.age_zoom_correction[0];
+      pad_y = pad_y + objOpts.canvas.age_zoom_correction[1];
+    }
+
     //get shift amounts
     const shift_x = objOpts.canvas.shift_x;
     const shift_y = objOpts.canvas.shift_y;
@@ -1176,11 +1213,13 @@ document.addEventListener("DOMContentLoaded", () => {
       const dpir = objOpts.canvas.dpir; //window.devicePixelRatio || 1;
       const xMag = dpir * objOpts.canvas.zoom_level[0];
       let yMag = dpir * objOpts.canvas.zoom_level[1];
-      if (objOpts.canvas.depth_scale == "age") {
-        yMag = yMag * objOpts.canvas.age_zoom_correction;
-      }
       const pad_x = objOpts.canvas.pad_x;
-      const pad_y = objOpts.canvas.pad_y;
+      let pad_y = objOpts.canvas.pad_y;
+      if (objOpts.canvas.depth_scale == "age") {
+        yMag = yMag * objOpts.canvas.age_zoom_correction[0];
+        pad_y = pad_y + objOpts.canvas.age_zoom_correction[1];
+      }
+      
       //get shift amounts
       const shift_x = objOpts.canvas.shift_x;
       const shift_y = objOpts.canvas.shift_y;
@@ -1224,12 +1263,9 @@ document.addEventListener("DOMContentLoaded", () => {
         const gridStartY = (0 + shift_y) * yMag + pad_y; //pix
         let age_mod = 1;
         if (objOpts.canvas.depth_scale == "age") {
-          age_mod = objOpts.canvas.age_zoom_correction;
+          age_mod = objOpts.canvas.age_zoom_correction[0];
         }
-        const gridStepY = fitScaler(
-          objOpts.canvas.zoom_level[1],
-          yMag / age_mod
-        ); //pix
+        const gridStepY = fitScaler(objOpts.canvas.zoom_level[1], yMag / age_mod); //pix
 
         const gridMaxY = parseInt(canvasBase.style.height.match(/\d+/)[0], 10);
         const gridMaxX = parseInt(canvasBase.style.width.match(/\d+/)[0], 10);
@@ -1246,8 +1282,7 @@ document.addEventListener("DOMContentLoaded", () => {
             const text = " " + Math.round(d).toLocaleString();
             return text;
           } else {
-            const text =
-              " " + (Math.round(d) / 100).toFixed(2).toLocaleString();
+            const text = " " + (Math.round(d) / 100).toFixed(2).toLocaleString();
             return text;
           }
         };
@@ -1291,12 +1326,57 @@ document.addEventListener("DOMContentLoaded", () => {
       //-----------------------------------------------------------------------------------------
 
       //initiarise
-      let num_disable = {
-        total: 0,
-        hole: 0,
-      };
+      //draw finder target line
+      if(finderEnable){        
+        //get pos
+        let num_disable = {total: 0, hole: 0};
+        let maxHoleOrder = 0;
+        let hole_x1 = 0;
+        for (let p = 0; p < LCCore.projects.length; p++) {
+          for (let h = 0; h < LCCore.projects[p].holes.length; h++) {
+            maxHoleOrder = LCCore.projects[p].holes[h].order;
+            if (!LCCore.projects[p].holes[h].enable) {
+              //case not plot, count
+              num_disable.hole += 1;
+              
+              continue;
+            }
+            hole_x1 = 20 + (objOpts.hole.distance + objOpts.hole.width) * (num_disable.total + LCCore.projects[p].holes[h].order - num_disable.hole);
+          }
+          num_disable.total += LCCore.projects[p].holes.length + 1;
+        } 
+
+        //fix position
+        const target_y = (objOpts.canvas.finder_y + shift_y) * yMag + pad_y;
+        //const target_x0 = 140;
+        //const target_x1 = (hole_x1 + shift_x + objOpts.hole.width / 2) * xMag + pad_x;
+        const target_x0 = canvasPos[0] + 20;
+        const target_x1 = canvasPos[0] + scroller.clientWidth - 20;
+        
+
+        sketch.strokeWeight(1);
+        sketch.stroke("Red");
+        sketch.line(
+          target_x0,
+          target_y,
+          target_x1,
+          target_y
+        );
+        sketch.fill("Red");
+        sketch.triangle(
+          target_x0,      target_y,
+          target_x0 - 10, target_y + 5, 
+          target_x0 - 10, target_y - 5
+          );
+          sketch.triangle(
+            target_x1,      target_y,
+            target_x1 + 10, target_y + 5, 
+            target_x1 + 10, target_y - 5
+            );
+      }
 
       //main
+      let num_disable = {total: 0, hole: 0};
       for (let p = 0; p < LCCore.projects.length; p++) {
         const project = LCCore.projects[p];
         for (let h = 0; h < LCCore.projects[p].holes.length; h++) {
@@ -1312,14 +1392,9 @@ document.addEventListener("DOMContentLoaded", () => {
           }
 
           //calc position excluding diable holes------------------------------
-          let hole_top =
-            hole.sections[0].markers[0][objOpts.canvas.depth_scale];
-          let hole_bottom = hole.sections.slice(-1)[0].markers.slice(-1)[0][
-            objOpts.canvas.depth_scale
-          ];
-          let hole_x0 =
-            (objOpts.hole.distance + objOpts.hole.width) *
-            (num_disable.total + hole.order - num_disable.hole);
+          let hole_top = hole.sections[0].markers[0][objOpts.canvas.depth_scale];
+          let hole_bottom = hole.sections.slice(-1)[0].markers.slice(-1)[0][objOpts.canvas.depth_scale];
+          let hole_x0 = (objOpts.hole.distance + objOpts.hole.width) * (num_disable.total + hole.order - num_disable.hole);
 
           //check position
           if (hole_top == null && hole_bottom == null && hole_x0 == null) {
@@ -1425,14 +1500,17 @@ document.addEventListener("DOMContentLoaded", () => {
             //add section photo-------------------------------------------------
             if (objOpts.canvas.draw_core_photo) {
               try {
-                if (
-                  modelImages[objOpts.canvas.depth_scale][
-                    hole.name + "-" + section.name
-                  ] !== undefined
-                ) {
+                let ptoto_depth_scale;
+                if(objOpts.canvas.depth_scale == "age"){
+                  ptoto_depth_scale = "event_free_depth";
+                } else {
+                  ptoto_depth_scale = objOpts.canvas.depth_scale;
+                }
+                
+                if (modelImages[ptoto_depth_scale][hole.name + "-" + section.name] !== undefined) {
                   try {
                     sketch.image(
-                      modelImages[objOpts.canvas.depth_scale][
+                      modelImages[ptoto_depth_scale][
                         hole.name + "-" + section.name
                       ],
                       sec_x0,
@@ -1442,17 +1520,11 @@ document.addEventListener("DOMContentLoaded", () => {
                     );
                   } catch (error) {
                     console.error(error);
-                    console.log(
-                      modelImages[objOpts.canvas.depth_scale][
-                        hole.name + "-" + section.name
-                      ]
-                    );
+                    console.log(modelImages[ptoto_depth_scale][hole.name + "-" + section.name]);
                   }
                 }
               } catch (err) {}
             }
-
-            //
 
             //add section name-------------------------------------------------
             sketch.fill(objOpts.section.font_colour);
@@ -1620,71 +1692,74 @@ document.addEventListener("DOMContentLoaded", () => {
               //-----------------------------------------------------------
               //make connection objects=================================================================================
               //add connection
-              const connectionData = this.getNearestConnectedMarkerIdx( LCCore, marker.id );
+              if( objOpts.canvas.is_connection){
+                const connectionData = this.getNearestConnectedMarkerIdx( LCCore, marker.id );
 
-              //check connection
-              if (connectionData == null) {
-                //there is no connection
-                continue;
-              }
+                //check connection
+                if (connectionData == null) {
+                  //there is no connection
+                  continue;
+                }
 
-              const idxTo = connectionData.connected_idx;
+                const idxTo = connectionData.connected_idx;
 
-              //get connectied hole position
-              const connectedHole_x0 =
-                (objOpts.hole.distance + objOpts.hole.width) * (1 * LCCore.projects[idxTo[0]].order + connectionData.num_total - connectionData.num_total_disable); //LCCore.projects[idxTo[0]].holes[idxTo[1]].order
+                //get connectied hole position
+                const connectedHole_x0 =
+                  (objOpts.hole.distance + objOpts.hole.width) * (1 * LCCore.projects[idxTo[0]].order + connectionData.num_total - connectionData.num_total_disable); //LCCore.projects[idxTo[0]].holes[idxTo[1]].order
 
-              const connectedMarker_top = LCCore.projects[idxTo[0]].holes[idxTo[1]].sections[idxTo[2]].markers[idxTo[3]][objOpts.canvas.depth_scale];
+                const connectedMarker_top = LCCore.projects[idxTo[0]].holes[idxTo[1]].sections[idxTo[2]].markers[idxTo[3]][objOpts.canvas.depth_scale];
 
-              if (connectedMarker_top == null) {
-                //console.log("Connected marker position is null.");
-                continue;
-              }
-              //get connector position
-              const cn_x0 = (hole_x0 + shift_x + objOpts.marker.width) * xMag + pad_x;
-              const cn_y0 = (marker_top + shift_y) * yMag + pad_y;
-              const cn_x1 = cn_x0 + objOpts.connection.indexWidth;
-              const cn_y1 = cn_y0;
-              const cn_x3 = (connectedHole_x0 + shift_x) * xMag + pad_x;
-              const cn_y3 = (connectedMarker_top + shift_y) * yMag + pad_y;
-              const cn_x2 = cn_x3 - objOpts.connection.indexWidth;
-              const cn_y2 = cn_y3;
-              let  connection_colour = objOpts.connection.line_colour;
-              let connection_line_width = objOpts.connection.line_width;
+                if (connectedMarker_top == null) {
+                  //console.log("Connected marker position is null.");
+                  continue;
+                }
+
+                //get connector position
+                const cn_x0 = (hole_x0 + shift_x + objOpts.marker.width) * xMag + pad_x;
+                const cn_y0 = (marker_top + shift_y) * yMag + pad_y;
+                const cn_x1 = cn_x0 + objOpts.connection.indexWidth;
+                const cn_y1 = cn_y0;
+                const cn_x3 = (connectedHole_x0 + shift_x) * xMag + pad_x;
+                const cn_y3 = (connectedMarker_top + shift_y) * yMag + pad_y;
+                const cn_x2 = cn_x3 - objOpts.connection.indexWidth;
+                const cn_y2 = cn_y3;
+                let  connection_colour = objOpts.connection.line_colour;
+                let connection_line_width = objOpts.connection.line_width;
+
+                //get style
+                if (cn_y0 !== cn_y3) {
+                  //not horizontal
+                  if (objOpts.connection.emphasize_non_horizontal && objOpts.canvas.depth_scale !== "drilling_depth"){
+                    connection_colour = "Red";
+                  }
+                }
+                if (!connectionData.isNext) {
+                  //connected core is not located at the next
+                  if (objOpts.connection.show_remote_connections){
+                    sketch.drawingContext.setLineDash([5, 5]);
+                  }
+                } else {
+                  sketch.drawingContext.setLineDash([]);
+                }
+
+                if ( marker.isMaster && 
+                    LCCore.projects[idxTo[0]].holes[idxTo[1]].sections[idxTo[2]].markers[idxTo[3]].isMaster &&
+                    LCCore.projects[idxTo[0]].id[0] == marker.id[0]
+                    ) {
+                  //if connection of master section
+                  connection_colour = "Blue";
+                  connection_line_width = objOpts.connection.line_width * 1.3
+                }
+
+                //draw connection---------------------------------------------
+                sketch.strokeWeight(connection_line_width);
+                sketch.stroke(connection_colour);
+
+                sketch.line(cn_x0, cn_y0, cn_x1, cn_y1); //start point
+                sketch.line(cn_x1, cn_y1, cn_x2, cn_y2); //index left
+                sketch.line(cn_x2, cn_y2, cn_x3, cn_y3); //index right
+              } 
               
-              //get style
-              if (cn_y0 !== cn_y3) {
-                //not horizontal
-                if (objOpts.connection.emphasize_non_horizontal && objOpts.canvas.depth_scale !== "drilling_depth"){
-                  connection_colour = "Red";
-                }
-              }
-              if (!connectionData.isNext) {
-                //connected core is not located at the next
-                if (objOpts.connection.show_remote_connections){
-                  sketch.drawingContext.setLineDash([5, 5]);
-                }
-              } else {
-                sketch.drawingContext.setLineDash([]);
-              }
-
-              if ( marker.isMaster && 
-                   LCCore.projects[idxTo[0]].holes[idxTo[1]].sections[idxTo[2]].markers[idxTo[3]].isMaster &&
-                   LCCore.projects[idxTo[0]].id[0] == marker.id[0]
-                  ) {
-                //if connection of master section
-                connection_colour = "Blue";
-                connection_line_width = objOpts.connection.line_width * 1.3
-              }
-
-              //draw connection---------------------------------------------
-              sketch.strokeWeight(connection_line_width);
-              sketch.stroke(connection_colour);
-
-              sketch.line(cn_x0, cn_y0, cn_x1, cn_y1); //start point
-              sketch.line(cn_x1, cn_y1, cn_x2, cn_y2); //index left
-              sketch.line(cn_x2, cn_y2, cn_x3, cn_y3); //index right
-
               //=====================================================================================================
             }
           }
@@ -1712,9 +1787,7 @@ document.addEventListener("DOMContentLoaded", () => {
       //get position & plot
 
       for (let a = 0; a < ageSeries.length; a++) {
-        num_disable = {
-          hole: 0,
-        };
+        num_disable = {hole: 0};
         let posX;
         let posY;
         if (ageSeries[a].original_depth_type == "trinity") {
@@ -1722,18 +1795,25 @@ document.addEventListener("DOMContentLoaded", () => {
           //get hole
           let hole = null;
           let isSkip = false;
-          for (let p = 0; p < LCCore.projects.length; p++) {
-            for (let h = 0; h < LCCore.projects[p].holes.length; h++) {
-              const hole_temp = LCCore.projects[p].holes[h];
-              if (hole_temp.name == ageSeries[a].trinity.hole_name) {
-                if (hole_temp.enable == false) {
-                  isSkip = true;
+          let num_hole = {enable:0,disable:0};
+          outerloop:
+          for (let po = 0; po < LCCore.projects.length; po++) {
+            for (let ho = 0; ho < LCCore.projects[po].holes.length; ho++) {
+              const hole_temp = LCCore.projects[po].holes[ho];
+              if (hole_temp.name == ageSeries[a].trinity.hole_name){
+                if(LCCore.projects[po].holes[ho].enable == true){
+                  num_hole.enable += 1;
+                  hole = hole_temp;
+                }else{
+                  num_hole.disable += 1;
+                  isSkip = true;                  
                 }
-                hole = hole_temp;
-                break;
+                break outerloop;
               } else {
-                if (hole_temp.enable == false) {
-                  num_disable.hole += 1;
+                if(LCCore.projects[po].holes[ho].enable == true){
+                  num_hole.enable += 1;
+                }else{
+                  num_hole.disable += 1;
                 }
               }
             }
@@ -1743,33 +1823,20 @@ document.addEventListener("DOMContentLoaded", () => {
             //if disabel hole
             continue;
           }
-
+         
           //calc position
+          posX = ((objOpts.hole.distance + objOpts.hole.width) * (num_hole.enable -1 ) + shift_x) * xMag +  
+              pad_x + objOpts.hole.width * xMag - objOpts.age.incon_size * 1.2;
 
-          posX =
-            ((objOpts.hole.distance + objOpts.hole.width) *
-              (hole.order - num_disable.hole) +
-              shift_x) *
-              xMag +
-            pad_x +
-            objOpts.hole.width * xMag -
-            objOpts.age.incon_size * 1.2;
-          posY =
-            (ageSeries[a][objOpts.canvas.depth_scale] + shift_y) * yMag +
-            pad_y -
-            objOpts.age.incon_size / 2;
+          posY = (ageSeries[a][objOpts.canvas.depth_scale] + shift_y) * yMag + pad_y - objOpts.age.incon_size / 2;
 
           //console.log(posX + "/" + posY);
           //------------------------------------------------
         } else {
           //plot 0
           const age_shift_x = -50;
-          posX =
-            age_shift_x + shift_x * xMag + pad_x - objOpts.age.incon_size * 1.2;
-          posY =
-            (ageSeries[a][objOpts.canvas.depth_scale] + shift_y) * yMag +
-            pad_y -
-            objOpts.age.incon_size / 2;
+          posX = age_shift_x + shift_x * xMag + pad_x - objOpts.age.incon_size * 1.2;
+          posY = (ageSeries[a][objOpts.canvas.depth_scale] + shift_y) * yMag + pad_y - objOpts.age.incon_size / 2;
 
           //console.log(ageSeries[a]);
           //console.log(ageSeries[a].name + ":" + posX + "/" + posY);
@@ -1841,11 +1908,12 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const xMag = dpir * objOpts.canvas.zoom_level[0];
     let yMag = dpir * objOpts.canvas.zoom_level[1];
-    if (objOpts.canvas.depth_scale == "age") {
-      yMag = yMag * objOpts.canvas.age_zoom_correction;
-    }
     const pad_x = objOpts.canvas.pad_x;
-    const pad_y = objOpts.canvas.pad_y;
+    let pad_y = objOpts.canvas.pad_y;
+    if (objOpts.canvas.depth_scale == "age") {
+      yMag = yMag * objOpts.canvas.age_zoom_correction[0];
+      pad_y = pad_y + objOpts.canvas.age_zoom_correction[1];
+    }
     //get shift amounts
     const shift_x = objOpts.canvas.shift_x;
     const shift_y = objOpts.canvas.shift_y;
@@ -1952,7 +2020,7 @@ document.addEventListener("DOMContentLoaded", () => {
       const gridStartY = (0 + shift_y) * yMag + pad_y; //pix
       let age_mod = 1;
       if (objOpts.canvas.depth_scale == "age") {
-        age_mod = objOpts.canvas.age_zoom_correction;
+        age_mod = objOpts.canvas.age_zoom_correction[0];
       }
       const gridStepY = fitScaler(objOpts.canvas.zoom_level[1], yMag / age_mod); //pix
 
@@ -2473,7 +2541,8 @@ document.addEventListener("DOMContentLoaded", () => {
         let hole = null;
         let isSkip = false;
 
-        breakMarker: for (let p = 0; p < LCCore.projects.length; p++) {
+        breakMarker: 
+        for (let p = 0; p < LCCore.projects.length; p++) {
           for (let h = 0; h < LCCore.projects[p].holes.length; h++) {
             const hole_temp = LCCore.projects[p].holes[h];
             if (hole_temp.name == ageSeries[a].trinity.hole_name) {
@@ -2603,7 +2672,12 @@ document.addEventListener("DOMContentLoaded", () => {
     let clickCount = 2;
     let startPoint = null;
     let endPoint = null;
-    measureObject;
+
+    let age_correction = [1, 0];
+    if(objOpts.canvas.depth_scale == "age"){
+      age_correction[0] = objOpts.canvas.age_zoom_correction[0];
+      age_correction[1] = objOpts.canvas.age_zoom_correction[1];
+    }
 
     sketch.setup = () => {
       sketchCanvas = sketch.createCanvas(
@@ -2621,7 +2695,6 @@ document.addEventListener("DOMContentLoaded", () => {
     };
 
     sketch.draw = () => {
-      console.log(clickCount);
       sketch.strokeWeight(2);
       sketch.push(); // Save settings
       sketch.translate(-scroller.scrollLeft, -scroller.scrollTop);
@@ -2629,36 +2702,18 @@ document.addEventListener("DOMContentLoaded", () => {
       sketch.clear();
       if (clickCount == 1) {
         sketch.line(
-          (startPoint[0] + objOpts.canvas.shift_x) *
-            objOpts.canvas.zoom_level[0] *
-            objOpts.canvas.dpir +
-            objOpts.canvas.pad_x,
-          (startPoint[1] + objOpts.canvas.shift_y) *
-            objOpts.canvas.zoom_level[1] *
-            objOpts.canvas.dpir +
-            objOpts.canvas.pad_y,
-          sketch.mouseX + scroller.scrollLeft,
-          sketch.mouseY + scroller.scrollTop
+          (startPoint[0] + objOpts.canvas.shift_x) * objOpts.canvas.zoom_level[0] * objOpts.canvas.dpir + objOpts.canvas.pad_x,
+          (startPoint[1] + objOpts.canvas.shift_y) * objOpts.canvas.zoom_level[1] * objOpts.canvas.dpir * age_correction[0] + objOpts.canvas.pad_y + age_correction[1],
+          sketch.mouseX  + scroller.scrollLeft,
+          sketch.mouseY  + scroller.scrollTop
         );
         sketch.pop(); // Restore settings
       } else if (clickCount == 0) {
         sketch.line(
-          (startPoint[0] + objOpts.canvas.shift_x) *
-            objOpts.canvas.zoom_level[0] *
-            objOpts.canvas.dpir +
-            objOpts.canvas.pad_x,
-          (startPoint[1] + objOpts.canvas.shift_y) *
-            objOpts.canvas.zoom_level[1] *
-            objOpts.canvas.dpir +
-            objOpts.canvas.pad_y,
-          (endPoint[0] + objOpts.canvas.shift_x) *
-            objOpts.canvas.zoom_level[0] *
-            objOpts.canvas.dpir +
-            objOpts.canvas.pad_x,
-          (endPoint[1] + objOpts.canvas.shift_y) *
-            objOpts.canvas.zoom_level[1] *
-            objOpts.canvas.dpir +
-            objOpts.canvas.pad_y
+          (startPoint[0] + objOpts.canvas.shift_x) * objOpts.canvas.zoom_level[0] * objOpts.canvas.dpir + objOpts.canvas.pad_x,
+          (startPoint[1] + objOpts.canvas.shift_y) * objOpts.canvas.zoom_level[1] * objOpts.canvas.dpir *  + age_correction[0] + objOpts.canvas.pad_y + age_correction[1],
+          (endPoint[0] + objOpts.canvas.shift_x) * objOpts.canvas.zoom_level[0] * objOpts.canvas.dpir + objOpts.canvas.pad_x,
+          (endPoint[1] + objOpts.canvas.shift_y) * objOpts.canvas.zoom_level[1] * objOpts.canvas.dpir *  + age_correction[0] + objOpts.canvas.pad_y + age_correction[1]
         );
       }
     };
@@ -2668,43 +2723,30 @@ document.addEventListener("DOMContentLoaded", () => {
       sketch.resizeCanvas(scroller.clientWidth, scroller.clientHeight);
     };
 
+    //let x = (scroller.scrollLeft + mouseX - pad_x) / xMag - shift_x;
+    //let y = (scroller.scrollTop + mouseY - pad_y) / yMag / age_mod - shift_y;
+    
     sketch.mouseClicked = () => {
       if (clickCount == 2) {
         startPoint = [0, 0];
         clickCount -= 1;
         sketch.loop();
         //convert depth scale
-        startPoint[0] =
-          (sketch.mouseX + scroller.scrollLeft - objOpts.canvas.pad_x) /
-            objOpts.canvas.zoom_level[0] /
-            objOpts.canvas.dpir -
-          objOpts.canvas.shift_x;
-        startPoint[1] =
-          (sketch.mouseY + scroller.scrollTop - objOpts.canvas.pad_y) /
-            objOpts.canvas.zoom_level[1] /
-            objOpts.canvas.dpir -
-          objOpts.canvas.shift_y;
+        startPoint[0] = (sketch.mouseX + scroller.scrollLeft - objOpts.canvas.pad_x) / objOpts.canvas.zoom_level[0] * objOpts.canvas.dpir - objOpts.canvas.shift_x;
+        startPoint[1] = (sketch.mouseY + scroller.scrollTop - objOpts.canvas.pad_y - age_correction[1]) / (objOpts.canvas.zoom_level[1]  * objOpts.canvas.dpir * age_correction[0]) - objOpts.canvas.shift_y;
         //finish
         measureObject.measureData.start = startPoint;
-        console.log("Strat: " + startPoint);
+        console.log("[Measure]: Strat from " + startPoint);
       } else if (clickCount == 1) {
         endPoint = [0, 0];
         clickCount -= 1;
         sketch.noLoop();
         //convert depth scale
-        endPoint[0] =
-          (sketch.mouseX + scroller.scrollLeft - objOpts.canvas.pad_x) /
-            objOpts.canvas.zoom_level[0] /
-            objOpts.canvas.dpir -
-          objOpts.canvas.shift_x;
-        endPoint[1] =
-          (sketch.mouseY + scroller.scrollTop - objOpts.canvas.pad_y) /
-            objOpts.canvas.zoom_level[1] /
-            objOpts.canvas.dpir -
-          objOpts.canvas.shift_y;
+        endPoint[0] = (sketch.mouseX + scroller.scrollLeft - objOpts.canvas.pad_x) / objOpts.canvas.zoom_level[0] * objOpts.canvas.dpir - objOpts.canvas.shift_x;
+        endPoint[1] = (sketch.mouseY + scroller.scrollTop - objOpts.canvas.pad_y - age_correction[1]) / (objOpts.canvas.zoom_level[1] * objOpts.canvas.dpir * age_correction[0]) - objOpts.canvas.shift_y;
         //finish
         measureObject.measureData.end = endPoint;
-        console.log("End: " + endPoint);
+        console.log("[Measure]: End to " + endPoint);
         measureResults();
       } else if (clickCount > 0) {
         clickCount -= 1;
@@ -2715,33 +2757,35 @@ document.addEventListener("DOMContentLoaded", () => {
 
   async function measureResults() {
     //calc
-    let upperVal = null;
-    let lowerVal = null;
-
-    if (
-      measureObject.measureData.start[1] <= measureObject.measureData.end[1]
-    ) {
-      upperVal = measureObject.measureData.start[1];
-      lowerVal = measureObject.measureData.end[1];
-    } else {
-      lowerVal = measureObject.measureData.start[1];
-      upperVal = measureObject.measureData.end[1];
+    let x0;
+    let x1;
+    let y0;
+    let y1;
+    let age_correction = 1;
+    if(objOpts.canvas.depth_scale == "age"){
+      age_correction = objOpts.canvas.age_zoom_correction[0];
     }
 
-    const upperData = await window.LCapi.depthConvert(
-      ["", upperVal],
-      measureObject.measureData.type,
-      "linear"
-    );
-    const lowerData = await window.LCapi.depthConvert(
-      ["", lowerVal],
-      measureObject.measureData.type,
-      "linear"
-    );
+
+    if (measureObject.measureData.start[1] <= measureObject.measureData.end[1]) {
+      x0 = measureObject.measureData.start[0];
+      y0 = measureObject.measureData.start[1];
+      x1 = measureObject.measureData.end[0];      
+      y1 = measureObject.measureData.end[1];
+    } else {
+      x1 = measureObject.measureData.start[0];
+      y1 = measureObject.measureData.start[1];
+      x0 = measureObject.measureData.end[0];      
+      y0 = measureObject.measureData.end[1];
+    }
+
+    //get click position
+    const upperData = await window.LCapi.depthConvert(["measured_upper", y0, [null, null, null, null]], measureObject.measureData.type,"linear");
+    const lowerData = await window.LCapi.depthConvert(["measured_lower", y1, [null, null, null, null]], measureObject.measureData.type,"linear");
 
     //calc stat
     const meanAge = (lowerData.age_mid + upperData.age_mid) / 2;
-    const meanCD = (lowerData.cd + upperData.cd) / 2;
+    const meanCD  = (lowerData.cd + upperData.cd) / 2;
     const meanEFD = (lowerData.efd + upperData.efd) / 2;
 
     const duration = lowerData.age_mid - upperData.age_mid;
@@ -2751,12 +2795,9 @@ document.addEventListener("DOMContentLoaded", () => {
     const srCD = thicknessCD / duration;
     const srEFD = thicknessEFD / duration;
 
-    console.log(lowerData);
-    console.log(upperData);
-
     //show
     const text =
-      "1. Mean\nComposite depth: " +
+      "1. Mean\nComposite depth: " + 
       (Math.round(meanCD * 10) / 10).toLocaleString() +
       " cm\nEvent free depth: " +
       (Math.round(meanEFD * 10) / 10).toLocaleString() +
@@ -2768,15 +2809,18 @@ document.addEventListener("DOMContentLoaded", () => {
       (Math.round(thicknessEFD * 10) / 10).toLocaleString() +
       " cm\nDuration: " +
       (Math.round(duration * 10) / 10).toLocaleString() +
-      " yrs\n\n3. Sedimentation rate\nCD: " +
+      " yrs\n\n3. Sedimentation rate\nComposite Depth: " +
       Math.round(srCD * 1000) / 1000 +
-      " cm/yr\nEFD: " +
+      " cm/yr\nEvent Free Depth: " +
       Math.round(srEFD * 1000) / 1000 +
       " cm/yr";
     alert(text);
 
+    console.log("[Renderer]: Measured " +  measureObject.measureData.start[1] + "==>" + measureObject.measureData.end[1] + measureObject.measureData.type);
+
     document.getElementById("bt_measure").style.backgroundColor = "#f0f0f0";
-    penObject.isMeasure = false;
+    //penObject.isMeasure = false;
+    measureObject.isMeasure = false;
     measureObject.measureCanvas = null;
     measureObject.measureData.type = null;
     measureObject.measureData.start = null;
@@ -2786,10 +2830,6 @@ document.addEventListener("DOMContentLoaded", () => {
     while (parentElement2.firstChild) {
       parentElement2.removeChild(parentElement2.firstChild);
     }
-
-    console.log(
-      measureObject.measureData.start + "==>" + measureObject.measureData.end
-    );
   }
   //--------------------------------------------------------------------------------------------
   const penSketch = (sketch) => {
@@ -2904,20 +2944,22 @@ document.addEventListener("DOMContentLoaded", () => {
 
   async function registerModel(in_path) {
     if (in_path == null) {
-      return;
+      return null;
     }
 
     //mount model into LCCore
     const results = await window.LCapi.RegisterModelFromCsv(in_path);
 
     if (results == null) {
-      return;
+      console.log("[Renderer]: Failed to resister correlation model.")
+      return null;
     }
 
     correlation_model_list.push(results); //{id,name,path}
 
-    console.log("Correlation model is registered.");
+    console.log("[Renderer]: Resistered Correlation Model: " + results.name +".");
     //console.log(results);
+    return true;
   }
 
   async function loadModel() {
@@ -2973,95 +3015,17 @@ document.addEventListener("DOMContentLoaded", () => {
       sortHoleByOrder(LCCore);
 
       //update position
-      let newPad_y = 20 - LCCore.projects[0].composite_depth_top * 10;
+      let newPad_y = 100 - LCCore.projects[0].composite_depth_top * 10;
       objOpts.canvas.pad_y = newPad_y;
 
       //shwo model summary
+      console.log("[Renderer]: Loaded Correlation Model(s).");
+      LCCore.projects.forEach(p=>{
+        console.log({ ID: p.id[0], Name: p.name ,Version:p.correlation_version, Type: p.model_type});
+      })
       console.log(LCCore);
-      console.log("Correlation model Loaded.");
-      console.log({ ID: LCCore.id, Name: LCCore.name });
 
       //updateView();
-    }
-  }
-
-  async function loadModelImages(modelImages, dir_path) {
-    if (LCCore != null) {
-      let N = 0;
-      LCCore.projects.forEach((p) => {
-        p.holes.forEach((h) => {
-          h.sections.forEach((s) => {
-            N += 1;
-          });
-        });
-      });
-
-      window.LCapi.progressbar(
-        "Loading Core images",
-        "Converting section images..."
-      );
-      let n = 0;
-
-      for (project of LCCore.projects) {
-        for (hole of project.holes) {
-          for (section of hole.sections) {
-            const im_name = hole.name + "-" + section.name;
-            let img = new Image();
-            try {
-              const imageBase64 = await window.LCapi.LoadRasterImage(
-                dir_path + "/" + project.name + "/" + im_name + ".jpg",
-                3000
-              );
-
-              modelImages[im_name] = "data:image/jpeg;base64," + imageBase64;
-              //modelImages[im_name] =  dir_path + "/" + project.name + "/" + im_name + ".jpg";
-            } catch (error) {
-              //console.log(error);
-              modelImages[im_name] = [];
-            }
-
-            //update progressbar
-            n += 1;
-            window.LCapi.updateProgressbar(n, N);
-          }
-        }
-      }
-    }
-    console.log("Core images loaded.");
-  }
-
-  async function loadCalcedImages(calcedImages, imageData, LCCore, depthScale) {
-    if (LCCore != null) {
-      const keys = Object.keys(imageData);
-      const N = keys.length;
-      let n = 0;
-      window.LCapi.progressbar(
-        "Loading Core images",
-        "Converting section images to " + depthScale + "..."
-      );
-
-      for (project of LCCore.projects) {
-        for (hole of project.holes) {
-          for (section of hole.sections) {
-            const im_name = hole.name + "-" + section.name;
-            try {
-              console.log(im_name);
-              const imageBase64 = await window.LCapi.makeModelImage(
-                imageData[im_name],
-                section,
-                depthScale
-              );
-              calcedImages[im_name] = "data:image/jpeg;base64," + imageBase64;
-            } catch (err) {
-              console.log(err);
-              calcedImages[im_name] = [];
-            }
-
-            n += 1;
-            window.LCapi.updateProgressbar(n, N);
-          }
-        }
-      }
     }
   }
 
@@ -3093,7 +3057,7 @@ document.addEventListener("DOMContentLoaded", () => {
       newOption.textContent = results.name;
       document.getElementById("AgeModelSelect").appendChild(newOption);
 
-      console.log("Age model is registered.");
+      console.log("[Renderer]: Registered Age Model: "+results.name);
       //console.log(results);
     }
   }
@@ -3113,14 +3077,14 @@ document.addEventListener("DOMContentLoaded", () => {
         }
       });
 
-      console.log("Age model loaded.");
+      console.log("[Renderer]: Age model loaded.");
       console.log({ ID: age_id, Name: name });
 
       console.log(LCCore);
 
       updateView();
     } else {
-      console.log("RENDERER: Fail to read age model.");
+      console.log("[Renderer]: Fail to read age model.");
     }
   }
   async function registerPlotFromLCAge() {
@@ -3138,7 +3102,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const results = await window.LCapi.LoadPlotFromLCPlot();
     if (results) {
       LCplot = results;
-      console.log("Plot age data loaded");
+      console.log("[Renderer]: Loaded Plot Age Data");
       console.log(results);
     }
   }
@@ -3175,6 +3139,12 @@ document.addEventListener("DOMContentLoaded", () => {
     LCplot = null;
   }
   async function initiariseCanvas() {
+    //canvas initiarise
+    const parentElement = document.getElementById("hole_list");
+    while (parentElement.firstChild) {
+      parentElement.removeChild(parentElement.firstChild);
+    }
+    
     //plot update
     if (isDrawVector) {
       //canvas initiarise
@@ -3188,7 +3158,7 @@ document.addEventListener("DOMContentLoaded", () => {
       }
       vectorObjects = null;
       penObject = { isPen: false, penCanvas: null, penData: [] };
-      document.getElementById("bt_pen").style.backgroundColor = "#f0f0f0";
+      document.getElementById("bt_pen").style.backgroundColor =  "#f0f0f0";
       document.getElementById("p5penCanvas").style.display = "none";
     } else {
       //clear canvas data
@@ -3402,15 +3372,10 @@ function getNearestConnectedMarkerIdx(LCCore, idFrom) {
 
       //new connection available
       if (connectedHoleData !== null) {
-        if (
-          holeList[listTo][0] > currentTotalOrder &&
-          holeList[listTo][0] < connectedTotalOrder &&
-          LCCore.projects[idxTo[0]].holes[idxTo[1]].enable
-        ) {
+        if (holeList[listTo][0] > currentTotalOrder && holeList[listTo][0] < connectedTotalOrder && LCCore.projects[idxTo[0]].holes[idxTo[1]].enable ) {
           //if connected hole has large order, enable but the order smaller (nearer place in canvas) than stocked one.
           connectedMarkerData =
-            LCCore.projects[idxTo[0]].holes[idxTo[1]].sections[idxTo[2]]
-              .markers[idxTo[3]];
+            LCCore.projects[idxTo[0]].holes[idxTo[1]].sections[idxTo[2]].markers[idxTo[3]];
           connectedHoleData = LCCore.projects[idxTo[0]].holes[idxTo[1]];
           connectedProjectData = LCCore.projects[idxTo[0]];
           connectedTotalOrder = holeList[listTo][0];
@@ -3422,8 +3387,7 @@ function getNearestConnectedMarkerIdx(LCCore, idFrom) {
           LCCore.projects[idxTo[0]].holes[idxTo[1]].enable
         ) {
           connectedMarkerData =
-            LCCore.projects[idxTo[0]].holes[idxTo[1]].sections[idxTo[2]]
-              .markers[idxTo[3]];
+            LCCore.projects[idxTo[0]].holes[idxTo[1]].sections[idxTo[2]].markers[idxTo[3]];
           connectedHoleData = LCCore.projects[idxTo[0]].holes[idxTo[1]];
           connectedProjectData = LCCore.projects[idxTo[0]];
           connectedTotalOrder = holeList[listTo][0];
@@ -3505,7 +3469,7 @@ function getNearestConnectedMarkerIdx(LCCore, idFrom) {
   }
 }
 function getIdxById(LCCore, id) {
-  let relative_idxs = [null, null, null];
+  let relative_idxs = [null, null, null, null];
 
   if (id[0] !== null || id[0] !== "") {
     for (let p = 0; p < LCCore.projects.length; p++) {
@@ -3657,11 +3621,12 @@ function calcCanvasBaseSize(LCCore, objOpts) {
 
   const xMag = dpir * objOpts.canvas.zoom_level[0];
   let yMag = dpir * objOpts.canvas.zoom_level[1];
-  if (objOpts.canvas.depth_scale == "age") {
-    yMag = yMag * objOpts.canvas.age_zoom_correction;
-  }
   const pad_x = objOpts.canvas.pad_x;
-  const pad_y = objOpts.canvas.pad_y;
+  let pad_y = objOpts.canvas.pad_y;
+  if (objOpts.canvas.depth_scale == "age") {
+    yMag = yMag * objOpts.canvas.age_zoom_correction[0];
+    pad_y = pad_y + objOpts.canvas.age_zoom_correction[1];
+  }
   //get shift amounts
   const shift_x = objOpts.canvas.shift_x;
   const shift_y = objOpts.canvas.shift_y;
@@ -3799,41 +3764,48 @@ function isInside(rectA, rectB, pad) {
   return true;
 }
 
-async function loadVectorImages(modelImages, LCCore, depthScale) {
+async function loadCoreImages(modelImages, LCCore, depthScale) {
   return new Promise(async (resolve, reject) => {
   //const prom = new Promise((resolve, reject) => {
     let results = {};
 
-    console.log("Load images in " + depthScale + " scale.");
+    console.log("[Renderer]: Load images in " + depthScale + " scale.");
 
     //check
     if (modelImages.image_dir.length == 0) {
-      console.log("There is no image path.");
+      console.log("[Renderer]: There is no image path.");
       resolve(results);
     }
     if (LCCore == null) {
-      console.log("There is no LCCore.");
+      console.log("[Renderer]: There is no LCCore.");
       resolve(results);
     }
 
     
-    if (depthScale == "composite_depth" || depthScale == "event_free_depth") {
+    if (depthScale == "composite_depth" || depthScale == "event_free_depth" || depthScale == "age") {
       if (Object.keys(modelImages.drilling_depth).length == 0) {
-        console.log("There is no original image.");
+        console.log("[Renderer]: There is no original image.");
         resolve(results);
       }
     }
 
-    //main
-    //get num images
+    //main get num images
     let N = 0;
-    LCCore.projects.forEach((p) => {
-      p.holes.forEach((h) => {
-        h.sections.forEach((s) => {
-          N += 1;
+    console.log(modelImages.load_target_ids.length);
+    if(modelImages.load_target_ids.length == 0){
+      //case all
+      LCCore.projects.forEach((p) => {
+        p.holes.forEach((h) => {
+          h.sections.forEach((s) => {
+            N += 1;
+            modelImages.load_target_ids.push(s.id);
+          });
         });
       });
-    });
+    } else {
+      N = modelImages.load_target_ids.length;
+    }
+    
 
     //main
     //Progress
@@ -3847,80 +3819,75 @@ async function loadVectorImages(modelImages, LCCore, depthScale) {
     await new Promise((p5resolve)=>{
       new p5(async (p) => {
         let n = 0;
-  
-        for (project of LCCore.projects) {
-          for (hole of project.holes) {
-            for (section of hole.sections) {
-              const im_name = hole.name + "-" + section.name;
-              if (depthScale == "drilling_depth") {
-                //case original image
-                const dpcm = 30; //pix/cm}
-                const im_height = Math.round(
-                  dpcm * (section.markers[section.markers.length - 1].distance - section.markers[0].distance),
-                  0
-                );
-                //load image
-                try {
-                  const imageBase64 = await window.LCapi.LoadRasterImage(modelImages.image_dir +"/" +project.name +"/" +im_name +".jpg", im_height);
-  
-                  if (imageBase64 !== undefined) {
-                    results[im_name] = await p.loadImage(
-                      "data:image/png;base64," + imageBase64,
-                      async () => {
-                        //console.log("");
-                      },
-                      async () => {
-                        console.log("Fail to load image of " + im_name);
-                      }
-                    );
-                  } else {
-                    results[im_name] = undefined;
-                  }
-                } catch (error) {
-                  //console.log(error);
-                  results[im_name] = undefined;
-                }
-              } else if ( depthScale == "composite_depth" ||  depthScale == "event_free_depth"  ) {
-                //case CD, EF, convert original to CD EFD image
-                const dpcm = 30; //pix/cm}
-                const im_height = Math.round(
-                  dpcm * (section.markers[section.markers.length - 1].distance - section.markers[0].distance),
-                  0
-                );
 
-                //load image
-                try {
-                  const imageBase64 = await window.LCapi.makeModelImage(
-                    modelImages.image_dir +"/" +project.name +"/" +im_name +".jpg", 
-                    section,
-                    im_height,
-                    depthScale
-                  );//[imPath, sectionData, imHeight, depthScale]
- 
-                  if (imageBase64 !== undefined) {
-                    results[im_name] = await p.loadImage(
-                      "data:image/png;base64," + imageBase64,
-                      async () => {
-                        //console.log("");
-                      },
-                      async () => {
-                        console.log("Fail to load image of " + im_name);
-                      }
-                    );
-                  } else {
-                    results[im_name] = undefined;
-                  }
-                } catch (error) {
-                  //console.log(error);
-                  results[im_name] = undefined;
-                }
+        for(let t=0; t<N;t++){
+          const targeIdx = getIdxById(LCCore, modelImages.load_target_ids[t]);
+          const project = LCCore.projects[targeIdx[0]];
+          const hole    = project.holes[targeIdx[1]];
+          const section = hole.sections[targeIdx[2]];
 
+          const im_name = hole.name + "-" + section.name;
+          if (depthScale == "drilling_depth") {
+            //case original image
+            const dpcm = 30; //pix/cm}
+            const im_height = Math.round(dpcm * (section.markers[section.markers.length - 1].distance - section.markers[0].distance), 0);
+            //load image
+            try {
+              const imageBase64 = await window.LCapi.LoadRasterImage(modelImages.image_dir +"/" +project.name +"/" +im_name +".jpg", im_height);
+
+              if (imageBase64 !== undefined) {
+                results[im_name] = await p.loadImage("data:image/png;base64," + imageBase64,
+                  async () => {
+                    //console.log("");
+                  },
+                  async () => {
+                    console.log("Fail to load image of " + im_name);
+                  }
+                );
+              } else {
+                results[im_name] = undefined;
               }
-  
-              n += 1;
-              window.LCapi.updateProgressbar(n, N);
+            } catch (error) {
+              //console.log(error);
+              results[im_name] = undefined;
+            }
+          } else if ( depthScale == "composite_depth" ||  depthScale == "event_free_depth"  ) {
+            //case CD, EF, convert original to CD EFD image
+            const dpcm = 30; //pix/cm}
+            const im_height = Math.round(
+              dpcm * (section.markers[section.markers.length - 1].distance - section.markers[0].distance),
+              0
+            );
+
+            //load image
+            try {
+              const imageBase64 = await window.LCapi.makeModelImage(
+                modelImages.image_dir +"/" +project.name +"/" +im_name +".jpg", 
+                section,
+                im_height,
+                depthScale
+              );//[imPath, sectionData, imHeight, depthScale]
+
+              if (imageBase64 !== undefined) {
+                results[im_name] = await p.loadImage(
+                  "data:image/png;base64," + imageBase64,
+                  async () => {
+                    //console.log("");
+                  },
+                  async () => {
+                    console.log("Fail to load image of " + im_name);
+                  }
+                );
+              } else {
+                results[im_name] = undefined;
+              }
+            } catch (error) {
+              //console.log(error);
+              results[im_name] = undefined;
             }
           }
+          n += 1;
+          window.LCapi.updateProgressbar(n, N);
         }
         p5resolve();
       });
@@ -3946,5 +3913,130 @@ async function loadResourcePath(objOpts){
     console.log("Failed to load resource path", error);
 
   }
+}
+function loadToolIcons(objOpts) {
+  for (let key in objOpts.interface.icon_list) {
+    let path = null;
+    try {
+      path =  objOpts.interface.icon_list[key];
+      document.getElementById(key).querySelector("img").src = path;
+    }catch{}
+    
+       /*
+    let img = new Image();
+    try {
+      const imageBase64 = await window.LCapi.LoadRasterImage(path, 0);
+      agePlotIcons[key] = "data:image/png;base64," + imageBase64;
+    } catch (error) {
+      console.log(error);
+      continue;
+    }
+      */
+
+  }
+}
+function getClickedItemIdx(mouseX, mouseY, LCCore, objOpts){
+ 
+  const xMag = objOpts.canvas.zoom_level[0] * objOpts.canvas.dpir;
+  let yMag = objOpts.canvas.zoom_level[1] * objOpts.canvas.dpir;
+  const pad_x = objOpts.canvas.pad_x;
+  let pad_y = objOpts.canvas.pad_y;
+  if (objOpts.canvas.depth_scale == "age") {
+    yMag = yMag * objOpts.canvas.age_zoom_correction[0];
+    pad_y = pad_y + objOpts.canvas.age_zoom_correction[1];
+  }
+  const shift_x = objOpts.canvas.shift_x;
+  const shift_y = objOpts.canvas.shift_y;
+
+  //mouse position
+  let x = (scroller.scrollLeft + mouseX - pad_x) / xMag - shift_x;
+  let y = (scroller.scrollTop + mouseY - pad_y) / yMag - shift_y;
+
+  //calc which hole
+  let num_hole = {
+    total: 0,
+    disable: 0,
+  };
+
+  let results = {x:x, y:y, depth_scale:objOpts.canvas.depth_scale, project:null, hole:null, section:null, distance:null, nearest_marker: null, nearest_distance:null};
+
+  breakpoint:
+  for(let p=0; p<LCCore.projects.length; p++){
+    for(let h=0; h<LCCore.projects[p].holes.length; h++){     
+      if(!LCCore.projects[p].holes[h].enable){
+        num_hole.disable += 1;
+      }
+      const hole_x0 = (objOpts.hole.distance + objOpts.hole.width) * (num_hole.total + LCCore.projects[p].holes[h].order - num_hole.disable);
+      const hole_x1 = hole_x0 + objOpts.hole.width;
+      if(x >= hole_x0 && x <= hole_x1){
+        results.project = LCCore.projects[p].holes[h].id[0];
+        results.hole = LCCore.projects[p].holes[h].id[1];
+        for(let s=0; s<LCCore.projects[p].holes[h].sections.length; s++){
+          const sec_y0 = LCCore.projects[p].holes[h].sections[s].markers[0][objOpts.canvas.depth_scale];//cd/efd
+          const sec_y1 = LCCore.projects[p].holes[h].sections[s].markers.slice(-1)[0][objOpts.canvas.depth_scale];//cd/efd
+          //const sec_y0 = (section_top + shift_y) * yMag + pad_y;
+          //const sec_y1 = sec_y0 + ((section_bottom - section_top) * yMag);
+
+          if(y >= sec_y0 && y <= sec_y1){
+            results.section = LCCore.projects[p].holes[h].sections[s].id[2];
+
+            let upperIdx = null;
+            let lowerIdx = null;
+            let lowerDistance = Infinity;
+            let upperDistance = -Infinity;
+
+            for(let m=0; m<LCCore.projects[p].holes[h].sections[s].markers.length; m++){
+              const marker_y0 = LCCore.projects[p].holes[h].sections[s].markers[m][objOpts.canvas.depth_scale];
+              if(marker_y0 - y > 0 && Math.abs(lowerDistance) >= Math.abs(marker_y0 - y)){
+                lowerDistance = marker_y0 - y;
+                lowerIdx = m;
+              }
+
+              if(marker_y0 - y <= 0 && Math.abs(upperDistance) >= Math.abs(marker_y0 - y)){
+                upperDistance = marker_y0 - y;
+                upperIdx = m;
+              }
+            } 
+    
+            //Distance calculation is not recommended because the interpolation is in charge of LCCroe module.
+            /*
+            let D1 = LCCore.projects[p].holes[h].sections[s].markers[upperIdx].distance; //distance
+            let D3 = LCCore.projects[p].holes[h].sections[s].markers[lowerIdx].distance; //distance
+            let d1 = LCCore.projects[p].holes[h].sections[s].markers[upperIdx][objOpts.canvas.depth_scale]; //cd/efd
+            let d2 = y; //cd/efd
+            let d3 = LCCore.projects[p].holes[h].sections[s].markers[lowerIdx][objOpts.canvas.depth_scale]; //cd/efd
+
+            let d2d1 = Math.abs(d2 - d1);
+            let d3d1 = Math.abs(d3 - d1);
+            let D2 = null;
+            if (d3d1 == 0) {
+              D2 = D1;
+            } else {
+              D2 = D1 + (d2d1 / d3d1) * (D3 - D1);
+            }
+            results.distance = D2; //(((y - sec_y0) - pad_y) / yMag) - shift_y;
+            */
+
+            let nearestIdx = null;
+            let markerDistance = null;
+            if(Math.abs(lowerDistance) >= Math.abs(upperDistance)){
+              nearestIdx = upperIdx;
+              markerDistance = upperDistance;
+            }else{
+              nearestIdx = lowerIdx;
+              markerDistance = lowerDistance;
+            }
+
+            results.nearest_distance = markerDistance;
+            results.nearest_marker = LCCore.projects[p].holes[h].sections[s].markers[nearestIdx].id[3];   
+            break breakpoint;
+          }     
+        }  
+      }
+    }  
+    num_hole.total += LCCore.projects[p].holes.length + 1;
+  }
+  
+  return results;
 }
 //============================================================================================

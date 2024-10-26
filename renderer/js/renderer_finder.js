@@ -2,101 +2,113 @@ document.addEventListener("DOMContentLoaded", () => {
   let isFix = true;
   let isLink = true;
   let isCalledFinder = false;
+  let projectList = [];
   let holeList = [];
   let sectionList = [];
   let inputDistance = null;
+  let targetId = [null, null, null, null];
+  let resourcePaths ={};
+  let previousValue = {project:null,hole:null,section:null,distance:null,cd:null,efd:null,age:null,ageUpper:null,ageLower:null};
+  
   //-------------------------------------------------------------------------------------------
   //when startup
   window.FinderApi.receive("FinderToolClicked", async () => {
-    console.log("Start finder");
+    window.FinderApi.rendererLog("[Finder]: Finder started.");
 
     await getList();
     await updateHoleList();
     await updateSectionList();
     await limitDistance();
+
+    //load tool icon images
+    resourcePaths = await window.FinderApi.getResourcePath();
+    document.getElementById("link").querySelector("img").src = resourcePaths.finder["linked"];
+    document.getElementById("fix").querySelector("img").src = resourcePaths.finder["fixed"];
+
+    previousValue = {
+      project:null,
+      hole:document.getElementById("holeOptions").value,
+      section:document.getElementById("sectionOptions").value,
+      distance:document.getElementById("distanceInput").value,
+      cd:document.getElementById("cdInput"),
+      efd:document.getElementById("efdInput").value,
+      age:document.getElementById("ageInput").value,
+      ageUpper:document.getElementById("ageUpperInput").value,
+      ageLower:document.getElementById("ageLowerInput").value
+    };
+
   });
 
   //-------------------------------------------------------------------------------------------
-  //check input event
-  document
-    .getElementById("distanceInput")
-    .addEventListener("change", function (event) {
-      var numberInput = event.target;
-      var minValue = parseFloat(numberInput.min);
-      var maxValue = parseFloat(numberInput.max);
-      var currentValue = parseFloat(numberInput.value);
-
-      if (currentValue > maxValue) {
-        numberInput.value = maxValue;
-      } else if (currentValue < minValue) {
-        numberInput.value = minValue;
+  //-------------------------------------------------------------------------------------------
+  //distance
+  document.getElementById("distanceInput").addEventListener("change", async (event) => {
+      //calc
+      await limitDistance();
+      if(parseFloat(event.target.value) > document.getElementById("distanceInput").max){
+        document.getElementById("distanceInput").value = document.getElementById("distanceInput").max;
       }
+      if(parseFloat(event.target.value) < document.getElementById("distanceInput").min){
+        document.getElementById("distanceInput").value = document.getElementById("distanceInput").min;
+      }
+      await window.FinderApi.rendererLog(`[Finder]: Distance is changed to : ${event.target.value} cm`);
+      
+      isCalledFinder = true;
+      targetId = [null,null,null,null];
+      await calc("trinity");
     });
   //-------------------------------------------------------------------------------------------
   //hole
-  document
-    .getElementById("holeOptions")
-    .addEventListener("change", async (event) => {
-      console.log(`Hole: ${event.target.value}`);
+  document.getElementById("holeOptions").addEventListener("change", async (event) => {
+    //display
+    await window.FinderApi.rendererLog(`[Finder]: Hole is changed to : ${event.target.value}.`);
 
-      //calc
-      isCalledFinder = true;
-      await calc("trinity");
-      await limitDistance();
-      //change sec list
-      await updateSectionList();
-    });
+    //calc, fixed CD
+    isCalledFinder = true;
+    const newHoleData = holeList[document.getElementById("holeOptions").value][1];
+    targetId = newHoleData;
+    await calc("trinity");
+    await limitDistance();
+    //change sec list
+    await updateSectionList();
+  });
   //-------------------------------------------------------------------------------------------
   //section
-  document
-    .getElementById("sectionOptions")
-    .addEventListener("change", async (event) => {
+  document.getElementById("sectionOptions").addEventListener("change", async (event) => {
       //change distance max/min
       document.getElementById("distanceInput").max = 100;
-
       //calc
-      console.log(`Section: ${event.target.value}`);
+      await window.FinderApi.rendererLog(`[Finder]: Section is changed to : ${event.target.value}.`);
+      
       isCalledFinder = true;
+      targetId = [null,null,null,null];
       await calc("trinity");
       await limitDistance();
-    });
-  //-------------------------------------------------------------------------------------------
-  //distance
-  document
-    .getElementById("distanceInput")
-    .addEventListener("change", async (event) => {
-      //calc
-      console.log(`Distance: ${event.target.value}`);
-      isCalledFinder = true;
-      await calc("trinity");
     });
   //-------------------------------------------------------------------------------------------
   //cd
-  document
-    .getElementById("cdInput")
-    .addEventListener("change", async (event) => {
+  document.getElementById("cdInput").addEventListener("change", async (event) => {
       //calc
-      console.log(`CD: ${event.target.value}`);
+      await window.FinderApi.rendererLog(`[Finder]: CD is changed to : ${event.target.value} cm`);
+ 
       isCalledFinder = true;
       await calc("composite_depth");
     });
   //-------------------------------------------------------------------------------------------
   //efd
-  document
-    .getElementById("efdInput")
-    .addEventListener("change", async (event) => {
+  document.getElementById("efdInput").addEventListener("change", async (event) => {
       //calc
-      console.log(`EFD: ${event.target.value}`);
+      await window.FinderApi.rendererLog(`[Finder]: EFD is changed to : ${event.target.value} cm`);
+
       isCalledFinder = true;
       await calc("event_free_depth");
     });
   //-------------------------------------------------------------------------------------------
   //age
-  document
-    .getElementById("ageInput")
-    .addEventListener("change", async (event) => {
+  document.getElementById("ageInput").addEventListener("change", async (event) => {
       //calc
-      console.log(`Age: ${event.target.value}`);
+      await window.FinderApi.rendererLog(`[Finder]: Age is changed to : ${event.target.value} calBP`);
+
       isCalledFinder = true;
       await calc("age");
     });
@@ -104,16 +116,9 @@ document.addEventListener("DOMContentLoaded", () => {
   //-------------------------------------------------------------------------------------------
   async function limitDistance() {
     const holeName = holeList[document.getElementById("holeOptions").value][2];
-    const sectionName =
-      sectionList[document.getElementById("holeOptions").value][
-        document.getElementById("sectionOptions").value
-      ][2];
-    const sectionId =
-      sectionList[document.getElementById("holeOptions").value][
-        document.getElementById("sectionOptions").value
-      ];
+    const sectionName = sectionList[document.getElementById("holeOptions").value][document.getElementById("sectionOptions").value][2];
+    const sectionId = sectionList[document.getElementById("holeOptions").value][document.getElementById("sectionOptions").value];
 
-    console.log();
     const secLimit = await window.FinderApi.getSectionLimit(
       [sectionId[1][0], null, null, null],
       holeName,
@@ -126,7 +131,10 @@ document.addEventListener("DOMContentLoaded", () => {
   //-------------------------------------------------------------------------------------------
   async function getList() {
     //get hole list
-    [holeList, sectionList] = await window.FinderApi.finderGetCoreList();
+    //[p, project.id, project.name]
+    //[nh, hole.id, hole.name] nh:total idex
+    //[s,section.id,section.name,section.markers[0].distance,section.markers[section.markers.length - 1].distance, section.markers ]
+    [projectList, holeList, sectionList] = await window.FinderApi.finderGetCoreList();
   }
   //-------------------------------------------------------------------------------------------
   async function updateHoleList() {
@@ -172,61 +180,78 @@ document.addEventListener("DOMContentLoaded", () => {
   //-------------------------------------------------------------------------------------------
   async function calc(...args) {
     let calcType = args[0];
-    let depth = null;
-    if (args.length == 2) {
-      depth = args[1];
-    }
-    console.log(calcType, depth);
 
+    //calc depth from calcType
     let calcedData = {};
     if (calcType == "trinity") {
       //get trinity data
-      const holeName =
-        holeList[document.getElementById("holeOptions").value][2];
-      const sectionName =
-        sectionList[document.getElementById("holeOptions").value][
-          document.getElementById("sectionOptions").value
-        ][2];
-      const distance = parseFloat(
-        document.getElementById("distanceInput").value
-      );
-      const sectionId =
-        sectionList[document.getElementById("holeOptions").value][
-          document.getElementById("sectionOptions").value
-        ][1];
+      const holeName    = holeList[document.getElementById("holeOptions").value][2];
+      const sectionName = sectionList[document.getElementById("holeOptions").value][document.getElementById("sectionOptions").value][2];
+      const distance    = parseFloat(document.getElementById("distanceInput").value);
+      const sectionId   = sectionList[document.getElementById("holeOptions").value][document.getElementById("sectionOptions").value][1];
+      const cd          = parseFloat(document.getElementById("cdInput").value);
 
       //calc
-      calcedData = await window.FinderApi.finderConvert(
-        ["", holeName, sectionName, distance],
-        "trinity",
-        "linear"
-      );
-
-      //apply
-      document.getElementById("cdInput").value =
-        Math.round(calcedData.cd * 10) / 10;
-      document.getElementById("efdInput").value =
-        Math.round(calcedData.efd * 10) / 10;
-      document.getElementById("ageInput").value =
-        Math.round(calcedData.age_mid * 10) / 10;
-      document.getElementById("ageUpperInput").value =
-        Math.round(calcedData.age_upper * 10) / 10;
-      document.getElementById("ageLowerInput").value =
-        Math.round(calcedData.age_lower * 10) / 10;
-    } else if (calcType == "composite_depth") {
-      let cd = null;
-      if (depth == null) {
-        cd = parseFloat(document.getElementById("cdInput").value);
+      if(targetId[1] == null){
+        //case changed section and distance
+        await window.FinderApi.rendererLog(["", holeName, sectionName, distance]);
+        calcedData = await window.FinderApi.finderConvert(["", ["", holeName, sectionName, distance], targetId], "trinity", "linear");
+        await window.FinderApi.rendererLog(calcedData);
+        //apply
+        document.getElementById("cdInput").value        = Math.round(calcedData.cd * 10) / 10;
+        document.getElementById("efdInput").value       = Math.round(calcedData.efd * 10) / 10;
+        document.getElementById("ageInput").value       = Math.round(calcedData.age_mid * 10) / 10;
+        document.getElementById("ageUpperInput").value  = Math.round(calcedData.age_upper * 10) / 10;
+        document.getElementById("ageLowerInput").value  = Math.round(calcedData.age_lower * 10) / 10;
       } else {
-        cd = depth;
+        //case changed hole
+        //try to find same CD in selected hole
+        calcedData = await window.FinderApi.finderConvert(["", cd, targetId], "composite_depth", "linear");
+        //await window.FinderApi.rendererLog(calcedData); 
+        if(calcedData.hole == holeName){
+          //if selected hole exist
+          let hole_idx = null;
+          holeList.forEach((hole, h) => {
+            if (hole[2] == calcedData.hole) {
+              hole_idx = h;
+            }
+          });
+  
+          let sec_idx = null;
+          sectionList[hole_idx].forEach((sec, s) => {
+            if (sec[2] == calcedData.section) {
+              sec_idx = s;
+            }
+          });
+  
+          //apply
+          document.getElementById("holeOptions").value = hole_idx;
+          updateSectionList();
+          document.getElementById("sectionOptions").value = sec_idx;
+          document.getElementById("distanceInput").value  = isNaN(calcedData.distance) ? "" : Math.round(calcedData.distance * 10) / 10;
+          document.getElementById("cdInput").value        = Math.round(calcedData.cd * 10) / 10;
+          document.getElementById("efdInput").value       = Math.round(calcedData.efd * 10) / 10;
+          document.getElementById("ageInput").value       = Math.round(calcedData.age_mid * 10) / 10;
+          document.getElementById("ageUpperInput").value  = Math.round(calcedData.age_upper * 10) / 10;
+          document.getElementById("ageLowerInput").value  = Math.round(calcedData.age_lower * 10) / 10;
+        } else {
+          //if not selected hole exist
+          //await window.FinderApi.rendererLog(previousValue); 
+          let hole_idx = previousValue.hole;
+    
+          //apply
+          document.getElementById("holeOptions").value = hole_idx;
+          
+        }
       }
+            
+    } else if (calcType == "composite_depth") {
+      //get cd
+      let cd = parseFloat(document.getElementById("cdInput").value);
 
-      //calc
-      calcedData = await window.FinderApi.finderConvert(
-        ["", cd],
-        "composite_depth",
-        "linear"
-      );
+      //calc 
+      calcedData = await window.FinderApi.finderConvert(["finder_from_cd", cd, targetId], "composite_depth", "linear");
+      //window.FinderApi.rendererLog(calcedData);
 
       //apply//calc(data[2]);
       let hole_idx = null;
@@ -247,41 +272,18 @@ document.addEventListener("DOMContentLoaded", () => {
       updateSectionList();
       document.getElementById("sectionOptions").value = sec_idx;
 
-      document.getElementById("distanceInput").value = isNaN(
-        calcedData.distance
-      )
-        ? ""
-        : Math.round(calcedData.distance * 10) / 10;
-      document.getElementById("efdInput").value = isNaN(calcedData.efd)
-        ? ""
-        : Math.round(calcedData.efd * 10) / 10;
-      document.getElementById("ageInput").value = isNaN(calcedData.age_mid)
-        ? ""
-        : Math.round(calcedData.age_mid * 10) / 10;
-      document.getElementById("ageUpperInput").value = isNaN(
-        calcedData.age_upper
-      )
-        ? ""
-        : Math.round(calcedData.age_upper * 10) / 10;
-      document.getElementById("ageLowerInput").value = isNaN(
-        calcedData.age_lower
-      )
-        ? ""
-        : Math.round(calcedData.age_lower * 10) / 10;
+      document.getElementById("distanceInput").value = isNaN(calcedData.distance) ? "" : Math.round(calcedData.distance * 10) / 10;
+      document.getElementById("efdInput").value      = isNaN(calcedData.efd) ? "" : Math.round(calcedData.efd * 10) / 10;
+      document.getElementById("ageInput").value      = isNaN(calcedData.age_mid) ? "" : Math.round(calcedData.age_mid * 10) / 10;
+      document.getElementById("ageUpperInput").value = isNaN(calcedData.age_upper) ? "" : Math.round(calcedData.age_upper * 10) / 10;
+      document.getElementById("ageLowerInput").value = isNaN(calcedData.age_lower) ? "" : Math.round(calcedData.age_lower * 10) / 10;
     } else if (calcType == "event_free_depth") {
-      let efd = null;
-      if (depth == null) {
-        efd = parseFloat(document.getElementById("efdInput").value);
-      } else {
-        efd = depth;
-      }
+      //get efd
+      let efd = parseFloat(document.getElementById("efdInput").value);
 
       //calc
-      calcedData = await window.FinderApi.finderConvert(
-        ["", efd],
-        "event_free_depth",
-        "linear"
-      );
+      calcedData = await window.FinderApi.finderConvert(["finder_from_efd", efd, targetId], "event_free_depth", "linear");
+      //await window.FinderApi.rendererLog(calcedData);
 
       //apply
       let hole_idx = null;
@@ -302,41 +304,17 @@ document.addEventListener("DOMContentLoaded", () => {
       updateSectionList();
       document.getElementById("sectionOptions").value = sec_idx;
 
-      document.getElementById("distanceInput").value = isNaN(
-        calcedData.distance
-      )
-        ? ""
-        : Math.round(calcedData.distance * 10) / 10;
-      document.getElementById("cdInput").value = isNaN(calcedData.cd)
-        ? ""
-        : Math.round(calcedData.cd * 10) / 10;
-      document.getElementById("ageInput").value = isNaN(calcedData.age_mid)
-        ? ""
-        : Math.round(calcedData.age_mid * 10) / 10;
-      document.getElementById("ageUpperInput").value = isNaN(
-        calcedData.age_upper
-      )
-        ? ""
-        : Math.round(calcedData.age_upper * 10) / 10;
-      document.getElementById("ageLowerInput").value = isNaN(
-        calcedData.age_lower
-      )
-        ? ""
-        : Math.round(calcedData.age_lower * 10) / 10;
+      document.getElementById("distanceInput").value = isNaN(calcedData.distance) ? "" : Math.round(calcedData.distance * 10) / 10;
+      document.getElementById("cdInput").value       = isNaN(calcedData.cd) ? "" : Math.round(calcedData.cd * 10) / 10;
+      document.getElementById("ageInput").value      = isNaN(calcedData.age_mid) ? "" : Math.round(calcedData.age_mid * 10) / 10;
+      document.getElementById("ageUpperInput").value = isNaN(calcedData.age_upper) ? "" : Math.round(calcedData.age_upper * 10) / 10;
+      document.getElementById("ageLowerInput").value = isNaN(calcedData.age_lower) ? "" : Math.round(calcedData.age_lower * 10) / 10;
     } else if (calcType == "age") {
-      let age = null;
-      if (depth == null) {
-        age = parseFloat(document.getElementById("ageInput").value);
-      } else {
-        age = depth;
-      }
+      let age = parseFloat(document.getElementById("ageInput").value);
 
       //calc
-      calcedData = await window.FinderApi.finderConvert(
-        ["", age],
-        "age",
-        "linear"
-      );
+      calcedData = await window.FinderApi.finderConvert(["", age, targetId], "age", "linear");
+      await window.FinderApi.rendererLog(calcedData);
 
       //apply
       let hole_idx = null;
@@ -361,57 +339,53 @@ document.addEventListener("DOMContentLoaded", () => {
       updateSectionList();
       document.getElementById("sectionOptions").value = selected_sec_id;
 
-      document.getElementById("distanceInput").value = isNaN(
-        calcedData.distance
-      )
-        ? ""
-        : Math.round(calcedData.distance * 10) / 10;
-      document.getElementById("efdInput").value = isNaN(calcedData.efd)
-        ? ""
-        : Math.round(calcedData.efd * 10) / 10;
-      document.getElementById("cdInput").value = isNaN(calcedData.cd)
-        ? ""
-        : Math.round(calcedData.cd * 10) / 10;
-      document.getElementById("ageInput").value = isNaN(calcedData.age_mid)
-        ? ""
-        : Math.round(calcedData.age_mid * 10) / 10;
-      document.getElementById("ageUpperInput").value = isNaN(
-        calcedData.age_upper
-      )
-        ? ""
-        : Math.round(calcedData.age_upper * 10) / 10;
-      document.getElementById("ageLowerInput").value = isNaN(
-        calcedData.age_lower
-      )
-        ? ""
-        : Math.round(calcedData.age_lower * 10) / 10;
+      document.getElementById("distanceInput").value = isNaN(calcedData.distance) ? "" : Math.round(calcedData.distance * 10) / 10;
+      document.getElementById("efdInput").value      = isNaN(calcedData.efd) ? "" : Math.round(calcedData.efd * 10) / 10;
+      document.getElementById("cdInput").value       = isNaN(calcedData.cd) ? "" : Math.round(calcedData.cd * 10) / 10;
+      document.getElementById("ageInput").value      = isNaN(calcedData.age_mid) ? "" : Math.round(calcedData.age_mid * 10) / 10;
+      document.getElementById("ageUpperInput").value = isNaN(calcedData.age_upper) ? "" : Math.round(calcedData.age_upper * 10) / 10;
+      document.getElementById("ageLowerInput").value = isNaN(calcedData.age_lower) ? "" : Math.round(calcedData.age_lower * 10) / 10;
     }
 
     //move position
-    if (isLink && isCalledFinder) {
+    if (isCalledFinder) {
       document.getElementById("Options");
       const send_data = {
+        isMove: isLink,
         source: calcType,
         composite_depth: calcedData.cd,
         event_free_depth: calcedData.efd,
         age: calcedData.age_mid,
       };
+
       await window.FinderApi.MoveToHorizon(send_data);
     }
+
+    //update
+    previousValue = {
+      project:null,
+      hole:document.getElementById("holeOptions").value,
+      section:document.getElementById("sectionOptions").value,
+      distance:document.getElementById("distanceInput").value,
+      cd:document.getElementById("cdInput"),
+      efd:document.getElementById("efdInput").value,
+      age:document.getElementById("ageInput").value,
+      ageUpper:document.getElementById("ageUpperInput").value,
+      ageLower:document.getElementById("ageLowerInput").value
+    };
   }
 
   //-------------------------------------------------------------------------------------------
 
   document.getElementById("fix").addEventListener("click", async (event) => {
-    await window.FinderApi.changeFix(isFix);
     if (isFix) {
       isFix = false;
       //document.getElementById("fix").style.backgroundColor = "white";
-      document.getElementById("fix_img").src = "../resources/tool/fix.png";
+      document.getElementById("fix").querySelector("img").src = resourcePaths.finder["fix"];
     } else {
       isFix = true;
       //document.getElementById("fix").style.backgroundColor = "lightgray";
-      document.getElementById("fix_img").src = "../resources/tool/fixed.png";
+      document.getElementById("fix").querySelector("img").src = resourcePaths.finder["fixed"];
     }
   });
   //-------------------------------------------------------------------------------------------
@@ -419,35 +393,44 @@ document.addEventListener("DOMContentLoaded", () => {
     if (isLink) {
       isLink = false;
       //document.getElementById("fix").style.backgroundColor = "white";
-      document.getElementById("link_img").src = "../resources/tool/unlink.png";
+      document.getElementById("link").querySelector("img").src = resourcePaths.finder["link"];
     } else {
       isLink = true;
       //document.getElementById("fix").style.backgroundColor = "lightgray";
-      document.getElementById("link_img").src = "../resources/tool/link.png";
+      document.getElementById("link").querySelector("img").src = resourcePaths.finder["linked"];
+
+      //move to target
+      const send_data = {
+        isMove: isLink,
+        source: "composite_depth",
+        composite_depth:  Math.round(document.getElementById("cdInput").value * 10) / 10,
+        event_free_depth: Math.round(document.getElementById("efdInput").value * 10) / 10,
+        age: Math.round(document.getElementById("ageInput").value * 10) / 10,
+      };
+      await window.FinderApi.MoveToHorizon(send_data);
     }
   });
   //-------------------------------------------------------------------------------------------
   //update depth from main renderer
   window.FinderApi.receive("SendDepthFromMain", async (data) => {
     if (isLink) {
-      //data[correlation id, depth, depth scale]
+      //if recieved data from main process
+      //data: {x:x, y:y, depth_scale:objOpts.canvas.depth_scale, project:null, hole:null, section:null, distance:null, nearest_marker: null, nearest_distance:null};
+      await window.FinderApi.rendererLog("[Finder]: Recieved data from renderer.");
+      targetId = [data.project, data.hole, data.section, null]; // update target section
 
-      if (data[2] == "composite_depth") {
-        document.getElementById("cdInput").value =
-          Math.round(data[1] * 10) / 10;
-      } else if (data[2] == "event_free_depth") {
-        document.getElementById("efdInput").value =
-          Math.round(data[1] * 10) / 10;
-      } else if (data[2] == "age") {
-        document.getElementById("ageInput").value =
-          Math.round(data[1] * 10) / 10;
+      //input value
+      if (data.depth_scale == "composite_depth") {
+        document.getElementById("cdInput").value = Math.round(data.y * 10) / 10;
+        document.getElementById("cdInput").dispatchEvent(new Event("change"));
+      } else if (data.depth_scale == "event_free_depth") {
+        document.getElementById("efdInput").value = Math.round(data.y * 10) / 10;
+        document.getElementById("efdInput").dispatchEvent(new Event("change"));
+      } else if (data.depth_scale == "age") {
+        document.getElementById("ageInput").value = Math.round(data.y * 10) / 10;
+        document.getElementById("ageInput").dispatchEvent(new Event("change"));
       }
-
-      //call event
-      //document.getElementById("cdInput").dispatchEvent(new Event("change"));
-
-      //calc
-      await calc(data[2], data[1]);
+      
     }
   });
 

@@ -8,6 +8,8 @@ class Age {
     this.age_mid = null;
     this.age_upper_1std = null;
     this.age_lower_1std = null;
+    this.age_upper_2std = null;
+    this.age_lower_2std = null;
     this.age_raw = null;
 
     this.original_depth_type = null;

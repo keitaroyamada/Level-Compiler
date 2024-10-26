@@ -47,16 +47,15 @@ class LevelCompilerCore {
           console.log("LCCore: Load duo file.");
         } else if (match[1] == "" || match[1] == undefined) {
           console.log("LCCore: There is no identifier for correlation model.");
-          return;
+          return null;
         } else {
-          console.log(
-            "LCCore: The identifier does not match correlation model."
-          );
-          return;
+          console.log("LCCore: The identifier does not match correlation model."          );
+          return null;
         }
       } else if (this.projects.length > 0) {
         if (match[1].toLowerCase().includes("correlation")) {
           console.log("LCCore: Correlation file is not supported as a second model.");
+          //console.log("LCCore: Additional Correlation Model is loaded.");
           return;
         } else if (match[1].toLowerCase().includes("duo")) {
           model_info.name = match[2];
@@ -75,7 +74,7 @@ class LevelCompilerCore {
         return;
       }
     } else {
-      return;
+      return null;
     }
 
     //add project data
@@ -440,6 +439,7 @@ class LevelCompilerCore {
     this.sortModel();
 
     console.log("LCCore: Model loaded from csv.");
+    return true;
   }
   connectDuoModel() {
     if (this.projects.length < 1) {
@@ -873,6 +873,7 @@ class LevelCompilerCore {
       let efd_counts = 0;
       let rank_counts = 0;
       let max_rank = -1;
+      let age_counts = 0;
       project.holes.forEach((hole) => {
         hole.sections.forEach((section) => {
           section.markers.forEach((marker) => {
@@ -899,11 +900,17 @@ class LevelCompilerCore {
               }
               efd_counts += 1;
             }
+            if (marker.age == null) {
+              if (project.model_type !== "duo") {
+                //console.log("ERROR: EFD is null. " + this.getMarkerNameFromId(marker.id));
+              }
+              age_counts += 1;
+            }
           });
         });
       });
       console.log(
-        "[" +
+          "LCCore: [" +
           project.model_type +
           "]" +
           project.name +
@@ -914,7 +921,9 @@ class LevelCompilerCore {
           ", Rank:" +
           rank_counts +
           ", Max rank:" +
-          max_rank
+          max_rank +
+          ", Age:" +
+          age_counts
       );
 
       if (cd_counts == 0 && efd_counts == 0) {
@@ -926,56 +935,54 @@ class LevelCompilerCore {
 
     return results;
   }
-  getDepthFromTrinity(projectId, trinityList, calcType) {
-    let projectIdx = null;
-    this.projects.forEach((project, p) => {
-      if (project.id[0] == projectId[0]) {
-        projectIdx = [p, null, null, null];
-      }
-    });
-    if (projectIdx == null) {
-      return null;
-    }
+  getDepthFromTrinity(targetId, trinityList, calcType) {
 
     let output = [];
+    
     for (let t = 0; t < trinityList.length; t++) {
       //initiarize
       let upperIdxs = [];
       let lowerIdxs = [];
 
-      const holeName = lcfnc.zeroPadding(trinityList[t].hole_name);
+      const holeName    = lcfnc.zeroPadding(trinityList[t].hole_name);
       const sectionName = lcfnc.zeroPadding(trinityList[t].section_name);
-      const distance = parseFloat(trinityList[t].distance);
+      const distance    = parseFloat(trinityList[t].distance);
 
-      const num_holes = this.projects[projectIdx[0]].holes.length;
-      for (let h = 0; h < num_holes; h++) {
-        const holeData = this.projects[projectIdx[0]].holes[h];
-        const num_secs = holeData.sections.length;
-        for (let s = 0; s < num_secs; s++) {
-          const sectionData = holeData.sections[s];
-          const num_markers = sectionData.markers.length;
-          for (let m = 0; m < num_markers - 1; m++) {
-            //check name and distance
-            if (holeData.name === holeName) {
-              if (sectionData.name === sectionName) {
-                if (distance >= sectionData.markers[m].distance) {
-                  if (distance <= sectionData.markers[m + 1].distance) {
-                    if (upperIdxs.length > 0) {
-                      if (
-                        lowerIdxs[lowerIdxs.length - 1].toString() ==
-                        [projectIdx[0], h, s, m].toString()
-                      ) {
-                        //case the target horizon located on the marker
-                        //none
+      for(let p=0;p<this.projects.length;p++){
+        if(targetId[0] == null || targetId[0] == this.projects[p].id[0]){
+
+          for (let h = 0; h < this.projects[p].holes.length; h++) {
+            const holeData = this.projects[p].holes[h];
+
+            if(targetId[1] == null || targetId[1] == holeData.id[1]){
+              for (let s = 0; s < this.projects[p].holes[h].sections.length; s++) {
+                const sectionData = holeData.sections[s];
+
+                if(targetId[2] == null || targetId[2] == sectionData.id[2]){
+                  for (let m = 0; m < this.projects[p].holes[h].sections[s].markers.length - 1; m++) {
+
+                    //check name and distance
+                    if (holeData.name === holeName) {
+                      if (sectionData.name === sectionName) {
+                        if (distance >= sectionData.markers[m].distance) {
+                          if (distance <= sectionData.markers[m + 1].distance) {
+                            if (upperIdxs.length > 0) {
+                              if (lowerIdxs[lowerIdxs.length - 1].toString() == [p, h, s, m].toString()) {
+                                //case the target horizon located on the marker
+                                //none
+                              }
+                            } else {
+                              upperIdxs.push([p, h, s, m]);
+                              lowerIdxs.push([p, h, s, m + 1]);
+                            }
+                          }
+                        }
                       }
-                    } else {
-                      upperIdxs.push([projectIdx[0], h, s, m]);
-                      lowerIdxs.push([projectIdx[0], h, s, m + 1]);
                     }
                   }
                 }
               }
-            }
+            }           
           }
         }
       }
@@ -1011,15 +1018,15 @@ class LevelCompilerCore {
       }
 
       //get section data
-      let sectionId = this.projects[projectIdx[0]].holes[upperIdxs[0][1]].sections[upperIdxs[0][2]].id;
+      let sectionId = this.projects[upperIdxs[0][0]].holes[upperIdxs[0][1]].sections[upperIdxs[0][2]].id;
 
       //get nearest cd/efd data
-      const D1      = this.projects[projectIdx[0]].holes[upperIdxs[0][1]].sections[upperIdxs[0][2]].markers[upperIdxs[0][3]][calcType];
-      const D3      = this.projects[projectIdx[0]].holes[lowerIdxs[0][1]].sections[lowerIdxs[0][2]].markers[lowerIdxs[0][3]][calcType];
-      const d1      = this.projects[projectIdx[0]].holes[upperIdxs[0][1]].sections[upperIdxs[0][2]].markers[upperIdxs[0][3]].distance;
-      const d3      = this.projects[projectIdx[0]].holes[lowerIdxs[0][1]].sections[lowerIdxs[0][2]].markers[lowerIdxs[0][3]].distance;
-      const D1_rank = this.projects[projectIdx[0]].holes[upperIdxs[0][1]].sections[upperIdxs[0][2]].markers[upperIdxs[0][3]].connection_rank;
-      const D3_rank = this.projects[projectIdx[0]].holes[lowerIdxs[0][1]].sections[lowerIdxs[0][2]].markers[lowerIdxs[0][3]].connection_rank;
+      const D1      = this.projects[upperIdxs[0][0]].holes[upperIdxs[0][1]].sections[upperIdxs[0][2]].markers[upperIdxs[0][3]][calcType];
+      const D3      = this.projects[lowerIdxs[0][0]].holes[lowerIdxs[0][1]].sections[lowerIdxs[0][2]].markers[lowerIdxs[0][3]][calcType];
+      const d1      = this.projects[upperIdxs[0][0]].holes[upperIdxs[0][1]].sections[upperIdxs[0][2]].markers[upperIdxs[0][3]].distance;
+      const d3      = this.projects[lowerIdxs[0][0]].holes[lowerIdxs[0][1]].sections[lowerIdxs[0][2]].markers[lowerIdxs[0][3]].distance;
+      const D1_rank = this.projects[upperIdxs[0][0]].holes[upperIdxs[0][1]].sections[upperIdxs[0][2]].markers[upperIdxs[0][3]].connection_rank;
+      const D3_rank = this.projects[lowerIdxs[0][0]].holes[lowerIdxs[0][1]].sections[lowerIdxs[0][2]].markers[lowerIdxs[0][3]].connection_rank;
       
       if (D1 == null || D3 == null) {
         console.log("ERROR: " + calcType + " of value is empty.");
@@ -1039,15 +1046,8 @@ class LevelCompilerCore {
     }
     return output;
   }
-  getEFDfromCD(projectId, targetCD) {
-    //initiarise
-    let projectIdx = null;
-    this.projects.forEach((project, p) => {
-      if (project.id[0] == projectId[0]) {
-        projectIdx = [p, null, null, null];
-      }
-    });
-    
+  getEFDfromCD(targetCD) {
+    //initiarise   
     let upperData = {
       id: null,
       nearest_data: { event_free_depth: null, composite_depth: null },
@@ -1060,45 +1060,44 @@ class LevelCompilerCore {
     };
 
     //search nearest markers
-    this.projects[projectIdx[0]].holes.forEach((hole) => {
-      hole.sections.forEach((section) => {
-        section.markers.forEach((marker) => {
-          const temp = marker.composite_depth - targetCD;
-          if (temp <= 0 && upperData.cumulate_distance < temp) {
-            //console.log(this.getMarkerNameFromId(marker.id));
-            upperData.id = marker.id;
-            upperData.nearest_data.composite_depth = marker.composite_depth;
-            upperData.nearest_data.event_free_depth = marker.event_free_depth;
-            upperData.cumulate_distance = temp;
-          }
-          if (temp >= 0 && lowerData.cumulate_distance > temp) {
-            lowerData.id = marker.id;
-            lowerData.nearest_data.composite_depth = marker.composite_depth;
-            lowerData.nearest_data.event_free_depth = marker.event_free_depth;
-            lowerData.cumulate_distance = temp;
-          }
+    this.projects.forEach((project)=>{
+      project.holes.forEach((hole) => {
+        hole.sections.forEach((section) => {
+          section.markers.forEach((marker) => {
+            const temp = marker.composite_depth - targetCD;
+            if (temp <= 0 && upperData.cumulate_distance < temp) {
+              //console.log(this.getMarkerNameFromId(marker.id));
+              upperData.id = marker.id;
+              upperData.nearest_data.composite_depth = marker.composite_depth;
+              upperData.nearest_data.event_free_depth = marker.event_free_depth;
+              upperData.cumulate_distance = temp;
+            }
+            if (temp >= 0 && lowerData.cumulate_distance > temp) {
+              lowerData.id = marker.id;
+              lowerData.nearest_data.composite_depth = marker.composite_depth;
+              lowerData.nearest_data.event_free_depth = marker.event_free_depth;
+              lowerData.cumulate_distance = temp;
+            }
+          });
         });
       });
-    });
+    })
 
     //calc interpolated event free depth
-    let D1 = parseFloat(upperData.nearest_data.event_free_depth);
-    let D3 = parseFloat(lowerData.nearest_data.event_free_depth);
+    const D1 = parseFloat(upperData.nearest_data.event_free_depth);
+    const D3 = parseFloat(lowerData.nearest_data.event_free_depth);
+    const d1 = upperData.nearest_data.composite_depth;
+    const d2 = targetCD;
+    const d3 = lowerData.nearest_data.composite_depth;
 
-    const d2d1 = -1 * parseFloat(upperData.nearest_data.composite_depth - targetCD);
-    const d3d1 = parseFloat(lowerData.nearest_data.composite_depth - targetCD) + d2d1;
+    const d2d1 = d2 - d1;
+    const d3d1 = d3 - d1;
 
     let interpolatedEFD = this.linearInterp(D1, D3, d2d1, d3d1);
 
     return interpolatedEFD;
   }
-  getCDfromEFD(projectId, targetEFD) {
-    let projectIdx = null;
-    this.projects.forEach((project, p) => {
-      if (project.id[0] == projectId[0]) {
-        projectIdx = [p, null, null, null];
-      }
-    });
+  getCDfromEFD(targetEFD) {
     //this method is return paseudo result because multiple CDs are match.
     //initiarise
     let upperData = {
@@ -1112,43 +1111,49 @@ class LevelCompilerCore {
       cumulate_distance: Infinity,
     };
 
-    this.projects[projectIdx[0]].holes.forEach((hole) => {
-      hole.sections.forEach((section) => {
-        section.markers.forEach((marker) => {
-          const temp = marker.event_free_depth - targetEFD;
-          if (temp <= 0 && upperData.cumulate_distance < temp) {
-            //console.log(this.getMarkerNameFromId(marker.id));
-            upperData.id = marker.id;
-            upperData.nearest_data.composite_depth = marker.composite_depth;
-            upperData.nearest_data.event_free_depth = marker.event_free_depth;
-            upperData.cumulate_distance = temp;
-          }
-          if (temp >= 0 && lowerData.cumulate_distance > temp) {
-            lowerData.id = marker.id;
-            lowerData.nearest_data.composite_depth = marker.composite_depth;
-            lowerData.nearest_data.event_free_depth = marker.event_free_depth;
-            lowerData.cumulate_distance = temp;
-          }
+    this.projects.forEach((project)=>{
+      project.holes.forEach((hole) => {
+        hole.sections.forEach((section) => {
+          section.markers.forEach((marker) => {
+            const temp = marker.event_free_depth - targetEFD;
+            if (temp <= 0 && upperData.cumulate_distance < temp) {
+              //console.log(this.getMarkerNameFromId(marker.id));
+              upperData.id = marker.id;
+              upperData.nearest_data.composite_depth = marker.composite_depth;
+              upperData.nearest_data.event_free_depth = marker.event_free_depth;
+              upperData.cumulate_distance = temp;
+            }
+            if (temp >= 0 && lowerData.cumulate_distance > temp) {
+              lowerData.id = marker.id;
+              lowerData.nearest_data.composite_depth = marker.composite_depth;
+              lowerData.nearest_data.event_free_depth = marker.event_free_depth;
+              lowerData.cumulate_distance = temp;
+            }
+          });
         });
       });
-    });
+    })
+    
+    const D1 = upperData.nearest_data.composite_depth;
+    const D3 = lowerData.nearest_data.composite_depth;
+    const d1 = upperData.nearest_data.event_free_depth;
+    const d2 = targetEFD;
+    const d3 = lowerData.nearest_data.event_free_depth;
+    const d2d1 = d2 - d1;
+    const d3d1 = d3 - d1;
 
-    const interpolatedEFD = this.clacInterpolateDepth(
-      upperData,
-      lowerData,
-      "composite_depth"
-    );
-    //console.log(      this.getMarkerNameFromId(upperData.id) +        "-" +        this.getMarkerNameFromId(lowerData.id) +        ":" +        interpolatedEFD    );
+    const interpolatedEFD = this.linearInterp(D1, D3, d2d1, d3d1);
+
     return interpolatedEFD;
   }
 
   calcMarkerAges(LCAge) {
     if (this.projects.length == 0) {
-      console.log("There is no correlation model.");
+      console.log("LCCore: There is no correlation model.");
       return;
     }
     if (LCAge.AgeModels.length == 0) {
-      console.log("There is no age model.");
+      console.log("LCCore: There is no age model.");
       return;
     }
 
@@ -1162,12 +1167,9 @@ class LevelCompilerCore {
           ) {
             const marker = this.projects[p].holes[h].sections[s].markers[m];
             if (marker.event_free_depth !== null) {
-              const age = LCAge.getAgeFromEFD(
-                marker.event_free_depth,
-                "linear"
-              );
+              const age = LCAge.getAgeFromEFD(marker.event_free_depth,"linear"); //{age: { type: null, mid: null, upper: null, lower: null }, age_idx:null};
 
-              this.projects[p].holes[h].sections[s].markers[m].age = age.mid;
+              this.projects[p].holes[h].sections[s].markers[m].age = age.age.mid;
             }
           }
         }
@@ -1834,27 +1836,44 @@ class LevelCompilerCore {
     const output = "[" + holeName + "-" + secName + "-" + markerName + "]";
     return output;
   }
-  getDataByIdx(relative_idxs) {
+  getDataByIdx(idxs) {
     let output;
-    if (relative_idxs.length == 1) {
-      //case project data
-      output = this.projects[relative_idxs[0]];
-    } else if (relative_idxs.length == 2) {
-      //case hole data
-      output = this.projects[relative_idxs[0]].holes[relative_idxs[1]];
-    } else if (relative_idxs.length == 3) {
-      //case section data
-      output =
-        this.projects[relative_idxs[0]].holes[relative_idxs[1]].sections[
-          relative_idxs[2]
-        ];
-    } else if (relative_idxs.length == 4) {
-      //case marker/event data
-      output =
-        this.projects[relative_idxs[0]].holes[relative_idxs[1]].sections[
-          relative_idxs[2]
-        ].markers[relative_idxs[3]];
+    let num_idx = 0;  
+
+    if (idxs.length == 1) {
+      num_idx = 1;
+    } else if (idxs.length == 2) {
+      num_idx = 2;
+    } else if (idxs.length == 3) {
+      num_idx = 3;
+    } else if (idxs.length == 4) {
+      num_idx = 0;
+      for(let i=0; i<idxs.length; i++){
+        if(idxs[i] !== null){
+          num_idx +=1;
+        }else{
+          break;
+        }
+      }
     }
+
+    if(num_idx == 0){
+      //no id
+      return output;
+    } else if (num_idx == 1){
+      //case project data
+      output = this.projects[idxs[0]];
+    } else if(num_idx == 2){
+      //case hole data
+      output = this.projects[idxs[0]].holes[idxs[1]];
+    } else if(num_idx == 3){
+      //case section data
+      output = this.projects[idxs[0]].holes[idxs[1]].sections[idxs[2]];
+    } else if (num_idx == 4){
+      //case marker/event data
+      output = this.projects[idxs[0]].holes[idxs[1]].sections[idxs[2]].markers[idxs[3]];
+    }
+
 
     return output;
   }
@@ -2758,81 +2777,116 @@ class LevelCompilerCore {
     }
     return [null, null, null, null];
   }
-  getNearestTrinity(projectId, depth, calcType) {
-    //get idx
-    let projectIdx = null;
-    this.projects.forEach((project, p) => {
-      if (project.id[0] == projectId[0]) {
-        projectIdx = [p, null, null, null];
-      }
-    });
-
+  getNearestTrinity(targetId, depth, calcType) {
+    //search in target
     //this method returns paseudo result because multiple sections matched, but returns most goood sections based on centre of sections.
+    let output = {index:[null,null,null,null], project:null, hole:null, section: null, distance: null};
     let nearestSectionData = null;
+    let nearestSectionList = [];
+    let tempSectionData = null;
     let diffDepth = Infinity;
-    for (let h = 0; h < this.projects[projectIdx[0]].holes.length; h++) {
-      for (
-        let s = 0;
-        s < this.projects[projectIdx[0]].holes[h].sections.length;
-        s++
-      ) {
-        const sectionData = this.projects[projectIdx[0]].holes[h].sections[s];
-        const midSec =
-          (sectionData.markers[0][calcType] +
-            sectionData.markers[sectionData.markers.length - 1][calcType]) /
-          2;
 
-        if (diffDepth > Math.abs(midSec - depth)) {
-          diffDepth = Math.abs(midSec - depth);
-          nearestSectionData = sectionData;
+    //search target section, if not 
+    if(targetId[0] !== null && targetId[1] !== null && targetId[2] !== null){
+      //if section is selected
+      const targetIdx = this.search_idx_list[targetId.toString()];
+      nearestSectionData = this.getDataByIdx(targetIdx);
+      output.index = targetIdx;
+    } else {
+      //if section is not selected
+      for(let p=0; p<this.projects.length;p++){
+        //if target project
+        for(let h=0; h<this.projects[p].holes.length;h++){            
+          //fisrt, search in the selected hole
+          tempSectionData = null;
+          diffDepth = Infinity;
+          for(let s=0; s<this.projects[p].holes[h].sections.length; s++){             
+            const sectionData = this.projects[p].holes[h].sections[s];
+            const midSec = (sectionData.markers[0][calcType] + sectionData.markers[sectionData.markers.length - 1][calcType]) / 2;  
+            if (diffDepth > Math.abs(midSec - depth)) {
+              diffDepth = Math.abs(midSec - depth);
+              tempSectionData = sectionData;
+              output.index = [p, h, s, null];
+            }
+          }
+          nearestSectionList.push([diffDepth, tempSectionData]);
         }
       }
-    }
 
+      //get best nearestData
+      for(let s=0; s<nearestSectionList.length; s++){
+        tempSectionData = nearestSectionList[s][1];
+        const tempUpperDepth = tempSectionData.markers[0][calcType];
+        const tempLowerDepth = tempSectionData.markers[tempSectionData.markers.length - 1][calcType];
+        if(tempSectionData.id[0] == targetId[0] && tempSectionData.id[1] == targetId[1] && targetId[0] !==null && targetId[1] !== null){
+          //target hole
+          if(depth >= tempUpperDepth && depth <= tempLowerDepth){
+            // on the section
+            nearestSectionData = tempSectionData;
+            break;
+          }
+        }
+      }
+
+      console.log("check1");
+      console.log(nearestSectionData);
+      //case of out side of section&hole
+      if(nearestSectionData == null){
+        diffDepth = Infinity;
+        for(let s=0; s<nearestSectionList.length; s++){
+          if(nearestSectionList[s][0] < diffDepth){
+            if(!(nearestSectionList[s][1].id[0] == targetId[0] && nearestSectionList[s][1].id[1] == targetId[1])){
+              nearestSectionData = nearestSectionList[s][1];
+              diffDepth = nearestSectionList[s][0];
+            }
+          }
+        }
+        console.log("check2");
+        console.log(nearestSectionData);
+      }
+      
+    }
+    
+    //chec section data
     if (nearestSectionData == null) {
-      return [null, null, null];
+      output.index = [null,null,null,null];
+      return output;
     }
 
-    //
-    let upperData = nearestSectionData.markers[0];
-    let lowerData =
-      nearestSectionData.markers[nearestSectionData.markers.length - 1];
-
-    nearestSectionData.markers.forEach((marker) => {
+    //if section data is exist
+    let upperMarkerData = nearestSectionData.markers[0];
+    let lowerMarkerData = nearestSectionData.markers[nearestSectionData.markers.length - 1];
+    for(let m=0; m<nearestSectionData.markers.length;m++){
+      let marker = nearestSectionData.markers[m];
       const temp = marker[calcType] - depth;
-      if (temp <= 0 && marker[calcType] - upperData[calcType] < temp) {
-        upperData = marker;
+      if (temp <= 0 && Math.abs(temp) < Math.abs(upperMarkerData[calcType] - depth)) {
+        upperMarkerData = marker;
       }
-      if (temp >= 0 && marker[calcType] - lowerData[calcType] > temp) {
-        lowerData = marker;
+      if (temp >= 0 && Math.abs(temp) < Math.abs(lowerMarkerData[calcType] - depth)) {
+        lowerMarkerData = marker;
       }
-    });
+    }
 
     //make function
-    const interp = ([d1, d3], [a1, a3], d2) => {
-      let a2 = null;
-      if (d3 - d1 == 0) {
-        a2 = a1;
-      } else {
-        a2 = a1 + ((d2 - d1) / (d3 - d1)) * (a3 - a1);
-      }
-      return a2;
-    };
+    const D1 = upperMarkerData.distance;
+    const D3 = lowerMarkerData.distance;
+    const d1 = upperMarkerData[calcType];
+    const d2 = depth;
+    const d3 = lowerMarkerData[calcType];
+    const d2d1 = d2 - d1;
+    const d3d1 = d3 - d1;
 
-    const interpDistance = interp(
-      [upperData[calcType], lowerData[calcType]],
-      [upperData.distance, lowerData.distance],
-      depth
-    );
+    const interpDistance = this.linearInterp(D1, D3, d2d1, d3d1);
 
-    const idxs = this.search_idx_list[nearestSectionData.id.toString()];
+    const idx = this.search_idx_list[nearestSectionData.id.toString()];
 
-    return [
-      this.projects[projectIdx[0]].holes[idxs[1]].name,
-      nearestSectionData.name,
-      interpDistance,
-    ];
-  }
+    output.project = this.projects[idx[0]].name;
+    output.hole    = this.projects[idx[0]].holes[idx[1]].name;
+    output.section = this.projects[idx[0]].holes[idx[1]].sections[idx[2]].name;
+    output.distance= interpDistance;
+
+    return output;
+ }
   getIdxFromTrinity(projectId, [holeName, sectionName, distance]) {
     //get idx
     let projectIdx = null;
