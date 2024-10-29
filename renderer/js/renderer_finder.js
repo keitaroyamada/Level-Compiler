@@ -67,10 +67,10 @@ document.addEventListener("DOMContentLoaded", () => {
     isCalledFinder = true;
     const newHoleData = holeList[document.getElementById("holeOptions").value][1];
     targetId = newHoleData;
+    await updateSectionList();
     await calc("trinity");
     await limitDistance();
     //change sec list
-    await updateSectionList();
   });
   //-------------------------------------------------------------------------------------------
   //section
@@ -149,8 +149,8 @@ document.addEventListener("DOMContentLoaded", () => {
       for (let i = 0; i < holeList.length; i++) {
         const option = document.createElement("option");
         option.textContent = holeList[i][2]; //name
-        option.value = holeList[i][0]; //idx
-        option.id = holeList[i][1]; //id
+        option.value       = holeList[i][0]; //idx
+        option.id          = holeList[i][1]; //id
 
         document.getElementById("holeOptions").appendChild(option);
       }
@@ -170,8 +170,8 @@ document.addEventListener("DOMContentLoaded", () => {
       for (let i = 0; i < sectionList[selectedHole].length; i++) {
         const option = document.createElement("option");
         option.textContent = sectionList[selectedHole][i][2]; //name
-        option.value = sectionList[selectedHole][i][0]; //idx
-        option.id = sectionList[selectedHole][i][1]; //idx
+        option.value       = sectionList[selectedHole][i][0]; //idx
+        option.id          = sectionList[selectedHole][i][1]; //id
 
         document.getElementById("sectionOptions").appendChild(option);
       }
@@ -211,23 +211,30 @@ document.addEventListener("DOMContentLoaded", () => {
         if(calcedData.hole == holeName){
           //if selected hole exist
           let hole_idx = null;
-          holeList.forEach((hole, h) => {
+          let selected_hole_id = null;
+          for(let h=0; h<holeList.length;h++){
+            const hole = holeList[h];
             if (hole[2] == calcedData.hole) {
               hole_idx = h;
+              selected_hole_id = hole[0];
             }
-          });
-  
+          }
+          
           let sec_idx = null;
-          sectionList[hole_idx].forEach((sec, s) => {
+          let selected_sec_id = null;
+          for(let s=0;s<sectionList[hole_idx].length;s++){
+            const sec = sectionList[hole_idx][s];
             if (sec[2] == calcedData.section) {
+              
               sec_idx = s;
+              selected_sec_id = sec[0];
             }
-          });
+          }
   
           //apply
-          document.getElementById("holeOptions").value = hole_idx;
+          document.getElementById("holeOptions").value = selected_hole_id;
           updateSectionList();
-          document.getElementById("sectionOptions").value = sec_idx;
+          document.getElementById("sectionOptions").value = selected_sec_id;
           document.getElementById("distanceInput").value  = isNaN(calcedData.distance) ? "" : Math.round(calcedData.distance * 10) / 10;
           document.getElementById("cdInput").value        = Math.round(calcedData.cd * 10) / 10;
           document.getElementById("efdInput").value       = Math.round(calcedData.efd * 10) / 10;
@@ -235,12 +242,13 @@ document.addEventListener("DOMContentLoaded", () => {
           document.getElementById("ageUpperInput").value  = Math.round(calcedData.age_upper * 10) / 10;
           document.getElementById("ageLowerInput").value  = Math.round(calcedData.age_lower * 10) / 10;
         } else {
-          //if not selected hole exist
+          //if selected hole is not exist
           //await window.FinderApi.rendererLog(previousValue); 
-          let hole_idx = previousValue.hole;
     
           //apply
-          document.getElementById("holeOptions").value = hole_idx;
+          document.getElementById("holeOptions").value    = previousValue.hole;
+          updateSectionList();
+          document.getElementById("sectionOptions").value  = previousValue.section;
           
         }
       }
@@ -255,22 +263,29 @@ document.addEventListener("DOMContentLoaded", () => {
 
       //apply//calc(data[2]);
       let hole_idx = null;
-      holeList.forEach((hole, h) => {
+      let selected_hole_id = null;
+      for(let h=0; h<holeList.length;h++){
+        const hole = holeList[h];
         if (hole[2] == calcedData.hole) {
           hole_idx = h;
+          selected_hole_id = hole[0];
         }
-      });
-
+      }
+      
       let sec_idx = null;
-      sectionList[hole_idx].forEach((sec, s) => {
+      let selected_sec_id = null;
+      for(let s=0;s<sectionList[hole_idx].length;s++){
+        const sec = sectionList[hole_idx][s];
         if (sec[2] == calcedData.section) {
+          
           sec_idx = s;
+          selected_sec_id = sec[0];
         }
-      });
+      }
 
-      document.getElementById("holeOptions").value = hole_idx;
+      document.getElementById("holeOptions").value = selected_hole_id;
       updateSectionList();
-      document.getElementById("sectionOptions").value = sec_idx;
+      document.getElementById("sectionOptions").value = selected_sec_id;
 
       document.getElementById("distanceInput").value = isNaN(calcedData.distance) ? "" : Math.round(calcedData.distance * 10) / 10;
       document.getElementById("efdInput").value      = isNaN(calcedData.efd) ? "" : Math.round(calcedData.efd * 10) / 10;
@@ -287,22 +302,29 @@ document.addEventListener("DOMContentLoaded", () => {
 
       //apply
       let hole_idx = null;
-      holeList.forEach((hole, h) => {
+      let selected_hole_id = null;
+      for(let h=0; h<holeList.length;h++){
+        const hole = holeList[h];
         if (hole[2] == calcedData.hole) {
           hole_idx = h;
+          selected_hole_id = hole[0];
         }
-      });
-
+      }
+      
       let sec_idx = null;
-      sectionList[hole_idx].forEach((sec, s) => {
+      let selected_sec_id = null;
+      for(let s=0;s<sectionList[hole_idx].length;s++){
+        const sec = sectionList[hole_idx][s];
         if (sec[2] == calcedData.section) {
+          
           sec_idx = s;
+          selected_sec_id = sec[0];
         }
-      });
+      }
 
-      document.getElementById("holeOptions").value = hole_idx;
+      document.getElementById("holeOptions").value = selected_hole_id;
       updateSectionList();
-      document.getElementById("sectionOptions").value = sec_idx;
+      document.getElementById("sectionOptions").value = selected_sec_id;
 
       document.getElementById("distanceInput").value = isNaN(calcedData.distance) ? "" : Math.round(calcedData.distance * 10) / 10;
       document.getElementById("cdInput").value       = isNaN(calcedData.cd) ? "" : Math.round(calcedData.cd * 10) / 10;
@@ -387,6 +409,7 @@ document.addEventListener("DOMContentLoaded", () => {
       //document.getElementById("fix").style.backgroundColor = "lightgray";
       document.getElementById("fix").querySelector("img").src = resourcePaths.finder["fixed"];
     }
+    window.FinderApi.changeFix(isFix);
   });
   //-------------------------------------------------------------------------------------------
   document.getElementById("link").addEventListener("click", async (event) => {

@@ -56,7 +56,17 @@ function createMainWIndow() {
     mainWindow.webContents.openDevTools();
   }
   mainWindow.loadFile(path.join(__dirname, "./renderer/index.html"));
-
+  mainWindow.on('close', () => {
+    if (finderWindow && !finderWindow.isDestroyed()) {
+      finderWindow.close();
+    }
+    if (dividerWindow && !dividerWindow.isDestroyed()) {
+      dividerWindow.close();
+    }
+    if (converterWindow && !converterWindow.isDestroyed()) {
+      converterWindow.close();
+    }
+  });
   //===================================================================================================================================
   //make Menu
   const lcmenu = [
@@ -95,24 +105,37 @@ function createMainWIndow() {
       submenu: [
         {
           label: "Load Correlation Model",
+          accelerator: "CmdOrCtrl+M",
           click: () => {
             mainWindow.webContents.send("LoadCorrelationModelMenuClicked");
           },
         },
         {
           label: "Load Age model",
+          accelerator: "CmdOrCtrl+T",
           click: () => {
             mainWindow.webContents.send("LoadAgeModelMenuClicked");
           },
         },
+        { type: "separator" },
         {
           label: "Load Core Images",
+          accelerator: "CmdOrCtrl+I",
           click: () => {
             mainWindow.webContents.send("LoadCoreImagesMenuClicked");
           },
         },
         {
+          label: "Load Plot Data",
+          accelerator: "CmdOrCtrl+P",
+          click: () => {
+            mainWindow.webContents.send("LoadPlotDataMenuClicked");
+          },
+        },
+        { type: "separator" },
+        {
           label: "Unload all models",
+          accelerator: "CmdOrCtrl+U",
           click: () => {
             mainWindow.webContents.send("UnLoadModelsMenuClicked");
           },
@@ -136,6 +159,35 @@ function createMainWIndow() {
         {
           label: "converter",
           click: () => {
+            if (converterWindow) {
+              converterWindow.focus();
+              return;
+            }
+        
+            //create finder window
+            converterWindow = new BrowserWindow({
+              title: "Converter",
+              width: 700,
+              height: 790,
+              webPreferences: {preload: path.join(__dirname, "preload_converter.js"),},
+            });
+            converterWindow.setAlwaysOnTop(true, "normal");
+            converterWindow.on("closed", () => {
+              converterWindow = null;
+              mainWindow.webContents.send("ConverterClosed", "");
+            });
+            converterWindow.setMenu(null);
+        
+            converterWindow.loadFile(path.join(__dirname, "./renderer/converter.html"));
+        
+            converterWindow.once("ready-to-show", () => {
+              converterWindow.show();
+              //dividerWindow.webContents.openDevTools();
+              // /dividerWindow.setAlwaysOnTop(true, "normal");
+              converterWindow.webContents.send("ConverterToolClicked", "");
+            });
+
+            /*
             const win = createNewWindow("Converter", "./renderer/converter.html", "preload_converter.js");
 
             win.once("ready-to-show", () => {
@@ -145,6 +197,7 @@ function createMainWIndow() {
               win.setAlwaysOnTop(true, "normal");
               win.webContents.send("ConverterMenuClicked", "");
             });
+            */
           },
         },
       ],
@@ -345,7 +398,7 @@ function createMainWIndow() {
       
     } catch (error) {
       console.log(error);
-      console.error("Correlation model register error.");
+      console.error("MAIN: Correlation model register error.");
       return null;
     }
   });
@@ -602,7 +655,7 @@ function createMainWIndow() {
 
     return LCCore;
   });
-  ipcMain.handle("RegisterPlotFromLCAge", async (_e) => {
+  ipcMain.handle("RegisterAgePlotFromLCAge", async (_e) => {
     try {
       //register all LCAge models
       for (let i = 0; i < LCAge.AgeModels.length; i++) {
@@ -620,7 +673,7 @@ function createMainWIndow() {
         });
 
         //register dage data from LCAge
-        LCPlot.addDatasetFromLCAgeModel(
+        LCPlot.addAgesetFromLCAgeModel(
           LCPlot.age_selected_id, //new made lotdata id
           LCAge.AgeModels[age_idx]
         );
@@ -1028,7 +1081,11 @@ function createMainWIndow() {
         mainWindow.webContents.openDevTools();
       }
     } else if(data == "converter"){
-      console.log("MAIN: Changing Devtool is not supported in converter.");
+      if (converterWindow.webContents.isDevToolsOpened()) {
+        converterWindow.webContents.closeDevTools();
+      } else {
+        converterWindow.webContents.openDevTools();
+      }
     }
     
 });
@@ -1319,6 +1376,8 @@ function createMainWIndow() {
     return results;
   });
   //--------------------------------------------------------------------------------------------------
+ 
+  //--------------------------------------------------------------------------------------------------
   //for finder
   ipcMain.handle("finderGetCoreList", async (_e) => {
     //get data
@@ -1354,9 +1413,9 @@ function createMainWIndow() {
   });
   ipcMain.handle("changeFix", async (_e, isFix) => {
     if (isFix) {
-      finderWindow.setAlwaysOnTop(false);
-    } else {
       finderWindow.setAlwaysOnTop(true, "normal");
+    } else {
+      finderWindow.setAlwaysOnTop(false);
     }
   });
   ipcMain.handle("getSectionLimit", async (_e, projectId, holeName, sectionName) => {
@@ -1435,7 +1494,6 @@ function createMainWIndow() {
       });
 
       //get idex
-      console.log("1207", cd_list);
       const calcedIdx = LCCore.search_idx_list[calcedId.toString()];
 
       //stack

@@ -48,6 +48,7 @@ document.addEventListener("DOMContentLoaded", () => {
   let objOpts = {
     interface:[],
     canvas: [],
+    project:[],
     hole: [],
     section: [],
     marker: [],
@@ -55,6 +56,7 @@ document.addEventListener("DOMContentLoaded", () => {
     connection: [],
     age: [],
     pen: [],
+    edit:[],
   };
   objOpts.canvas.depth_scale = "composite_depth";
   objOpts.canvas.zoom_level = [4, 3]; //[x, y](1pix/2cm)
@@ -76,6 +78,8 @@ document.addEventListener("DOMContentLoaded", () => {
   objOpts.canvas.is_connection = true;
   objOpts.canvas.draw_core_photo = false;
   objOpts.canvas.finder_y = 0;
+
+  objOpts.project.interval = 0;
 
   objOpts.hole.distance = 20;
   objOpts.hole.width = 20;
@@ -120,14 +124,15 @@ document.addEventListener("DOMContentLoaded", () => {
   };
   objOpts.event.line_width = 1;
   objOpts.event.line_colour = "Gray"; //rate
-  objOpts.event.face_wodth  = 0.93;//rate
+  objOpts.event.folded_width  = 0.2;//rate
   objOpts.event.face_height = 0.98;//rate
 
   objOpts.connection.line_colour = "Gray";
   objOpts.connection.line_width = 1.5;
   objOpts.connection.indexWidth = objOpts.hole.distance * 0.7; //20;
   objOpts.connection.emphasize_non_horizontal = true;
-  objOpts.connection.show_remote_connections = false;
+  objOpts.connection.show_remote_connections = true;
+  objOpts.connection.emphasize_remote_connections = false;
 
   objOpts.pen.colour = "Red";
 
@@ -236,7 +241,7 @@ document.addEventListener("DOMContentLoaded", () => {
       await loadAge(age_model_list[0].id);
 
       //register age into LCplot
-      await registerPlotFromLCAge();
+      await registerAgePlotFromLCAge();
 
       //load core images
       const response = await window.LCapi.askdialog(
@@ -497,7 +502,7 @@ document.addEventListener("DOMContentLoaded", () => {
     await loadAge(selected_age_model_id);
 
     //
-    await registerPlotFromLCAge();
+    await registerAgePlotFromLCAge();
     await loadPlotData();
 
     //update plot
@@ -530,6 +535,30 @@ document.addEventListener("DOMContentLoaded", () => {
     modelImages["composite_depth"] = compositeImages;
     let eventFreeImages = await loadCoreImages(modelImages, LCCore, "event_free_depth");
     modelImages["event_free_depth"] = eventFreeImages;
+
+    //update plot
+    updateView();
+  });
+  //============================================================================================
+  //load age model
+  window.LCapi.receive("LoadPlotDataMenuClicked", async () => {
+    if (correlation_model_list.length == 0) {
+      return;
+    }
+
+    //call from main process
+    let path = "";
+    try {
+      path = await window.LCapi.FileChoseDialog("Chose Plot Data csv file");
+      if (path == null) {
+        return;
+      }
+    } catch (error) {
+      console.error("ERROR: File load error", error);
+      return;
+    }
+
+    //load plot data
 
     //update plot
     updateView();
@@ -658,7 +687,7 @@ document.addEventListener("DOMContentLoaded", () => {
       await loadAge(selected_age_model_id);
 
       //reload plot data
-      await registerPlotFromLCAge();
+      await registerAgePlotFromLCAge();
       await loadPlotData();
 
       console.log(LCCore);
@@ -1092,6 +1121,9 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
   //============================================================================================
+
+
+  //============================================================================================
   //============================================================================================
   //main functions
   //============================================================================================
@@ -1351,7 +1383,7 @@ document.addEventListener("DOMContentLoaded", () => {
             }
             hole_x1 = 20 + (objOpts.hole.distance + objOpts.hole.width) * (num_disable.total + LCCore.projects[p].holes[h].order - num_disable.hole);
           }
-          num_disable.total += LCCore.projects[p].holes.length + 1;
+          num_disable.total += LCCore.projects[p].holes.length + objOpts.project.interval;
         } 
 
         //fix position
@@ -1550,6 +1582,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
             for (let m = 0; m < section.markers.length; m++) {
               //make marker objects=================================================================================
+                           
               //load marker data
               const marker = section.markers[m];
               let markerLineColour = objOpts.marker.line_colour;
@@ -1563,13 +1596,11 @@ document.addEventListener("DOMContentLoaded", () => {
               }
 
               //first, draw event
-              let ew = 0;
-              if (objOpts.canvas.is_event) {
-                //ew = objOpts.section.width * xMag - 6;
-                ew = objOpts.section.width * xMag * objOpts.event.face_wodth
-              } else {
-                ew = 8;
+              let ew = 1;
+              if (!objOpts.canvas.is_event) {
+                ew = objOpts.event.folded_width;
               }
+              
               for (let e = 0; e < marker.event.length; e++) {
                 //make marker objects=================================================================================
                 //get position
@@ -1585,16 +1616,18 @@ document.addEventListener("DOMContentLoaded", () => {
                 //draw event layers
 
                 if (lowerDepth !== null) {
-                  sketch.fill(objOpts.event.face_colour[event[3]]);
-                  sketch.noStroke();
-                  sketch.stroke(objOpts.event.face_colour[event[3]]);
-                  sketch.rect(
-                    (hole_x0 + shift_x) * xMag + pad_x + 3,
-                    (lowerDepth + shift_y) * yMag + pad_y,
-                    ew ,
-                    eventThickness * yMag * objOpts.event.face_height,
-                    1,1,1,1 //rounded option
-                  );
+                  if( objOpts.canvas.is_connection){
+                    sketch.fill(objOpts.event.face_colour[event[3]]);
+                    sketch.noStroke();
+                    sketch.stroke(objOpts.event.face_colour[event[3]]);
+                    sketch.rect(
+                      (hole_x0 + shift_x) * xMag + pad_x + 3,
+                      (lowerDepth + shift_y) * yMag + pad_y,
+                      objOpts.section.width * ew * xMag - 6,
+                      eventThickness * yMag * objOpts.event.face_height,
+                      1,1,1,1 //rounded option
+                    );
+                  }
                 }
               }
 
@@ -1604,20 +1637,24 @@ document.addEventListener("DOMContentLoaded", () => {
               if (m == 0 || m == section.markers.length - 1) {
                 topBot -= objOpts.marker.width * xMag; //or +20
               }
-
               //draw markers
               sketch.drawingContext.setLineDash([]);
               sketch.strokeWeight(objOpts.marker.line_width);
               sketch.stroke(objOpts.marker.line_colour); //(markerLineColour);
-              sketch.line(
-                (hole_x0 + shift_x) * xMag + pad_x,
-                (marker_top + shift_y) * yMag + pad_y,
-                (hole_x0 + shift_x) * xMag +
-                  pad_x +
-                  objOpts.marker.width * xMag +
-                  topBot,
-                (marker_top + shift_y) * yMag + pad_y
-              );
+              let mw = 1;
+               
+              if (!objOpts.canvas.is_event) {
+                mw = 0.2;
+              }
+
+              if( objOpts.canvas.is_connection){
+                sketch.line(
+                  (hole_x0 + shift_x) * xMag + pad_x,
+                  (marker_top + shift_y) * yMag + pad_y,
+                  (hole_x0 + shift_x) * xMag + pad_x + objOpts.marker.width * mw * xMag,// + topBot,
+                  (marker_top + shift_y) * yMag + pad_y
+                );
+              }
 
               //add rank marker-------------------------------------------
               if (objOpts.marker.is_rank) {
@@ -1631,7 +1668,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 }
                 sketch.text(
                   rank_name,
-                  (hole_x0 + shift_x) * xMag + pad_x - 23,
+                  (hole_x0 + shift_x) * xMag + pad_x + 10,//- 23,
                   (marker_top + shift_y) * yMag + pad_y + 5
                 );
 
@@ -1654,15 +1691,17 @@ document.addEventListener("DOMContentLoaded", () => {
               //add marker name--------------------------------------------
               //add marker name without top/bottom name
               if (m !== 0 && m !== section.markers.length - 1) {
-                sketch.fill(objOpts.marker.font_colour);
-                sketch.noStroke();
-                sketch.textFont(objOpts.marker.font);
-                sketch.textSize(objOpts.marker.font_size);
-                sketch.text(
-                  marker.name,
-                  (hole_x0 + shift_x) * xMag + pad_x + 10,
-                  (marker_top + shift_y) * yMag + pad_y - 2
-                );
+                if( objOpts.canvas.is_connection){
+                  sketch.fill(objOpts.marker.font_colour);
+                  sketch.noStroke();
+                  sketch.textFont(objOpts.marker.font);
+                  sketch.textSize(objOpts.marker.font_size);
+                  sketch.text(
+                    marker.name,
+                    (hole_x0 + shift_x) * xMag + pad_x - sketch.textWidth(marker.name) - 5,//+ 10,
+                    (marker_top + shift_y) * yMag + pad_y - 2
+                  );
+                }
               }
 
               //add marker distance----------------------------------------
@@ -1670,14 +1709,13 @@ document.addEventListener("DOMContentLoaded", () => {
               sketch.noStroke();
               sketch.textFont(objOpts.marker.font);
               sketch.textSize(objOpts.marker.font_size);
-              sketch.text(
-                (Math.round(marker.distance * 10) / 10).toFixed(1).toString(),
-                (hole_x0 + shift_x) * xMag +
-                  pad_x +
-                  objOpts.marker.width * xMag +
-                  5,
-                (marker_top + shift_y) * yMag + pad_y - 2
-              );
+              if( objOpts.canvas.is_connection){
+                sketch.text(
+                  (Math.round(marker.distance * 10) / 10).toFixed(1).toString(),
+                  (hole_x0 + shift_x) * xMag + pad_x + objOpts.marker.width * xMag + 5,
+                  (marker_top + shift_y) * yMag + pad_y - 2
+                );
+              }
               //add master section-----------------------------------------
               if (marker.isMaster) {
                 if (section.markers[m + 1] !== undefined) {
@@ -1685,8 +1723,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     sketch.drawingContext.setLineDash([]);
                     sketch.strokeWeight(4);
                     sketch.stroke("blue"); //(markerLineColour);
-                    const next_marker_top =
-                      section.markers[m + 1][objOpts.canvas.depth_scale];
+                    const next_marker_top = section.markers[m + 1][objOpts.canvas.depth_scale];
                     sketch.line(
                       (hole_x0 + shift_x) * xMag + pad_x,
                       (marker_top + shift_y) * yMag + pad_y,
@@ -1701,7 +1738,7 @@ document.addEventListener("DOMContentLoaded", () => {
               //make connection objects=================================================================================
               //add connection
               if( objOpts.canvas.is_connection){
-                const connectionData = this.getNearestConnectedMarkerIdx( LCCore, marker.id );
+                const connectionData = this.getNearestConnectedMarkerIdx( LCCore, marker.id, objOpts);
 
                 //check connection
                 if (connectionData == null) {
@@ -1712,8 +1749,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 const idxTo = connectionData.connected_idx;
 
                 //get connectied hole position
-                const connectedHole_x0 =
-                  (objOpts.hole.distance + objOpts.hole.width) * (1 * LCCore.projects[idxTo[0]].order + connectionData.num_total - connectionData.num_total_disable); //LCCore.projects[idxTo[0]].holes[idxTo[1]].order
+                const connectedHole_x0 = (objOpts.hole.distance + objOpts.hole.width) * ((LCCore.projects[idxTo[0]].order * objOpts.project.interval)+ (connectionData.num_total - connectionData.num_total_disable)); //LCCore.projects[idxTo[0]].holes[idxTo[1]].order
 
                 const connectedMarker_top = LCCore.projects[idxTo[0]].holes[idxTo[1]].sections[idxTo[2]].markers[idxTo[3]][objOpts.canvas.depth_scale];
 
@@ -1731,7 +1767,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 const cn_y3 = (connectedMarker_top + shift_y) * yMag + pad_y;
                 const cn_x2 = cn_x3 - objOpts.connection.indexWidth;
                 const cn_y2 = cn_y3;
-                let  connection_colour = objOpts.connection.line_colour;
+                let connection_colour = objOpts.connection.line_colour;
                 let connection_line_width = objOpts.connection.line_width;
 
                 //get style
@@ -1741,13 +1777,16 @@ document.addEventListener("DOMContentLoaded", () => {
                     connection_colour = "Red";
                   }
                 }
-                if (!connectionData.isNext) {
+
+                if (connectionData.isNext == false) {
                   //connected core is not located at the next
                   if (objOpts.connection.show_remote_connections){
-                    sketch.drawingContext.setLineDash([5, 5]);
+                    if(objOpts.connection.emphasize_remote_connections){
+                      sketch.drawingContext.setLineDash([5, 5]);
+                    }
+                  }else{
+                    continue
                   }
-                } else {
-                  sketch.drawingContext.setLineDash([]);
                 }
 
                 if ( marker.isMaster && 
@@ -1772,7 +1811,7 @@ document.addEventListener("DOMContentLoaded", () => {
             }
           }
         }
-        num_disable.total += project.holes.length + 1;
+        num_disable.total += project.holes.length + objOpts.project.interval;
       }
 
       //==========================================================================================
@@ -1849,6 +1888,7 @@ document.addEventListener("DOMContentLoaded", () => {
           //console.log(ageSeries[a]);
           //console.log(ageSeries[a].name + ":" + posX + "/" + posY);
         }
+
         //---------------------------------------------------------------------------------------
         //plot main
         if (ageSeries[a].source_type == "") {
@@ -2426,7 +2466,8 @@ document.addEventListener("DOMContentLoaded", () => {
             //add connection
             const connectionData = this.getNearestConnectedMarkerIdx(
               LCCore,
-              marker.id
+              marker.id,
+              objOpts
             );
 
             //check connection
@@ -3095,7 +3136,7 @@ document.addEventListener("DOMContentLoaded", () => {
       console.log("[Renderer]: Fail to read age model.");
     }
   }
-  async function registerPlotFromLCAge() {
+  async function registerAgePlotFromLCAge() {
     if (correlation_model_list.length == 0) {
       return;
     }
@@ -3103,7 +3144,7 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
     //load age model
-    await window.LCapi.RegisterPlotFromLCAge();
+    await window.LCapi.RegisterAgePlotFromLCAge();
   }
   async function loadPlotData() {
     //LC plot age_collection id is as same as LCAge id
@@ -3276,7 +3317,7 @@ function fitScaler(zoom_level, mag) {
 
   return step;
 }
-function getNearestConnectedMarkerIdx(LCCore, idFrom) {
+function getNearestConnectedMarkerIdx(LCCore, idFrom, objOpts) {
   //temp function
   const getListIdx = (list, p, h) => {
     let output = null;
@@ -3312,60 +3353,45 @@ function getNearestConnectedMarkerIdx(LCCore, idFrom) {
   });
 
   //get start marker data
-  const idxFrom = this.getIdxById(LCCore, idFrom);
+  const idxFrom  = this.getIdxById(LCCore, idFrom);
   const listFrom = getListIdx(holeList, idxFrom[0], idxFrom[1]);
-  const currentTotalOrder = holeList[listFrom][0];
-  const currentMarkerData =
-    LCCore.projects[idxFrom[0]].holes[idxFrom[1]].sections[idxFrom[2]].markers[
-      idxFrom[3]
-    ];
-  const currentHoleData = LCCore.projects[idxFrom[0]].holes[idxFrom[1]];
+  const currentTotalOrder  = holeList[listFrom][0];
+  const currentMarkerData  = LCCore.projects[idxFrom[0]].holes[idxFrom[1]].sections[idxFrom[2]].markers[idxFrom[3]];
+  const currentHoleData    = LCCore.projects[idxFrom[0]].holes[idxFrom[1]];
   const currentProjectData = LCCore.projects[idxFrom[0]];
 
   //check first data
   let isMasterConnection = 0;
-  if (
-    currentMarkerData.h_connection == null ||
-    currentMarkerData.h_connection.length == 0
-  ) {
+  if (currentMarkerData.h_connection == null || currentMarkerData.h_connection.length == 0) {
     //case there is no connection
     return null;
   } else {
     currentMarkerData.h_connection.forEach((c) => {
       const idx = this.getIdxById(LCCore, c);
-      if (
-        LCCore.projects[idx[0]].holes[idx[1]].sections[idx[2]].markers[idx[3]]
-          .isMaster
-      ) {
+      if (LCCore.projects[idx[0]].holes[idx[1]].sections[idx[2]].markers[idx[3]].isMaster) {
         isMasterConnection += 1;
       }
     });
   }
 
   //get first connection data
-  let connectedMarkerData = null;
-  let connectedHoleData = null;
+  let connectedMarkerData  = null;
+  let connectedHoleData    = null;
   let connectedProjectData = null;
 
   //check and replace connection---------------------------------------------------------------------------
 
   //get first data beacause some case include only single connection
-  let idTo = currentMarkerData.h_connection[0];
-  let idxTo = this.getIdxById(LCCore, idTo);
+  let idTo   = currentMarkerData.h_connection[0];
+  let idxTo  = this.getIdxById(LCCore, idTo);
   let listTo = getListIdx(holeList, idxTo[0], idxTo[1]);
   let connectedTotalOrder = holeList[listTo][0];
 
   //if next marker order is large and enable, get
-  if (
-    connectedTotalOrder > currentTotalOrder &&
-    LCCore.projects[idxTo[0]].holes[idxTo[1]].enable
-  ) {
-    connectedMarkerData =
-      LCCore.projects[idxTo[0]].holes[idxTo[1]].sections[idxTo[2]].markers[
-        idxTo[3]
-      ];
-    connectedHoleData = LCCore.projects[idxTo[0]].holes[idxTo[1]];
-    connectedProjectData = LCCore.projects[idxTo[0]];
+  if (connectedTotalOrder > currentTotalOrder && LCCore.projects[idxTo[0]].holes[idxTo[1]].enable) {
+    connectedMarkerData = LCCore.projects[idxTo[0]].holes[idxTo[1]].sections[idxTo[2]].markers[idxTo[3]];
+    connectedHoleData   = LCCore.projects[idxTo[0]].holes[idxTo[1]];
+    connectedProjectData= LCCore.projects[idxTo[0]];
   } else {
     //case lost connected marker and remains only connection (unsuspected error)
   }
@@ -3382,27 +3408,23 @@ function getNearestConnectedMarkerIdx(LCCore, idFrom) {
       if (connectedHoleData !== null) {
         if (holeList[listTo][0] > currentTotalOrder && holeList[listTo][0] < connectedTotalOrder && LCCore.projects[idxTo[0]].holes[idxTo[1]].enable ) {
           //if connected hole has large order, enable but the order smaller (nearer place in canvas) than stocked one.
-          connectedMarkerData =
-            LCCore.projects[idxTo[0]].holes[idxTo[1]].sections[idxTo[2]].markers[idxTo[3]];
-          connectedHoleData = LCCore.projects[idxTo[0]].holes[idxTo[1]];
+          connectedMarkerData  = LCCore.projects[idxTo[0]].holes[idxTo[1]].sections[idxTo[2]].markers[idxTo[3]];
+          connectedHoleData    = LCCore.projects[idxTo[0]].holes[idxTo[1]];
           connectedProjectData = LCCore.projects[idxTo[0]];
-          connectedTotalOrder = holeList[listTo][0];
+          connectedTotalOrder  = holeList[listTo][0];
         }
       } else {
         //previously checked connection is died (unsuspected error)
-        if (
-          holeList[listTo][0] > currentTotalOrder &&
-          LCCore.projects[idxTo[0]].holes[idxTo[1]].enable
-        ) {
-          connectedMarkerData =
-            LCCore.projects[idxTo[0]].holes[idxTo[1]].sections[idxTo[2]].markers[idxTo[3]];
-          connectedHoleData = LCCore.projects[idxTo[0]].holes[idxTo[1]];
+        if (holeList[listTo][0] > currentTotalOrder && LCCore.projects[idxTo[0]].holes[idxTo[1]].enable) {
+          connectedMarkerData  = LCCore.projects[idxTo[0]].holes[idxTo[1]].sections[idxTo[2]].markers[idxTo[3]];
+          connectedHoleData    = LCCore.projects[idxTo[0]].holes[idxTo[1]];
           connectedProjectData = LCCore.projects[idxTo[0]];
-          connectedTotalOrder = holeList[listTo][0];
+          connectedTotalOrder  = holeList[listTo][0];
         }
       }
     }
   }
+    
 
   //count num disable holes between connection for plot x position------------------------------
   if (connectedHoleData == null) {
@@ -3447,6 +3469,7 @@ function getNearestConnectedMarkerIdx(LCCore, idFrom) {
     }
   }
 
+;
   //console.log(    "total: " + numTotal + "|proj: " + numProject + "|diable: " + numDisable  );
 
   //check and output---------------------------------------------------------------------------
@@ -3457,7 +3480,7 @@ function getNearestConnectedMarkerIdx(LCCore, idFrom) {
     //check is ringht next for plot style
     let isNext = false;
     const idxTo = this.getIdxById(LCCore, connectedMarkerData.id);
-    if (betweenRange[1] - betweenRange[0] - numBetweenDisable == 1) {
+    if ((betweenRange[1] - betweenRange[0] - numBetweenDisable) == 1) {
       isNext = true;
     }
 
@@ -3777,8 +3800,6 @@ async function loadCoreImages(modelImages, LCCore, depthScale) {
   //const prom = new Promise((resolve, reject) => {
     let results = {};
 
-    console.log("[Renderer]: Load images in " + depthScale + " scale.");
-
     //check
     if (modelImages.image_dir.length == 0) {
       console.log("[Renderer]: There is no image path.");
@@ -3799,7 +3820,6 @@ async function loadCoreImages(modelImages, LCCore, depthScale) {
 
     //main get num images
     let N = 0;
-    console.log(modelImages.load_target_ids.length);
     if(modelImages.load_target_ids.length == 0){
       //case all
       LCCore.projects.forEach((p) => {
@@ -3815,18 +3835,18 @@ async function loadCoreImages(modelImages, LCCore, depthScale) {
     }
     
 
-    //main
-    //Progress
+    //main Progress
     let txt = "Converting section images to " + depthScale + " scale...";
     if (depthScale == "drilling_depth") {
       txt = "Loading original section images...";
     }
     window.LCapi.progressbar("Load images", txt);
     let n = 0;
-
+  
+    let suc = 0;
     await new Promise((p5resolve)=>{
       new p5(async (p) => {
-        let n = 0;
+        
 
         for(let t=0; t<N;t++){
           const targeIdx = getIdxById(LCCore, modelImages.load_target_ids[t]);
@@ -3847,6 +3867,7 @@ async function loadCoreImages(modelImages, LCCore, depthScale) {
                 results[im_name] = await p.loadImage("data:image/png;base64," + imageBase64,
                   async () => {
                     //console.log("");
+                    suc++;
                   },
                   async () => {
                     console.log("Fail to load image of " + im_name);
@@ -3881,6 +3902,7 @@ async function loadCoreImages(modelImages, LCCore, depthScale) {
                   "data:image/png;base64," + imageBase64,
                   async () => {
                     //console.log("");
+                    suc++;
                   },
                   async () => {
                     console.log("Fail to load image of " + im_name);
@@ -3901,13 +3923,13 @@ async function loadCoreImages(modelImages, LCCore, depthScale) {
       });
     })
     
+    //console.log(modelImages.load_target_ids.length);
+
+    console.log("[Renderer]: Load " + suc +" images / "+N+ " sections in " + depthScale + " scale.");
     resolve(results);
   });
 
-  return Promise.all([prom]).then((pr) => {
-    console.log(depthScale + " images loaded.");
-    return pr[0];
-  });
+
 }
 
 async function loadResourcePath(objOpts){
@@ -4042,7 +4064,7 @@ function getClickedItemIdx(mouseX, mouseY, LCCore, objOpts){
         }  
       }
     }  
-    num_hole.total += LCCore.projects[p].holes.length + 1;
+    num_hole.total += LCCore.projects[p].holes.length + objOpts.project.interval;
   }
   
   return results;

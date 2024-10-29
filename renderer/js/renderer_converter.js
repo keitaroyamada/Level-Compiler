@@ -304,7 +304,7 @@ document.addEventListener("DOMContentLoaded", () => {
   //-------------------------------------------------------------------------------------------
   document.addEventListener("keydown", (e) => {
     if (e.key === "F12") {
-      window.ConverterApi.toggleDevTools("divider");
+      window.ConverterApi.toggleDevTools("converter");
     }
   });
 });

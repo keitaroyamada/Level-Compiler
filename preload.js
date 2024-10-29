@@ -16,7 +16,7 @@ contextBridge.exposeInMainWorld("LCapi", {
   LoadModelFromLCCore: () => ipcRenderer.invoke("LoadModelFromLCCore"),
   RegisterAgeFromCsv: (args) => ipcRenderer.invoke("RegistertAgeFromCsv", args),
   LoadAgeFromLCAge: (args) => ipcRenderer.invoke("LoadAgeFromLCAge", args),
-  RegisterPlotFromLCAge: () => ipcRenderer.invoke("RegisterPlotFromLCAge"),
+  RegisterAgePlotFromLCAge: () => ipcRenderer.invoke("RegisterAgePlotFromLCAge"),
   LoadPlotFromLCPlot: () => ipcRenderer.invoke("LoadPlotFromLCPlot"),
 
   //calcs
@@ -44,7 +44,7 @@ contextBridge.exposeInMainWorld("LCapi", {
   makeModelImage: (args1, args2, args3, args4) =>  ipcRenderer.invoke("makeModelImage", args1, args2, args3, args4),
   getResourcePath: () => ipcRenderer.sendSync("getResourcePath"),
   toggleDevTools: (args1) => ipcRenderer.send('toggle-devtools',args1),
-
+ 
   //main -> renderer
   receive: (channel, func) => {
     ipcRenderer.on(channel, (event, ...args) => func(...args));

@@ -13,7 +13,7 @@ var ss = require("simple-statistics");
 
 class LevelCompilerPlot {
   constructor() {
-    this.age_collections = []; //dataRepository > dataCollection > dataset > data
+    this.age_collections = []; //dataRepository > dataCollection > dataset > data  [LCplot.age_collections[age_plot_idx].datasets[0].data_series;]
     this.age_selected_id = null;
 
     this.data_collections = []; //dataRepository > dataCollection > dataset > data
@@ -31,7 +31,7 @@ class LevelCompilerPlot {
     this.age_selected_id = age_id;
   }
 
-  addDatasetFromLCAgeModel(age_collectionId, LCAgeModel) {
+  addAgesetFromLCAgeModel(age_collectionId, LCAgeModel) {
     //get collection idx
     let targetIdx = null;
     this.age_collections.forEach((col, c) => {
@@ -48,19 +48,19 @@ class LevelCompilerPlot {
       const newData = new PlotData();
 
       //input data
-      newData.id = LCAgeModel.ages[a].id;
-      newData.name = LCAgeModel.ages[a].name;
+      newData.id                  = LCAgeModel.ages[a].id;
+      newData.name                = LCAgeModel.ages[a].name;
       newData.original_depth_type = LCAgeModel.ages[a].original_depth_type;
-      newData.trinity = LCAgeModel.ages[a].trinityData;
-      newData.drilling_depth = null;
-      newData.composite_depth = LCAgeModel.ages[a].composite_depth;
-      newData.event_free_depth = LCAgeModel.ages[a].event_free_depth;
-      newData.age = LCAgeModel.ages[a].age_mid;
-      newData.data = LCAgeModel.ages[a].age_mid;
-      newData.source_type = LCAgeModel.ages[a].source_type;
-      newData.source_code = LCAgeModel.ages[a].source_code;
-      newData.unit = LCAgeModel.ages[a].unit;
-      newData.description = LCAgeModel.ages[a].note;
+      newData.trinity             = LCAgeModel.ages[a].trinityData;
+      newData.drilling_depth      = null;
+      newData.composite_depth     = LCAgeModel.ages[a].composite_depth;
+      newData.event_free_depth    = LCAgeModel.ages[a].event_free_depth;
+      newData.age                 = LCAgeModel.ages[a].age_mid;
+      newData.data                = LCAgeModel.ages[a].age_mid;
+      newData.source_type         = LCAgeModel.ages[a].source_type;
+      newData.source_code         = LCAgeModel.ages[a].source_code;
+      newData.unit                = LCAgeModel.ages[a].unit;
+      newData.description         = LCAgeModel.ages[a].note;
 
       //add
 
@@ -69,7 +69,44 @@ class LevelCompilerPlot {
 
     this.age_collections[targetIdx].datasets.push(newDataset);
   }
+  addDatasetFromLCAgeModel(age_collectionId, LCCore, LCAge) {
+    //get collection idx
+    let targetIdx = null;
+    this.age_collections.forEach((col, c) => {
+      if (col.id == age_collectionId) {
+        targetIdx = c;
+      }
+    });
 
+    //add age dataset
+    const newDataset = new PlotDataset();
+
+    for (let a = 0; a < LCAgeModel.ages.length; a++) {
+      //make new dataset
+      const newData = new PlotData();
+
+      //input data
+      newData.id                  = LCAgeModel.ages[a].id;
+      newData.name                = LCAgeModel.ages[a].name;
+      newData.original_depth_type = LCAgeModel.ages[a].original_depth_type;
+      newData.trinity             = LCAgeModel.ages[a].trinityData;
+      newData.drilling_depth      = null;
+      newData.composite_depth     = LCAgeModel.ages[a].composite_depth;
+      newData.event_free_depth    = LCAgeModel.ages[a].event_free_depth;
+      newData.age                 = LCAgeModel.ages[a].age_mid;
+      newData.data                = LCAgeModel.ages[a].age_mid;
+      newData.source_type         = LCAgeModel.ages[a].source_type;
+      newData.source_code         = LCAgeModel.ages[a].source_code;
+      newData.unit                = LCAgeModel.ages[a].unit;
+      newData.description         = LCAgeModel.ages[a].note;
+
+      //add
+
+      newDataset.data_series.push(newData);
+    }
+
+    this.age_collections[targetIdx].datasets.push(newDataset);
+  }
   calcAgeCollectionPosition(LCCore, LCAge) {
     const targetProjectId = LCCore.base_project_id;
 
