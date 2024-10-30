@@ -5,8 +5,8 @@
 ### 2.1. Recommended environments(Development environment)
 - WIndows11
 ### 2.2. Windows
-#### 2.2.1. Download installer from the right panel "Releases".
-#### 2.2.1. Run downloaded exe file.
+1. Download installer from the right panel "Releases".
+2. Run downloaded exe file.
 
 ### 2.3. Mac(Apple silicon)
 >[!NOTE]
@@ -28,4 +28,4 @@
    ```
 9. Run the built executable file.
 
-## 3. 
+## 3. References
