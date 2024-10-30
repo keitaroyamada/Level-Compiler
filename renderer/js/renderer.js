@@ -578,6 +578,7 @@ document.addEventListener("DOMContentLoaded", () => {
       await initiariseCanvas();
       await initiarisePlot();
       console.log("[Renderer]: Unload Models of Correlations, Ages and Canvas.");
+      console.log(LCa)
     } else {
       //no
       return;
@@ -2937,8 +2938,8 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     //get click position
-    const upperData = await window.LCapi.depthConvert(["measured_upper", y0, [null, null, null, null]], measureObject.measureData.type,"linear");
-    const lowerData = await window.LCapi.depthConvert(["measured_lower", y1, [null, null, null, null]], measureObject.measureData.type,"linear");
+    const upperData = await window.LCapi.depthConverter(["measured_upper", y0, [null, null, null, null]], measureObject.measureData.type,"linear");
+    const lowerData = await window.LCapi.depthConverter(["measured_lower", y1, [null, null, null, null]], measureObject.measureData.type,"linear");
 
     //calc stat
     const meanAge = (lowerData.age_mid + upperData.age_mid) / 2;
@@ -3114,7 +3115,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     correlation_model_list.push(results); //{id,name,path}
 
-    console.log("[Renderer]: Resistered Correlation Model: " + results.name +".");
+    console.log("[Renderer]: Correlation Model has been resistered into the LCCore: " + results.name +".");
     //console.log(results);
     return true;
   }
@@ -3176,11 +3177,16 @@ document.addEventListener("DOMContentLoaded", () => {
       objOpts.canvas.pad_y = newPad_y;
 
       //shwo model summary
-      console.log("[Renderer]: Loaded Correlation Model(s).");
+      console.log("[Renderer]: Correlation Model has been loaded into the renderer.");
       LCCore.projects.forEach(p=>{
-        console.log({ ID: p.id[0], Name: p.name ,Version:p.correlation_version, Type: p.model_type});
+        console.log(
+          "Project ID: " + p.id[0],
+          "\nProject name: " + p.name,
+          "\nVersion: " + p.correlation_version,
+          "\nType: " + p.model_type,
+          "\nModel data: " , LCCore
+        );
       })
-      console.log(LCCore);
 
       //updateView();
     }
@@ -3205,7 +3211,7 @@ document.addEventListener("DOMContentLoaded", () => {
       newOption.textContent = results.name;
       document.getElementById("AgeModelSelect").appendChild(newOption);
 
-      console.log("[Renderer]: Registered Age Model: "+results.name);
+      console.log("[Renderer]: Age Model has been registered into the LCAge: "+results.name);
       //console.log(results);
     }
   }
@@ -3225,14 +3231,16 @@ document.addEventListener("DOMContentLoaded", () => {
         }
       });
 
-      console.log("[Renderer]: Age model loaded.");
-      console.log({ ID: age_id, Name: name });
-
-      console.log(LCCore);
+      console.log("[Renderer]: Age model has been loaded into the renderer.");
+      console.log(
+        "ID: " + age_id,
+        "\nName: " + name,
+        "\nData: ",LCCore
+      );
 
       updateView();
     } else {
-      console.log("[Renderer]: Fail to read age model.");
+      console.log("[Renderer]: Failed to read the age model.");
     }
   }
   async function registerAgePlotFromLCAge() {
@@ -3244,14 +3252,21 @@ document.addEventListener("DOMContentLoaded", () => {
     }
     //load age model
     await window.LCapi.RegisterAgePlotFromLCAge();
+    console.log("[Renderer]: Age points have been resistered into the LCPlot.");
   }
   async function loadPlotData() {
     //LC plot age_collection id is as same as LCAge id
     const results = await window.LCapi.LoadPlotFromLCPlot();
     if (results) {
       LCplot = results;
-      console.log("[Renderer]: Loaded Plot Data");
-      console.log(results);
+      const num_age_collections = results.age_collections.length;
+      const num_data_collections= results.data_collections.length;
+      console.log("[Renderer]: Plot Data have been loaded into the renderer.");
+      console.log(
+        "Age points: " + num_age_collections,
+        "\nData points:" + num_data_collections,
+        "\nData: ", results
+      );
     }
   }
 

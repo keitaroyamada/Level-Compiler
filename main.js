@@ -674,7 +674,7 @@ function createMainWIndow() {
       console.log("MAIN: Registered age model from " + age_path);
       return { id: LCAge.selected_id, name: model_name, path: age_path };
     } catch (error) {
-      console.error("Age model register error.");
+      console.error("MAINE: Age model register error.");
       console.log(error);
       return null;
     }
@@ -708,6 +708,7 @@ function createMainWIndow() {
     return LCCore;
   });
   ipcMain.handle("RegisterAgePlotFromLCAge", async (_e) => {
+    LCPlot.initiariseAgeCollection();
     try {
       //register all LCAge models
       for (let i = 0; i < LCAge.AgeModels.length; i++) {

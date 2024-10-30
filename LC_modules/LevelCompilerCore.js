@@ -538,6 +538,7 @@ class LevelCompilerCore {
           section.markers.forEach(marker=>{
             marker.connection_rank = null;
             marker.depth_source = ["",null,null];
+            marker[calcType] = null;
           })
         })
       })

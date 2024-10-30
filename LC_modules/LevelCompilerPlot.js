@@ -23,6 +23,9 @@ class LevelCompilerPlot {
   //from new csv
 
   //methods
+  initiariseAgeCollection(){
+    this.age_collections = [];
+  }
   addNewAgeCollection(name, age_id) {
     const newCollection = new PlotCollection();
     newCollection.id = age_id;

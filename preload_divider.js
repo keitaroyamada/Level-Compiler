@@ -8,11 +8,9 @@ contextBridge.exposeInMainWorld("DividerApi", {
 
   changeFix: (args) => ipcRenderer.invoke("changeFix", args),
 
-  finderConvert: (args1, args2, args3) =>
-    ipcRenderer.invoke("finderConvert", args1, args2, args3),
+  depthConverter: (args1, args2, args3) => ipcRenderer.invoke("depthConverter", args1, args2, args3),
 
-  getSectionLimit: (args1, args2) =>
-    ipcRenderer.invoke("getSectionLimit", args1, args2),
+  getSectionLimit: (args1, args2) => ipcRenderer.invoke("getSectionLimit", args1, args2),
 
   MoveToHorizon: (args1) => ipcRenderer.invoke("MoveToHorizon", args1),
   terminalLog: (args1) => ipcRenderer.invoke("terminalLog", args1),
