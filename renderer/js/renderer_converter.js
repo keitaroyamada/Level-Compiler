@@ -2,9 +2,18 @@ document.addEventListener("DOMContentLoaded", () => {
   let source_data = null;
   let n_r = null;
   let n_c = null;
+  let output_type = "export";
   //-------------------------------------------------------------------------------------------
   window.ConverterApi.receive("ConverterMenuClicked", async (data) => {
-    console.log("making");
+    output_type = data;
+    console.log("[Converter]: Conterter starting type: " + output_type);
+
+    if(output_type == "export"){
+      document.getElementById("cvt_bt_convert").textContent = "Export";
+    } else if (output_type == "import"){
+      document.getElementById("cvt_bt_convert").textContent = "Import";
+    }
+
     //make model chooser
 
     //correlation
@@ -221,81 +230,175 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   //-------------------------------------------------------------------------------------------
   document.getElementById("cvt_bt_convert").addEventListener("click", async (event) => {
-      console.log("Converting...");
+      console.log("[Converter]: Converting...");
 
       //get model ids
-      const corId = parseInt(
-        document.getElementById("cvt_correlation_model").value.split(",")[0]
-      );
-      const ageId = parseInt(
-        document.getElementById("cvt_age_model").value.split(",")[0]
-      );
-      let modelIds = {
-        correlation: corId,
-        age: ageId,
-      };
+      const corId = parseInt(document.getElementById("cvt_correlation_model").value.split(",")[0]);
+      const ageId = parseInt(document.getElementById("cvt_age_model").value.split(",")[0]);
+      let modelIds = {correlation: corId,  age: ageId};
 
       //get source type
       const sourceType = document.getElementById("cvt_source_type").value;
+      let depthMaxIdx = 0;
 
       //make data
-      let indata = [];
-      if (document.getElementById("cvt_source_type").value == "trinity") {
-        const nameIdx = document.getElementById("depth_chooser0").value;
-        const holeIdx = document.getElementById("depth_chooser1").value;
-        const sectionIdx = document.getElementById("depth_chooser2").value;
+      let indataList = [];
+      if (sourceType == "trinity") {
+        const nameIdx     = document.getElementById("depth_chooser0").value;
+        const holeIdx     = document.getElementById("depth_chooser1").value;
+        const sectionIdx  = document.getElementById("depth_chooser2").value;
         const distanceIdx = document.getElementById("depth_chooser3").value;
+        depthMaxIdx = Math.max(...[nameIdx, holeIdx, sectionIdx, distanceIdx]);
+        //skip header
+        for (let i = 1; i < source_data.length; i++) {
+          indataList.push([
+            source_data[i][nameIdx], //data name
+            [null,source_data[i][holeIdx], source_data[i][sectionIdx],source_data[i][distanceIdx]],//position trinity name
+            [null,null,null,null],//search range
+          ]);
+        }
+      } else if (sourceType == "composite_depth") {
+        const nameIdx = document.getElementById("depth_chooser0").value;
+        const cdIdx = document.getElementById("depth_chooser1").value;
+        depthMaxIdx = Math.max(...[nameIdx, cdIdx]);
         for (let i = 0; i < source_data.length; i++) {
           indata.push([
             source_data[i][nameIdx],
-            source_data[i][holeIdx],
-            source_data[i][sectionIdx],
-            source_data[i][distanceIdx],
+            source_data[i][cdIdx],
+            [null,null,null,null], 
           ]);
         }
-      } else if (
-        document.getElementById("cvt_source_type").value == "composite_depth"
-      ) {
-        const nameIdx = document.getElementById("depth_chooser0").value;
-        const cdIdx = document.getElementById("depth_chooser1").value;
-        for (let i = 0; i < source_data.length; i++) {
-          indata.push([source_data[i][nameIdx], source_data[i][cdIdx]]);
-        }
-      } else if (
-        document.getElementById("cvt_source_type").value == "event_free_depth"
-      ) {
+      } else if (sourceType == "event_free_depth") {
         const nameIdx = document.getElementById("depth_chooser0").value;
         const efdIdx = document.getElementById("depth_chooser1").value;
+        depthMaxIdx = Math.max(...[nameIdx, efdIdx]);
         for (let i = 0; i < source_data.length; i++) {
-          indata.push([source_data[i][nameIdx], source_data[i][efdIdx]]);
+          indata.push([
+            source_data[i][nameIdx], 
+            source_data[i][efdIdx],
+            [null,null,null,null],
+          ]);
         }
-      } else if (
-        document.getElementById("cvt_source_type").value == "drilling_depth"
-      ) {
+      } else if (sourceType == "drilling_depth") {
         const nameIdx = document.getElementById("depth_chooser0").value;
         const ddIdx = document.getElementById("depth_chooser1").value;
+        depthMaxIdx = Math.max(...[nameIdx, ddIdx]);
         for (let i = 0; i < source_data.length; i++) {
-          indata.push([source_data[i][nameIdx], source_data[i][ddIdx]]);
+          indata.push([
+            source_data[i][nameIdx], 
+            source_data[i][ddIdx],
+            [null,null,null,null],
+          ]);
         }
-      } else if (document.getElementById("cvt_source_type").value == "age") {
+      } else if (sourceType == "age") {
         const nameIdx = document.getElementById("depth_chooser0").value;
         const ageIdx = document.getElementById("depth_chooser1").value;
+        depthMaxIdx = Math.max(...[nameIdx, ageIdx]);
         for (let i = 0; i < source_data.length; i++) {
-          indata.push([source_data[i][nameIdx], source_data[i][ageIdx]]);
+          indata.push([
+            source_data[i][nameIdx], 
+            source_data[i][ageIdx],
+            [null,null,null,null],
+          ]);
         }
       }
 
-      document.getElementById("cvt_age_model").value.split(",")[0];
+      //output
+      if(output_type == "export"){
+        //calc
+        let convertedData = [];
+        let header = [
+            "Name",
+            "Project",
+            "Hole",
+            "Section",
+            "Distance (cm)",
+            "Composite depth (cm)",
+            "Eventfree depth (cm)",
+            "Drilling depth (cm)",
+            "Age mid (calBP)",
+            "Age upper (calBP)",
+            "Age lower (calBP)",
+            "Connection Rank",
+            "Source Type",
+            "Correlation Model Version",
+            "Event Model Version",
+            "Age Model Version",
+            "",
+        ];
+        if(n_c>depthMaxIdx+1){
+          for(let d=depthMaxIdx+1; d<n_c; d++){
+            header.push(source_data[0][d]);
+          }
+        }
+        convertedData.push(header);
 
-      //calc
-      let convertedData = [];
-      if (source_data !== null) {
-        convertedData = await window.ConverterApi.cvtConvert(modelIds, indata, sourceType,"linear");
+        if (source_data !== null) {
+          for(let i=0;i<indataList.length;i++){
+            const calcedData = await window.ConverterApi.depthConverter(indataList[i], sourceType, "linear");
+            //make output array
+            let rowData = [
+              calcedData.name, 
+              calcedData.project,
+              calcedData.hole,
+              calcedData.section,
+              parseFloat(calcedData.distance).toFixed(1),
+              parseFloat(calcedData.cd).toFixed(1),
+              parseFloat(calcedData.efd).toFixed(1),
+              parseFloat(calcedData.dd).toFixed(1),
+              parseFloat(calcedData.age_mid).toFixed(1),
+              parseFloat(calcedData.age_upper).toFixed(1),
+              parseFloat(calcedData.age_lower).toFixed(1),
+              calcedData.correlation_rank,
+              calcedData.source_type,
+              calcedData.correlation_model_version,
+              calcedData.event_model_version,
+              calcedData.age_model_version,
+              NaN,
+            ];
+            
+            for(let d=depthMaxIdx; d<n_c; d++){
+              rowData.push(source_data[i+1][d]); //remove header
+            }
+            convertedData.push(rowData);
+          }
+        }
+
+        //export
+        await window.ConverterApi.cvtExport(convertedData);
+        console.log("[Converter]: Converted data is exported.");
+      } else if (output_type == "import"){
+
+        if (source_data !== null) {
+          let output = [];
+          for(let i=0;i<indataList.length;i++){
+            let calcedData = await window.ConverterApi.depthConverter(indataList[i], sourceType, "linear");
+
+            let header = [];
+            for(let d=depthMaxIdx+1; d<n_c; d++){
+              header.push(source_data[0][d]); //remove header
+            }
+            let values = [];
+            for(let d=depthMaxIdx+1; d<n_c; d++){
+              values.push(source_data[i+1][d]); //remove header
+            }
+            
+            calcedData.data_header = header;
+            calcedData.data_values = values;
+
+            output.push(calcedData);
+          }
+
+          await window.ConverterApi.sendImportedData(output);
+          console.log("[Converter]: Converted data is imported.");
+        }
+
+      } else {
+        console.log("Unkown conert type.")
+        return
       }
 
-      //export
-      await window.ConverterApi.cvtExport(convertedData);
-      console.log("done");
+      
       //console.log(convertedData);
     });
 

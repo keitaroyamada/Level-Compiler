@@ -301,6 +301,19 @@ html {
   width: 100%;
   z-index: 10;
 }
+#bt_chart {
+  box-sizing: border-box;
+  width: 40px;
+  height: 40px;
+  border: 1px solid gray;
+  z-index: 10;
+}
+
+#bt_chart img {
+  height: 75%;
+  width: 100%;
+  z-index: 10;
+}
 
 footer {
   display: flex;

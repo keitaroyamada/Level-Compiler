@@ -57,6 +57,7 @@ document.addEventListener("DOMContentLoaded", () => {
     age: [],
     pen: [],
     edit:[],
+    plot:[],
   };
   objOpts.canvas.depth_scale = "composite_depth";
   objOpts.canvas.zoom_level = [4, 3]; //[x, y](1pix/2cm)
@@ -134,6 +135,13 @@ document.addEventListener("DOMContentLoaded", () => {
   objOpts.connection.show_remote_connections = true;
   objOpts.connection.emphasize_remote_connections = false;
 
+  objOpts.plot.dot_colour = "Black";
+  objOpts.plot.line_colour = "Red";
+  objOpts.plot.show_dot = false;
+  objOpts.plot.show_line = false;
+  objOpts.plot.collecion_idx = 0;
+  objOpts.plot.series_idx = 0;
+
   objOpts.pen.colour = "Red";
 
   objOpts.age.incon_size = 20;
@@ -202,8 +210,7 @@ document.addEventListener("DOMContentLoaded", () => {
   //============================================================================================
   //============================================================================================
   //hide test event
-  const testButton = document.getElementById("footerLeftText");
-  testButton.addEventListener("click", async () => {
+  document.getElementById("footerLeftText").addEventListener("click", async () => {
     if(developerMode){
       //initiarise
       await initiariseCorrelationModel();
@@ -271,6 +278,114 @@ document.addEventListener("DOMContentLoaded", () => {
       //console.log(LCCore);
       //console.log(LCplot);
   }
+  });
+  //============================================================================================
+  document.getElementById("scroller").addEventListener("dragover", (e) => {
+    e.preventDefault(e);
+  });
+  
+  document.getElementById("scroller").addEventListener("drop", async (e) => {
+    e.preventDefault(e);
+    //get list
+    let dataList = [];
+    for(const file of e.dataTransfer.files){
+      const fileParseData = await window.LCapi.getFilePath(file);
+      dataList.push(fileParseData);
+    }
+
+    //check
+    let order = [];
+    //check correlatiob model
+    dataList.forEach((data,i)=>{
+      if(data.base.includes("[correlation]")){
+        order.push(i);
+      }
+    })
+    if(order.length>1){
+      alert("Multiple [correlation] model detected. Please load base [correlation] model first.");
+      return;
+    }
+
+    dataList.forEach((data,i)=>{
+      if(data.base.includes("[duo]")){
+        order.push(i);
+      }
+    })
+    
+    if(!LCCore && order.length == 0){
+      alert("There is no correlation/duo model. Please load correlation model first.");
+      return;
+    }
+
+    //check age model
+    dataList.forEach((data,i)=>{
+      if(data.base.includes("[age]")){
+        order.push(i);
+      }
+    })
+
+    //check corephoto
+    dataList.forEach((data,i)=>{
+      if(data.ext == ""){
+        order.push(i);
+      }
+    })
+
+
+    //get
+    for(let i=0;i<order.length;i++){
+      const fileParseData = dataList[order[i]];
+      if(fileParseData.ext == ""){
+        //case photo
+        const response = await window.LCapi.askdialog(
+          "Load core images",
+          "Do you want to load the core images?"
+        );
+  
+        if (response.response) {
+          console.log("[Renderer]: Directory load from drop..");
+          modelImages.image_dir = fileParseData.fullpath;
+          modelImages.load_target_ids = []; //= [];//load all
+  
+          //load images
+          let originalImages = await loadCoreImages(modelImages, LCCore, "drilling_depth");
+          modelImages["drilling_depth"] = originalImages;
+          let compositeImages = await loadCoreImages(modelImages, LCCore, "composite_depth");
+          modelImages["composite_depth"] = compositeImages;
+          let eventFreeImages = await loadCoreImages(modelImages, LCCore, "event_free_depth");
+          modelImages["event_free_depth"] = eventFreeImages;
+        }
+      } else if(fileParseData.ext == ".csv"){
+        if(fileParseData.base.includes("[correlation]") || fileParseData.base.includes("[duo]")){
+          //case model file
+          console.log("[Renderer]: Correlation model file load from drop.");
+          //register correlation model
+          await registerModel(fileParseData.fullpath);
+  
+          //load model into renderer
+          await loadModel();
+      
+        } else if (fileParseData.base.includes("[age]")){
+          //case age file
+          console.log("[Renderer]: Age model file load from drop.");
+          //register age model
+          await registerAge(fileParseData.fullpath);
+  
+          //load age model into LCCore
+          await loadAge(age_model_list[0].id);
+  
+          //register age into LCplot
+          await registerAgePlotFromLCAge();
+  
+          //load LCplot
+          await loadPlotData();
+        }
+      }
+    }
+
+    //update
+    updateView();
+
   });
   //============================================================================================
   //open divider
@@ -539,28 +654,23 @@ document.addEventListener("DOMContentLoaded", () => {
     //update plot
     updateView();
   });
-  //============================================================================================
-  //load age model
-  window.LCapi.receive("LoadPlotDataMenuClicked", async () => {
-    if (correlation_model_list.length == 0) {
-      return;
-    }
+   //============================================================================================
+   //import plot data
+  window.LCapi.receive("importedData", async (data) => {
+    console.log("[Renderer]: Imported data recieved.");
+    
+    //register into LCPlot
+    window.LCapi.RegisterDataPlot(data);
 
-    //call from main process
-    let path = "";
-    try {
-      path = await window.LCapi.FileChoseDialog("Chose Plot Data csv file");
-      if (path == null) {
-        return;
-      }
-    } catch (error) {
-      console.error("ERROR: File load error", error);
-      return;
-    }
+    //load renderer
+    await loadPlotData()
+    console.log("[Renderer]: Load plot data.");
+    console.log(LCplot);
 
-    //load plot data
+    objOpts.plot.show_dot = true;
+    objOpts.plot.show_line = true;
+    document.getElementById("bt_chart").style.backgroundColor = "#ccc";
 
-    //update plot
     updateView();
   });
   //============================================================================================
@@ -615,7 +725,22 @@ document.addEventListener("DOMContentLoaded", () => {
     //update plot
     updateView();
   });
-
+  //============================================================================================
+  document.getElementById("bt_chart").addEventListener("click", async () => {
+    if (LCCore) {
+      if (!objOpts.plot.show_dot || !objOpts.plot.show_line) {
+        objOpts.plot.show_dot = true;
+        objOpts.plot.show_line = true;
+        document.getElementById("bt_chart").style.backgroundColor = "#ccc";
+        updateView();
+      } else {
+        objOpts.plot.show_dot = false;
+        objOpts.plot.show_line = false;
+        document.getElementById("bt_chart").style.backgroundColor = "#f0f0f0";
+        updateView();
+      }
+    }
+  });
   //============================================================================================
   //check hole list
   document.querySelector("#hole_list").addEventListener("change", function (event) {
@@ -654,6 +779,7 @@ document.addEventListener("DOMContentLoaded", () => {
         updateView();
       }
     });
+    
   //============================================================================================
   //reload
   document.getElementById("bt_reload").addEventListener("click", async (event) => {
@@ -1121,7 +1247,6 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
   //============================================================================================
-
 
   //============================================================================================
   //============================================================================================
@@ -1829,69 +1954,17 @@ document.addEventListener("DOMContentLoaded", () => {
       });
 
       //get age data(because age data, age series is single)
-      const ageSeries = LCplot.age_collections[age_plot_idx].datasets[0].data_series;
+      const ageSet = LCplot.age_collections[age_plot_idx].datasets[0];
 
       //get position & plot
+      const posList = getPlotPosiotion(ageSet, [shift_x, pad_x, xMag], [shift_y, pad_y, yMag], LCCore, objOpts, "age")
 
-      for (let a = 0; a < ageSeries.length; a++) {
-        num_disable = {hole: 0};
-        let posX;
-        let posY;
-        if (ageSeries[a].original_depth_type == "trinity") {
-          //plot next to core
-          //get hole
-          let hole = null;
-          let isSkip = false;
-          let num_hole = {enable:0,disable:0};
-          outerloop:
-          for (let po = 0; po < LCCore.projects.length; po++) {
-            for (let ho = 0; ho < LCCore.projects[po].holes.length; ho++) {
-              const hole_temp = LCCore.projects[po].holes[ho];
-              if (hole_temp.name == ageSeries[a].trinity.hole_name){
-                if(LCCore.projects[po].holes[ho].enable == true){
-                  num_hole.enable += 1;
-                  hole = hole_temp;
-                }else{
-                  num_hole.disable += 1;
-                  isSkip = true;                  
-                }
-                break outerloop;
-              } else {
-                if(LCCore.projects[po].holes[ho].enable == true){
-                  num_hole.enable += 1;
-                }else{
-                  num_hole.disable += 1;
-                }
-              }
-            }
-          }
-
-          if (isSkip || hole == null) {
-            //if disabel hole
-            continue;
-          }
-         
-          //calc position
-          posX = ((objOpts.hole.distance + objOpts.hole.width) * (num_hole.enable -1 ) + shift_x) * xMag +  
-              pad_x + objOpts.hole.width * xMag - objOpts.age.incon_size * 1.2;
-
-          posY = (ageSeries[a][objOpts.canvas.depth_scale] + shift_y) * yMag + pad_y - objOpts.age.incon_size / 2;
-
-          //console.log(posX + "/" + posY);
-          //------------------------------------------------
-        } else {
-          //plot 0
-          const age_shift_x = -50;
-          posX = age_shift_x + shift_x * xMag + pad_x - objOpts.age.incon_size * 1.2;
-          posY = (ageSeries[a][objOpts.canvas.depth_scale] + shift_y) * yMag + pad_y - objOpts.age.incon_size / 2;
-
-          //console.log(ageSeries[a]);
-          //console.log(ageSeries[a].name + ":" + posX + "/" + posY);
-        }
-
-        //---------------------------------------------------------------------------------------
+      for (let a = 0; a < ageSet.data_series.length; a++) {
+        const posXY = posList[a];
+        const posX = posXY.x0;
+        const posY = posXY.y0;
         //plot main
-        if (ageSeries[a].source_type == "") {
+        if (ageSet.data_series[a].source_type == "") {
           sketch.image(
             ageVectorPlotIcons["none"],
             posX,
@@ -1901,17 +1974,52 @@ document.addEventListener("DOMContentLoaded", () => {
           );
         } else {
           sketch.image(
-            ageVectorPlotIcons[ageSeries[a].source_type],
+            ageVectorPlotIcons[ageSet.data_series[a].source_type],
             posX,
             posY,
             objOpts.age.incon_size,
             objOpts.age.incon_size
           );
         }
-
-        //---------------------------------------------------------------------------------------
       }
+      //==========================================================================================
+      //==========================================================================================
+      //draw data points
+      //get age data(because age data, age series is single)
+      if(LCplot.data_collections.length == 0){
+        return;
+      }
+      const dataSet = LCplot.data_collections[objOpts.plot.collecion_idx].datasets[objOpts.plot.series_idx];
 
+      //get position & plot
+      const dataList = getPlotPosiotion(dataSet, [shift_x, pad_x, xMag], [shift_y, pad_y, yMag], LCCore, objOpts, "data")
+
+      for (let a = 0; a < dataSet.data_series.length; a++) {
+        const posXY = dataList[a];
+        const posX1 = posXY.x0;
+        const posY1 = posXY.y0;
+
+        //plot main
+        if(objOpts.plot.show_dot == true){
+          sketch.fill(objOpts.plot.dot_colour);
+          sketch.noStroke();
+          sketch.ellipse(
+            posXY.x0,
+            posXY.y0,
+            2
+          );
+        }
+        if(objOpts.plot.show_line == true){
+          sketch.strokeWeight(2);
+          sketch.stroke(objOpts.plot.line_colour); 
+          sketch.line(
+            posXY.x0,
+            posXY.y0,
+            posXY.x1,
+            posXY.y1
+          );
+        }
+      }
       //==========================================================================================
 
       sketch.pop(); //restore
@@ -3078,15 +3186,6 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  function loadImage(path) {
-    return new Promise((resolve, reject) => {
-      const img = new Image();
-      img.onload = () => resolve(img);
-      img.onerror = () => reject(console.log("Load image rejected."));
-      img.src = path;
-    });
-  }
-
   async function registerAge(in_path) {
     if (in_path == null) {
       return;
@@ -3151,7 +3250,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const results = await window.LCapi.LoadPlotFromLCPlot();
     if (results) {
       LCplot = results;
-      console.log("[Renderer]: Loaded Plot Age Data");
+      console.log("[Renderer]: Loaded Plot Data");
       console.log(results);
     }
   }
@@ -4068,5 +4167,108 @@ function getClickedItemIdx(mouseX, mouseY, LCCore, objOpts){
   }
   
   return results;
+}
+function getPlotPosiotion(dataSet, xMod, yMod, LCCore, objOpts, type){
+  const dataSeries = dataSet.data_series;
+  const shift_x = xMod[0];
+  const pad_x   = xMod[1]
+  const xMag    = xMod[2];
+  const shift_y = yMod[0];
+  const pad_y   = yMod[1];
+  const yMag    = yMod[2];
+  const dataRange = dataSet.data_max - dataSet.data_min;
+  const dataAmpRate = objOpts.hole.width / dataRange;
+
+  let output = [];
+  for (let a = 0; a < dataSeries.length; a++) {
+    let posX0 = NaN;
+    let posY0 = NaN;
+    let posX1 = NaN;
+    let posY1 = NaN;
+
+    //get hole
+    let hole = null;
+    let isSkip = false;
+    let num_hole = {enable:0, disable:0};
+    if (dataSeries[a].original_depth_type == "trinity") {
+      //plot next to core
+      
+      outerloop:
+      for (let po = 0; po < LCCore.projects.length; po++) {
+        for (let ho = 0; ho < LCCore.projects[po].holes.length; ho++) {
+          const hole_temp = LCCore.projects[po].holes[ho];
+          if (hole_temp.name == dataSeries[a].trinity.hole_name){
+            if(LCCore.projects[po].holes[ho].enable == true){
+              num_hole.enable += 1;
+              hole = hole_temp;
+            }else{
+              num_hole.disable += 1;
+              isSkip = true;                  
+            }
+            break outerloop;
+          } else {
+            if(LCCore.projects[po].holes[ho].enable == true){
+              num_hole.enable += 1;
+            }else{
+              num_hole.disable += 1;
+            }
+          }
+        }
+      }
+
+      if (isSkip || hole == null) {
+        //if disabel hole
+        output.push({x0:posX0, x1:posX1, y0:posY0, y1:posY1});
+        continue;
+      }
+     
+      //calc position
+
+      if(type == "age"){
+        posX0 = ((objOpts.hole.distance + objOpts.hole.width) * (num_hole.enable -1 ) + shift_x) * xMag + pad_x + objOpts.hole.width * xMag - objOpts.age.incon_size * 1.2;
+        if(dataSeries[a][objOpts.canvas.depth_scale] !== null){
+          posY0 = (dataSeries[a][objOpts.canvas.depth_scale] + shift_y) * yMag + pad_y - objOpts.age.incon_size / 2;
+        }
+      } else{
+        if(dataSeries[a].data !== null){
+          posX0 = ((objOpts.hole.distance + objOpts.hole.width) * (num_hole.enable -1 ) + dataSeries[a].data * dataAmpRate + shift_x) * xMag + pad_x;
+        }
+        if(dataSeries[a][objOpts.canvas.depth_scale] !== null){
+          posY0 = (dataSeries[a][objOpts.canvas.depth_scale] + shift_y) * yMag + pad_y;
+        }
+      }
+      
+
+      if(type !== "age" && a !== dataSeries.length -1 && dataSeries[a].data !== NaN){
+        if(dataSeries[a+1].data !== null){
+          posX1 = ((objOpts.hole.distance + objOpts.hole.width) * (num_hole.enable -1 ) + dataSeries[a+1].data * dataAmpRate + shift_x) * xMag + pad_x;
+        }
+        if(dataSeries[a+1][objOpts.canvas.depth_scale] !== null){
+          posY1 = (dataSeries[a+1][objOpts.canvas.depth_scale] + shift_y) * yMag + pad_y;
+        }
+      }
+      
+      output.push({x0:posX0, x1:posX1, y0:posY0, y1:posY1});
+      //------------------------------------------------
+    } else {
+      //plot 0
+      if(type == "age"){
+        const age_shift_x = -50;
+        posX0 = age_shift_x + shift_x * xMag + pad_x - objOpts.age.incon_size * 1.2;
+        posY0 = (dataSeries[a][objOpts.canvas.depth_scale] + shift_y) * yMag + pad_y - objOpts.age.incon_size / 2;
+      }else{
+        posX0 = shift_x * xMag + pad_x;
+        posY0 = (dataSeries[a][objOpts.canvas.depth_scale] + shift_y) * yMag + pad_y;
+      }
+
+      if(type !== "age" && a !== dataSeries.length -1 && dataSeries[a].data !== NaN){
+        posX1 = ((objOpts.hole.distance + objOpts.hole.width) * (num_hole.enable -1 ) + dataSeries[a+1].data * dataAmpRate + shift_x) * xMag + pad_x + objOpts.hole.width * xMag;
+        posY1 = (dataSeries[a+1][objOpts.canvas.depth_scale] + shift_y) * yMag + pad_y;
+      }
+      
+      output.push({x0:posX0, x1:posX1, y0:posY0, y1:posY1});
+    }
+  }
+  return output;
 }
 //============================================================================================

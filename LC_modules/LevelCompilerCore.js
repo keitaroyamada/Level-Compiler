@@ -994,7 +994,7 @@ class LevelCompilerCore {
       //check num of detection
       if (upperIdxs.length == 0 || lowerIdxs.length == 0) {
         console.log(
-          "ERROR: Nearest unique marker set does not exist. [" +
+          "LCCore: Nearest unique marker set does not exist. [" +
             trinityList[t].name +
             " : " +
             trinityList[t].hole_name +
@@ -1002,7 +1002,7 @@ class LevelCompilerCore {
             trinityList[t].section_name +
             "-" +
             trinityList[t].distance +
-            " cm]"
+            " cm]. Point is probably out of section."
         );
         output.push([null, null, null]);
         continue;

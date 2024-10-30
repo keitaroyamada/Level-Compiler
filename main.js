@@ -24,10 +24,11 @@ const { lcfnc } = require("./LC_modules/lcfnc.js");
 const { LevelCompilerAge } = require("./LC_modules/LevelCompilerAge.js");
 const { LevelCompilerPlot } = require("./LC_modules/LevelCompilerPlot.js");
 const { Trinity } = require("./LC_modules/Trinity.js");
+const { send } = require("process");
 
 //properties
 const isMac = process.platform === "darwin";
-const isDev = process.env.NODE_ENV !== "development"; //const isDev = false;
+const isDev = false;//process.env.NODE_ENV !== "development"; //const isDev = false;
 const LCCore = new LevelCompilerCore();
 const LCAge = new LevelCompilerAge();
 const LCPlot = new LevelCompilerPlot();
@@ -36,6 +37,7 @@ const LCPlot = new LevelCompilerPlot();
 let finderWindow = null;
 let dividerWindow = null;
 let converterWindow = null;
+let importerWindow = null;
 let progressBar = null;
 
 function createMainWIndow() {
@@ -129,7 +131,47 @@ function createMainWIndow() {
           label: "Load Plot Data",
           accelerator: "CmdOrCtrl+P",
           click: () => {
-            mainWindow.webContents.send("LoadPlotDataMenuClicked");
+            if (converterWindow) {
+              converterWindow.focus();
+              return;
+            }
+        
+            //create finder window
+            converterWindow = new BrowserWindow({
+              title: "Converter",
+              width: 700,
+              height: 800,
+              webPreferences: {preload: path.join(__dirname, "preload_converter.js"),},
+            });
+            
+            //converterWindow.setAlwaysOnTop(true, "normal");
+            converterWindow.on("closed", () => {
+              converterWindow = null;
+              mainWindow.webContents.send("ConverterClosed", "");
+            });
+            converterWindow.setMenu(null);
+        
+            converterWindow.loadFile(path.join(__dirname, "./renderer/converter.html"));
+        
+            converterWindow.once("ready-to-show", () => {
+              converterWindow.show();
+              converterWindow.setAlwaysOnTop(true, "normal");
+              //converterWindow.webContents.openDevTools();
+              //converterWindow.setAlwaysOnTop(true, "normal");
+              converterWindow.webContents.send("ConverterMenuClicked", "import");
+            });
+
+            /*
+            const win = createNewWindow("Converter", "./renderer/converter.html", "preload_converter.js");
+
+            win.once("ready-to-show", () => {
+              win.show();
+              //win.webContents.openDevTools();
+              win.setMenu(null);
+              win.setAlwaysOnTop(true, "normal");
+              win.webContents.send("ConverterMenuClicked", "");
+            });
+            */
           },
         },
         { type: "separator" },
@@ -154,10 +196,10 @@ function createMainWIndow() {
     },
 
     {
-      label: "Converter",
+      label: "Tools",
       submenu: [
         {
-          label: "converter",
+          label: "Converter",
           click: () => {
             if (converterWindow) {
               converterWindow.focus();
@@ -168,10 +210,11 @@ function createMainWIndow() {
             converterWindow = new BrowserWindow({
               title: "Converter",
               width: 700,
-              height: 790,
+              height: 800,
               webPreferences: {preload: path.join(__dirname, "preload_converter.js"),},
             });
-            converterWindow.setAlwaysOnTop(true, "normal");
+            
+            //converterWindow.setAlwaysOnTop(true, "normal");
             converterWindow.on("closed", () => {
               converterWindow = null;
               mainWindow.webContents.send("ConverterClosed", "");
@@ -182,9 +225,10 @@ function createMainWIndow() {
         
             converterWindow.once("ready-to-show", () => {
               converterWindow.show();
-              //dividerWindow.webContents.openDevTools();
-              // /dividerWindow.setAlwaysOnTop(true, "normal");
-              converterWindow.webContents.send("ConverterToolClicked", "");
+              converterWindow.setAlwaysOnTop(true, "normal");
+              //converterWindow.webContents.openDevTools();
+              //converterWindow.setAlwaysOnTop(true, "normal");
+              converterWindow.webContents.send("ConverterMenuClicked", "export");
             });
 
             /*
@@ -198,6 +242,18 @@ function createMainWIndow() {
               win.webContents.send("ConverterMenuClicked", "");
             });
             */
+          },
+        },
+        { type: "separator" },
+        {
+          label: "Developer tool",
+          click: () => {
+            if (mainWindow.webContents.isDevToolsOpened()) {
+              mainWindow.webContents.closeDevTools();
+            } else {
+              mainWindow.webContents.openDevTools();
+            }
+            //mainWindow.webContents.openDevTools();
           },
         },
       ],
@@ -246,17 +302,6 @@ function createMainWIndow() {
             label: "Help",
             submenu: [
               { label: "About", click: createAboutWindow },
-              {
-                label: "Developer tool",
-                click: () => {
-                  if (mainWindow.webContents.isDevToolsOpened()) {
-                    mainWindow.webContents.closeDevTools();
-                  } else {
-                    mainWindow.webContents.openDevTools();
-                  }
-                  //mainWindow.webContents.openDevTools();
-                },
-              },
             ],
           },
         ]
@@ -339,6 +384,7 @@ function createMainWIndow() {
       bt_event_layer:path.join(resourcePath, "resources","tool","event.png"),
       bt_core_photo:path.join(resourcePath, "resources","tool","core_photo.png"),
       bt_connection:path.join(resourcePath, "resources","tool","connection.png"),
+      bt_chart:path.join(resourcePath, "resources","tool","chart.png"),
     };
     
     let finder_icons ={
@@ -350,6 +396,7 @@ function createMainWIndow() {
   
     _e.returnValue = {plot:plot_icons, tool:tool_icons, finder:finder_icons};
   });
+  //============================================================================================
   ipcMain.handle("InitiariseCorrelationModel", async (_e) => {
     //import modeln
     console.log("MAIN: Initiarise correlation model");
@@ -380,7 +427,12 @@ function createMainWIndow() {
     console.log("MAIN: Project plot data is initiarised.");
     return;
   });
-
+  ipcMain.handle("getFilePath", async (_e, pathData) => {
+    //import modeln
+    let results = path.parse(pathData);
+    results.fullpath = path.join(results.dir, results.base);
+    return results;
+  });
   ipcMain.handle("RegisterModelFromCsv", async (_e, model_path) => {
     try {
       //register model
@@ -687,16 +739,60 @@ function createMainWIndow() {
       console.log(error);
     }
   });
+  ipcMain.handle("RegisterDataPlot", async (_e, data) => {
+    LCPlot.addDataset(data);
+    console.log("MAIN: Registered plot data.");
+  });
+  ipcMain.handle("OpenImporter", async (_e) => {
+    if (importerWindow) {
+      importerWindow.focus();
+      importerWindow.webContents.send("ImporterToolClicked", "");
+      return;
+    }
+
+    //create finder window
+    importerWindow = new BrowserWindow({
+      title: "Finder",
+      width: 700,
+      height: 700,
+      webPreferences: {
+        preload: path.join(__dirname, "preload_converter.js"),
+      },
+    });
+
+    importerWindow.on("closed", () => {
+      importerWindow = null;
+      mainWindow.webContents.send("ImporterClosed", "");
+    });
+
+    importerWindow.setMenu(null);
+    importerWindow.loadFile(path.join(__dirname, "./renderer/importer.html"));
+
+    importerWindow.once("ready-to-show", () => {
+      importerWindow.show();
+      //importerWindow.webContents.openDevTools();
+      //importerWindow.setAlwaysOnTop(true, "normal");
+      importerWindow.webContents.send("ImporterToolClicked", "");
+    });
+  });
+  ipcMain.handle("CloseImporter", async (_e) => {
+    if (importerWindow) {
+      importerWindow.close();
+      importerWindow = null;
+      return;
+    }
+  });
 
   ipcMain.handle("LoadPlotFromLCPlot", async (_e) => {
     //calc latest age and depth
     LCPlot.calcAgeCollectionPosition(LCCore, LCAge);
+    LCPlot.calcDataCollectionPosition(LCCore, LCAge);
 
     //LC plot age_collection id is as same as LCAge id
     LCPlot.age_selected_id = LCAge.selected_id;
 
     if (LCPlot) {
-      console.log("Main: Load plot data from LCPlot");
+      console.log("MAIN: Load plot data from LCPlot");
       return LCPlot;
     }
   });
@@ -1086,6 +1182,12 @@ function createMainWIndow() {
       } else {
         converterWindow.webContents.openDevTools();
       }
+    } else if(data == "importer"){
+      if (importerWindow.webContents.isDevToolsOpened()) {
+        importerWindow.webContents.closeDevTools();
+      } else {
+        importerWindow.webContents.openDevTools();
+      }
     }
     
 });
@@ -1143,238 +1245,6 @@ function createMainWIndow() {
     putcsvfile(mainWindow, data);
   });
 
-  ipcMain.handle("cvtConvert", async (_e, modelIds, data, type, method) => {
-    //[name hole section distance cd efd age age_errorU age_errorL correlation_version event_version age_version connection_rank]
-    let results = [
-      [
-        "Name",
-        "Hole",
-        "Section",
-        "Distance (cm)",
-        "Composite depth (cm)",
-        "Eventfree depth (cm)",
-        "Age mid (calBP)",
-        "Age upper (calBP)",
-        "Age lower (calBP)",
-        "Correlation Rank",
-        "Correlation Model Version",
-        "Event Model Version",
-        "Age Model Version",
-      ],
-    ];
-
-    if (type == "trinity") {
-      for (let i = 1; i < data.length; i++) {
-        //calc each depth
-        let send_data = [];
-        let td = new Trinity();
-        td.name = data[i][0];
-        td.hole_name = data[i][1];
-        td.section_name = data[i][2];
-        td.distance = parseFloat(data[i][3]);
-        send_data.push(td);
-
-        //convert depth (listed for function)
-        const cd_list = LCCore.getDepthFromTrinity(
-          LCCore.base_project_id,
-          send_data,
-          "composite_depth"
-        ); //output:[sec id, cd]
-        const cd = [];
-        cd.push(cd_list[0][1]);
-
-        //
-        const efd_list = LCCore.getDepthFromTrinity(
-          LCCore.base_project_id,
-          send_data,
-          "event_free_depth"
-        ); //output:[sec id, efd]
-        const efd = efd_list[0][1];
-        const new_rank = efd_list[0][2];
-
-        let model_idx = null;
-        LCCore.projects.forEach((project, p) => {
-          if (project.id[0] == LCCore.base_project_id[0]) {
-            model_idx = p;
-          }
-        });
-
-        //calc age
-        LCAge.selected_id = modelIds.age;
-        const age = LCAge.getAgeFromEFD(efd, method);
-        let age_mid;
-        let age_upper;
-        let age_lower;
-        if (age) {
-          age_mid = age.age.mid;
-          age_upper = age.age.upper;
-          age_lower = age.age.lower;
-        }
-
-        //get age model idx
-        let ageIdx = null;
-        LCAge.AgeModels.forEach((a, s) => {
-          if (a.id == modelIds.age) {
-            ageIdx = s;
-          }
-        });
-
-        //stack
-        results.push([
-          send_data[0] !== undefined ? send_data[0].name : NaN,
-          send_data[0] !== undefined ? send_data[0].hole_name : NaN,
-          send_data[0] !== undefined ? send_data[0].section_name : NaN,
-          send_data[0] !== undefined ? send_data[0].distance : NaN,
-          cd !== null ? cd[0] : NaN,
-          efd !== null ? efd : NaN,
-          age_mid !== null ? age_mid : NaN,
-          age_upper !== null ? age_upper : NaN,
-          age_lower !== null ? age_lower : NaN,
-          new_rank !== null ? new_rank : NaN,
-          LCCore.projects[model_idx].id !== null ? LCCore.projects[model_idx].correlation_version : NaN,
-          LCCore.projects[model_idx].id !== null ? LCCore.projects[model_idx].correlation_version : NaN,
-          LCAge.AgeModels[ageIdx] !== undefined ? LCAge.AgeModels[ageIdx].version : NaN,
-        ]);
-      }
-    } else if (type == "composite_depth") {
-      for (let i = 1; i < data.length; i++) {
-        //get cd
-        const name = data[i][0];
-        const cd = data[i][1];
-
-        //calc efd
-        const efd = LCCore.getEFDfromCD(cd);
-
-        let model_idx = null;
-        LCCore.projects.forEach((project, p) => {
-          if (project.id[0] == LCCore.base_project_id[0]) {
-            model_idx = p;
-          }
-        });
-
-        //calc age
-        LCAge.selected_id = modelIds.age;
-        const age = LCAge.getAgeFromEFD(efd, method);
-        let age_mid;
-        let age_upper;
-        let age_lower;
-        if (age) {
-          age_mid = age.age.mid;
-          age_upper = age.age.upper;
-          age_lower = age.age.lower;
-        }
-
-        //get age model idx
-        let ageIdx = null;
-        LCAge.AgeModels.forEach((a, s) => {
-          if (a.id == modelIds.age) {
-            ageIdx = s;
-          }
-        });
-
-        //stack
-        results.push([
-          name,
-          NaN,
-          NaN,
-          NaN,
-          cd !== null ? cd[0] : NaN,
-          efd !== null ? efd : NaN,
-          age_mid !== null ? age_mid : NaN,
-          age_upper !== null ? age_upper : NaN,
-          age_lower !== null ? age_lower : NaN,
-          3,
-          "Converted from composite depth",
-          LCCore.projects[model_idx].id !== null ? LCCore.projects[model_idx].correlation_version : NaN,
-          LCAge.AgeModels[ageIdx] !== undefined ? LCAge.AgeModels[ageIdx].version : NaN,
-        ]);
-      }
-    } else if (type == "event_free_depth") {
-      for (let i = 1; i < data.length; i++) {
-        //get efd
-        const name = data[i][0];
-        const efd = data[i][1];
-
-        //calc age
-        LCAge.selected_id = modelIds.age;
-        const age = LCAge.getAgeFromEFD(efd, method);
-        let age_mid;
-        let age_upper;
-        let age_lower;
-        if (age) {
-          age_mid = age.age.mid;
-          age_upper = age.age.upper;
-          age_lower = age.age.lower;
-        }
-
-        //get age model idx
-        let ageIdx = null;
-        LCAge.AgeModels.forEach((a, s) => {
-          if (a.id == modelIds.age) {
-            ageIdx = s;
-          }
-        });
-
-        //stack
-        results.push([
-          name,
-          NaN,
-          NaN,
-          NaN,
-          NaN,
-          efd !== null ? efd : NaN,
-          age_mid !== null ? age_mid : NaN,
-          age_upper !== null ? age_upper : NaN,
-          age_lower !== null ? age_lower : NaN,
-          3,
-          "Converted from event free depth",
-          "Converted from event free depth",
-          LCAge.AgeModels[ageIdx] !== undefined ? LCAge.AgeModels[ageIdx].version  : NaN,
-        ]);
-      }
-    } else if (type == "drilling_depth") {
-    } else if (type == "age") {
-      for (let i = 1; i < data.length; i++) {
-        //get efd
-        const name = data[i][0];
-        const age = data[i][1];
-
-        //calc efd
-        LCAge.selected_id = modelIds.age;
-        const efds = LCAge.getEFDFromAge(age, method);
-        const efd = efds.mid;
-
-        //get age model idx
-        let ageIdx = null;
-        LCAge.AgeModels.forEach((a, s) => {
-          if (a.id == modelIds.age) {
-            ageIdx = s;
-          }
-        });
-
-        //stack
-        results.push([
-          name,
-          NaN,
-          NaN,
-          NaN,
-          NaN,
-          efd !== null ? efd : NaN,
-          age !== null ? age : NaN,
-          NaN,
-          NaN,
-          3,
-          "Converted from age",
-          "Converted from age",
-          LCAge.AgeModels[ageIdx] !== undefined ? LCAge.AgeModels[ageIdx].version : NaN,
-        ]);
-      }
-    } else {
-      return null;
-    }
-
-    return results;
-  });
   //--------------------------------------------------------------------------------------------------
  
   //--------------------------------------------------------------------------------------------------
@@ -1436,11 +1306,13 @@ function createMainWIndow() {
   ipcMain.handle("rendererLog", async (_e, data) => {
     mainWindow.webContents.send("rendererLog", data);
   });
-
-  ipcMain.handle("finderConvert", async (_e, data, type, method) => {
-    //data["name","depth_data","target_id"]
-
-    //[name hole section distance cd efd age age_errorU age_errorL correlation_version event_version age_version connection_rank]
+  ipcMain.handle("sendImportedData", async (_e, data) => {
+    mainWindow.webContents.send("importedData", data);
+  });
+  ipcMain.handle("depthConverter", async (_e, data, type, method) => {
+    //data: ["name","depth_data","target_id"] e.g. ["name",[projectName(no use),holeName, sectionName, distance],[null, null, null, null]]
+    //type: "trinity", "composite_depth", "event_free_depth","age"
+    //method(age): "linear"
     let results = {
       name: null,
       project: null,
@@ -1449,6 +1321,7 @@ function createMainWIndow() {
       distance: null,
       cd: null,
       efd: null,
+      dd:null,
       age_mid: null,
       age_upper: null,
       age_lower: null,
@@ -1457,6 +1330,7 @@ function createMainWIndow() {
       event_model_version: null,
       age_model_version: null,
       description: null,
+      source_type:null
     };
 
     if (type == "trinity") {
@@ -1482,6 +1356,9 @@ function createMainWIndow() {
       const efd = efd_list[0][1];
       const new_rank = efd_list[0][2];
 
+      const dd_list = LCCore.getDepthFromTrinity(targetId, send_data, "drilling_depth"); //output:[sec id, efd, rank]
+      const dd = dd_list[0][1];
+
       //calc age
       const age = LCAge.getAgeFromEFD(efd, method);
 
@@ -1494,24 +1371,32 @@ function createMainWIndow() {
       });
 
       //get idex
-      const calcedIdx = LCCore.search_idx_list[calcedId.toString()];
+      let calcedIdx;
+      if(calcedId == null){
+        calcedIdx = null;
+        console.log("MAIN: "+ send_data[0].hole_name +"-"+send_data[0].section_name+"-"+send_data[0].distance+"cm is out of section.");
+      } else {
+        calcedIdx = LCCore.search_idx_list[calcedId.toString()];
+      }       
 
       //stack
       results.name     = send_data[0] !== undefined ? send_data[0].name : NaN;
-      results.project  = calcedIdx    !== undefined ? LCCore.projects[calcedIdx[0]].name : NaN;
+      results.project  = calcedIdx !== null && calcedIdx !== undefined ? LCCore.projects[calcedIdx[0]].name : NaN;
       results.hole     = send_data[0] !== undefined ? send_data[0].hole_name : NaN;
       results.section  = send_data[0] !== undefined ? send_data[0].section_name : NaN;
       results.distance = send_data[0] !== undefined ? send_data[0].distance : NaN;
       results.cd  = cd !== null ? cd[0] : NaN;
       results.efd = efd !== null ? efd : NaN;
+      results.dd  = dd !== null ? dd : NaN;
       results.age_mid   = age.age.mid   !== null ? age.age.mid   : NaN;
       results.age_upper = age.age.upper !== null ? age.age.upper : NaN;
       results.age_lower = age.age.lower !== null ? age.age.lower : NaN;
       results.correlation_rank = new_rank !== null ? new_rank : NaN;
-      results.correlation_model_version = calcedIdx[0] !== null ? LCCore.projects[calcedIdx[0]].correlation_version : NaN;
-      results.event_model_version       = calcedIdx[0] !== null ? LCCore.projects[calcedIdx[0]].correlation_version : NaN;
+      results.correlation_model_version = calcedIdx !== null ? LCCore.projects[calcedIdx[0]].correlation_version : NaN;
+      results.event_model_version       = calcedIdx !== null ? LCCore.projects[calcedIdx[0]].correlation_version : NaN;
       results.age_model_version         = LCAge.AgeModels[ageIdx] !== undefined ? LCAge.AgeModels[ageIdx].version : NaN;
       results.description               = "Converted from trinity.";
+      results.source_type = type;
     } else if (type == "composite_depth") {
       //get cd
       const name     = data[0];
@@ -1537,6 +1422,7 @@ function createMainWIndow() {
       results.distance = paseudoTrinity.distance !== null ? paseudoTrinity.distance : NaN;
       results.cd = cd !== null ? cd : NaN;
       results.efd = efd !== null ? efd : NaN;
+      results.dd  = NaN;
       results.age_mid = age.mid !== null ? age.mid : NaN;
       results.age_upper = age.upper !== null ? age.upper : NaN;
       results.age_lower = age.lower !== null ? age.lower : NaN;
@@ -1545,6 +1431,7 @@ function createMainWIndow() {
       results.event_model_version       = paseudoTrinity.index[0] !== null ? LCCore.projects[paseudoTrinity.index[0]].correlation_version : NaN;
       results.age_model_version         = LCAge.AgeModels[ageIdx] !== undefined ? LCAge.AgeModels[ageIdx].version : NaN;
       results.description               = "Converted from Composite depth. The trinity is paseudo data.";
+      results.source_type = type;
     } else if (type == "event_free_depth") {
       //get efd
       const name = data[0];
@@ -1570,6 +1457,7 @@ function createMainWIndow() {
       results.distance = paseudoTrinity.distance !== null ? paseudoTrinity.distance : NaN;
       results.cd = cd !== null ? cd : NaN;
       results.efd = efd !== null ? efd : NaN;
+      results.dd  = NaN;
       results.age_mid = age.mid !== null ? age.mid : NaN;
       results.age_upper = age.upper !== null ? age.upper : NaN;
       results.age_lower = age.lower !== null ? age.lower : NaN;
@@ -1578,6 +1466,7 @@ function createMainWIndow() {
       results.event_model_version       = paseudoTrinity.index[0] !== null ? LCCore.projects[paseudoTrinity.index[0]].correlation_version : NaN;
       results.age_model_version         = LCAge.AgeModels[ageIdx] !== undefined ? LCAge.AgeModels[ageIdx].version : NaN;
       results.description               = "Converted from Event Free Depth. The trinity and CD are paseudo data.";
+      results.source_type = type;
     } else if (type == "drilling_depth") {
       //NOT RECOMMENDED!!
       //get cd
@@ -1622,6 +1511,7 @@ function createMainWIndow() {
       results.distance = paseudoTrinity[2] !== null ? paseudoTrinity[2] : NaN;
       results.cd = cd !== null ? cd : NaN;
       results.efd = efd !== null ? efd : NaN;
+      results.dd  = dd !== null ? dd : NaN;
       results.age_mid = age.mid !== null ? age.mid : NaN;
       results.age_upper = age.upper !== null ? age.upper : NaN;
       results.age_lower = age.lower !== null ? age.lower : NaN;
@@ -1630,6 +1520,7 @@ function createMainWIndow() {
       results.event_model_version       = paseudoTrinity.index[0] !== null ? LCCore.projects[paseudoTrinity.index[0]].correlation_version : NaN;
       results.age_model_version         = LCAge.AgeModels[ageIdx] !== undefined ? LCAge.AgeModels[ageIdx].version : NaN;
       results.description               = "NOT RECOMMENDED! Converted from Drilling Depth. The trinity, CD, EFD amd Age are paseudo data.";
+      results.source_type = type;
     } else if (type == "age") {
       //get efd
       const name = data[0];
@@ -1665,6 +1556,7 @@ function createMainWIndow() {
       results.distance = paseudoTrinity.distance !== null ? paseudoTrinity.distance : NaN;
       results.cd = cd !== null ? cd : NaN;
       results.efd = efd !== null ? efd : NaN;
+      results.dd  = NaN;
       results.age_mid = rage.age.mid !== null ? rage.age.mid : NaN;
       results.age_upper = rage.age.upper !== null ? rage.age.upper : NaN;
       results.age_lower = rage.age.lower !== null ? rage.age.lower : NaN;
@@ -1673,6 +1565,7 @@ function createMainWIndow() {
       results.event_model_version       = paseudoTrinity.index[0] !== null ? LCCore.projects[paseudoTrinity.index[0]].correlation_version : NaN;
       results.age_model_version         = LCAge.AgeModels[ageIdx] !== undefined ? LCAge.AgeModels[ageIdx].version : NaN;
       results.description               = "Converted from Age. The trinity and CD are paseudo data.";
+      results.source_type = type;
     } else {
       return null;
     }

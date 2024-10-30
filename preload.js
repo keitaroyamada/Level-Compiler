@@ -1,7 +1,10 @@
 // preload.js
-const { contextBridge, ipcRenderer } = require("electron");
+const { contextBridge, ipcRenderer, webUtils } = require("electron");
 
 contextBridge.exposeInMainWorld("LCapi", {
+
+  getFilePath: (args) => ipcRenderer.invoke("getFilePath", webUtils.getPathForFile(args)),
+
   //rederer <-> main
   Test: (args1, args2) => ipcRenderer.invoke("test", args1, args2),
   //lcfnc: () => ipcRenderer.invoke("lcfnc"),
@@ -17,6 +20,7 @@ contextBridge.exposeInMainWorld("LCapi", {
   RegisterAgeFromCsv: (args) => ipcRenderer.invoke("RegistertAgeFromCsv", args),
   LoadAgeFromLCAge: (args) => ipcRenderer.invoke("LoadAgeFromLCAge", args),
   RegisterAgePlotFromLCAge: () => ipcRenderer.invoke("RegisterAgePlotFromLCAge"),
+  RegisterDataPlot: (args) => ipcRenderer.invoke("RegisterDataPlot", args),
   LoadPlotFromLCPlot: () => ipcRenderer.invoke("LoadPlotFromLCPlot"),
 
   //calcs
@@ -32,6 +36,8 @@ contextBridge.exposeInMainWorld("LCapi", {
   SendDepthToFinder: (args) => ipcRenderer.invoke("SendDepthToFinder", args),
   OpenDivider: () => ipcRenderer.invoke("OpenDivider"),
   CloseDivider: () => ipcRenderer.invoke("CloseDivider"),
+  OpenImporter: () => ipcRenderer.invoke("OpenImporter"),
+  CloseImporter: () => ipcRenderer.invoke("CloseImporter"),
 
   //others
   FileChoseDialog: (args1, args2) => ipcRenderer.invoke("FileChoseDialog", args1, args2),
@@ -44,6 +50,8 @@ contextBridge.exposeInMainWorld("LCapi", {
   makeModelImage: (args1, args2, args3, args4) =>  ipcRenderer.invoke("makeModelImage", args1, args2, args3, args4),
   getResourcePath: () => ipcRenderer.sendSync("getResourcePath"),
   toggleDevTools: (args1) => ipcRenderer.send('toggle-devtools',args1),
+
+  
  
   //main -> renderer
   receive: (channel, func) => {

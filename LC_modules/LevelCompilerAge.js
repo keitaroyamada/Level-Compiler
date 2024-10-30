@@ -31,6 +31,11 @@ class LevelCompilerAge {
       return;
     }
 
+    if(LCCore.projects[targetProjectIdx[0]].model_type == "duo"){
+      console.log("LCAge: [ERROR] There is only duo model. Please load base correlation model.");
+      return;
+    }
+
     //check dataset
     const num_age_dataset = this.AgeModels.length;
     //console.log("Load age model :" + age_path);
