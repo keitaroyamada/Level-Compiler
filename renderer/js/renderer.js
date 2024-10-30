@@ -714,6 +714,14 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
   //============================================================================================
+  //load correlation model
+  window.LCapi.receive("ExportCorrelationAsCsvMenuClicked", async () => {
+    //
+    console.log("clickeddddddddddd");
+
+    await window.LCapi.ExportCorrelationAsCsv(LCCore);
+  });
+  //============================================================================================
   //change canvas mode
   window.LCapi.receive("CanvasModeChanged", async (data) => {
     //call from main process

@@ -23,6 +23,11 @@ contextBridge.exposeInMainWorld("LCapi", {
   RegisterDataPlot: (args) => ipcRenderer.invoke("RegisterDataPlot", args),
   LoadPlotFromLCPlot: () => ipcRenderer.invoke("LoadPlotFromLCPlot"),
 
+  //export
+  ExportCorrelationAsCsv: (args) => ipcRenderer.invoke("ExportCorrelationAsCsvFromRenderer",args),
+  
+
+
   //calcs
   CalcCompositeDepth: () => ipcRenderer.invoke("CalcCompositeDepth"),
   CalcEventFreeDepth: () => ipcRenderer.invoke("CalcEventFreeDepth"),

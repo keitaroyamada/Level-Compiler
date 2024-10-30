@@ -2949,93 +2949,172 @@ class LevelCompilerCore {
     return idx;
   }
   constructLegacyModel(){
-    let wholeHoleIdx = [];
-    let wholeHoleIdxTemp = -1;
-    let numHoles = 0;
+    //
+    let output = [];
     for(let p=0; p<this.projects.length;p++){
-      for(let h=0;this.projects[p].holes.length;h++){
-        wholeHoleIdxTemp += 1;
-        wholeHoleIdx[p][h] = wholeHoleIdxTemp;
-        numHoles += 1;
+      let resultIds = [];
+      let visited = new Set();
+      const projectData = this.projects[p];
+      this.search_idx_list[projectData.id.toString()] = [p,null,null,null];
+      for(let h=0;h<this.projects[p].holes.length;h++){
+        const holeData = this.projects[p].holes[h];
+        this.search_idx_list[holeData.id.toString()] = [p, h, null, null];
+        for(let s=0;s<this.projects[p].holes[h].sections.length;s++){
+          const sectionData = this.projects[p].holes[h].sections[s];
+          this.search_idx_list[sectionData.id.toString()] = [p, h, s, null];
+          for(let m=0;m<this.projects[p].holes[h].sections[s].markers.length;m++){
+            const markerData = this.projects[p].holes[h].sections[s].markers[m];
+            this.search_idx_list[markerData.id.toString()] = [p, h, s, m];
+          }
+        }
       }
     }
-    
+
     //get id list
-    let resultIds = [];
-    let visited = new Set();
     for(let p=0; p<this.projects.length;p++){
-      for(let h=0;this.projects[p].holes.length;h++){
+      const projectData = this.projects[p];
+      let resultIds = [];
+      let visited = new Set();
+      for(let h=0;h<this.projects[p].holes.length;h++){
         for(let s=0;s<this.projects[p].holes[h].sections.length;s++){
           for(let m=0;m<this.projects[p].holes[h].sections[s].markers.length;m++){
             const markerData = this.projects[p].holes[h].sections[s].markers[m];
             if(!visited.has(markerData.id.toString())){
-
               //set vigited id
               let horizontalMarkers = [];
               visited.add(markerData.id.toString());
-              horizontalMarkers.push([wholeHoleIdx[p][h], markerData.id]);
+              horizontalMarkers.push([h, markerData.id]);
               for(let h=0;h<markerData.h_connection.length;h++){
-                visited.add(markerData.h_connection[h].toString());
-                horizontalMarkers.push([wholeHoleIdx[markerData.h_connection[h][0]][markerData.h_connection[h][1]], markerData.h_connection[h]]);
+                if(projectData.id[0] == markerData.h_connection[h][0]){
+                  //case same project
+                  visited.add(markerData.h_connection[h].toString());
+                  const holeIdx = this.search_idx_list[markerData.h_connection[h]];
+                  horizontalMarkers.push([holeIdx[1],  markerData.h_connection[h]]);//[hole idx, marker id]
+                }
               }
-
-              //
               resultIds.push([markerData.composite_depth, horizontalMarkers]);
             }
           }
         }
-      }      
-    }
+      }   
+      
+      //sort by cd
+      //コアの上下判定がうまく行っていない。コア・トップが伸びて上のコアと逆転したときに問題が起きる
+      resultIds.sort((a,b)=>{
+        return a[0] - b[0];
+      })
 
-    //sort by cd
-    resultIds.sort((a,b)=>{
-      return a[0].localeCompare(b[0]);
-    })
-
-    //get csv data
-    let outputData = [];
-    for(let i=0;i<resultIds.length;i++){
-      const cd  = resultIds[i][0];
-      const ids = resultIds[i][1];
-      let rowData = [];
-      for(let h=0; h<numHoles -1; h++){
-        let cellsData = [null, null, null, null]; //[name, distance, drilling depth, event]
-
-        for(let c=0;c<ids.length;c++){
-          const holeIdx = ids[0];
-          const id = ids[1];
-          if(holeIdx == h){
-            const markerData = this.getDataByIdx(this.search_idx_list[id.toString()]);
-            cellsData[0] = markerData.name;
-            cellsData[1] = markerData.distance;
-            cellsData[2] = markerData.drilling_depth;
-            for(let e=0;e<markerData.event.length;e++){
-              let eventFlag;
-              if(markerData.event[e][0]=="erosion" && markerData.event[e][1]=="upward"){
-                eventFlag = markerData.event[e][0] +"-downward("+markerData.event[e][4]+")";
-              }else{
-                if(markerData.event[e][1] == "upward"){
-                  eventFlag = markerData.event[e][0] +"-lower()["+markerData.event[e][3]+"]";
-                }else if(markerData.event[e][1] == "downward"){
-                  eventFlag = markerData.event[e][0] +"-upper()["+markerData.event[e][3]+"]";
-                }
-                if(e !== markerData.event.length -1){
-                  eventFlag = eventFlag + "/";
+      //get csv data
+      let projectOutput = [];
+      let prevMasterHole = "";
+      for(let i=0;i<resultIds.length;i++){
+        const cd  = resultIds[i][0];
+        const ids = resultIds[i][1];
+        let rowData = [];
+        let zeroMarker = "";
+        let masterHole = "";
+        let curMasterHole = [];
+        for(let h=0; h<this.projects[p].holes.length; h++){
+          let cellsData = [null, null, null, null]; //[name, distance, drilling depth, event]
+         
+          for(let c=0;c<ids.length;c++){
+            const holeIdx = ids[c][0];
+            const id      = ids[c][1];          
+            if(holeIdx == h){            
+              const markerData = this.getDataByIdx(this.search_idx_list[id.toString()]);
+              //get marker data
+              cellsData[0] = markerData.name;
+              cellsData[1] = markerData.distance;
+              cellsData[2] = markerData.drilling_depth;
+              let eventFlag = "";
+              for(let e=0;e<markerData.event.length;e++){
+                
+                if(markerData.event[e][0]=="erosion" && markerData.event[e][1]=="upward"){
+                  if(eventFlag !==""){eventFlag += "/";}
+                  eventFlag += markerData.event[e][0] +"-downward("+markerData.event[e][4]+")";
+                }else{
+                  if(markerData.event[e][1] == "upward"){
+                    if(eventFlag !==""){eventFlag += "/";}
+                    eventFlag += markerData.event[e][0] +"-lower()["+markerData.event[e][3]+"]";
+                  }else if(markerData.event[e][1] == "downward"){
+                    if(eventFlag !==""){eventFlag += "/";}
+                    eventFlag += markerData.event[e][0] +"-upper()["+markerData.event[e][3]+"]";
+                  }else if(markerData.event[e][1] == "through-up"){
+                    //"through-up" and "through-down" is set, so set only "through-up"
+                    if(eventFlag !==""){eventFlag += "/";}
+                    eventFlag += markerData.event[e][0] +"-through()["+markerData.event[e][3]+"]";
+                  } 
                 }
               }
+              cellsData[3] = eventFlag;
+
+              //get master connections
+              if(markerData.isMaster == true){
+                curMasterHole.push(this.getDataByIdx(this.search_idx_list[[markerData.id[0],markerData.id[1],null,null].toString()]).name);
+              }
+
+              if(markerData.isZeroPoint !== false){
+                zeroMarker  = "(" + markerData.isZeroPoint + ")";
+              }
             }
-            cellsData[3] = eventFlag;
           }
+
+          rowData = [...rowData, ...cellsData];
         }
 
-        rowData.push(cellsData);
-      }
-      outputData.push(rowData);
-    }
+        //calc master hole
+        if(curMasterHole.length==0){
+          //case top/bottom
+          masterHole = prevMasterHole;
+        }else if(curMasterHole.length==1){
+          //case not connection point
+          if(prevMasterHole==""){
+            //case top
+            prevMasterHole = curMasterHole[0];
+          }
+          masterHole = prevMasterHole;
+        }else if(curMasterHole.length == 2){
+          //case connection point
+          for(let c=0;c<curMasterHole.length;c++){
+            if(curMasterHole[c] !== prevMasterHole){
+              masterHole = prevMasterHole +"/"+ curMasterHole[c];
+              prevMasterHole = curMasterHole[c];
+              break;
+            }            
+          }          
+        }else{
+          console.log("LCCore: Too many master marker detected at Line: " + c+1);
+          return;
+        }
 
-    //
-    return outputData;    
+        //add top/bottom markers
+        if(i==0){
+          masterHole = "top/" + masterHole;
+        } else if(i==resultIds.length-1){
+          masterHole = masterHole + "/bottom";
+        }
+
+        //add header
+        if(i==0){
+          //header
+          let header = ["Master hole"];
+          for(let h=0; h<this.projects[p].holes.length; h++){
+            const hole = this.projects[p].holes[h];
+
+            header = [...header, "Laminaname(" + hole.name + ")[" + hole.type + "]", "Distance from core top (cm)", "Drilling depth (cm)", "Event"];
+          }
+          projectOutput.push(header);
+        }
+
+        //add master info
+        rowData.unshift(masterHole + zeroMarker);
+        projectOutput.push(rowData);
+      }
+      output.push(projectOutput); 
+    }    
+    return output; 
   }
+  
 }
 
 module.exports = { LevelCompilerCore };

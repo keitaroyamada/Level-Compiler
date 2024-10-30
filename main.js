@@ -160,18 +160,14 @@ function createMainWIndow() {
               //converterWindow.setAlwaysOnTop(true, "normal");
               converterWindow.webContents.send("ConverterMenuClicked", "import");
             });
-
-            /*
-            const win = createNewWindow("Converter", "./renderer/converter.html", "preload_converter.js");
-
-            win.once("ready-to-show", () => {
-              win.show();
-              //win.webContents.openDevTools();
-              win.setMenu(null);
-              win.setAlwaysOnTop(true, "normal");
-              win.webContents.send("ConverterMenuClicked", "");
-            });
-            */
+          },
+        },
+        { type: "separator" },
+        {
+          label: "Export correlation as csv",
+          accelerator: "CmdOrCtrl+E",
+          click: () => {
+            mainWindow.webContents.send("ExportCorrelationAsCsvMenuClicked");
           },
         },
         { type: "separator" },
@@ -230,20 +226,9 @@ function createMainWIndow() {
               //converterWindow.setAlwaysOnTop(true, "normal");
               converterWindow.webContents.send("ConverterMenuClicked", "export");
             });
-
-            /*
-            const win = createNewWindow("Converter", "./renderer/converter.html", "preload_converter.js");
-
-            win.once("ready-to-show", () => {
-              win.show();
-              //win.webContents.openDevTools();
-              win.setMenu(null);
-              win.setAlwaysOnTop(true, "normal");
-              win.webContents.send("ConverterMenuClicked", "");
-            });
-            */
           },
         },
+        
         { type: "separator" },
         {
           label: "Developer tool",
@@ -743,6 +728,20 @@ function createMainWIndow() {
   ipcMain.handle("RegisterDataPlot", async (_e, data) => {
     LCPlot.addDataset(data);
     console.log("MAIN: Registered plot data.");
+  });
+  ipcMain.handle("ExportCorrelationAsCsvFromRenderer", async (_e, MD) => {
+    let exportLCCore = new LevelCompilerCore();
+    
+    //exportLCCore <- MD
+    Object.assign(exportLCCore, MD);
+
+    //make export array
+    let outputArray = exportLCCore.constructLegacyModel();
+
+    putcsvfile(mainWindow, outputArray[0] );
+    
+
+    
   });
   ipcMain.handle("OpenImporter", async (_e) => {
     if (importerWindow) {
