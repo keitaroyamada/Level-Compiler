@@ -18,7 +18,7 @@ class LevelCompilerAge {
 
   loadAgeFromCsv(LCCore, age_path) {
     //target
-    LCCore.sortModel();
+    LCCore.sortModelByOrder();
     const targetProjectId = LCCore.base_project_id;
     let targetProjectIdx = null;
     LCCore.projects.forEach((project, p) => {

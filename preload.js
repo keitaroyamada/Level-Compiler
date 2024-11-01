@@ -55,8 +55,12 @@ contextBridge.exposeInMainWorld("LCapi", {
   makeModelImage: (args1, args2, args3, args4) =>  ipcRenderer.invoke("makeModelImage", args1, args2, args3, args4),
   getResourcePath: () => ipcRenderer.sendSync("getResourcePath"),
   toggleDevTools: (args1) => ipcRenderer.send('toggle-devtools',args1),
-
-  
+  showContextMenu: (args1) => ipcRenderer.invoke("showContextMenu", args1),
+  connectMarkers: (args1,args2,args3) => ipcRenderer.invoke("connectMarkers", args1,args2,args3),
+  disconnectMarkers: (args1,args2,args3) => ipcRenderer.invoke("disconnectMarkers", args1,args2,args3),
+  sendUndo: () => ipcRenderer.invoke('sendUndo'),
+  sendRedo: () => ipcRenderer.invoke('sendRedo'),
+  sendSaveState: () => ipcRenderer.invoke('sendSaveState'),  
  
   //main -> renderer
   receive: (channel, func) => {

@@ -33,6 +33,7 @@ document.addEventListener("DOMContentLoaded", () => {
   //measure canvas
   let measureObject = {
     isMeasure: false,
+    showMeasureResults:false,
     measureCanvas: null,
     measureData: { type: null, start: null, end: null },
   };
@@ -58,6 +59,7 @@ document.addEventListener("DOMContentLoaded", () => {
     pen: [],
     edit:[],
     plot:[],
+    edit:[],
   };
   objOpts.canvas.depth_scale = "composite_depth";
   objOpts.canvas.zoom_level = [4, 3]; //[x, y](1pix/2cm)
@@ -141,6 +143,14 @@ document.addEventListener("DOMContentLoaded", () => {
   objOpts.plot.show_line = false;
   objOpts.plot.collecion_idx = 0;
   objOpts.plot.series_idx = 0;
+
+  objOpts.edit.editable = false;
+  objOpts.edit.contextmenu_enable = false;
+  objOpts.edit.hittest = null;
+  objOpts.edit.mode = null;
+  objOpts.edit.sensibility = 2;
+  objOpts.edit.marker_from = null;
+  objOpts.edit.marker_to = null;
 
   objOpts.pen.colour = "Red";
 
@@ -552,11 +562,14 @@ document.addEventListener("DOMContentLoaded", () => {
         if(objOpts.canvas.depth_scale !== "drilling_depth"){
           if (!measureObject.isMeasure) {
             measureObject.isMeasure = true;
+            measureObject.showMeasureResults = true;
+            
             measureObject.measureCanvas = new p5(measureSketch);
             document.getElementById("bt_measure").style.backgroundColor = "#ccc";
             measureObject.measureData.type = objOpts.canvas.depth_scale;
           } else {
             measureObject.isMeasure = false;
+            measureObject.showMeasureResults = false;
             measureObject.measureCanvas = null;
             document.getElementById("bt_measure").style.backgroundColor = "#f0f0f0";
           }
@@ -674,6 +687,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     updateView();
   });
+  
   //============================================================================================
   //load correlation model
   window.LCapi.receive("LoadCorrelationModelMenuClicked", async () => {
@@ -715,10 +729,149 @@ document.addEventListener("DOMContentLoaded", () => {
   });
   //============================================================================================
   //load correlation model
-  window.LCapi.receive("ExportCorrelationAsCsvMenuClicked", async () => {
-    //
-    console.log("clickeddddddddddd");
+  //
+  window.LCapi.receive("EditCorrelation", async () => {
+    if(!LCCore){   
+       return  
+    };
 
+    if(objOpts.edit.editable){
+      objOpts.edit.editable = false;
+      objOpts.edit.contextmenu_enable = false;
+      objOpts.edit.hittest = null;
+      objOpts.edit.marker_from = null;
+      objOpts.edit.marker_to = null;
+      document.body.style.cursor = "default";
+     
+      document.removeEventListener('contextmenu', handleEditContextmenu);
+    }else{
+      objOpts.edit.editable = true;
+      objOpts.edit.contextmenu_enable = true;
+      document.body.style.cursor = "crosshair"; 
+      if(objOpts.edit.contextmenu_enable){
+        document.addEventListener('contextmenu', handleEditContextmenu);
+      }
+    }
+
+  });
+  //--------------------------------------------
+  async function handleEditContextmenu(event) {
+    console.log("[Renderer]: Click right button]");
+    event.preventDefault();
+
+    const clickResult = await window.LCapi.showContextMenu("editContextMenu");
+    if(clickResult == "connect"){
+      objOpts.edit.contextmenu_enable = false;
+      objOpts.edit.mode = "connect_marker";
+      document.addEventListener("mousemove", handleEditMouseMove);
+            objOpts.edit.marker_from;
+      objOpts.edit.marker_to;
+      console.log(objOpts.edit);
+      //measureObject.measureCanvas = new p5(connectSketch);
+    } else if(clickResult == "disconnect"){
+      objOpts.edit.contextmenu_enable = false;
+      objOpts.edit.mode = "disconnect_marker";
+      document.addEventListener("mousemove", handleEditMouseMove);
+      //measureObject.measureCanvas = new p5(connectSketch);
+    }else{
+      objOpts.edit.contextmenu_enable = true;
+    }
+
+  }
+  //--------------------------------------------
+  function handleEditMouseMove(event) {
+    
+    
+    const rect = document.getElementById("p5Canvas").getBoundingClientRect(); // Canvas position and size
+    const mouseX = event.clientX - rect.left;
+    const mouseY = event.clientY - rect.top;
+    const results = getClickedItemIdx(mouseX, mouseY, LCCore, objOpts);
+    objOpts.edit.hittest = results;
+    updateView();
+  
+    //context menu
+    if (Math.abs(objOpts.edit.hittest.nearest_distance) < objOpts.edit.sensibility) {
+      document.addEventListener('click', handleEditClick);
+    }else{
+      document.removeEventListener('click', handleEditClick);
+    }
+  }
+  //--------------------------------------------
+  async function handleEditClick(event) {
+    const ht = objOpts.edit.hittest;
+    event.preventDefault();
+
+    //initiarise
+    if(objOpts.edit.marker_from !== null && objOpts.edit.marker_to !== null){
+      objOpts.edit.marker_from = null;
+      objOpts.edit.marker_to = null;
+      objOpts.edit.mode = null;
+    }
+
+    //if clicked same hole
+    if(objOpts.edit.marker_from == null && ht.nearest_marker !== null){
+      objOpts.edit.marker_from = ht;
+    }
+
+    if(objOpts.edit.marker_to == null && ht.nearest_marker !== null){
+      if(!(objOpts.edit.marker_from.project == objOpts.edit.hittest.project && objOpts.edit.marker_from.hole == objOpts.edit.hittest.hole)){
+        objOpts.edit.marker_to = ht;
+      }  
+    }    
+    
+    if (objOpts.edit.marker_from !== null && objOpts.edit.marker_to !== null) {
+      //if get both markers
+      if(objOpts.edit.mode == "connect_marker"){
+        const response = await window.LCapi.askdialog(
+          "Connect markers",
+          "Do you want to CONNECT between selected markers?"
+        );
+        if (response.response) {
+          const fromId = [objOpts.edit.marker_from.project, objOpts.edit.marker_from.hole, objOpts.edit.marker_from.section, objOpts.edit.marker_from.nearest_marker];
+          const toId  = [objOpts.edit.marker_to.project, objOpts.edit.marker_to.hole, objOpts.edit.marker_to.section, objOpts.edit.marker_to.nearest_marker];
+          
+          console.log("[Editor]: Connected markers between " + fromId +" to " + toId);
+
+          await undo("save");//undo
+          await window.LCapi.connectMarkers(fromId, toId, "horizontal");
+          await loadModel();
+          updateView();
+
+        }
+      } else if(objOpts.edit.mode == "disconnect_marker"){
+        const response = await window.LCapi.askdialog(
+          "Connect markers",
+          "Do you want to DISCONNECT between selected markers?"
+        );
+        if (response.response) {
+          const fromId = [objOpts.edit.marker_from.project, objOpts.edit.marker_from.hole, objOpts.edit.marker_from.section, objOpts.edit.marker_from.nearest_marker];
+          const toId  = [objOpts.edit.marker_to.project, objOpts.edit.marker_to.hole, objOpts.edit.marker_to.section, objOpts.edit.marker_to.nearest_marker];
+
+          console.log("[Editor]: Disconnected markers between " + fromId +" to " + toId);
+
+          await undo("save");//undo
+          await window.LCapi.disconnectMarkers(fromId, toId, "horizontal");
+          await loadModel();
+          updateView();
+          
+        }
+      }
+      console.log(LCCore);
+
+      //exit process
+      document.removeEventListener("click", handleEditClick);
+      document.removeEventListener("mousemove", handleEditMouseMove);
+      objOpts.edit.contextmenu_enable = false;
+      objOpts.edit.hittest = null;
+      objOpts.edit.marker_from = null;
+      objOpts.edit.marker_to = null;
+    }
+
+    updateView();
+  }
+  //============================================================================================
+  //load correlation model
+  window.LCapi.receive("ExportCorrelationAsCsvMenuClicked", async () => {
     await window.LCapi.ExportCorrelationAsCsv(LCCore);
   });
   //============================================================================================
@@ -1250,10 +1403,51 @@ document.addEventListener("DOMContentLoaded", () => {
     updateView();
   });
   //============================================================================================
-  document.addEventListener("keydown", (e) => {
-    if (e.key === "F12") {
+  document.addEventListener("keydown", async (event) => {
+    //F12 => Dev tool
+    if (event.key === "F12") {
       window.LCapi.toggleDevTools("main");
     }
+
+    
+    // Ctrl + Z => Undo model
+    if (event.ctrlKey && event.key === "z") {
+      event.preventDefault();
+      const result = await undo("undo");//undo
+      if(result == true){
+        const selected_age_model_id = document.getElementById("AgeModelSelect").value;
+
+        await loadModel();
+        await loadAge(selected_age_model_id);
+        await loadModel();
+          
+        console.log("[Renderer]: Undo model");
+        console.log(LCCore);
+  
+        //update plot
+        updateView();
+      }
+    }
+
+    // Ctrl + R => Redo model
+    if (event.ctrlKey && event.key === "r") {
+      event.preventDefault();
+      const result = await undo("redo");//undo
+      if(result == true){
+        const selected_age_model_id = document.getElementById("AgeModelSelect").value;
+
+        await loadModel();
+        await loadAge(selected_age_model_id);
+        await loadModel();
+          
+        console.log("[Renderer]: Redo model");
+        console.log(LCCore);
+
+        //update plot
+        updateView();
+      }
+    }
+        
   });
   //============================================================================================
 
@@ -1780,6 +1974,57 @@ document.addEventListener("DOMContentLoaded", () => {
               if (!objOpts.canvas.is_event) {
                 mw = 0.2;
               }
+
+              //----------------------------------------------------------------------------------------------------------------------------------
+              //show hittest
+              if(objOpts.edit.editable){
+                //live hittest
+                if(objOpts.edit.hittest !== null){
+                  const hitId = [objOpts.edit.hittest.project, objOpts.edit.hittest.hole, objOpts.edit.hittest.section, objOpts.edit.hittest.nearest_marker];
+                  if(Math.abs(objOpts.edit.hittest.nearest_distance) < objOpts.edit.sensibility){
+                    if(hitId.toString() == marker.id.toString()){
+                      sketch.strokeWeight(3);
+                      sketch.stroke("Red");
+                    }
+                  }
+                }
+                if(objOpts.edit.marker_from !== null){
+                  const hitId = [objOpts.edit.marker_from.project, objOpts.edit.marker_from.hole, objOpts.edit.marker_from.section, objOpts.edit.marker_from.nearest_marker];
+                  if(hitId.toString() == marker.id.toString()){
+                    sketch.strokeWeight(3);
+                    sketch.stroke("Red");
+
+                    if(objOpts.edit.marker_to == null){
+                      //console.log(objOpts.edit);
+
+                      let ex0 = (hole_x0 + shift_x) * xMag + pad_x;
+                      let ey0 = (marker_top + shift_y) * yMag + pad_y;
+                      let ex1 = sketch.mouseX + scroller.scrollLeft;
+                      let ey1 = sketch.mouseY+scroller.scrollTop;
+                      
+                      //mouse position is righ/left of "from hole"
+                      if((sketch.mouseX + scroller.scrollLeft) > ((hole_x0 + shift_x) * xMag + pad_x + (objOpts.marker.width * mw * xMag)/2)){
+                        ex0 = (hole_x0 + shift_x) * xMag + pad_x + objOpts.marker.width * mw * xMag;
+                      }
+
+                      //if hit second marker
+                      if(objOpts.edit.hittest.marker !== null){
+                        //under construction
+                      }
+                      
+                      sketch.line(ex0,ey0,ex1,ey1);
+                    }
+                  }
+                }
+                if(objOpts.edit.marker_to !== null){
+                  const hitId = [objOpts.edit.marker_to.project, objOpts.edit.marker_to.hole, objOpts.edit.marker_to.section, objOpts.edit.marker_to.nearest_marker];
+                  if(hitId.toString() == marker.id.toString()){
+                    sketch.strokeWeight(3);
+                    sketch.stroke("Red");
+                  }
+                }
+              }
+              //----------------------------------------------------------------------------------------------------------------------------------
 
               if( objOpts.canvas.is_connection){
                 sketch.line(
@@ -2913,15 +3158,97 @@ document.addEventListener("DOMContentLoaded", () => {
         //finish
         measureObject.measureData.end = endPoint;
         console.log("[Measure]: End to " + endPoint);
-        measureResults();
+        if(measureObject.showMeasureResults){
+          measureResults();
+        }
+        
       } else if (clickCount > 0) {
         clickCount -= 1;
       }
     };
   };
   //--------------------------------------------------------------------------------------------
-
+  
+//--------------------------------------------------------------------------------------------
   async function measureResults() {
+    //calc
+    let x0;
+    let x1;
+    let y0;
+    let y1;
+    let age_correction = 1;
+    if(objOpts.canvas.depth_scale == "age"){
+      age_correction = objOpts.canvas.age_zoom_correction[0];
+    }
+
+
+    if (measureObject.measureData.start[1] <= measureObject.measureData.end[1]) {
+      x0 = measureObject.measureData.start[0];
+      y0 = measureObject.measureData.start[1];
+      x1 = measureObject.measureData.end[0];      
+      y1 = measureObject.measureData.end[1];
+    } else {
+      x1 = measureObject.measureData.start[0];
+      y1 = measureObject.measureData.start[1];
+      x0 = measureObject.measureData.end[0];      
+      y0 = measureObject.measureData.end[1];
+    }
+
+    //get click position
+    const upperData = await window.LCapi.depthConverter(["measured_upper", y0, [null, null, null, null]], measureObject.measureData.type,"linear");
+    const lowerData = await window.LCapi.depthConverter(["measured_lower", y1, [null, null, null, null]], measureObject.measureData.type,"linear");
+
+    //calc stat
+    const meanAge = (lowerData.age_mid + upperData.age_mid) / 2;
+    const meanCD  = (lowerData.cd + upperData.cd) / 2;
+    const meanEFD = (lowerData.efd + upperData.efd) / 2;
+
+    const duration = lowerData.age_mid - upperData.age_mid;
+    const thicknessCD = lowerData.cd - upperData.cd;
+    const thicknessEFD = lowerData.efd - upperData.efd;
+
+    const srCD = thicknessCD / duration;
+    const srEFD = thicknessEFD / duration;
+
+    //show
+    const text =
+      "1. Mean\nComposite depth: " + 
+      (Math.round(meanCD * 10) / 10).toLocaleString() +
+      " cm\nEvent free depth: " +
+      (Math.round(meanEFD * 10) / 10).toLocaleString() +
+      " cm\nAge: " +
+      (Math.round(meanAge * 10) / 10).toLocaleString() +
+      " calBP\n\n2. Duration/Thickness\nThickness(CD): " +
+      (Math.round(thicknessCD * 10) / 10).toLocaleString() +
+      " cm\nThickness(EFD): " +
+      (Math.round(thicknessEFD * 10) / 10).toLocaleString() +
+      " cm\nDuration: " +
+      (Math.round(duration * 10) / 10).toLocaleString() +
+      " yrs\n\n3. Sedimentation rate\nComposite Depth: " +
+      Math.round(srCD * 1000) / 1000 +
+      " cm/yr\nEvent Free Depth: " +
+      Math.round(srEFD * 1000) / 1000 +
+      " cm/yr";
+    alert(text);
+
+    console.log("[Renderer]: Measured " +  measureObject.measureData.start[1] + "==>" + measureObject.measureData.end[1] + measureObject.measureData.type);
+
+    document.getElementById("bt_measure").style.backgroundColor = "#f0f0f0";
+    //penObject.isMeasure = false;
+    measureObject.isMeasure = false;
+    measureObject.measureCanvas = null;
+    measureObject.measureData.type = null;
+    measureObject.measureData.start = null;
+    measureObject.measureData.end = null;
+
+    const parentElement2 = document.getElementById("p5measureCanvas");
+    while (parentElement2.firstChild) {
+      parentElement2.removeChild(parentElement2.firstChild);
+    }
+  }
+  //--------------------------------------------------------------------------------------------
+
+  async function getClickPoints() {
     //calc
     let x0;
     let x1;
@@ -3134,6 +3461,10 @@ document.addEventListener("DOMContentLoaded", () => {
     LCCore = await window.LCapi.LoadModelFromLCCore();
 
     if (LCCore) {
+      //initiarise hole list
+      while (document.getElementById("hole_list").firstChild) {
+        document.getElementById("hole_list").removeChild(document.getElementById("hole_list").firstChild);
+      }
       //add hole list
       LCCore.projects.forEach((project, p) => {
         const container = document.getElementById("hole_list");
@@ -3916,7 +4247,23 @@ function isInside(rectA, rectB, pad) {
   }
   return true;
 }
+async function undo(type){
+  return new Promise(async(resolve, reject)=>{
+    let result;
+    if(type == "undo"){
+      result = await window.LCapi.sendUndo();
+      console.log("[Renderer]: Recieved undo data: "+result);
+    }else if(type == "redo"){
+      result = await window.LCapi.sendRedo();
+      console.log("[Renderer]: Recieved redo data: "+result);
+    }else if(type == "save"){
+      result = await window.LCapi.sendSaveState();
+    }
 
+    
+     resolve(result);
+  })
+}
 async function loadCoreImages(modelImages, LCCore, depthScale) {
   return new Promise(async (resolve, reject) => {
   //const prom = new Promise((resolve, reject) => {
@@ -4110,7 +4457,17 @@ function getClickedItemIdx(mouseX, mouseY, LCCore, objOpts){
     disable: 0,
   };
 
-  let results = {x:x, y:y, depth_scale:objOpts.canvas.depth_scale, project:null, hole:null, section:null, distance:null, nearest_marker: null, nearest_distance:null};
+  let results = {
+    x:x, 
+    y:y, 
+    depth_scale:objOpts.canvas.depth_scale, 
+    project:null, 
+    hole:null, 
+    section:null, 
+    distance:null, 
+    nearest_marker: null, 
+    nearest_distance:null
+  };
 
   breakpoint:
   for(let p=0; p<LCCore.projects.length; p++){

@@ -8,6 +8,7 @@ const { Trinity } = require("./Trinity.js");
 var ss = require("simple-statistics");
 const { Colors } = require("chart.js");
 const { copyFileSync } = require("original-fs");
+const { isObject } = require("chart.js/helpers");
 
 class LevelCompilerCore {
   constructor() {
@@ -333,8 +334,8 @@ class LevelCompilerCore {
               if (val != "" && !isNaN(parseFloat(val))) {
                 const correlated_marker_id = markerIdList[marker_r][k - 1];
                 if(correlated_marker_id == null){
-                  console.log("LCCore: Correlation model contains error in cell (" +marker_r+", "+k+ ")");
-                  return
+                  console.error("LCCore: Correlation model contains error in cell (" +marker_r+", "+k+ ")");
+                  return 
                 }
 
                 if (correlated_marker_id.join("-") !== this.projects[projectIdx[0]].holes[h].sections[s].markers[m].id.join("-")) {
@@ -353,10 +354,7 @@ class LevelCompilerCore {
                 const correlated_marker_id = markerIdList[marker_r][k - 1];
 
                 //exclude own id
-                if (
-                  correlated_marker_id.join("-") !==
-                  this.projects[projectIdx[0]].holes[h].sections[s].markers[m].id.join("-")
-                ) {
+                if (correlated_marker_id.join("-") !== this.projects[projectIdx[0]].holes[h].sections[s].markers[m].id.join("-")) {
                   this.projects[projectIdx[0]].holes[h].sections[s].markers[m].h_connection.push(correlated_marker_id);
                 }
 
@@ -367,9 +365,7 @@ class LevelCompilerCore {
                   const duo_connected_sec = lcfnc.zeroPadding(model_r[2]);
                   const duo_connected_dist =
                     Math.round(parseFloat(model_r[3]) * 10) / 10;
-                  this.projects[projectIdx[0]].duo_connection[
-                    correlated_marker_id.toString()
-                  ] = [
+                  this.projects[projectIdx[0]].duo_connection[correlated_marker_id.toString()] = [
                     duo_connected_hole,
                     duo_connected_sec,
                     duo_connected_dist,
@@ -440,7 +436,7 @@ class LevelCompilerCore {
     //connect duo
     this.connectDuoModel();
 
-    this.sortModel();
+    this.sortModelByOrder();
 
     console.log("LCCore: Model loaded from csv.");
     return true;
@@ -531,7 +527,7 @@ class LevelCompilerCore {
     }
 
     //initiarise
-    this.sortModel();
+    this.sortModelByOrder();
     this.projects.forEach(project=>{
       project.holes.forEach(hole=>{
         hole.sections.forEach(section=>{
@@ -1882,7 +1878,7 @@ class LevelCompilerCore {
 
     return output;
   }
-  sortModel() {
+  sortModelByOrder() {
     //sort project by order
     this.projects.sort((a, b) => (a.order < b.order ? -1 : 1));
 
@@ -1902,6 +1898,58 @@ class LevelCompilerCore {
         }
       }
     }
+
+    //add new order
+    this.projects.forEach((project, p) => {
+      project.order = p;
+      project.holes.forEach((hole, h) => {
+        hole.order = h;
+        hole.sections.forEach((section, s) => {
+          section.order = s;
+          section.markers.forEach((marker, m) => {
+            marker.order = m;
+          });
+        });
+      });
+    });
+
+    //update search_ids_list
+    this.updateSearchIdx();
+  }
+  sortModel() {
+    //sort markers by distance
+    for (let p = 0; p < this.projects.length; p++) {
+      for (let h = 0; h < this.projects[p].holes.length; h++) {
+        for (let s = 0; s < this.projects[p].holes[h].sections.length; s++) {
+          this.projects[p].holes[h].sections[s].markers.sort((a, b) => 
+            a.distance < b.distance ? -1 : 1
+          );
+        }
+      }
+    }
+
+    //sort section by drilling depth of top marker
+    for (let p = 0; p < this.projects.length; p++) {
+      for (let h = 0; h < this.projects[p].holes.length; h++) {      
+        this.projects[p].holes[h].sections.sort((a, b) =>{
+          a.markers[0].drilling_depth < b.markers[0].drilling_depth ? -1 : 1
+        });
+      }
+    }
+
+    //sort hole by name
+    for (let p = 0; p < this.projects.length; p++) {
+      for (let h = 0; h < this.projects[p].holes.length; h++) {
+        this.projects[p].holes.sort((a, b) => {
+          a.name.localeCompare(b.name);
+        });
+      }
+    }
+
+    //sort project by name
+    this.projects.sort((a, b) => {
+      a.name.localeCompare(b.name);
+    });
 
     //add new order
     this.projects.forEach((project, p) => {
@@ -2589,6 +2637,27 @@ class LevelCompilerCore {
         }
       });
 
+      //check
+      for(let h of this.projects[fromIdx[0]].holes[fromIdx[1]].sections[fromIdx[2]].markers[fromIdx[3]].h_connection){
+        if(h[0] == toId[0] && h[1] == toId[1]){
+          //if connected same hole
+          if(!(h[2] == toId[2] && h[3] == toId[3])){
+            console.log("Fail to connect to " +this.getMarkerNameFromId(toId) + "markers because "+this.getMarkerNameFromId(fromId)+ " have been connected the 'to hole' at " + this.getMarkerNameFromId(h));
+            return;
+          }
+        }
+      }
+        
+      for(let h of this.projects[toIdx[0]].holes[toIdx[1]].sections[toIdx[2]].markers[toIdx[3]].h_connection){
+        if(h[0] == fromId[0] && h[1] == fromId[1]){
+          //if connected same hole
+          if(!(h[2] == fromId[2] && h[3] == fromId[3])){
+            console.log("Fail to connect to "+this.getMarkerNameFromId(fromId)+ " markers because "+this.getMarkerNameFromId(toId)+ " have been connected the 'to hole' at " + this.getMarkerNameFromId(h));
+            return;
+          }
+        }
+      }
+
       //connect
       if (connectionIdxFrom == null) {
         this.projects[fromIdx[0]].holes[fromIdx[1]].sections[fromIdx[2]].markers[fromIdx[3]].h_connection.push(toId);
@@ -2625,17 +2694,13 @@ class LevelCompilerCore {
       let connectionIdxFrom = null;
       let connectionIdxTo = null;
       //check in connection of from
-      this.projects[fromIdx[0]].holes[fromIdx[1]].sections[fromIdx[2]].markers[
-        fromIdx[3]
-      ].v_connection.forEach((v_c, n) => {
+      this.projects[fromIdx[0]].holes[fromIdx[1]].sections[fromIdx[2]].markers[fromIdx[3]].v_connection.forEach((v_c, n) => {
         if (v_c.toString() == toId.toString()) {
           connectionIdxFrom = n;
         }
       });
       //check in connection of to
-      this.projects[toIdx[0]].holes[fromIdx[1]].sections[toIdx[2]].markers[
-        toIdx[3]
-      ].v_connection.forEach((v_c, n) => {
+      this.projects[toIdx[0]].holes[toIdx[1]].sections[toIdx[2]].markers[toIdx[3]].v_connection.forEach((v_c, n) => {
         if (v_c.toString() == fromId.toString()) {
           connectionIdxTo = n;
         }
@@ -2664,17 +2729,14 @@ class LevelCompilerCore {
       let connectionIdxFrom = null;
       let connectionIdxTo = null;
       //check in connection of from
-      this.projects[fromIdx[0]].holes[fromIdx[1]].sections[fromIdx[2]].markers[
-        fromIdx[3]
-      ].h_connection.forEach((h_c, n) => {
+      
+      this.projects[fromIdx[0]].holes[fromIdx[1]].sections[fromIdx[2]].markers[fromIdx[3]].h_connection.forEach((h_c, n) => {
         if (h_c.toString() == toId.toString()) {
           connectionIdxFrom = n;
         }
       });
       //check in connection of to
-      this.projects[toIdx[0]].holes[fromIdx[1]].sections[toIdx[2]].markers[
-        toIdx[3]
-      ].h_connection.forEach((h_c, n) => {
+      this.projects[toIdx[0]].holes[toIdx[1]].sections[toIdx[2]].markers[toIdx[3]].h_connection.forEach((h_c, n) => {
         if (h_c.toString() == fromId.toString()) {
           connectionIdxTo = n;
         }
@@ -2682,12 +2744,8 @@ class LevelCompilerCore {
 
       //disconnect
       if (connectionIdxFrom !== null && connectionIdxTo !== null) {
-        this.projects[fromIdx[0]].holes[fromIdx[1]].sections[
-          fromIdx[2]
-        ].markers[fromIdx[3]].h_connection.splice(connectionIdxFrom, 1);
-        this.projects[toIdx[0]].holes[fromIdx[1]].sections[toIdx[2]].markers[
-          toIdx[3]
-        ].h_connection.splice(connectionIdxTo, 1);
+        this.projects[fromIdx[0]].holes[fromIdx[1]].sections[fromIdx[2]].markers[fromIdx[3]].h_connection.splice(connectionIdxFrom, 1);
+        this.projects[toIdx[0]].holes[fromIdx[1]].sections[toIdx[2]].markers[toIdx[3]].h_connection.splice(connectionIdxTo, 1);
         /*
         console.log(
           "Disconnected between " +
@@ -2950,6 +3008,9 @@ class LevelCompilerCore {
   }
   constructLegacyModel(){
     //
+    this.sortModel();
+
+    //update search_idx
     let output = [];
     for(let p=0; p<this.projects.length;p++){
       let resultIds = [];
@@ -2957,15 +3018,19 @@ class LevelCompilerCore {
       const projectData = this.projects[p];
       this.search_idx_list[projectData.id.toString()] = [p,null,null,null];
       for(let h=0;h<this.projects[p].holes.length;h++){
+        let holeCompositeDepthSecTop = 0;
         const holeData = this.projects[p].holes[h];
         this.search_idx_list[holeData.id.toString()] = [p, h, null, null];
         for(let s=0;s<this.projects[p].holes[h].sections.length;s++){
+          
           const sectionData = this.projects[p].holes[h].sections[s];
           this.search_idx_list[sectionData.id.toString()] = [p, h, s, null];
           for(let m=0;m<this.projects[p].holes[h].sections[s].markers.length;m++){
             const markerData = this.projects[p].holes[h].sections[s].markers[m];
+            this.projects[p].holes[h].sections[s].markers[m].hole_composite_depth = holeCompositeDepthSecTop + markerData.distance;
             this.search_idx_list[markerData.id.toString()] = [p, h, s, m];
           }
+          holeCompositeDepthSecTop += this.projects[p].holes[h].sections[s].markers[this.projects[p].holes[h].sections[s].markers.length-1].distance;
         }
       }
     }
@@ -2975,6 +3040,7 @@ class LevelCompilerCore {
       const projectData = this.projects[p];
       let resultIds = [];
       let visited = new Set();
+      
       for(let h=0;h<this.projects[p].holes.length;h++){
         for(let s=0;s<this.projects[p].holes[h].sections.length;s++){
           for(let m=0;m<this.projects[p].holes[h].sections[s].markers.length;m++){
@@ -2982,33 +3048,43 @@ class LevelCompilerCore {
             if(!visited.has(markerData.id.toString())){
               //set vigited id
               let horizontalMarkers = [];
+              let depth = [];
+              for(let hh=0;hh<this.projects[p].holes.length;hh++){
+                depth.push(null);
+              }
+
               visited.add(markerData.id.toString());
+              depth[h] = markerData.hole_composite_depth;
               horizontalMarkers.push([h, markerData.id]);
               for(let h=0;h<markerData.h_connection.length;h++){
                 if(projectData.id[0] == markerData.h_connection[h][0]){
                   //case same project
                   visited.add(markerData.h_connection[h].toString());
-                  const holeIdx = this.search_idx_list[markerData.h_connection[h]];
+                  const holeIdx = this.search_idx_list[markerData.h_connection[h].toString()];
+                  const connectedData = this.getDataByIdx(this.search_idx_list[markerData.h_connection[h].toString()]);
+                  depth[holeIdx[1]] = connectedData.hole_composite_depth;
                   horizontalMarkers.push([holeIdx[1],  markerData.h_connection[h]]);//[hole idx, marker id]
                 }
               }
-              resultIds.push([markerData.composite_depth, horizontalMarkers]);
+              resultIds.push([depth, horizontalMarkers]);
             }
           }
         }
       }   
       
-      //sort by cd
-      //コアの上下判定がうまく行っていない。コア・トップが伸びて上のコアと逆転したときに問題が起きる
-      resultIds.sort((a,b)=>{
-        return a[0] - b[0];
-      })
+      
+      //sort by drillin depth
+      //ソートを実装する必要がある
+      //cdが一番マシだが、内挿がない場合、矛盾する場合がある。
+      resultIds = this.insrtionSort(resultIds);
+      
+      
 
       //get csv data
       let projectOutput = [];
       let prevMasterHole = "";
       for(let i=0;i<resultIds.length;i++){
-        const cd  = resultIds[i][0];
+        const dds  = resultIds[i][0];
         const ids = resultIds[i][1];
         let rowData = [];
         let zeroMarker = "";
@@ -3114,7 +3190,96 @@ class LevelCompilerCore {
     }    
     return output; 
   }
+
+  insrtionSort(data){
+    //sort 1st col
+    data.sort((a,b)=>{
+      return a[0][0] < b[0][0];
+    })
+
+    //sort 2nd col
+    let outData = data.filter(item => item[0][0] !== null);
+
+    
+    for(let c=1; c<data[0][0].length; c++){
+      let col = c;
+      const nullData = data.filter(item => {
+        for(let ct=0; ct<c; ct++){
+          if(item[0][ct] !== null){
+            return false;
+          }
+        }
+        return true;      
+      });
+
+      for(let n=0; n<nullData.length; n++){
+        
+        const ddNull = nullData[n][0][col];
+      
+        if(ddNull == null){
+          continue;
+        }
+        let insertUpperIdx = -Infinity;
+        let insertLowerIdx = Infinity;
+        for(let o=0; o<outData.length; o++){
+          const ddOut  = outData[o][0][col];
+          if(ddOut==null){
+            continue;
+          }
+          if(ddNull >= ddOut && insertUpperIdx<=o){
+            insertUpperIdx = o;
+          }
+          if(ddNull <= ddOut && insertLowerIdx>=o){
+            insertLowerIdx = o;
+          }
+        }
+    
+
+        //===================================================================
+        //ここが問題
+        let insertIdx = null;
+        if(insertUpperIdx == -Infinity){
+          insertUpperIdx = null;
+        }
+        if(insertLowerIdx == Infinity){
+          insertLowerIdx = null;
+        }
+    
+
+        if(insertUpperIdx !== null && insertLowerIdx == null){
+          insertIdx = insertUpperIdx;
+        }else if(insertUpperIdx == null && insertLowerIdx !== null){
+          insertIdx = insertLowerIdx - 1;
+        }else if(insertUpperIdx !== null && insertLowerIdx !== null){
+          insertIdx = Math.floor((insertUpperIdx + insertLowerIdx)/2);
+        }
+        //===================================================================
+        if(col==3){
+          console.log(n, insertUpperIdx,insertLowerIdx);
+          console.log(nullData[n])
+          /*
+          if(n==310){
+            console.log(outData[insertUpperIdx]);
+            
+            console.log(outData[insertLowerIdx]);
+          }
+            */
+        }
+        
+        
+        if(insertIdx!==null){
+          //insert
+          outData = [...outData.slice(0, insertIdx+1), nullData[n], ...outData.slice(insertIdx+1, outData.length)];
+          
+        }
+      }
+    }
+    
+    return outData;
+  }
   
+ 
 }
+
 
 module.exports = { LevelCompilerCore };

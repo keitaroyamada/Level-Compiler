@@ -23,15 +23,17 @@ const { Project } = require("./LC_modules/Project.js");
 const { lcfnc } = require("./LC_modules/lcfnc.js");
 const { LevelCompilerAge } = require("./LC_modules/LevelCompilerAge.js");
 const { LevelCompilerPlot } = require("./LC_modules/LevelCompilerPlot.js");
+const { UndoManager } = require("./LC_modules/UndoManager.js");
 const { Trinity } = require("./LC_modules/Trinity.js");
 const { send } = require("process");
 
 //properties
 const isMac = process.platform === "darwin";
 const isDev = false;//process.env.NODE_ENV !== "development"; //const isDev = false;
-const LCCore = new LevelCompilerCore();
-const LCAge = new LevelCompilerAge();
-const LCPlot = new LevelCompilerPlot();
+let LCCore = new LevelCompilerCore();
+let LCAge  = new LevelCompilerAge();
+let LCPlot = new LevelCompilerPlot();
+const history = new UndoManager();
 
 //
 let finderWindow = null;
@@ -228,7 +230,13 @@ function createMainWIndow() {
             });
           },
         },
-        
+        {
+          label: "Edit correlation",
+          //accelerator: "CmdOrCtrl+M",
+          click: () => {
+            mainWindow.webContents.send("EditCorrelation");
+          },
+        },
         { type: "separator" },
         {
           label: "Developer tool",
@@ -641,7 +649,42 @@ function createMainWIndow() {
     const response = dialog.showMessageBox(null, options);
     return response;
   });
+  ipcMain.handle('showContextMenu', (event, type) => {
+    return new Promise((resolve) => {
+      let template;
+      if(type == "editContextMenu"){
+        template = [
+          {
+            label:"Marker",
+            submenu:[
+              { 
+                label: 'Connect markers', 
+                click: () => {
+                  console.log('MAIN: Connect markers'); 
+                  resolve("connect"); 
+                 
+                } 
+              },
+              { type: 'separator' },
+              { 
+                label: 'Disconnect markers', 
+                click: () => { 
+                  console.log('MAIN: Disconnect markers'); 
+                  resolve("disconnect"); 
+                } 
+              },
+            ]
+          },          
+        ];
+        
+      }
+       
+      const menu = Menu.buildFromTemplate(template);
+      menu.popup(BrowserWindow.fromWebContents(event.sender));
 
+     
+    });
+  });
   ipcMain.handle("RegistertAgeFromCsv", async (_e, age_path) => {
     try {
       //import model
@@ -655,6 +698,7 @@ function createMainWIndow() {
           model_name = model.name;
         }
       });
+
 
       console.log("MAIN: Registered age model from " + age_path);
       return { id: LCAge.selected_id, name: model_name, path: age_path };
@@ -716,9 +760,8 @@ function createMainWIndow() {
           LCAge.AgeModels[age_idx]
         );
 
-        console.log(
-          "MAIN: Registered age plot data from " + LCAge.AgeModels[age_idx].name
-        );
+
+        console.log("MAIN: Registered age plot data from " + LCAge.AgeModels[age_idx].name);
       }
     } catch (error) {
       console.error("ERROR: Plot data register from LCAge error.");
@@ -727,6 +770,7 @@ function createMainWIndow() {
   });
   ipcMain.handle("RegisterDataPlot", async (_e, data) => {
     LCPlot.addDataset(data);
+
     console.log("MAIN: Registered plot data.");
   });
   ipcMain.handle("ExportCorrelationAsCsvFromRenderer", async (_e, MD) => {
@@ -1190,7 +1234,39 @@ function createMainWIndow() {
       }
     }
     
-});
+  });
+  ipcMain.handle("sendUndo", async (_e) => { 
+    const result = await history.undo();   
+    if(result !== null){
+      //Undo deep copy
+      Object.assign(LCCore, result.LCCore);
+      Object.assign(LCAge, result.LCAge);
+      Object.assign(LCPlot, result.LCPlot);
+      console.log("MAIN: Undo loaded.");
+      return true;
+    }else{
+      return false;
+    }
+  });
+  ipcMain.handle("sendRedo", async (_e) => {
+    const result = await history.redo();
+    
+    if(result !== null){
+      Object.assign(LCCore, result.LCCore);
+      Object.assign(LCAge,  result.LCAge);
+      Object.assign(LCPlot, result.LCPlot);
+      console.log("MAIN: Redo loaded.");
+      return true;
+    }else{
+      return false;
+    }
+  });
+  ipcMain.handle("sendSaveState", async (_e) => {
+    history.saveState({LCCore:LCCore, LCAge:LCAge, LCPlot:LCPlot});
+    console.log("MAIN: State saved. Num of history is " + history.undoStack.length);    
+    return true;
+    return;
+  });
   //------------------------------------------------------------------------------------------------
   //for converter
 
@@ -1571,6 +1647,12 @@ function createMainWIndow() {
     }
 
     return results;
+  });
+  ipcMain.handle("connectMarkers", (_e, fromId, toId, direction) => {
+    LCCore.connectMarkers(fromId, toId, direction);
+  });
+  ipcMain.handle("disconnectMarkers", (_e, fromId, toId,direction) => {
+    LCCore.disconnectMarkers(fromId, toId, direction);
   });
 
   //--------------------------------------------------------------------------------------------------
