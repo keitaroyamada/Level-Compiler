@@ -658,6 +658,15 @@ function createMainWIndow() {
             label:"Marker",
             submenu:[
               { 
+                label: 'Add new marker', 
+                click: () => {
+                  console.log('MAIN: Add new marker'); 
+                  resolve("addMarker"); 
+                 
+                } 
+              },
+              { type: 'separator' },
+              { 
                 label: 'Connect markers', 
                 click: () => {
                   console.log('MAIN: Connect markers'); 
@@ -665,12 +674,20 @@ function createMainWIndow() {
                  
                 } 
               },
-              { type: 'separator' },
               { 
                 label: 'Disconnect markers', 
                 click: () => { 
                   console.log('MAIN: Disconnect markers'); 
                   resolve("disconnect"); 
+                } 
+              },
+              { type: 'separator' },
+              { 
+                label: 'Delete marker', 
+                click: () => {
+                  console.log('MAIN: Delete marker'); 
+                  resolve("deleteMarker"); 
+                 
                 } 
               },
             ]
@@ -1236,7 +1253,7 @@ function createMainWIndow() {
     
   });
   ipcMain.handle("sendUndo", async (_e) => { 
-    const result = await history.undo();   
+    const result = await history.undo({LCCore:LCCore, LCAge:LCAge, LCPlot:LCPlot});   
     if(result !== null){
       //Undo deep copy
       Object.assign(LCCore, result.LCCore);
@@ -1249,7 +1266,7 @@ function createMainWIndow() {
     }
   });
   ipcMain.handle("sendRedo", async (_e) => {
-    const result = await history.redo();
+    const result = await history.redo({LCCore:LCCore, LCAge:LCAge, LCPlot:LCPlot});
     
     if(result !== null){
       Object.assign(LCCore, result.LCCore);
@@ -1653,6 +1670,27 @@ function createMainWIndow() {
   });
   ipcMain.handle("disconnectMarkers", (_e, fromId, toId,direction) => {
     LCCore.disconnectMarkers(fromId, toId, direction);
+  });
+  ipcMain.handle("deleteMarkers", (_e, targetId) => {
+    LCCore.deleteMarker(targetId);
+    console.log("MAIN: Delete target marker.");
+  });
+  ipcMain.handle("addMarkers", (_e, fromId, toId) => {
+    const targetSectionId = [toId[0], toId[1], toId[2], null];
+    const sectionIdx = LCCore.search_idx_list[targetSectionId.toString()];
+    const sectionData = LCCore.getDataByIdx(sectionIdx);
+
+    let newId = Math.max(...sectionData.reserved_marker_ids) + 1;
+    const newMarkerId = [toId[0], toId[1], toId[2], newId];
+
+    LCCore.disconnectMarkers(fromId, toId, "vertical");
+    LCCore.connectMarkers(fromId, newMarkerId, "vertical");
+    LCCore.connectMarkers(newMarkerId, toId, "vertical");
+    LCCore.projects[sectionIdx[0]].holes[sectionIdx[1]].sections[sectionIdx[2]].reserved_marker_ids.push(newId);
+
+    //add event
+
+    console.log("MAIN: Add new marker between " + LCCore.getMarkerNameFromId(fromId) +" and " + LCCore.getMarkerNameFromId(toId));
   });
 
   //--------------------------------------------------------------------------------------------------

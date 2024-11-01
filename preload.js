@@ -58,6 +58,9 @@ contextBridge.exposeInMainWorld("LCapi", {
   showContextMenu: (args1) => ipcRenderer.invoke("showContextMenu", args1),
   connectMarkers: (args1,args2,args3) => ipcRenderer.invoke("connectMarkers", args1,args2,args3),
   disconnectMarkers: (args1,args2,args3) => ipcRenderer.invoke("disconnectMarkers", args1,args2,args3),
+  deleteMarker: (args1) => ipcRenderer.invoke("deleteMarker", args1),
+  addMarker: (args1,args2) => ipcRenderer.invoke("addMarker", args1,args2),
+
   sendUndo: () => ipcRenderer.invoke('sendUndo'),
   sendRedo: () => ipcRenderer.invoke('sendRedo'),
   sendSaveState: () => ipcRenderer.invoke('sendSaveState'),  

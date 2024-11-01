@@ -13,25 +13,25 @@ class UndoManager {
     }
 
     // Undo
-    undo() {
+    undo(state) {
         if (this.undoStack.length === 0) {
             console.log("Undo: There is no Undo history.");
             return null;
         }
         ////set redo
         const lastState = this.undoStack.pop();
-        this.redoStack.push(lastState);
+        this.redoStack.push(JSON.parse(JSON.stringify(state)));
         console.log("Undo: Reconstruct last data.");
         return lastState;
     }
 
-    redo(){
+    redo(state){
         if (this.redoStack.length === 0) {
             console.log("Undo: There is no Redo history.");
             return null;
         }
         const nextState = this.redoStack.pop();
-        this.undoStack.push(nextState);
+        this.undoStack.push(JSON.parse(JSON.stringify(state)));
         
         return nextState;
     }

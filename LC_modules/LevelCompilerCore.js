@@ -2759,6 +2759,55 @@ class LevelCompilerCore {
       }
     }
   }
+  deleteMarker(targetId){
+    const targetMarkerIdx = this.search_idx_list[targetId.toString()];
+    const targetMarkerData = this.getDataByIdx(targetMarkerIdx);
+    const targetSectionData = this.getDataByIdx(LCCore.search_idx_list[[targetId[0],targetId[1],targetId[2],null].toString()]);
+    let upperMarkerId = null;
+    let lowerMarkerId = null;
+    if(targetMarkerData.v_connection.length == 2){
+      //case not top/bottom(excluding piston core)
+      upperMarkerId = targetMarkerData.v_connection[0];
+      lowerMarkerId = targetMarkerData.v_connection[1];
+    } 
+
+    //trim target markerdata
+    this.disconnectMarkers(upperMarkerId, targetId, "vertical");
+    this.disconnectMarkers(targetId, lowerMarkerId, "vertical");
+    this.connectMarkers(upperMarkerId, lowerMarkerId, "vertical");
+    this.projects[targetMarkerIdx[0]].holes[targetMarkerIdx[1]].sections[targetMarkerIdx[2]].reserved_marker_ids = targetSectionData.reserved_marker_ids.filter(num => num !== targetId[3]);
+
+    //remove event layers
+    if(targetMarkerData.event !== 0){
+      for(let e of targetMarkerData.event){
+        //["deposition", "upward", connected_marker_id, [label], (value))]
+        if(e[1] == "through-up"){
+          for(let e2 of targetMarkerData.event){
+            //e[1] == "through-down"
+          }
+          const conEventIdx = this.search_idx_list[e[2].toString()];
+
+        }
+
+      }
+      
+    }
+    
+
+    //remove from horizontal connection
+    const connectedIds = targetMarkerData.h_connection;
+    for(let id of connectedIds){
+      const connectedIdx = this.search_idx_list[id.toString()];
+      const connectedMarkerData = LCCore.projects[connectedIdx[0]].holes[connectedIdx[1]].sections[connectedIdx[2].markers[connectedIdx[3]]];
+      let h_connections = [];
+      for(let cid of connectedMarkerData.h_connection){
+        if(cid.toString() !== targetId.toString()){
+          h_connections.push(cid);
+        }
+      }
+      this.projects[connectedIdx[0]].holes[connectedIdx[1]].sections[connectedIdx[2].markers[connectedIdx[3]]].h_connection = h_connections;
+    }
+  }
   searchHconnection(startId) {
     let visitedId = new Set();
     let stack = [];

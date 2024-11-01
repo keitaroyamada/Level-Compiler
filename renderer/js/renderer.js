@@ -773,10 +773,36 @@ document.addEventListener("DOMContentLoaded", () => {
       objOpts.edit.mode = "disconnect_marker";
       document.addEventListener("mousemove", handleEditMouseMove);
       //measureObject.measureCanvas = new p5(connectSketch);
+    }else if(clickResult == "addMarker"){
+      objOpts.edit.contextmenu_enable = false;
+      objOpts.edit.mode = "add_marker";
+      document.addEventListener("mousemove", handleEditAddMouseMove);
+
+    }else if(clickResult == "deleteMarker"){
+      objOpts.edit.contextmenu_enable = false;
+      objOpts.edit.mode = "delete_marker";
+      document.addEventListener("mousemove", handleEditDeleteMouseMove);
+
     }else{
       objOpts.edit.contextmenu_enable = true;
     }
 
+  }
+  //--------------------------------------------
+  function handleEditDeleteMouseMove(event) {
+    const rect = document.getElementById("p5Canvas").getBoundingClientRect(); // Canvas position and size
+    const mouseX = event.clientX - rect.left;
+    const mouseY = event.clientY - rect.top;
+    const results = getClickedItemIdx(mouseX, mouseY, LCCore, objOpts);
+    objOpts.edit.hittest = results;
+    updateView();
+  
+    //context menu
+    if (Math.abs(objOpts.edit.hittest.nearest_distance) < objOpts.edit.sensibility) {
+      document.addEventListener('click', handleEditDeleteClick);
+    }else{
+      document.removeEventListener('click', handleEditDeleteClick);
+    }
   }
   //--------------------------------------------
   function handleEditMouseMove(event) {
@@ -795,7 +821,71 @@ document.addEventListener("DOMContentLoaded", () => {
     }else{
       document.removeEventListener('click', handleEditClick);
     }
-  }
+  
+  //--------------------------------------------
+  async function handleEditDeleteClick(event) {
+    const ht = objOpts.edit.hittest;
+    event.preventDefault();
+
+    //initiarise
+    if(objOpts.edit.marker_from !== null ){
+      objOpts.edit.marker_from = null;
+      objOpts.edit.mode = null;
+    }
+
+    if(objOpts.edit.marker_from == null && ht.nearest_marker !== null){
+      objOpts.edit.marker_from = ht;
+    }
+    
+    if (objOpts.edit.marker_from !== null) {
+      //if get both markers
+      if(objOpts.edit.mode == "delete_marker"){
+        const response = await window.LCapi.askdialog(
+          "Delete markers",
+          "Do you want to DELETE the selected marker?"
+        );
+        if (response.response) {
+          const fromId = [objOpts.edit.marker_from.project, objOpts.edit.marker_from.hole, objOpts.edit.marker_from.section, objOpts.edit.marker_from.nearest_marker];
+          
+          console.log("[Editor]: Delete marker: " + fromId);
+
+          await undo("save");//undo
+          await window.LCapi.connectMarkers(fromId, toId, "horizontal");
+          await loadModel();
+          updateView();
+
+        }
+      } else if(objOpts.edit.mode == "disconnect_marker"){
+        const response = await window.LCapi.askdialog(
+          "Connect markers",
+          "Do you want to DISCONNECT between selected markers?"
+        );
+        if (response.response) {
+          const fromId = [objOpts.edit.marker_from.project, objOpts.edit.marker_from.hole, objOpts.edit.marker_from.section, objOpts.edit.marker_from.nearest_marker];
+          const toId  = [objOpts.edit.marker_to.project, objOpts.edit.marker_to.hole, objOpts.edit.marker_to.section, objOpts.edit.marker_to.nearest_marker];
+
+          console.log("[Editor]: Disconnected markers between " + fromId +" to " + toId);
+
+          await undo("save");//undo
+          await window.LCapi.disconnectMarkers(fromId, toId, "horizontal");
+          await loadModel();
+          updateView();
+          
+        }
+      }
+      console.log(LCCore);
+
+      //exit process
+      document.removeEventListener("click", handleEditClick);
+      document.removeEventListener("mousemove", handleEditMouseMove);
+      objOpts.edit.contextmenu_enable = false;
+      objOpts.edit.hittest = null;
+      objOpts.edit.marker_from = null;
+      objOpts.edit.marker_to = null;
+    }
+
+    updateView();
+  }}
   //--------------------------------------------
   async function handleEditClick(event) {
     const ht = objOpts.edit.hittest;
@@ -1392,8 +1482,7 @@ document.addEventListener("DOMContentLoaded", () => {
   );
   //============================================================================================
   //YAxis dropdown changed event
-  const YAxisDropdown = document.getElementById("YAxisSelect");
-  YAxisDropdown.addEventListener("change", (event) => {
+  document.getElementById("YAxisSelect").addEventListener("change", (event) => {
     console.log(`Selected: ${event.target.value}`);
     objOpts.canvas.depth_scale = event.target.value;
     var mouseX = scroller.scrollLeft;
@@ -1419,7 +1508,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
         await loadModel();
         await loadAge(selected_age_model_id);
-        await loadModel();
+        await loadPlotData();
           
         console.log("[Renderer]: Undo model");
         console.log(LCCore);
@@ -1438,7 +1527,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
         await loadModel();
         await loadAge(selected_age_model_id);
-        await loadModel();
+        await loadPlotData();
           
         console.log("[Renderer]: Redo model");
         console.log(LCCore);
@@ -3169,7 +3258,7 @@ document.addEventListener("DOMContentLoaded", () => {
   };
   //--------------------------------------------------------------------------------------------
   
-//--------------------------------------------------------------------------------------------
+  //--------------------------------------------------------------------------------------------
   async function measureResults() {
     //calc
     let x0;
