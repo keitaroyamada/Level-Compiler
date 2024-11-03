@@ -680,7 +680,7 @@ function createMainWIndow() {
             label:"Hole",
             submenu:[
               { 
-                label: 'Edit name (under construction)', 
+                label: 'Edit name', 
                 click: () => {
                   console.log('MAIN: Edit Hole name'); 
                   resolve("changeHoleName"); 
@@ -692,6 +692,13 @@ function createMainWIndow() {
                 click: () => {
                   console.log('MAIN: Add new Hole'); 
                   resolve("addHole"); 
+                } 
+              },
+              { 
+                label: 'Delete Hole(under construction)', 
+                click: () => {
+                  console.log('MAIN: Delete target Hole'); 
+                  resolve("deleteHole"); 
                 } 
               },
             ]
@@ -1772,26 +1779,8 @@ function createMainWIndow() {
       }
       return result;
     }else if(type=="name"){
-      //check
-      let isUsed = false;
-      for(let markerData of LCCore.projects[idx[0]].holes[idx[1]].sections[idx[2]].markers){
-        if(value !== "" && markerData.name == zeroPadding(value)){
-          isUsed = true;
-          break;
-        }
-      }
-      //apply
-      if(isUsed == false){
-        LCCore.projects[idx[0]].holes[idx[1]].sections[idx[2]].markers[idx[3]].name = zeroPadding(value);
-        console.log("MAIN: Change marker name.");
-        return true;
-      }else{
-        if(LCCore.projects[idx[0]].holes[idx[1]].sections[idx[2]].markers[idx[3]].name == zeroPadding(value)){
-          return "same"
-        }else{
-          return "used"
-        }        
-      }
+      const result = LCCore.changeName(markerId, value)
+      return result;
     }
   });
   ipcMain.handle("changeSection", (_e, sectionId, type, value) => {
@@ -1799,27 +1788,17 @@ function createMainWIndow() {
     const idx = LCCore.search_idx_list[sectionId.toString()];
     
     if(type=="name"){
-      //check
-      let isUsed = false;
-      for(let sectionData of LCCore.projects[idx[0]].holes[idx[1]].sections){
-        if(value !== "" && sectionData.name == zeroPadding(value)){
-          isUsed = true;
-          break;
-        }
-      }
-
-      //apply
-      if(isUsed ==false){
-        LCCore.projects[idx[0]].holes[idx[1]].sections[idx[2]].name = zeroPadding(value);
-        console.log("MAIN: Change section name.");
-        return "success"
-      }else{
-        if(LCCore.projects[idx[0]].holes[idx[1]].sections[idx[2]].name == zeroPadding(value)){
-          return "same"
-        }else{
-          return "used"
-        }
-      }
+      const result = LCCore.changeName(sectionId, value);
+      return result;
+    }
+  });
+  ipcMain.handle("changeHole", (_e, holeId, type, value) => {
+    //
+    const idx = LCCore.search_idx_list[holeId.toString()];
+    
+    if(type=="name"){
+      const result = LCCore.changeName(holeId, value);
+      return result;
     }
   });
 

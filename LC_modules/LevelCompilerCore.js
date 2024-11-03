@@ -1839,42 +1839,20 @@ class LevelCompilerCore {
   }
   getDataByIdx(idxs) {
     let output;
-    let num_idx = 0;  
 
-    if (idxs.length == 1) {
-      num_idx = 1;
-    } else if (idxs.length == 2) {
-      num_idx = 2;
-    } else if (idxs.length == 3) {
-      num_idx = 3;
-    } else if (idxs.length == 4) {
-      num_idx = 0;
-      for(let i=0; i<idxs.length; i++){
-        if(idxs[i] !== null){
-          num_idx +=1;
-        }else{
-          break;
-        }
-      }
-    }
-
-    if(num_idx == 0){
-      //no id
-      return output;
-    } else if (num_idx == 1){
+    if (idxs.filter(item => item !== null).length == 1) {
       //case project data
       output = this.projects[idxs[0]];
-    } else if(num_idx == 2){
+    } else if (idxs.filter(item => item !== null).length == 2) {
       //case hole data
       output = this.projects[idxs[0]].holes[idxs[1]];
-    } else if(num_idx == 3){
+    } else if (idxs.filter(item => item !== null).length == 3) {
       //case section data
       output = this.projects[idxs[0]].holes[idxs[1]].sections[idxs[2]];
-    } else if (num_idx == 4){
+    } else if (idxs.filter(item => item !== null).length == 4) {
       //case marker/event data
       output = this.projects[idxs[0]].holes[idxs[1]].sections[idxs[2]].markers[idxs[3]];
     }
-
 
     return output;
   }
@@ -3036,6 +3014,61 @@ class LevelCompilerCore {
     }
 
     
+  }
+  changeName(targetId, value){
+    console.log(targetId)
+    const idx = this.search_idx_list[targetId.toString()];
+    const targetData = this.getDataByIdx(idx);
+    console.log(targetData.name)
+
+     //check duplicate
+    let isUsed = false;
+    if(idx.filter(item => item !== null).length == 1){
+      //project
+      for(let data of this.projects){
+        if(value !== "" && data.name == lcfnc.zeroPadding(value)){
+          isUsed = true;
+          break;
+        }
+      }
+    }else if(idx.filter(item => item !== null).length == 2){
+      //hole
+      for(let data of this.projects[idx[0]].holes){
+        if(value !== "" && data.name == lcfnc.zeroPadding(value)){
+          isUsed = true;
+          break;
+        }
+      }
+    }else if(idx.filter(item => item !== null).length == 3){
+      //section
+      for(let data of this.projects[idx[0]].holes[idx[1]].sections){
+        if(value !== "" && data.name == lcfnc.zeroPadding(value)){
+          isUsed = true;
+          break;
+        }
+      }
+    }else if(idx.filter(item => item !== null).length == 4){
+      //marker
+      for(let data of this.projects[idx[0]].holes[idx[1]].sections[idx[2]].markers){
+        if(value !== "" && data.name == lcfnc.zeroPadding(value)){
+          isUsed = true;
+          break;
+        }
+      }
+    }
+    
+    //apply to reference type array
+    if(isUsed == false){
+      targetData.name = lcfnc.zeroPadding(value);
+      console.log("MAIN: Change marker name.");
+      return true;
+    }else{
+      if(targetData.name == lcfnc.zeroPadding(value)){
+        return "same"
+      }else{
+        return "used"
+      }        
+    }
   }
   searchHconnection(startId) {
     let visitedId = new Set();

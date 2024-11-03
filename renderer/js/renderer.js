@@ -758,8 +758,6 @@ document.addEventListener("DOMContentLoaded", () => {
   async function handleEditContextmenu(event) {
     event.preventDefault();
 
-    let handleClick;
-    let handleMove;
     const clickResult = await window.LCapi.showContextMenu("editContextMenu");
 
     if(clickResult == "connect"){
@@ -834,6 +832,15 @@ document.addEventListener("DOMContentLoaded", () => {
       objOpts.edit.handleMove = handleSectionMouseMove;
       objOpts.edit.handleClick = null;
       document.addEventListener("mousemove", objOpts.edit.handleMove);
+    }else if(clickResult == "changeHoleName"){
+      objOpts.edit.contextmenu_enable = false;
+      objOpts.edit.hittest = null;
+      objOpts.edit.marker_from = null;
+      objOpts.edit.marker_to = null;
+      objOpts.edit.mode = "change_hole_name";
+      objOpts.edit.handleMove = handleHoleMouseMove;
+      objOpts.edit.handleClick = null;
+      document.addEventListener("mousemove", objOpts.edit.handleMove);
     }else{
       objOpts.edit.contextmenu_enable = true;
       objOpts.edit.hittest = null;
@@ -844,17 +851,17 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
   }
-  //1 Connect menu--------------------------------------------
+  //1 Connect move--------------------------------------------
   function handleConnectMouseMove(event) {
-    const rect = document.getElementById("p5Canvas").getBoundingClientRect(); // Canvas position and size
+    const rect = document.getElementById("p5Canvas").getBoundingClientRect(); 
     const mouseX = event.clientX - rect.left;
     const mouseY = event.clientY - rect.top;
-    const results = getClickedItemIdx(mouseX, mouseY, LCCore, objOpts);
-    objOpts.edit.hittest = results;
+    const ht = JSON.parse(JSON.stringify(getClickedItemIdx(mouseX, mouseY, LCCore, objOpts)));
+    objOpts.edit.hittest = ht;
     updateView();
   
     //context menu
-    if (Math.abs(objOpts.edit.hittest.nearest_distance) < objOpts.edit.sensibility) {
+    if (Math.abs(ht.nearest_distance) < objOpts.edit.sensibility) {
       objOpts.edit.handleClick = handleConnectClick;
       document.addEventListener('click', objOpts.edit.handleClick);
     }else if(objOpts.edit.handleClick !== null){
@@ -862,9 +869,12 @@ document.addEventListener("DOMContentLoaded", () => {
       objOpts.edit.handleClick = null;
     }
   }
-  //1 Connect menu--------------------------------------------
+  //1 Connect click--------------------------------------------
   async function handleConnectClick(event) {
-    const ht = objOpts.edit.hittest;
+    const rect = document.getElementById("p5Canvas").getBoundingClientRect(); 
+    const mouseX = event.clientX - rect.left;
+    const mouseY = event.clientY - rect.top;
+    const ht = JSON.parse(JSON.stringify(getClickedItemIdx(mouseX, mouseY, LCCore, objOpts)));
     event.preventDefault();
 
     //initiarise
@@ -880,7 +890,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     if(objOpts.edit.marker_to == null && ht.nearest_marker !== null){
-      if(!(objOpts.edit.marker_from.project == objOpts.edit.hittest.project && objOpts.edit.marker_from.hole == objOpts.edit.hittest.hole)){
+      if(!(objOpts.edit.marker_from.project == ht.project && objOpts.edit.marker_from.hole == ht.hole)){
         objOpts.edit.marker_to = ht;
       }  
     }    
@@ -894,7 +904,7 @@ document.addEventListener("DOMContentLoaded", () => {
         );
         if (response.response) {
           const fromId = [objOpts.edit.marker_from.project, objOpts.edit.marker_from.hole, objOpts.edit.marker_from.section, objOpts.edit.marker_from.nearest_marker];
-          const toId  = [objOpts.edit.marker_to.project, objOpts.edit.marker_to.hole, objOpts.edit.marker_to.section, objOpts.edit.marker_to.nearest_marker];
+          const toId   = [objOpts.edit.marker_to.project,   objOpts.edit.marker_to.hole,   objOpts.edit.marker_to.section,   objOpts.edit.marker_to.nearest_marker];
           
           console.log("[Editor]: Connected markers between " + fromId +" to " + toId);
 
@@ -910,7 +920,7 @@ document.addEventListener("DOMContentLoaded", () => {
         );
         if (response.response) {
           const fromId = [objOpts.edit.marker_from.project, objOpts.edit.marker_from.hole, objOpts.edit.marker_from.section, objOpts.edit.marker_from.nearest_marker];
-          const toId  = [objOpts.edit.marker_to.project, objOpts.edit.marker_to.hole, objOpts.edit.marker_to.section, objOpts.edit.marker_to.nearest_marker];
+          const toId   = [objOpts.edit.marker_to.project,   objOpts.edit.marker_to.hole,   objOpts.edit.marker_to.section,   objOpts.edit.marker_to.nearest_marker];
 
           console.log("[Editor]: Disconnected markers between " + fromId +" to " + toId);
 
@@ -930,27 +940,25 @@ document.addEventListener("DOMContentLoaded", () => {
       objOpts.edit.marker_from = null;
       objOpts.edit.marker_to = null;
     }
-
-    updateView();
   }
-  //2 Marker menu--------------------------------------------
+  //2 Marker move--------------------------------------------
   function handleMarkerMouseMove(event) {
-    const rect = document.getElementById("p5Canvas").getBoundingClientRect(); // Canvas position and size
+    const rect = document.getElementById("p5Canvas").getBoundingClientRect(); 
     const mouseX = event.clientX - rect.left;
     const mouseY = event.clientY - rect.top;
-    const results = getClickedItemIdx(mouseX, mouseY, LCCore, objOpts);
-    objOpts.edit.hittest = results;
+    const ht = JSON.parse(JSON.stringify(getClickedItemIdx(mouseX, mouseY, LCCore, objOpts)));
+    objOpts.edit.hittest = ht;
     updateView();
   
     //context menu
-    if(objOpts.edit.hittest.section !== null){
+    if(ht.section !== null){
       //on the section
       if(objOpts.edit.mode == "add_marker"){
         objOpts.edit.handleClick = handleMarkerAddClick;
         document.addEventListener('click', objOpts.edit.handleClick);
       }
 
-      if (Math.abs(objOpts.edit.hittest.nearest_distance) < objOpts.edit.sensibility) {
+      if (Math.abs(ht.nearest_distance) < objOpts.edit.sensibility) {
         if(objOpts.edit.mode == "delete_marker"){
           objOpts.edit.handleClick = handleMarkerDeleteClick;
           document.addEventListener('click', objOpts.edit.handleClick);
@@ -968,9 +976,12 @@ document.addEventListener("DOMContentLoaded", () => {
 
     
   }
-  //2 Marker menu--------------------------------------------
+  //2 Marker click--------------------------------------------
   async function handleMarkerChangeClick(event) {
-    const ht = objOpts.edit.hittest;
+    const rect = document.getElementById("p5Canvas").getBoundingClientRect(); 
+    const mouseX = event.clientX - rect.left;
+    const mouseY = event.clientY - rect.top;
+    const ht = JSON.parse(JSON.stringify(getClickedItemIdx(mouseX, mouseY, LCCore, objOpts)));
     event.preventDefault();
 
     //initiarise
@@ -1010,7 +1021,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }
          
         if (response !== null) {
-          const targetId = [objOpts.edit.marker_from.project, objOpts.edit.marker_from.hole, objOpts.edit.marker_from.section, objOpts.edit.marker_from.nearest_marker];
+          const targetId = [ht.project, ht.hole, ht.section, ht.nearest_marker];
 
           await undo("save");//undo
           const result = await window.LCapi.changeMarker(targetId, target, response);
@@ -1041,20 +1052,24 @@ document.addEventListener("DOMContentLoaded", () => {
         }
       }
 
-      //exit process
-      document.removeEventListener("click", handleMarkerChangeClick);
-      document.removeEventListener("mousemove", handleMarkerMouseMove);
-      objOpts.edit.contextmenu_enable = false;
-      objOpts.edit.hittest = null;
-      objOpts.edit.marker_from = null;
-      objOpts.edit.marker_to = null;
     }
 
+    document.removeEventListener("click", objOpts.edit.handleClick);
+    document.removeEventListener("mousemove", objOpts.edit.handleMove);
+    objOpts.edit.contextmenu_enable = true;
+    objOpts.edit.hittest = null;
+    objOpts.edit.marker_from = null;
+    objOpts.edit.marker_to = null;
+    objOpts.edit.handleClick = null;
+    objOpts.edit.handleMove = null;
     updateView();
   }
-  //2 Marker menu--------------------------------------------
+  //2 Marker click--------------------------------------------
   async function handleMarkerDeleteClick(event) {
-    const ht = objOpts.edit.hittest;
+    const rect = document.getElementById("p5Canvas").getBoundingClientRect(); 
+    const mouseX = event.clientX - rect.left;
+    const mouseY = event.clientY - rect.top;
+    const ht = JSON.parse(JSON.stringify(getClickedItemIdx(mouseX, mouseY, LCCore, objOpts)));
     event.preventDefault();
 
     //initiarise
@@ -1085,26 +1100,25 @@ document.addEventListener("DOMContentLoaded", () => {
           await undo("save");//undo
           await window.LCapi.deleteMarker(fromId);
           await loadModel();
-          updateView();
-
         }
       }
-      console.log(LCCore);
-
-      //exit process
-      document.removeEventListener("click", handleMarkerDeleteClick);
-      document.removeEventListener("mousemove", handleMarkerMouseMove);
-      objOpts.edit.contextmenu_enable = false;
-      objOpts.edit.hittest = null;
-      objOpts.edit.marker_from = null;
-      objOpts.edit.marker_to = null;
     }
-
+    document.removeEventListener("click", objOpts.edit.handleClick);
+    document.removeEventListener("mousemove", objOpts.edit.handleMove);
+    objOpts.edit.contextmenu_enable = true;
+    objOpts.edit.hittest = null;
+    objOpts.edit.marker_from = null;
+    objOpts.edit.marker_to = null;
+    objOpts.edit.handleClick = null;
+    objOpts.edit.handleMove = null;
     updateView();
   }
-  //2 Marker menu--------------------------------------------
+  //2 Marker click--------------------------------------------
   async function handleMarkerAddClick(event) {
-    const ht = objOpts.edit.hittest;
+    const rect = document.getElementById("p5Canvas").getBoundingClientRect(); 
+    const mouseX = event.clientX - rect.left;
+    const mouseY = event.clientY - rect.top;
+    const ht = JSON.parse(JSON.stringify(getClickedItemIdx(mouseX, mouseY, LCCore, objOpts)));
     event.preventDefault();
 
     //initiarise
@@ -1141,67 +1155,149 @@ document.addEventListener("DOMContentLoaded", () => {
         }
       }
 
-      //exit process
-      document.removeEventListener("click", handleMarkerAddClick);
-      document.removeEventListener("mousemove", handleMarkerMouseMove);
-      objOpts.edit.contextmenu_enable = false;
-      objOpts.edit.hittest = null;
-      objOpts.edit.marker_from = null;
-      objOpts.edit.marker_to = null;
     }
-
+    document.removeEventListener("click", objOpts.edit.handleClick);
+    document.removeEventListener("mousemove", objOpts.edit.handleMove);
+    objOpts.edit.contextmenu_enable = true;
+    objOpts.edit.hittest = null;
+    objOpts.edit.marker_from = null;
+    objOpts.edit.marker_to = null;
+    objOpts.edit.handleClick = null;
+    objOpts.edit.handleMove = null;
     updateView();
   }
-  //3 Section menu--------------------------------------------
+  //3 Section move--------------------------------------------
   function handleSectionMouseMove(event) {
-    const rect = document.getElementById("p5Canvas").getBoundingClientRect(); // Canvas position and size
+    const rect = document.getElementById("p5Canvas").getBoundingClientRect(); 
     const mouseX = event.clientX - rect.left;
     const mouseY = event.clientY - rect.top;
-    const results = getClickedItemIdx(mouseX, mouseY, LCCore, objOpts);
-    objOpts.edit.hittest = results;
+    const ht = JSON.parse(JSON.stringify(getClickedItemIdx(mouseX, mouseY, LCCore, objOpts)));
+    objOpts.edit.hittest = ht;
     updateView();
   
     //context menu
-    if(objOpts.edit.hittest.section !== null){
+    if(ht.section !== null){
       //on the section
       if(objOpts.edit.mode == "change_section_name"){
-        document.addEventListener('click', handleSectionChangeClick);
+        objOpts.edit.handleClick = handleSectionChangeClick;
+        document.addEventListener('click', objOpts.edit.handleClick);
       }else{
-        document.removeEventListener('click', handleSectionChangeClick);
+        if(objOpts.edit.handleClick !== null){
+          document.removeEventListener('click', objOpts.edit.handleClick);
+        }        
       }
     }else{
-      document.removeEventListener('click', handleSectionChangeClick);
+      if(objOpts.edit.handleClick !== null){
+        document.removeEventListener('click', objOpts.edit.handleClick);
+      }
     }
 
     
   }
-//3 Section menu--------------------------------------------
-async function handleSectionChangeClick(event) {
-  const ht = objOpts.edit.hittest;
-  event.preventDefault();
+  //3 Section click--------------------------------------------
+  async function handleSectionChangeClick(event) {
+    const rect = document.getElementById("p5Canvas").getBoundingClientRect(); 
+    const mouseX = event.clientX - rect.left;
+    const mouseY = event.clientY - rect.top;
+    const ht = JSON.parse(JSON.stringify(getClickedItemIdx(mouseX, mouseY, LCCore, objOpts)));
+    event.preventDefault();
 
-  if(objOpts.edit.mode == "change_section_name"){
-    let target = "name";
-    const response = await window.LCapi.inputdialog(
-      "Change section name",
-      "Please input a new section name.",
-      "text",
-    );
-    if (response !== null) {
-      const targetId = [objOpts.edit.hittest.project, objOpts.edit.hittest.hole, objOpts.edit.hittest.section, null];
+    if(objOpts.edit.mode == "change_section_name"){
+      let target = "name";
+      const response = await window.LCapi.inputdialog(
+        "Change section name",
+        "Please input a new section name.",
+        "text",
+      );
+      if (response !== null) {
+        const targetId = [ht.project, ht.hole, ht.section, null];
 
-      await undo("save");//undo
-      const result = await window.LCapi.changeSection(targetId, target, response);
-      if(result=="used"){
-        console.log("[Renderer]: "+response+" has already been used. Please input a unique name that has not been used.");
-        alert("[ "+response+" ] has already been used. Please input a unique name that has not been used.");
+        await undo("save");//undo
+        const result = await window.LCapi.changeSection(targetId, target, response);
+        if(result=="used"){
+          console.log("[Renderer]: "+response+" has already been used. Please input a unique name that has not been used.");
+          alert("[ "+response+" ] has already been used. Please input a unique name that has not been used.");
+        }
+        
+        await loadModel();
+        updateView();
       }
-      
-      await loadModel();
-      updateView();
     }
+    document.removeEventListener("click", objOpts.edit.handleClick);
+    document.removeEventListener("mousemove", objOpts.edit.handleMove);
+    objOpts.edit.contextmenu_enable = true;
+    objOpts.edit.hittest = null;
+    objOpts.edit.marker_from = null;
+    objOpts.edit.marker_to = null;
+    objOpts.edit.handleClick = null;
+    objOpts.edit.handleMove = null;
+    updateView();
   }
-}
+  //4 Hole move--------------------------------------------
+  function handleHoleMouseMove(event) {
+    const rect = document.getElementById("p5Canvas").getBoundingClientRect(); 
+    const mouseX = event.clientX - rect.left;
+    const mouseY = event.clientY - rect.top;
+    const ht = JSON.parse(JSON.stringify(getClickedItemIdx(mouseX, mouseY, LCCore, objOpts)));
+    objOpts.edit.hittest = ht;
+    updateView();
+  
+    //context menu
+    if(ht.hole !== null){
+      //on the section
+      if(objOpts.edit.mode == "change_hole_name"){
+        objOpts.edit.handleClick = handleHoleChangeClick;
+        document.addEventListener('click', objOpts.edit.handleClick);
+      }else{
+        if(objOpts.edit.handleClick !== null){
+          document.removeEventListener('click', objOpts.edit.handleClick);
+        }
+      }
+    }else{
+      if(objOpts.edit.handleClick !== null){
+        document.removeEventListener('click', objOpts.edit.handleClick);
+      }
+    }
+
+    
+  }
+  //4 Hole click--------------------------------------------
+  async function handleHoleChangeClick(event) {
+    const rect = document.getElementById("p5Canvas").getBoundingClientRect(); 
+    const mouseX = event.clientX - rect.left;
+    const mouseY = event.clientY - rect.top;
+    const ht = JSON.parse(JSON.stringify(getClickedItemIdx(mouseX, mouseY, LCCore, objOpts)));
+    event.preventDefault();
+
+    if(objOpts.edit.mode == "change_hole_name"){
+      let target = "name";
+      const response = await window.LCapi.inputdialog(
+        "Change hole name",
+        "Please input a new hole name.",
+        "text",
+      );
+      if (response !== null) {
+        const targetId = [ht.project, ht.hole, null, null];
+
+        await undo("save");//undo
+        const result = await window.LCapi.changeHole(targetId, target, response);
+        if(result=="used"){
+          console.log("[Renderer]: "+response+" has already been used. Please input a unique name that has not been used.");
+          alert("[ "+response+" ] has already been used. Please input a unique name that has not been used.");
+        }
+        
+        await loadModel();
+      }
+    }
+    
+    objOpts.edit.contextmenu_enable = true;
+    objOpts.edit.hittest = null;
+    objOpts.edit.marker_from = null;
+    objOpts.edit.marker_to = null;
+    objOpts.edit.handleClick = null;
+    objOpts.edit.handleMove = null;
+    updateView();
+  }
   //============================================================================================
   //load correlation model
   window.LCapi.receive("ExportCorrelationAsCsvMenuClicked", async () => {
