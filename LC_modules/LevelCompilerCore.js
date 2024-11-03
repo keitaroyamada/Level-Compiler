@@ -1745,19 +1745,19 @@ class LevelCompilerCore {
                   this.disconnectMarkers(
                     upper_marker_id,
                     lower_marker_id,
-                    "virtical"
+                    "vertical"
                   );
 
                   //connect with new marker
                   this.connectMarkers(
                     upper_marker_id,
                     newMarkerData.id,
-                    "virtical"
+                    "vertical"
                   );
                   this.connectMarkers(
                     lower_marker_id,
                     newMarkerData.id,
-                    "virtical"
+                    "vertical"
                   );
 
                   //connect event
@@ -2581,7 +2581,7 @@ class LevelCompilerCore {
     const fromIdx = this.search_idx_list[fromId.toString()];
     const toIdx = this.search_idx_list[toId.toString()];
 
-    if (direction == "virtical") {
+    if (direction == "vertical") {
       let connectionIdxFrom = null;
       let connectionIdxTo = null;
       //check in connection of from
@@ -2676,12 +2676,7 @@ class LevelCompilerCore {
         this.projects[ci[0]].holes[ci[1]].sections[ci[2]].markers[ci[3]].h_connection = newhconnected;
       });
     } else {
-      console.log(
-        "Fail to connect markers because there are already connected between ." +
-          this.getMarkerNameFromId(fromId) +
-          " and " +
-          this.getMarkerNameFromId(toId)
-      );
+      console.log("Fail to connect markers because direction is not correct.");
     }
   }
 
@@ -2690,7 +2685,7 @@ class LevelCompilerCore {
     const fromIdx = this.search_idx_list[fromId.toString()];
     const toIdx = this.search_idx_list[toId.toString()];
 
-    if (direction == "virtical") {
+    if (direction == "vertical") {
       let connectionIdxFrom = null;
       let connectionIdxTo = null;
       //check in connection of from
@@ -2762,7 +2757,7 @@ class LevelCompilerCore {
   deleteMarker(targetId){
     const targetMarkerIdx = this.search_idx_list[targetId.toString()];
     const targetMarkerData = this.getDataByIdx(targetMarkerIdx);
-    const targetSectionData = this.getDataByIdx(LCCore.search_idx_list[[targetId[0],targetId[1],targetId[2],null].toString()]);
+    const targetSectionData = this.getDataByIdx(this.search_idx_list[[targetId[0],targetId[1],targetId[2],null].toString()]);
     let upperMarkerId = null;
     let lowerMarkerId = null;
     if(targetMarkerData.v_connection.length == 2){
@@ -2771,42 +2766,276 @@ class LevelCompilerCore {
       lowerMarkerId = targetMarkerData.v_connection[1];
     } 
 
+    //remove event layers
+    if(targetMarkerData.event !== 0){
+      for(let e of targetMarkerData.event){
+        console.log(e)
+        //["deposition", "upward", connected_marker_id, [label], (value))]
+        if(e[1] == "through-up"){
+          if(targetMarkerData.v_connection.length==2){
+            const upperMarkerId = targetMarkerData.v_connection[0];
+            const lowerMarkerId = targetMarkerData.v_connection[1];
+            const upperMarkerIdx = this.search_idx_list[upperMarkerId.toString()];
+            const lowerMarkerIdx = this.search_idx_list[lowerMarkerId.toString()];
+            const connectedMarkerIdx = this.search_idx_list[e[2].toString()];
+            const upperMarkerData = JSON.parse(JSON.stringify(this.getDataByIdx(upperMarkerIdx)));
+            const lowerMarkerData = JSON.parse(JSON.stringify(this.getDataByIdx(lowerMarkerIdx)));
+            const connectedMarkerData = JSON.parse(JSON.stringify(this.getDataByIdx(connectedMarkerIdx)));
+
+            this.projects[upperMarkerIdx[0]].holes[upperMarkerIdx[1]].sections[upperMarkerIdx[2]].markers[upperMarkerIdx[3]].event 
+                = connectedMarkerData.event.filter(e2=> e2[2].toString() !== targetId.toString());
+            let newEvent = lowerMarkerData.event.filter(e2=>e2[2].toString() !== targetId.toString());
+            newEvent = newEvent[0];
+            this.projects[upperMarkerIdx[0]].holes[upperMarkerIdx[1]].sections[upperMarkerIdx[2]].markers[upperMarkerIdx[3]].event.push(newEvent);
+          }
+        } else if(e[1] == "upward"){
+          const connectedMarkerIdx = this.search_idx_list[e[2].toString()];
+          const connectedMarkerData = JSON.parse(JSON.stringify(this.getDataByIdx(connectedMarkerIdx)));
+          //if downward, remove
+          this.projects[connectedMarkerIdx[0]].holes[connectedMarkerIdx[1]].sections[connectedMarkerIdx[2]].markers[connectedMarkerIdx[3]].event 
+              = connectedMarkerData.event.filter(e2=>!(e[0] == e2[0] && e2[1] == "downward"));
+          //if through, replace
+          this.projects[connectedMarkerIdx[0]].holes[connectedMarkerIdx[1]].sections[connectedMarkerIdx[2]].markers[connectedMarkerIdx[3]].event 
+              = connectedMarkerData.event.filter(e2=>!(e[0] == e2[0] && (e2[1] == "through-down" || e2[1] == "through-up")));
+          let newEvent = connectedMarkerData.event.filter(e2=>(e[0] == e2[0] && e2[1] == "through-up"));
+          if(newEvent.length !== 0){
+            newEvent[0][1] = e[1];
+            newEvent = newEvent[0];
+          }          
+          this.projects[connectedMarkerIdx[0]].holes[connectedMarkerIdx[1]].sections[connectedMarkerIdx[2]].markers[connectedMarkerIdx[3]].event.push(newEvent);
+        } else if(e[1] == "downward"){
+          const connectedMarkerIdx = this.search_idx_list[e[2].toString()];
+          const connectedMarkerData = JSON.parse(JSON.stringify(this.getDataByIdx(connectedMarkerIdx)));
+          //if downward, remove
+          this.projects[connectedMarkerIdx[0]].holes[connectedMarkerIdx[1]].sections[connectedMarkerIdx[2]].markers[connectedMarkerIdx[3]].event 
+              = connectedMarkerData.event.filter(e2=>!(e[0] == e2[0] && e2[1] == "upward"));
+          //if through, replace
+          this.projects[connectedMarkerIdx[0]].holes[connectedMarkerIdx[1]].sections[connectedMarkerIdx[2]].markers[connectedMarkerIdx[3]].event 
+              = connectedMarkerData.event.filter(e2=>!(e[0] == e2[0] && (e2[1] == "through-down" || e2[1] == "through-up")));
+          let newEvent = connectedMarkerData.event.filter(e2=>(e[0] == e2[0] && e2[1] == "through-down"));          
+          if(newEvent.length !== 0){
+            newEvent[0][1] = e[1];
+            newEvent = newEvent[0];
+          }   
+          this.projects[connectedMarkerIdx[0]].holes[connectedMarkerIdx[1]].sections[connectedMarkerIdx[2]].markers[connectedMarkerIdx[3]].event.push(newEvent);
+        }
+      }
+    }
+    
     //trim target markerdata
     this.disconnectMarkers(upperMarkerId, targetId, "vertical");
     this.disconnectMarkers(targetId, lowerMarkerId, "vertical");
     this.connectMarkers(upperMarkerId, lowerMarkerId, "vertical");
     this.projects[targetMarkerIdx[0]].holes[targetMarkerIdx[1]].sections[targetMarkerIdx[2]].reserved_marker_ids = targetSectionData.reserved_marker_ids.filter(num => num !== targetId[3]);
-
-    //remove event layers
-    if(targetMarkerData.event !== 0){
-      for(let e of targetMarkerData.event){
-        //["deposition", "upward", connected_marker_id, [label], (value))]
-        if(e[1] == "through-up"){
-          for(let e2 of targetMarkerData.event){
-            //e[1] == "through-down"
-          }
-          const conEventIdx = this.search_idx_list[e[2].toString()];
-
-        }
-
-      }
+    const newMarkers = targetSectionData.markers.filter(m=> m.id.toString() !== targetId.toString());
+    this.projects[targetMarkerIdx[0]].holes[targetMarkerIdx[1]].sections[targetMarkerIdx[2]].markers = newMarkers;
+    
+    //remove from horizontal connection
+    for(let id of targetMarkerData.h_connection){
+      const connectedIdx = this.search_idx_list[id.toString()];
+      const connectedMarkerData = this.projects[connectedIdx[0]].holes[connectedIdx[1]].sections[connectedIdx[2]].markers[connectedIdx[3]];
       
+      this.projects[connectedIdx[0]].holes[connectedIdx[1]].sections[connectedIdx[2]].markers[connectedIdx[3]].h_connection 
+          = connectedMarkerData.h_connection.filter(id=>id.toString() !== targetId.toString());
+    }
+  }
+  addMarker(sectionId, depth, depthScale){
+    const sectionIdx  = this.search_idx_list[sectionId.toString()];
+    const sectionData = this.getDataByIdx(sectionIdx);
+
+    let newId = Math.max(...sectionData.reserved_marker_ids) + 1;
+    const newMarkerId = [sectionId[0], sectionId[1], sectionId[2], newId];
+
+    const results = this.getNearestTrinity(sectionId, depth, depthScale);
+
+    let upperIdx = null;
+    let lowerIdx = null;
+    let lowerDistance = Infinity;
+    let upperDistance = -Infinity;
+
+    for(let m=0; m<this.projects[sectionIdx[0]].holes[sectionIdx[1]].sections[sectionIdx[2]].markers.length; m++){
+      const marker_y0 = this.projects[sectionIdx[0]].holes[sectionIdx[1]].sections[sectionIdx[2]].markers[m].distance;
+      if(marker_y0 - results.distance > 0 && Math.abs(lowerDistance) >= Math.abs(marker_y0 - results.distance)){
+        lowerDistance = marker_y0 - results.distance;
+        lowerIdx = m;
+      }
+
+      if(marker_y0 - results.distance <= 0 && Math.abs(upperDistance) >= Math.abs(marker_y0 - results.distance)){
+        upperDistance = marker_y0 - results.distance;
+        upperIdx = m;
+      }
+    }
+    //console.log("Target is located between " +upperIdx+" and "+lowerIdx);
+
+    const upperMarkerData = this.projects[sectionIdx[0]].holes[sectionIdx[1]].sections[sectionIdx[2]].markers[upperIdx];
+    const lowerMarkerData = this.projects[sectionIdx[0]].holes[sectionIdx[1]].sections[sectionIdx[2]].markers[lowerIdx];
+    const upperId = upperMarkerData.id;
+    const lowerId = lowerMarkerData.id;
+
+    //make new marker
+    let newMarkerData = new Marker();
+    newMarkerData.id = newMarkerId;
+    newMarkerData[depthScale] = depth
+    newMarkerData.distance = results.distance;
+    if(this.projects[sectionIdx[0]].holes[sectionIdx[1]].sections[sectionIdx[2]].markers[upperIdx].isMaster == true && this.projects[sectionIdx[0]].holes[sectionIdx[1]].sections[sectionIdx[2]].markers[lowerIdx].isMaster == true){
+      newMarkerData.isMaster = true;
+    }
+    //event
+    for(let ue of upperMarkerData.event){
+      if(ue[2].toString() == lowerMarkerData.id.toString()){
+        if(ue[1] == "downward" || ue[1] == "through-down"){
+          newMarkerData.event.push([ue[0], "through-up", upperId, ue[3], ue[4]]);
+          newMarkerData.event.push([ue[0], "through-down", lowerId, ue[3], ue[4]]);
+        }
+      }
+    }
+
+    this.projects[sectionIdx[0]].holes[sectionIdx[1]].sections[sectionIdx[2]].markers.push(newMarkerData);
+
+    this.disconnectMarkers(upperId, lowerId, "vertical");
+    this.connectMarkers(upperId, newMarkerId, "vertical");
+    this.connectMarkers(newMarkerId, lowerId, "vertical");
+    this.projects[sectionIdx[0]].holes[sectionIdx[1]].sections[sectionIdx[2]].reserved_marker_ids.push(newId);
+  }
+  changeDistance(markerId, distance){
+    const markerIdx = this.search_idx_list[markerId.toString()];
+    let markerData = JSON.parse(JSON.stringify(this.getDataByIdx(markerIdx)));
+    let sectionData = JSON.parse(JSON.stringify(this.projects[markerIdx[0]].holes[markerIdx[1]].sections[markerIdx[2]]));
+    sectionData.markers.sort((a,b)=>a.distance-b.distance);
+    const minSecDistance = sectionData.markers[0].distance;
+    const maxSecDistance = sectionData.markers[sectionData.markers.length-1].distance;
+
+    let curUpperIdx = null;
+    let curLowerIdx = null;
+    let curTargetIdx = null;
+    let curLowerDistance = Infinity;
+    let curUpperDistance = -Infinity;
+    for(let m=0; m<sectionData.markers.length; m++){
+      const marker_y0 = sectionData.markers[m].distance;
+      if(marker_y0 - markerData.distance > 0 && Math.abs(curLowerDistance) > Math.abs(marker_y0 - markerData.distance)){
+        curLowerDistance = marker_y0 - markerData.distance;
+        curLowerIdx = m;
+      }
+
+      if(marker_y0 - markerData.distance < 0 && Math.abs(curUpperDistance) > Math.abs(marker_y0 - markerData.distance)){
+        curUpperDistance = marker_y0 - markerData.distance;
+        curUpperIdx = m;
+      }
+      if(marker_y0 - markerData.distance == 0){
+        curTargetIdx = m;
+      }
+    }
+
+    let newUpperIdx = null;
+    let newLowerIdx = null;
+    let newLowerDistance = Infinity;
+    let newUpperDistance = -Infinity;
+    for(let m=0; m<sectionData.markers.length; m++){
+      if(m == curTargetIdx){
+        continue;
+      }
+      const marker_y0 = sectionData.markers[m].distance;
+      if(marker_y0 - distance > 0 && Math.abs(newLowerDistance) > Math.abs(marker_y0 - distance)){
+        newLowerDistance = marker_y0 - distance;
+        newLowerIdx = m;
+      }
+
+      if(marker_y0 - distance < 0 && Math.abs(newUpperDistance) > Math.abs(marker_y0 - distance)){
+        newUpperDistance = marker_y0 - distance;
+        newUpperIdx = m;
+      }
+    }
+    //console.log(newLowerIdx, newUpperIdx, curLowerIdx, curUpperIdx, curTargetIdx)
+
+    //check position
+    if(newLowerIdx == null && newUpperIdx == null){
+      console.log("LCCore: Unsuspected case 1.");
+      return "unsuspected";
+    }
+
+    //case top/bottom move to out of section, move
+    if(newUpperIdx == null){
+      //out of upper
+      if(markerData.name.includes("top")){
+        //if top, move
+        this.projects[markerIdx[0]].holes[markerIdx[1]].sections[markerIdx[2]].markers[markerIdx[3]].distance = distance;
+        this.projects[markerIdx[0]].holes[markerIdx[1]].sections[markerIdx[2]].markers[markerIdx[3]].drilling_depth = markerData.drilling_depth + (distance - markerData.distance);
+        console.log("LCCore: Change distance (Move section top exceeding the current section upper).");
+        return true;
+      }else{
+        console.log("LCCore: No change distance (New position exceeds the current section upper).");
+        return "must_be_top";
+      }
+    }
+    if(newLowerIdx == null){
+      //out of upper
+      if(markerData.name.includes("bottom")){
+        //if top, move
+        this.projects[markerIdx[0]].holes[markerIdx[1]].sections[markerIdx[2]].markers[markerIdx[3]].distance = distance;
+        this.projects[markerIdx[0]].holes[markerIdx[1]].sections[markerIdx[2]].markers[markerIdx[3]].drilling_depth = markerData.drilling_depth + (distance - markerData.distance);
+        console.log("LCCore: Change distance (Move section bottom exceeding the current section lower).");
+        return true;
+      }else{
+        console.log("LCCore: No change distance (New position exceeds the current section lower).");
+        return "must_be_bottom";
+      }
     }
     
-
-    //remove from horizontal connection
-    const connectedIds = targetMarkerData.h_connection;
-    for(let id of connectedIds){
-      const connectedIdx = this.search_idx_list[id.toString()];
-      const connectedMarkerData = LCCore.projects[connectedIdx[0]].holes[connectedIdx[1]].sections[connectedIdx[2].markers[connectedIdx[3]]];
-      let h_connections = [];
-      for(let cid of connectedMarkerData.h_connection){
-        if(cid.toString() !== targetId.toString()){
-          h_connections.push(cid);
+    //case move within section
+    if(newLowerIdx !== null && newUpperIdx !== null){
+       //case marker is top marker
+      if(curUpperIdx == null){
+        if(curLowerIdx == newLowerIdx){
+          //between the same markers
+          this.projects[markerIdx[0]].holes[markerIdx[1]].sections[markerIdx[2]].markers[markerIdx[3]].distance = distance;
+          this.projects[markerIdx[0]].holes[markerIdx[1]].sections[markerIdx[2]].markers[markerIdx[3]].drilling_depth = markerData.drilling_depth + (distance - markerData.distance);
+          console.log("LCCore: Change distance (between the same markers).");
+          return true;
+        }else{
+          //between other markers(top marker must be top.)
+          console.log("LCCore: No change distance because the top marker must be the top of the section.")
+          return "must_be_top";
         }
       }
-      this.projects[connectedIdx[0]].holes[connectedIdx[1]].sections[connectedIdx[2].markers[connectedIdx[3]]].h_connection = h_connections;
+      //case marker is bottom marker
+      if(curLowerIdx == null){
+        if(curUpperIdx == newUpperIdx){
+          //between the same markers
+          this.projects[markerIdx[0]].holes[markerIdx[1]].sections[markerIdx[2]].markers[markerIdx[3]].distance = distance;
+          this.projects[markerIdx[0]].holes[markerIdx[1]].sections[markerIdx[2]].markers[markerIdx[3]].drilling_depth = markerData.drilling_depth + (distance - markerData.distance);
+          console.log("LCCore: Change distance (between the same markers).");
+          return true;
+        }else{
+          //between other markers(top marker must be top.)
+          console.log("LCCore: No change distance because the bottom marker must be the bottom of the section.")
+          return "must_be_bottom";
+        }
+      }
+      //case marker is other type
+      if(newUpperIdx !== null && newLowerIdx !== null){
+        if(newUpperIdx == curUpperIdx && newLowerIdx == curLowerIdx){
+          //between the same markers
+          this.projects[markerIdx[0]].holes[markerIdx[1]].sections[markerIdx[2]].markers[markerIdx[3]].distance = distance;
+          this.projects[markerIdx[0]].holes[markerIdx[1]].sections[markerIdx[2]].markers[markerIdx[3]].drilling_depth = markerData.drilling_depth + (distance - markerData.distance);
+          console.log("LCCore: Change distance (between the same markers).");
+          return true;
+        }else{
+          //between other markers
+          this.deleteMarker(markerId);
+          this.addMarker([markerId[0],markerId[1],markerId[2],null], distance, "distance");
+          console.log("LCCore: Change distance (between the different markers).");
+          return true;
+        }
+      }else{
+        console.log("LCCore: No change distance because the marker must be located between top and bottom.")
+        return "out_of_section";
+      }
+    }else{
+      console.log("LCCore: Unsuspected case 2")
+      return "unsuspected";
     }
+
+    
   }
   searchHconnection(startId) {
     let visitedId = new Set();

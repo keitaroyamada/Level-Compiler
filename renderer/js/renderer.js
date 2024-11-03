@@ -1,4 +1,5 @@
 document.addEventListener("DOMContentLoaded", () => {
+ 
   //============================================================================================
   let developerMode = true;
   //base properties
@@ -151,6 +152,8 @@ document.addEventListener("DOMContentLoaded", () => {
   objOpts.edit.sensibility = 2;
   objOpts.edit.marker_from = null;
   objOpts.edit.marker_to = null;
+  objOpts.edit.handleClick = null;
+  objOpts.edit.handleMove = null;
 
   objOpts.pen.colour = "Red";
 
@@ -728,8 +731,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
   //============================================================================================
-  //load correlation model
-  //
+  //Edit correlation model
   window.LCapi.receive("EditCorrelation", async () => {
     if(!LCCore){   
        return  
@@ -742,7 +744,6 @@ document.addEventListener("DOMContentLoaded", () => {
       objOpts.edit.marker_from = null;
       objOpts.edit.marker_to = null;
       document.body.style.cursor = "default";
-     
       document.removeEventListener('contextmenu', handleEditContextmenu);
     }else{
       objOpts.edit.editable = true;
@@ -752,142 +753,117 @@ document.addEventListener("DOMContentLoaded", () => {
         document.addEventListener('contextmenu', handleEditContextmenu);
       }
     }
-
   });
-  //--------------------------------------------
+  //0 Context menu--------------------------------------------
   async function handleEditContextmenu(event) {
-    console.log("[Renderer]: Click right button]");
     event.preventDefault();
 
+    let handleClick;
+    let handleMove;
     const clickResult = await window.LCapi.showContextMenu("editContextMenu");
+
     if(clickResult == "connect"){
-      objOpts.edit.contextmenu_enable = false;
-      objOpts.edit.mode = "connect_marker";
-      document.addEventListener("mousemove", handleEditMouseMove);
-            objOpts.edit.marker_from;
-      objOpts.edit.marker_to;
-      console.log(objOpts.edit);
-      //measureObject.measureCanvas = new p5(connectSketch);
-    } else if(clickResult == "disconnect"){
-      objOpts.edit.contextmenu_enable = false;
-      objOpts.edit.mode = "disconnect_marker";
-      document.addEventListener("mousemove", handleEditMouseMove);
-      //measureObject.measureCanvas = new p5(connectSketch);
-    }else if(clickResult == "addMarker"){
-      objOpts.edit.contextmenu_enable = false;
-      objOpts.edit.mode = "add_marker";
-      document.addEventListener("mousemove", handleEditAddMouseMove);
-
-    }else if(clickResult == "deleteMarker"){
-      objOpts.edit.contextmenu_enable = false;
-      objOpts.edit.mode = "delete_marker";
-      document.addEventListener("mousemove", handleEditDeleteMouseMove);
-
-    }else{
-      objOpts.edit.contextmenu_enable = true;
-    }
-
-  }
-  //--------------------------------------------
-  function handleEditDeleteMouseMove(event) {
-    const rect = document.getElementById("p5Canvas").getBoundingClientRect(); // Canvas position and size
-    const mouseX = event.clientX - rect.left;
-    const mouseY = event.clientY - rect.top;
-    const results = getClickedItemIdx(mouseX, mouseY, LCCore, objOpts);
-    objOpts.edit.hittest = results;
-    updateView();
-  
-    //context menu
-    if (Math.abs(objOpts.edit.hittest.nearest_distance) < objOpts.edit.sensibility) {
-      document.addEventListener('click', handleEditDeleteClick);
-    }else{
-      document.removeEventListener('click', handleEditDeleteClick);
-    }
-  }
-  //--------------------------------------------
-  function handleEditMouseMove(event) {
-    
-    
-    const rect = document.getElementById("p5Canvas").getBoundingClientRect(); // Canvas position and size
-    const mouseX = event.clientX - rect.left;
-    const mouseY = event.clientY - rect.top;
-    const results = getClickedItemIdx(mouseX, mouseY, LCCore, objOpts);
-    objOpts.edit.hittest = results;
-    updateView();
-  
-    //context menu
-    if (Math.abs(objOpts.edit.hittest.nearest_distance) < objOpts.edit.sensibility) {
-      document.addEventListener('click', handleEditClick);
-    }else{
-      document.removeEventListener('click', handleEditClick);
-    }
-  
-  //--------------------------------------------
-  async function handleEditDeleteClick(event) {
-    const ht = objOpts.edit.hittest;
-    event.preventDefault();
-
-    //initiarise
-    if(objOpts.edit.marker_from !== null ){
-      objOpts.edit.marker_from = null;
-      objOpts.edit.mode = null;
-    }
-
-    if(objOpts.edit.marker_from == null && ht.nearest_marker !== null){
-      objOpts.edit.marker_from = ht;
-    }
-    
-    if (objOpts.edit.marker_from !== null) {
-      //if get both markers
-      if(objOpts.edit.mode == "delete_marker"){
-        const response = await window.LCapi.askdialog(
-          "Delete markers",
-          "Do you want to DELETE the selected marker?"
-        );
-        if (response.response) {
-          const fromId = [objOpts.edit.marker_from.project, objOpts.edit.marker_from.hole, objOpts.edit.marker_from.section, objOpts.edit.marker_from.nearest_marker];
-          
-          console.log("[Editor]: Delete marker: " + fromId);
-
-          await undo("save");//undo
-          await window.LCapi.connectMarkers(fromId, toId, "horizontal");
-          await loadModel();
-          updateView();
-
-        }
-      } else if(objOpts.edit.mode == "disconnect_marker"){
-        const response = await window.LCapi.askdialog(
-          "Connect markers",
-          "Do you want to DISCONNECT between selected markers?"
-        );
-        if (response.response) {
-          const fromId = [objOpts.edit.marker_from.project, objOpts.edit.marker_from.hole, objOpts.edit.marker_from.section, objOpts.edit.marker_from.nearest_marker];
-          const toId  = [objOpts.edit.marker_to.project, objOpts.edit.marker_to.hole, objOpts.edit.marker_to.section, objOpts.edit.marker_to.nearest_marker];
-
-          console.log("[Editor]: Disconnected markers between " + fromId +" to " + toId);
-
-          await undo("save");//undo
-          await window.LCapi.disconnectMarkers(fromId, toId, "horizontal");
-          await loadModel();
-          updateView();
-          
-        }
-      }
-      console.log(LCCore);
-
-      //exit process
-      document.removeEventListener("click", handleEditClick);
-      document.removeEventListener("mousemove", handleEditMouseMove);
       objOpts.edit.contextmenu_enable = false;
       objOpts.edit.hittest = null;
       objOpts.edit.marker_from = null;
       objOpts.edit.marker_to = null;
+      objOpts.edit.mode = "connect_marker";
+      objOpts.edit.handleMove = handleConnectMouseMove;
+      objOpts.edit.handleClick = null;
+      document.addEventListener("mousemove", objOpts.edit.handleMove);
+      console.log(objOpts.edit);
+      //measureObject.measureCanvas = new p5(connectSketch);
+    } else if(clickResult == "disconnect"){
+      objOpts.edit.contextmenu_enable = false;
+      objOpts.edit.hittest = null;
+      objOpts.edit.marker_from = null;
+      objOpts.edit.marker_to = null;
+      objOpts.edit.mode = "disconnect_marker";
+      objOpts.edit.handleMove = handleConnectMouseMove;
+      objOpts.edit.handleClick = null;
+      document.addEventListener("mousemove", objOpts.edit.handleMove);
+      //measureObject.measureCanvas = new p5(connectSketch);
+    }else if(clickResult == "addMarker"){
+      objOpts.edit.contextmenu_enable = false;
+      objOpts.edit.hittest = null;
+      objOpts.edit.marker_from = null;
+      objOpts.edit.marker_to = null;
+      objOpts.edit.mode = "add_marker";
+      objOpts.edit.handleMove = handleMarkerMouseMove;
+      if(objOpts.edit.handleClick !== null){
+        document.removeEventListener('click', objOpts.edit.handleClick);
+        objOpts.edit.handleClick = null;
+      }
+      document.addEventListener("mousemove", objOpts.edit.handleMove);
+    }else if(clickResult == "deleteMarker"){
+      objOpts.edit.contextmenu_enable = false;
+      objOpts.edit.hittest = null;
+      objOpts.edit.marker_from = null;
+      objOpts.edit.marker_to = null;
+      objOpts.edit.mode = "delete_marker";
+      objOpts.edit.handleMove = handleMarkerMouseMove;
+      if(objOpts.edit.handleClick !== null){
+        document.removeEventListener('click', objOpts.edit.handleClick);
+        objOpts.edit.handleClick = null;
+      }
+      document.addEventListener("mousemove", objOpts.edit.handleMove);
+    }else if(clickResult == "changeMarkerName"){
+      objOpts.edit.contextmenu_enable = false;
+      objOpts.edit.hittest = null;
+      objOpts.edit.marker_from = null;
+      objOpts.edit.marker_to = null;
+      objOpts.edit.mode = "change_marker_name";
+      objOpts.edit.handleMove = handleMarkerMouseMove;
+      objOpts.edit.handleClick = null;
+      document.addEventListener("mousemove", objOpts.edit.handleMove);
+    }else if(clickResult == "changeMarkerDistance"){
+      objOpts.edit.contextmenu_enable = false;
+      objOpts.edit.hittest = null;
+      objOpts.edit.marker_from = null;
+      objOpts.edit.marker_to = null;
+      objOpts.edit.mode = "change_marker_distance";
+      objOpts.edit.handleMove = handleMarkerMouseMove;
+      objOpts.edit.handleClick = null;
+      document.addEventListener("mousemove", objOpts.edit.handleMove);
+    }else if(clickResult == "changeSectionName"){
+      objOpts.edit.contextmenu_enable = false;
+      objOpts.edit.hittest = null;
+      objOpts.edit.marker_from = null;
+      objOpts.edit.marker_to = null;
+      objOpts.edit.mode = "change_section_name";
+      objOpts.edit.handleMove = handleSectionMouseMove;
+      objOpts.edit.handleClick = null;
+      document.addEventListener("mousemove", objOpts.edit.handleMove);
+    }else{
+      objOpts.edit.contextmenu_enable = true;
+      objOpts.edit.hittest = null;
+      objOpts.edit.marker_from = null;
+      objOpts.edit.marker_to = null;
+      objOpts.edit.handleClick = null;
+      objOpts.edit.handleMove = null;
     }
 
+  }
+  //1 Connect menu--------------------------------------------
+  function handleConnectMouseMove(event) {
+    const rect = document.getElementById("p5Canvas").getBoundingClientRect(); // Canvas position and size
+    const mouseX = event.clientX - rect.left;
+    const mouseY = event.clientY - rect.top;
+    const results = getClickedItemIdx(mouseX, mouseY, LCCore, objOpts);
+    objOpts.edit.hittest = results;
     updateView();
-  }}
-  //--------------------------------------------
-  async function handleEditClick(event) {
+  
+    //context menu
+    if (Math.abs(objOpts.edit.hittest.nearest_distance) < objOpts.edit.sensibility) {
+      objOpts.edit.handleClick = handleConnectClick;
+      document.addEventListener('click', objOpts.edit.handleClick);
+    }else if(objOpts.edit.handleClick !== null){
+      document.removeEventListener('click', objOpts.edit.handleClick);
+      objOpts.edit.handleClick = null;
+    }
+  }
+  //1 Connect menu--------------------------------------------
+  async function handleConnectClick(event) {
     const ht = objOpts.edit.hittest;
     event.preventDefault();
 
@@ -926,7 +902,6 @@ document.addEventListener("DOMContentLoaded", () => {
           await window.LCapi.connectMarkers(fromId, toId, "horizontal");
           await loadModel();
           updateView();
-
         }
       } else if(objOpts.edit.mode == "disconnect_marker"){
         const response = await window.LCapi.askdialog(
@@ -943,14 +918,13 @@ document.addEventListener("DOMContentLoaded", () => {
           await window.LCapi.disconnectMarkers(fromId, toId, "horizontal");
           await loadModel();
           updateView();
-          
         }
       }
       console.log(LCCore);
 
       //exit process
-      document.removeEventListener("click", handleEditClick);
-      document.removeEventListener("mousemove", handleEditMouseMove);
+      document.removeEventListener("click", handleConnectClick);
+      document.removeEventListener("mousemove", handleConnectMouseMove);
       objOpts.edit.contextmenu_enable = false;
       objOpts.edit.hittest = null;
       objOpts.edit.marker_from = null;
@@ -959,6 +933,275 @@ document.addEventListener("DOMContentLoaded", () => {
 
     updateView();
   }
+  //2 Marker menu--------------------------------------------
+  function handleMarkerMouseMove(event) {
+    const rect = document.getElementById("p5Canvas").getBoundingClientRect(); // Canvas position and size
+    const mouseX = event.clientX - rect.left;
+    const mouseY = event.clientY - rect.top;
+    const results = getClickedItemIdx(mouseX, mouseY, LCCore, objOpts);
+    objOpts.edit.hittest = results;
+    updateView();
+  
+    //context menu
+    if(objOpts.edit.hittest.section !== null){
+      //on the section
+      if(objOpts.edit.mode == "add_marker"){
+        objOpts.edit.handleClick = handleMarkerAddClick;
+        document.addEventListener('click', objOpts.edit.handleClick);
+      }
+
+      if (Math.abs(objOpts.edit.hittest.nearest_distance) < objOpts.edit.sensibility) {
+        if(objOpts.edit.mode == "delete_marker"){
+          objOpts.edit.handleClick = handleMarkerDeleteClick;
+          document.addEventListener('click', objOpts.edit.handleClick);
+        }else if(["change_marker_name","change_marker_distance"].includes(objOpts.edit.mode)){
+          objOpts.edit.handleClick = handleMarkerChangeClick;
+          document.addEventListener('click', objOpts.edit.handleClick);
+        }      
+      }else if(objOpts.edit.handleClick !== null){
+        document.removeEventListener('click', objOpts.edit.handleClick);
+      }
+    }else if(objOpts.edit.handleClick !== null){
+      objOpts.edit.handleClick = null;
+      document.removeEventListener('click', objOpts.edit.handleClick);
+    }
+
+    
+  }
+  //2 Marker menu--------------------------------------------
+  async function handleMarkerChangeClick(event) {
+    const ht = objOpts.edit.hittest;
+    event.preventDefault();
+
+    //initiarise
+    if(objOpts.edit.marker_from !== null ){
+      objOpts.edit.marker_from = null;
+      objOpts.edit.marker_to = 999999;//dummy
+      objOpts.edit.mode = null;
+      return;
+    }
+
+    if(objOpts.edit.marker_from == null && ht.nearest_marker !== null){
+      objOpts.edit.marker_from = ht;
+      objOpts.edit.marker_to = 999999;//dummy
+    }
+    
+    if (objOpts.edit.marker_from !== null) {
+      //if get both markers
+      if(["change_marker_name","change_marker_distance"].includes(objOpts.edit.mode)){
+        let target = null;
+        let response=null;
+        if(objOpts.edit.mode == "change_marker_name"){
+          target = "name";
+          response = await window.LCapi.inputdialog(
+            "Change marker name",
+            "Please input new name",
+            "text",
+          );
+          console.log("[Editor]: Change marker: " + target);
+        }else if(objOpts.edit.mode == "change_marker_distance"){
+          target = "distance";
+          response = await window.LCapi.inputdialog(
+            "Change marker distance",
+            "Please input new distance(cm).",
+            "number",
+          );
+          console.log("[Editor]: Change marker: " + target);
+        }
+         
+        if (response !== null) {
+          const targetId = [objOpts.edit.marker_from.project, objOpts.edit.marker_from.hole, objOpts.edit.marker_from.section, objOpts.edit.marker_from.nearest_marker];
+
+          await undo("save");//undo
+          const result = await window.LCapi.changeMarker(targetId, target, response);
+          if(result == true){
+            await loadModel();
+            updateView();
+          }else{
+            let txt="";
+            if(result == "must_be_bottom"){
+              txt = "The bottom marker must be located the bottom of the section.";
+            }else if(result == "must_be_top"){
+              txt = "The top marker must be located the top of the section.";
+            }else if(result == "out_of_section"){
+              txt = "The marker must be located between top and bottom of the section.";
+            }else if(result == "used"){
+              txt = response + " already has been used.";
+            }else if(result == "same"){
+              txt = "";
+            }else{
+              txt = "Unsuspected error occurred.";
+            }
+            
+            if(txt !== ""){
+              alert(txt);
+            }
+            
+          }
+        }
+      }
+
+      //exit process
+      document.removeEventListener("click", handleMarkerChangeClick);
+      document.removeEventListener("mousemove", handleMarkerMouseMove);
+      objOpts.edit.contextmenu_enable = false;
+      objOpts.edit.hittest = null;
+      objOpts.edit.marker_from = null;
+      objOpts.edit.marker_to = null;
+    }
+
+    updateView();
+  }
+  //2 Marker menu--------------------------------------------
+  async function handleMarkerDeleteClick(event) {
+    const ht = objOpts.edit.hittest;
+    event.preventDefault();
+
+    //initiarise
+    if(objOpts.edit.marker_from !== null ){
+      objOpts.edit.marker_from = null;
+      objOpts.edit.marker_to = 999999;//dummy
+      objOpts.edit.mode = null;
+      return;
+    }
+
+    if(objOpts.edit.marker_from == null && ht.nearest_marker !== null){
+      objOpts.edit.marker_from = ht;
+      objOpts.edit.marker_to = 999999;//dummy
+    }
+    
+    if (objOpts.edit.marker_from !== null) {
+      //if get both markers
+      if(objOpts.edit.mode == "delete_marker"){
+        const response = await window.LCapi.askdialog(
+          "Delete markers",
+          "Do you want to DELETE the selected marker?"
+        );
+        if (response.response) {
+          const fromId = [objOpts.edit.marker_from.project, objOpts.edit.marker_from.hole, objOpts.edit.marker_from.section, objOpts.edit.marker_from.nearest_marker];
+          
+          console.log("[Editor]: Delete marker: " + fromId);
+
+          await undo("save");//undo
+          await window.LCapi.deleteMarker(fromId);
+          await loadModel();
+          updateView();
+
+        }
+      }
+      console.log(LCCore);
+
+      //exit process
+      document.removeEventListener("click", handleMarkerDeleteClick);
+      document.removeEventListener("mousemove", handleMarkerMouseMove);
+      objOpts.edit.contextmenu_enable = false;
+      objOpts.edit.hittest = null;
+      objOpts.edit.marker_from = null;
+      objOpts.edit.marker_to = null;
+    }
+
+    updateView();
+  }
+  //2 Marker menu--------------------------------------------
+  async function handleMarkerAddClick(event) {
+    const ht = objOpts.edit.hittest;
+    event.preventDefault();
+
+    //initiarise
+    if(objOpts.edit.marker_from !== null ){
+      objOpts.edit.marker_from = null;
+      objOpts.edit.marker_to = 999999;//dummy
+      objOpts.edit.mode = null;
+      return;
+    }
+
+    if(objOpts.edit.marker_from == null && ht.nearest_marker !== null){
+      objOpts.edit.marker_from = ht;
+      objOpts.edit.marker_to = 999999;//dummy
+    }
+    
+    if (objOpts.edit.marker_from !== null) {
+      //if get both markers
+      if(objOpts.edit.mode == "add_marker"){
+        const response = await window.LCapi.askdialog(
+          "Add new markers",
+          "Do you want to ADD a new marker?"
+        );
+        if (response.response) {
+          const upperId   = [objOpts.edit.marker_from.project, objOpts.edit.marker_from.hole, objOpts.edit.marker_from.section, objOpts.edit.marker_from.upper_marker];
+          const lowerId   = [objOpts.edit.marker_from.project, objOpts.edit.marker_from.hole, objOpts.edit.marker_from.section, objOpts.edit.marker_from.lower_marker];
+          const sectionId = [objOpts.edit.marker_from.project, objOpts.edit.marker_from.hole, objOpts.edit.marker_from.section, null];
+          console.log("[Editor]: Add marker between " + upperId +" and "+lowerId);
+
+          await undo("save");//undo
+          await window.LCapi.addMarker(sectionId, objOpts.edit.marker_from.y, objOpts.canvas.depth_scale);
+          await loadModel();
+          updateView();
+
+        }
+      }
+
+      //exit process
+      document.removeEventListener("click", handleMarkerAddClick);
+      document.removeEventListener("mousemove", handleMarkerMouseMove);
+      objOpts.edit.contextmenu_enable = false;
+      objOpts.edit.hittest = null;
+      objOpts.edit.marker_from = null;
+      objOpts.edit.marker_to = null;
+    }
+
+    updateView();
+  }
+  //3 Section menu--------------------------------------------
+  function handleSectionMouseMove(event) {
+    const rect = document.getElementById("p5Canvas").getBoundingClientRect(); // Canvas position and size
+    const mouseX = event.clientX - rect.left;
+    const mouseY = event.clientY - rect.top;
+    const results = getClickedItemIdx(mouseX, mouseY, LCCore, objOpts);
+    objOpts.edit.hittest = results;
+    updateView();
+  
+    //context menu
+    if(objOpts.edit.hittest.section !== null){
+      //on the section
+      if(objOpts.edit.mode == "change_section_name"){
+        document.addEventListener('click', handleSectionChangeClick);
+      }else{
+        document.removeEventListener('click', handleSectionChangeClick);
+      }
+    }else{
+      document.removeEventListener('click', handleSectionChangeClick);
+    }
+
+    
+  }
+//3 Section menu--------------------------------------------
+async function handleSectionChangeClick(event) {
+  const ht = objOpts.edit.hittest;
+  event.preventDefault();
+
+  if(objOpts.edit.mode == "change_section_name"){
+    let target = "name";
+    const response = await window.LCapi.inputdialog(
+      "Change section name",
+      "Please input a new section name.",
+      "text",
+    );
+    if (response !== null) {
+      const targetId = [objOpts.edit.hittest.project, objOpts.edit.hittest.hole, objOpts.edit.hittest.section, null];
+
+      await undo("save");//undo
+      const result = await window.LCapi.changeSection(targetId, target, response);
+      if(result=="used"){
+        console.log("[Renderer]: "+response+" has already been used. Please input a unique name that has not been used.");
+        alert("[ "+response+" ] has already been used. Please input a unique name that has not been used.");
+      }
+      
+      await loadModel();
+      updateView();
+    }
+  }
+}
   //============================================================================================
   //load correlation model
   window.LCapi.receive("ExportCorrelationAsCsvMenuClicked", async () => {
@@ -1945,6 +2188,17 @@ document.addEventListener("DOMContentLoaded", () => {
             sketch.strokeWeight(objOpts.section.line_width);
             sketch.stroke(objOpts.section.line_colour);
             sketch.fill(objOpts.section.face_colour);
+
+            //hittest
+            if(objOpts.edit.hittest){
+              if(["change_section_name"].includes(objOpts.edit.mode)){
+                if(objOpts.edit.hittest.hole == hole.id[1] && objOpts.edit.hittest.section == section.id[2]){
+                  sketch.strokeWeight(3);
+                  sketch.stroke("Red");
+                }               
+              }
+            }
+            
             sketch.rect(sec_x0, sec_y0, sec_w, sec_h, 3, 3, 3, 3); //rounded
 
             //check zoom level for ignoring plot markers
@@ -2069,15 +2323,31 @@ document.addEventListener("DOMContentLoaded", () => {
               if(objOpts.edit.editable){
                 //live hittest
                 if(objOpts.edit.hittest !== null){
-                  const hitId = [objOpts.edit.hittest.project, objOpts.edit.hittest.hole, objOpts.edit.hittest.section, objOpts.edit.hittest.nearest_marker];
-                  if(Math.abs(objOpts.edit.hittest.nearest_distance) < objOpts.edit.sensibility){
-                    if(hitId.toString() == marker.id.toString()){
-                      sketch.strokeWeight(3);
+                  if(["connect_marker", "disconnect_marker", "delete_marker","change_marker_name","change_marker_distance"].includes(objOpts.edit.mode)){
+                    const hitId = [objOpts.edit.hittest.project, objOpts.edit.hittest.hole, objOpts.edit.hittest.section, objOpts.edit.hittest.nearest_marker];
+                    if(Math.abs(objOpts.edit.hittest.nearest_distance) < objOpts.edit.sensibility){
+                      if(hitId.toString() == marker.id.toString()){
+                        sketch.strokeWeight(3);
+                        sketch.stroke("Red");
+                      }
+                    }
+                  } else if(objOpts.edit.mode == "add_marker"){
+                    if(objOpts.edit.hittest.hole == hole.id[1] && objOpts.edit.hittest.section == section.id[2]){
+                      sketch.push();//save
+                      sketch.strokeWeight(1);
                       sketch.stroke("Red");
+                      sketch.line(
+                        (hole_x0 + shift_x) * xMag + pad_x,
+                        sketch.mouseY+scroller.scrollTop, //(marker_top + shift_y) * yMag + pad_y,
+                        (hole_x0 + shift_x) * xMag + pad_x + objOpts.marker.width * mw * xMag,// + topBot,
+                        sketch.mouseY+scroller.scrollTop, //(marker_top + shift_y) * yMag + pad_y
+                      )
+                      sketch.pop();//load
                     }
                   }
-                }
-                if(objOpts.edit.marker_from !== null){
+                } 
+
+                if(objOpts.edit.marker_from !== null && ["connect_marker", "disconnect_marker", "delete_marker"].includes(objOpts.edit.mode)){
                   const hitId = [objOpts.edit.marker_from.project, objOpts.edit.marker_from.hole, objOpts.edit.marker_from.section, objOpts.edit.marker_from.nearest_marker];
                   if(hitId.toString() == marker.id.toString()){
                     sketch.strokeWeight(3);
@@ -3442,22 +3712,10 @@ document.addEventListener("DOMContentLoaded", () => {
         //plot previousdata(convert pixscale)
         for (let i = 0; i < penData.length; i++) {
           sketch.line(
-            (penData[i][0] + objOpts.canvas.shift_x) *
-              objOpts.canvas.zoom_level[0] *
-              objOpts.canvas.dpir +
-              objOpts.canvas.pad_x,
-            (penData[i][1] + objOpts.canvas.shift_y) *
-              objOpts.canvas.zoom_level[1] *
-              objOpts.canvas.dpir +
-              objOpts.canvas.pad_y,
-            (penData[i][2] + objOpts.canvas.shift_x) *
-              objOpts.canvas.zoom_level[0] *
-              objOpts.canvas.dpir +
-              objOpts.canvas.pad_x,
-            (penData[i][3] + objOpts.canvas.shift_y) *
-              objOpts.canvas.zoom_level[1] *
-              objOpts.canvas.dpir +
-              objOpts.canvas.pad_y
+            (penData[i][0] + objOpts.canvas.shift_x) * objOpts.canvas.zoom_level[0] * objOpts.canvas.dpir + objOpts.canvas.pad_x,
+            (penData[i][1] + objOpts.canvas.shift_y) * objOpts.canvas.zoom_level[1] * objOpts.canvas.dpir + objOpts.canvas.pad_y,
+            (penData[i][2] + objOpts.canvas.shift_x) * objOpts.canvas.zoom_level[0] * objOpts.canvas.dpir + objOpts.canvas.pad_x,    
+            (penData[i][3] + objOpts.canvas.shift_y) * objOpts.canvas.zoom_level[1] * objOpts.canvas.dpir + objOpts.canvas.pad_y
           );
         }
 
@@ -3473,22 +3731,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
           //convert depth scale
           penData.push([
-            (sketch.mouseX + scroller.scrollLeft - objOpts.canvas.pad_x) /
-              objOpts.canvas.zoom_level[0] /
-              objOpts.canvas.dpir -
-              objOpts.canvas.shift_x,
-            (sketch.mouseY + scroller.scrollTop - objOpts.canvas.pad_y) /
-              objOpts.canvas.zoom_level[1] /
-              objOpts.canvas.dpir -
-              objOpts.canvas.shift_y,
-            (sketch.pmouseX + scroller.scrollLeft - objOpts.canvas.pad_x) /
-              objOpts.canvas.zoom_level[0] /
-              objOpts.canvas.dpir -
-              objOpts.canvas.shift_x,
-            (sketch.pmouseY + scroller.scrollTop - objOpts.canvas.pad_y) /
-              objOpts.canvas.zoom_level[1] /
-              objOpts.canvas.dpir -
-              objOpts.canvas.shift_y,
+            (sketch.mouseX + scroller.scrollLeft - objOpts.canvas.pad_x) / objOpts.canvas.zoom_level[0] / objOpts.canvas.dpir - objOpts.canvas.shift_x,
+            (sketch.mouseY + scroller.scrollTop - objOpts.canvas.pad_y) / objOpts.canvas.zoom_level[1] / objOpts.canvas.dpir - objOpts.canvas.shift_y,
+            (sketch.pmouseX + scroller.scrollLeft - objOpts.canvas.pad_x) / objOpts.canvas.zoom_level[0] / objOpts.canvas.dpir - objOpts.canvas.shift_x,
+            (sketch.pmouseY + scroller.scrollTop - objOpts.canvas.pad_y) / objOpts.canvas.zoom_level[1] / objOpts.canvas.dpir - objOpts.canvas.shift_y,
           ]);
         }
 
@@ -3505,16 +3751,20 @@ document.addEventListener("DOMContentLoaded", () => {
         sketch.pmouseX = sketch.mouseX;
         sketch.pmouseY = sketch.mouseY;
         sketch.loop(); //
-      } else if (sketch.mouseButton == sketch.RIGHT) {
+      } 
+    };
+    sketch.keyPressed = () => {
+      if (sketch.key === 'n' && sketch.keyIsDown(sketch.CONTROL)) { 
         if (confirm("Are you sure you want to delete the written data?")) {
+          penData = [];
           sketch.pmouseX = sketch.mouseX;
           sketch.pmouseY = sketch.mouseY;
-          penData = [];
+          sketch.setup();
           sketch.redraw();
         } else {
         }
       }
-    };
+  };
 
     sketch.mouseReleased = () => {
       sketch.noLoop(); //
@@ -4555,7 +4805,9 @@ function getClickedItemIdx(mouseX, mouseY, LCCore, objOpts){
     section:null, 
     distance:null, 
     nearest_marker: null, 
-    nearest_distance:null
+    nearest_distance:null,
+    upper_marker:null,
+    lower_marker:null,
   };
 
   breakpoint:
@@ -4568,7 +4820,7 @@ function getClickedItemIdx(mouseX, mouseY, LCCore, objOpts){
       const hole_x1 = hole_x0 + objOpts.hole.width;
       if(x >= hole_x0 && x <= hole_x1){
         results.project = LCCore.projects[p].holes[h].id[0];
-        results.hole = LCCore.projects[p].holes[h].id[1];
+        results.hole    = LCCore.projects[p].holes[h].id[1];
         for(let s=0; s<LCCore.projects[p].holes[h].sections.length; s++){
           const sec_y0 = LCCore.projects[p].holes[h].sections[s].markers[0][objOpts.canvas.depth_scale];//cd/efd
           const sec_y1 = LCCore.projects[p].holes[h].sections[s].markers.slice(-1)[0][objOpts.canvas.depth_scale];//cd/efd
@@ -4626,7 +4878,9 @@ function getClickedItemIdx(mouseX, mouseY, LCCore, objOpts){
             }
 
             results.nearest_distance = markerDistance;
-            results.nearest_marker = LCCore.projects[p].holes[h].sections[s].markers[nearestIdx].id[3];   
+            results.nearest_marker   = LCCore.projects[p].holes[h].sections[s].markers[nearestIdx].id[3];   
+            results.upper_marker     = LCCore.projects[p].holes[h].sections[s].markers[upperIdx].id[3];
+            results.lower_marker    = LCCore.projects[p].holes[h].sections[s].markers[lowerIdx].id[3];
             break breakpoint;
           }     
         }  

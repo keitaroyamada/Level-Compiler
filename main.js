@@ -16,6 +16,7 @@ const { mode } = require("simple-statistics");
 const { parse } = require("csv-parse/sync");
 const { stringify } = require("csv-stringify/sync");
 const ProgressBar = require("electron-progressbar");
+const prompt = require("electron-prompt");
 
 const { app, BrowserWindow, Menu, ipcMain, dialog } = require("electron");
 const { LevelCompilerCore } = require("./LC_modules/LevelCompilerCore.js");
@@ -649,11 +650,71 @@ function createMainWIndow() {
     const response = dialog.showMessageBox(null, options);
     return response;
   });
+  ipcMain.handle("inputdialog", async (_e, tit, txt, type) => {
+    //type:text, password, email, number, url, date, time, color, range
+    try {
+      const result = await prompt({
+          title: tit,
+          label: txt,
+          inputAttrs: {
+              type: type,
+              required: true,
+              step: '0.0001' ,
+          },
+          type: "input"
+      });
+
+      return result
+
+    } catch (error) {
+        console.error("Prompt error:", error);
+        return null;
+    }
+  });
   ipcMain.handle('showContextMenu', (event, type) => {
     return new Promise((resolve) => {
       let template;
       if(type == "editContextMenu"){
         template = [
+          {
+            label:"Hole",
+            submenu:[
+              { 
+                label: 'Edit name (under construction)', 
+                click: () => {
+                  console.log('MAIN: Edit Hole name'); 
+                  resolve("changeHoleName"); 
+                 
+                } 
+              },
+              { 
+                label: 'Add new Hole(under construction)', 
+                click: () => {
+                  console.log('MAIN: Add new Hole'); 
+                  resolve("addHole"); 
+                } 
+              },
+            ]
+          }, 
+          {
+            label:"Section",
+            submenu:[
+              { 
+                label: 'Edit name', 
+                click: () => {
+                  console.log('MAIN: Edit section name'); 
+                  resolve("changeSectionName"); 
+                } 
+              },
+              { 
+                label: 'Add new section(under construction)', 
+                click: () => {
+                  console.log('MAIN: Add new section'); 
+                  resolve("addSection");                  
+                } 
+              },
+            ]
+          },
           {
             label:"Marker",
             submenu:[
@@ -663,6 +724,22 @@ function createMainWIndow() {
                   console.log('MAIN: Add new marker'); 
                   resolve("addMarker"); 
                  
+                } 
+              },
+              { type: 'separator' },
+              { 
+                label: 'Edit name', 
+                click: () => {
+                  console.log('MAIN: Edit marker name'); 
+                  resolve("changeMarkerName"); 
+                 
+                } 
+              },
+              { 
+                label: 'Edit distance', 
+                click: () => {
+                  console.log('MAIN: Edit marker distance'); 
+                  resolve("changeMarkerDistance");                      
                 } 
               },
               { type: 'separator' },
@@ -691,7 +768,7 @@ function createMainWIndow() {
                 } 
               },
             ]
-          },          
+          }, 
         ];
         
       }
@@ -1671,26 +1748,79 @@ function createMainWIndow() {
   ipcMain.handle("disconnectMarkers", (_e, fromId, toId,direction) => {
     LCCore.disconnectMarkers(fromId, toId, direction);
   });
-  ipcMain.handle("deleteMarkers", (_e, targetId) => {
+  ipcMain.handle("deleteMarker", (_e, targetId) => {
     LCCore.deleteMarker(targetId);
     console.log("MAIN: Delete target marker.");
   });
-  ipcMain.handle("addMarkers", (_e, fromId, toId) => {
-    const targetSectionId = [toId[0], toId[1], toId[2], null];
-    const sectionIdx = LCCore.search_idx_list[targetSectionId.toString()];
-    const sectionData = LCCore.getDataByIdx(sectionIdx);
+  ipcMain.handle("addMarker", (_e, sectionId, depth, depthScale) => {
+    //add
+    LCCore.addMarker(sectionId, depth, depthScale);
 
-    let newId = Math.max(...sectionData.reserved_marker_ids) + 1;
-    const newMarkerId = [toId[0], toId[1], toId[2], newId];
+    console.log("MAIN: Add a new marker on the section: " + sectionId +" of " + depth +" cm "+depthScale);
+  });
+  ipcMain.handle("changeMarker", (_e, markerId, type, value) => {
+    //
+    const idx = LCCore.search_idx_list[markerId.toString()];
+    
+    if(type == "distance"){
+      //value:distance
+      const result = LCCore.changeDistance(markerId, value);
+      if(result == true){
+        console.log("MAIN: Change marker distance.");
+      }else{
+        console.log("MAIN: Failed to change marker distance.")
+      }
+      return result;
+    }else if(type=="name"){
+      //check
+      let isUsed = false;
+      for(let markerData of LCCore.projects[idx[0]].holes[idx[1]].sections[idx[2]].markers){
+        if(value !== "" && markerData.name == zeroPadding(value)){
+          isUsed = true;
+          break;
+        }
+      }
+      //apply
+      if(isUsed == false){
+        LCCore.projects[idx[0]].holes[idx[1]].sections[idx[2]].markers[idx[3]].name = zeroPadding(value);
+        console.log("MAIN: Change marker name.");
+        return true;
+      }else{
+        if(LCCore.projects[idx[0]].holes[idx[1]].sections[idx[2]].markers[idx[3]].name == zeroPadding(value)){
+          return "same"
+        }else{
+          return "used"
+        }        
+      }
+    }
+  });
+  ipcMain.handle("changeSection", (_e, sectionId, type, value) => {
+    //
+    const idx = LCCore.search_idx_list[sectionId.toString()];
+    
+    if(type=="name"){
+      //check
+      let isUsed = false;
+      for(let sectionData of LCCore.projects[idx[0]].holes[idx[1]].sections){
+        if(value !== "" && sectionData.name == zeroPadding(value)){
+          isUsed = true;
+          break;
+        }
+      }
 
-    LCCore.disconnectMarkers(fromId, toId, "vertical");
-    LCCore.connectMarkers(fromId, newMarkerId, "vertical");
-    LCCore.connectMarkers(newMarkerId, toId, "vertical");
-    LCCore.projects[sectionIdx[0]].holes[sectionIdx[1]].sections[sectionIdx[2]].reserved_marker_ids.push(newId);
-
-    //add event
-
-    console.log("MAIN: Add new marker between " + LCCore.getMarkerNameFromId(fromId) +" and " + LCCore.getMarkerNameFromId(toId));
+      //apply
+      if(isUsed ==false){
+        LCCore.projects[idx[0]].holes[idx[1]].sections[idx[2]].name = zeroPadding(value);
+        console.log("MAIN: Change section name.");
+        return "success"
+      }else{
+        if(LCCore.projects[idx[0]].holes[idx[1]].sections[idx[2]].name == zeroPadding(value)){
+          return "same"
+        }else{
+          return "used"
+        }
+      }
+    }
   });
 
   //--------------------------------------------------------------------------------------------------
@@ -1699,6 +1829,13 @@ function createMainWIndow() {
 //===================================================================================================================================
 
 //--------------------------------------------------------------------------------------------------
+function zeroPadding(str) {
+  if (/^\d+$/.test(str.toString()) == true) {
+    //case number
+    str = str.toString().padStart(2, "0");
+  }
+  return str;
+}
 async function getfile(mainWindow, title, ext) {
   const options = {
     title: title,

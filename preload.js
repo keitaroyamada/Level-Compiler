@@ -52,6 +52,7 @@ contextBridge.exposeInMainWorld("LCapi", {
   progressbar: (args1, args2) => ipcRenderer.invoke("progressbar", args1, args2),
   updateProgressbar: (args1, args2) => ipcRenderer.invoke("updateProgressbar", args1, args2),
   askdialog: (args1, args2) => ipcRenderer.invoke("askdialog", args1, args2),
+  inputdialog: (args1, args2, args3) => ipcRenderer.invoke("inputdialog", args1, args2, args3),
   makeModelImage: (args1, args2, args3, args4) =>  ipcRenderer.invoke("makeModelImage", args1, args2, args3, args4),
   getResourcePath: () => ipcRenderer.sendSync("getResourcePath"),
   toggleDevTools: (args1) => ipcRenderer.send('toggle-devtools',args1),
@@ -59,7 +60,9 @@ contextBridge.exposeInMainWorld("LCapi", {
   connectMarkers: (args1,args2,args3) => ipcRenderer.invoke("connectMarkers", args1,args2,args3),
   disconnectMarkers: (args1,args2,args3) => ipcRenderer.invoke("disconnectMarkers", args1,args2,args3),
   deleteMarker: (args1) => ipcRenderer.invoke("deleteMarker", args1),
-  addMarker: (args1,args2) => ipcRenderer.invoke("addMarker", args1,args2),
+  addMarker: (args1,args2,args3) => ipcRenderer.invoke("addMarker", args1,args2,args3),
+  changeMarker: (args1,args2,args3) => ipcRenderer.invoke("changeMarker", args1,args2,args3),
+  changeSection: (args1,args2,args3) => ipcRenderer.invoke("changeSection", args1,args2,args3),
 
   sendUndo: () => ipcRenderer.invoke('sendUndo'),
   sendRedo: () => ipcRenderer.invoke('sendRedo'),

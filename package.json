@@ -16,24 +16,30 @@
     "chart.js": "^4.4.5",
     "csv-parse": "^5.5.6",
     "csv-stringify": "^6.5.1",
-    "simple-statistics": "^7.8.7",
     "electron-progressbar": "^2.2.1",
-    "sharp": "^0.33.5"
+    "electron-prompt": "^1.7.0",
+    "sharp": "^0.33.5",
+    "simple-statistics": "^7.8.7",
+    "sweetalert2": "^11.14.4"
   },
   "build": {
     "appId": "your.app.id",
-    "win": {"icon": "./icon/levelcompiler.png" },
-    "mac": {"icon": "./icon/levelcompiler.png" },
-    "linux": {"icon": "./icon/levelcompiler.png"},
+    "win": {
+      "icon": "./icon/levelcompiler.png"
+    },
+    "mac": {
+      "icon": "./icon/levelcompiler.png"
+    },
+    "linux": {
+      "icon": "./icon/levelcompiler.png"
+    },
     "extraResources": [
       "resources/"
     ]
   },
-  
   "devDependencies": {
     "electron": "^33.0.2",
     "electron-builder": "^25.1.8",
     "electronmon": "^2.0.3"
-    
   }
 }
