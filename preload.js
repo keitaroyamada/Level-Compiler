@@ -63,6 +63,7 @@ contextBridge.exposeInMainWorld("LCapi", {
   addMarker: (args1,args2,args3) => ipcRenderer.invoke("addMarker", args1,args2,args3),
   changeMarker: (args1,args2,args3) => ipcRenderer.invoke("changeMarker", args1,args2,args3),
   changeSection: (args1,args2,args3) => ipcRenderer.invoke("changeSection", args1,args2,args3),
+  deleteSection: (args1) => ipcRenderer.invoke("deleteSection", args1),
   changeHole: (args1,args2,args3) => ipcRenderer.invoke("changeHole", args1,args2,args3),
 
   sendUndo: () => ipcRenderer.invoke('sendUndo'),

@@ -832,6 +832,15 @@ document.addEventListener("DOMContentLoaded", () => {
       objOpts.edit.handleMove = handleSectionMouseMove;
       objOpts.edit.handleClick = null;
       document.addEventListener("mousemove", objOpts.edit.handleMove);
+    }else if(clickResult == "deleteSection"){
+      objOpts.edit.contextmenu_enable = false;
+      objOpts.edit.hittest = null;
+      objOpts.edit.marker_from = null;
+      objOpts.edit.marker_to = null;
+      objOpts.edit.mode = "delete_section";
+      objOpts.edit.handleMove = handleSectionMouseMove;
+      objOpts.edit.handleClick = null;
+      document.addEventListener("mousemove", objOpts.edit.handleMove);
     }else if(clickResult == "changeHoleName"){
       objOpts.edit.contextmenu_enable = false;
       objOpts.edit.hittest = null;
@@ -954,27 +963,31 @@ document.addEventListener("DOMContentLoaded", () => {
     if(ht.section !== null){
       //on the section
       if(objOpts.edit.mode == "add_marker"){
-        objOpts.edit.handleClick = handleMarkerAddClick;
-        document.addEventListener('click', objOpts.edit.handleClick);
-      }
-
-      if (Math.abs(ht.nearest_distance) < objOpts.edit.sensibility) {
-        if(objOpts.edit.mode == "delete_marker"){
+        if(objOpts.edit.handleClick == null){
+          objOpts.edit.handleClick = handleMarkerAddClick;
+          document.addEventListener('click', objOpts.edit.handleClick);
+        }else{
+          document.removeEventListener('click', objOpts.edit.handleClick);
+          objOpts.edit.handleClick = null;
+        }
+      }else if(objOpts.edit.mode == "delete_marker"){
+        if (Math.abs(ht.nearest_distance) < objOpts.edit.sensibility) {
           objOpts.edit.handleClick = handleMarkerDeleteClick;
           document.addEventListener('click', objOpts.edit.handleClick);
-        }else if(["change_marker_name","change_marker_distance"].includes(objOpts.edit.mode)){
+        }else if(objOpts.edit.handleClick !== null){
+          document.removeEventListener('click', objOpts.edit.handleClick);
+          objOpts.edit.handleClick = null;
+        }
+      }else if(["change_marker_name","change_marker_distance"].includes(objOpts.edit.mode)){
+        if (Math.abs(ht.nearest_distance) < objOpts.edit.sensibility) {
           objOpts.edit.handleClick = handleMarkerChangeClick;
           document.addEventListener('click', objOpts.edit.handleClick);
-        }      
-      }else if(objOpts.edit.handleClick !== null){
-        document.removeEventListener('click', objOpts.edit.handleClick);
+        }else if(objOpts.edit.handleClick !== null){
+          document.removeEventListener('click', objOpts.edit.handleClick);
+          objOpts.edit.handleClick = null;
+        }
       }
-    }else if(objOpts.edit.handleClick !== null){
-      objOpts.edit.handleClick = null;
-      document.removeEventListener('click', objOpts.edit.handleClick);
-    }
-
-    
+    }     
   }
   //2 Marker click--------------------------------------------
   async function handleMarkerChangeClick(event) {
@@ -1115,11 +1128,13 @@ document.addEventListener("DOMContentLoaded", () => {
   }
   //2 Marker click--------------------------------------------
   async function handleMarkerAddClick(event) {
+    console.log("[Renderer]: Add Marker clicked.")
     const rect = document.getElementById("p5Canvas").getBoundingClientRect(); 
     const mouseX = event.clientX - rect.left;
     const mouseY = event.clientY - rect.top;
     const ht = JSON.parse(JSON.stringify(getClickedItemIdx(mouseX, mouseY, LCCore, objOpts)));
     event.preventDefault();
+    
 
     //initiarise
     if(objOpts.edit.marker_from !== null ){
@@ -1150,18 +1165,16 @@ document.addEventListener("DOMContentLoaded", () => {
           await undo("save");//undo
           await window.LCapi.addMarker(sectionId, objOpts.edit.marker_from.y, objOpts.canvas.depth_scale);
           await loadModel();
-          updateView();
-
         }
       }
 
     }
-    document.removeEventListener("click", objOpts.edit.handleClick);
-    document.removeEventListener("mousemove", objOpts.edit.handleMove);
     objOpts.edit.contextmenu_enable = true;
     objOpts.edit.hittest = null;
     objOpts.edit.marker_from = null;
     objOpts.edit.marker_to = null;
+    document.removeEventListener("click", objOpts.edit.handleClick);
+    document.removeEventListener("mousemove", objOpts.edit.handleMove);
     objOpts.edit.handleClick = null;
     objOpts.edit.handleMove = null;
     updateView();
@@ -1180,6 +1193,9 @@ document.addEventListener("DOMContentLoaded", () => {
       //on the section
       if(objOpts.edit.mode == "change_section_name"){
         objOpts.edit.handleClick = handleSectionChangeClick;
+        document.addEventListener('click', objOpts.edit.handleClick);
+      }else if(objOpts.edit.mode == "delete_section"){
+        objOpts.edit.handleClick = handleSectionDeleteClick;
         document.addEventListener('click', objOpts.edit.handleClick);
       }else{
         if(objOpts.edit.handleClick !== null){
@@ -1219,6 +1235,38 @@ document.addEventListener("DOMContentLoaded", () => {
           alert("[ "+response+" ] has already been used. Please input a unique name that has not been used.");
         }
         
+        await loadModel();
+        updateView();
+      }
+    }
+    document.removeEventListener("click", objOpts.edit.handleClick);
+    document.removeEventListener("mousemove", objOpts.edit.handleMove);
+    objOpts.edit.contextmenu_enable = true;
+    objOpts.edit.hittest = null;
+    objOpts.edit.marker_from = null;
+    objOpts.edit.marker_to = null;
+    objOpts.edit.handleClick = null;
+    objOpts.edit.handleMove = null;
+    updateView();
+  }
+  //3 Section click--------------------------------------------
+  async function handleSectionDeleteClick(event) {
+    const rect = document.getElementById("p5Canvas").getBoundingClientRect(); 
+    const mouseX = event.clientX - rect.left;
+    const mouseY = event.clientY - rect.top;
+    const ht = JSON.parse(JSON.stringify(getClickedItemIdx(mouseX, mouseY, LCCore, objOpts)));
+    event.preventDefault();
+
+    if(objOpts.edit.mode == "delete_section"){
+      const response = await window.LCapi.askdialog(
+        "Delete section",
+        "Do you want to delete the section?",
+      );
+      if (response.response) {
+        const targetId = [ht.project, ht.hole, ht.section, null];
+
+        await undo("save");//undo
+        const result = await window.LCapi.deleteSection(targetId);
         await loadModel();
         updateView();
       }

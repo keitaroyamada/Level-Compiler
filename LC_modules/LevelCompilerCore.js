@@ -2801,9 +2801,17 @@ class LevelCompilerCore {
     }
     
     //trim target markerdata
-    this.disconnectMarkers(upperMarkerId, targetId, "vertical");
-    this.disconnectMarkers(targetId, lowerMarkerId, "vertical");
-    this.connectMarkers(upperMarkerId, lowerMarkerId, "vertical");
+    if(upperMarkerId !== null){
+      //not top
+      this.disconnectMarkers(upperMarkerId, targetId, "vertical");
+    }
+    if(lowerMarkerId !== null){
+      this.disconnectMarkers(targetId, lowerMarkerId, "vertical");
+    }
+    if(upperMarkerId !== null && lowerMarkerId !== null){
+      this.connectMarkers(upperMarkerId, lowerMarkerId, "vertical");
+    }
+    
     this.projects[targetMarkerIdx[0]].holes[targetMarkerIdx[1]].sections[targetMarkerIdx[2]].reserved_marker_ids = targetSectionData.reserved_marker_ids.filter(num => num !== targetId[3]);
     const newMarkers = targetSectionData.markers.filter(m=> m.id.toString() !== targetId.toString());
     this.projects[targetMarkerIdx[0]].holes[targetMarkerIdx[1]].sections[targetMarkerIdx[2]].markers = newMarkers;
@@ -3014,6 +3022,43 @@ class LevelCompilerCore {
     }
 
     
+  }
+  deleteSection(sectionId){
+    const sectionIdx = this.search_idx_list[sectionId.toString()];
+    const sectionData = JSON.parse(JSON.stringify(this.projects[sectionIdx[0]].holes[sectionIdx[1]].sections[sectionIdx[2]]));
+    const holeData = JSON.parse(JSON.stringify(this.projects[sectionIdx[0]].holes[sectionIdx[1]]));
+
+    //remove marker in the section
+    for(let markerData of sectionData.markers){
+      if(!markerData.name.includes("top") && !markerData.name.includes("bottom")){
+        this.deleteMarker(markerData.id);
+        this.calcCompositeDepth();
+      }
+    }
+
+    //case piston hole
+    for(let markerId of this.projects[sectionIdx[0]].holes[sectionIdx[1]].sections[sectionIdx[2]].markers[0].v_connection){
+      if(markerId.toString() !== this.projects[sectionIdx[0]].holes[sectionIdx[1]].sections[sectionIdx[2]].markers[1]){
+        //connected other sections
+        const otherSecIdx = this.search_idx_list[markerId.toString()];
+        this.projects[otherSecIdx[0]].holes[otherSecIdx[1]].sections[otherSecIdx[2]].markers[otherSecIdx[3]].v_connection 
+          = this.projects[otherSecIdx[0]].holes[otherSecIdx[1]].sections[otherSecIdx[2]].markers[otherSecIdx[3]].v_connection.filter(vc=>vc.toString()!==this.projects[sectionIdx[0]].holes[sectionIdx[1]].sections[sectionIdx[2]].markers[0].id.toString());
+      }
+    }
+    for(let markerId of this.projects[sectionIdx[0]].holes[sectionIdx[1]].sections[sectionIdx[2]].markers[1].v_connection){
+      if(markerId.toString() !== this.projects[sectionIdx[0]].holes[sectionIdx[1]].sections[sectionIdx[2]].markers[0]){
+        //connected other sections
+        const otherSecIdx = this.search_idx_list[markerId.toString()];
+        this.projects[otherSecIdx[0]].holes[otherSecIdx[1]].sections[otherSecIdx[2]].markers[otherSecIdx[3]].v_connection 
+          = this.projects[otherSecIdx[0]].holes[otherSecIdx[1]].sections[otherSecIdx[2]].markers[otherSecIdx[3]].v_connection.filter(vc=>vc.toString()!==this.projects[sectionIdx[0]].holes[sectionIdx[1]].sections[sectionIdx[2]].markers[0].id.toString());
+      }
+    }
+
+    //delete top/bottom
+    this.projects[sectionIdx[0]].holes[sectionIdx[1]].sections = this.projects[sectionIdx[0]].holes[sectionIdx[1]].sections.filter(sec=>sec.id[2]!==sectionId[2]);
+    this.projects[sectionIdx[0]].holes[sectionIdx[1]].reserved_section_ids = this.projects[sectionIdx[0]].holes[sectionIdx[1]].reserved_section_ids.filter(secid=>secid!==sectionId[2]);
+
+    return true;
   }
   changeName(targetId, value){
     console.log(targetId)

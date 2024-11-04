@@ -707,17 +707,26 @@ function createMainWIndow() {
             label:"Section",
             submenu:[
               { 
+                label: 'Add new section(under construction)', 
+                click: () => {
+                  console.log('MAIN: Add new section'); 
+                  resolve("addSection");                  
+                } 
+              },
+              { type: 'separator' },
+              { 
                 label: 'Edit name', 
                 click: () => {
                   console.log('MAIN: Edit section name'); 
                   resolve("changeSectionName"); 
                 } 
               },
+              { type: 'separator' },
               { 
-                label: 'Add new section(under construction)', 
+                label: 'Delete section', 
                 click: () => {
-                  console.log('MAIN: Add new section'); 
-                  resolve("addSection");                  
+                  console.log('MAIN: Delete section'); 
+                  resolve("deleteSection");                  
                 } 
               },
             ]
@@ -1792,6 +1801,18 @@ function createMainWIndow() {
       return result;
     }
   });
+  ipcMain.handle("deleteSection", (_e, sectionId) => {
+    //    
+    const result = LCCore.deleteSection(sectionId);
+    if(result == true){
+      console.log("MAIN: Delete section.")
+      return result;  
+    }else{
+      console.log("MAIN: Failed to delete section.")
+      return result;  
+    }
+    
+  });
   ipcMain.handle("changeHole", (_e, holeId, type, value) => {
     //
     const idx = LCCore.search_idx_list[holeId.toString()];
@@ -1808,13 +1829,7 @@ function createMainWIndow() {
 //===================================================================================================================================
 
 //--------------------------------------------------------------------------------------------------
-function zeroPadding(str) {
-  if (/^\d+$/.test(str.toString()) == true) {
-    //case number
-    str = str.toString().padStart(2, "0");
-  }
-  return str;
-}
+
 async function getfile(mainWindow, title, ext) {
   const options = {
     title: title,
