@@ -832,6 +832,15 @@ document.addEventListener("DOMContentLoaded", () => {
       objOpts.edit.handleMove = handleSectionMouseMove;
       objOpts.edit.handleClick = null;
       document.addEventListener("mousemove", objOpts.edit.handleMove);
+    }else if(clickResult == "addSection"){
+      objOpts.edit.contextmenu_enable = false;
+      objOpts.edit.hittest = null;
+      objOpts.edit.marker_from = null;
+      objOpts.edit.marker_to = null;
+      objOpts.edit.mode = "add_section";
+      objOpts.edit.handleMove = handleSectionMouseMove;
+      objOpts.edit.handleClick = null;
+      document.addEventListener("mousemove", objOpts.edit.handleMove);
     }else if(clickResult == "deleteSection"){
       objOpts.edit.contextmenu_enable = false;
       objOpts.edit.hittest = null;
@@ -847,6 +856,24 @@ document.addEventListener("DOMContentLoaded", () => {
       objOpts.edit.marker_from = null;
       objOpts.edit.marker_to = null;
       objOpts.edit.mode = "change_hole_name";
+      objOpts.edit.handleMove = handleHoleMouseMove;
+      objOpts.edit.handleClick = null;
+      document.addEventListener("mousemove", objOpts.edit.handleMove);
+    }else if(clickResult == "addHole"){
+      objOpts.edit.contextmenu_enable = false;
+      objOpts.edit.hittest = null;
+      objOpts.edit.marker_from = null;
+      objOpts.edit.marker_to = null;
+      objOpts.edit.mode = "add_hole";
+      objOpts.edit.handleMove = handleHoleMouseMove;
+      objOpts.edit.handleClick = null;
+      document.addEventListener("mousemove", objOpts.edit.handleMove);
+    }else if(clickResult == "deleteHole"){
+      objOpts.edit.contextmenu_enable = false;
+      objOpts.edit.hittest = null;
+      objOpts.edit.marker_from = null;
+      objOpts.edit.marker_to = null;
+      objOpts.edit.mode = "delete_hole";
       objOpts.edit.handleMove = handleHoleMouseMove;
       objOpts.edit.handleClick = null;
       document.addEventListener("mousemove", objOpts.edit.handleMove);
@@ -1268,6 +1295,8 @@ document.addEventListener("DOMContentLoaded", () => {
         await undo("save");//undo
         const result = await window.LCapi.deleteSection(targetId);
         await loadModel();
+        await loadAge(document.getElementById("AgeModelSelect").value);
+        await loadPlotData();
         updateView();
       }
     }
@@ -1295,6 +1324,9 @@ document.addEventListener("DOMContentLoaded", () => {
       //on the section
       if(objOpts.edit.mode == "change_hole_name"){
         objOpts.edit.handleClick = handleHoleChangeClick;
+        document.addEventListener('click', objOpts.edit.handleClick);
+      }else if(objOpts.edit.mode == "delete_hole"){
+        objOpts.edit.handleClick = handleHoleDeleteClick;
         document.addEventListener('click', objOpts.edit.handleClick);
       }else{
         if(objOpts.edit.handleClick !== null){
@@ -1337,7 +1369,45 @@ document.addEventListener("DOMContentLoaded", () => {
         await loadModel();
       }
     }
-    
+    document.removeEventListener("click", objOpts.edit.handleClick);
+    document.removeEventListener("mousemove", objOpts.edit.handleMove);
+    objOpts.edit.contextmenu_enable = true;
+    objOpts.edit.hittest = null;
+    objOpts.edit.marker_from = null;
+    objOpts.edit.marker_to = null;
+    objOpts.edit.handleClick = null;
+    objOpts.edit.handleMove = null;
+    updateView();
+  }
+  //4 Hole click--------------------------------------------
+  async function handleHoleDeleteClick(event) {
+    const rect = document.getElementById("p5Canvas").getBoundingClientRect(); 
+    const mouseX = event.clientX - rect.left;
+    const mouseY = event.clientY - rect.top;
+    const ht = JSON.parse(JSON.stringify(getClickedItemIdx(mouseX, mouseY, LCCore, objOpts)));
+    event.preventDefault();
+
+    if(objOpts.edit.mode == "delete_hole"){
+      const response = await window.LCapi.askdialog(
+        "Delete hole",
+        "Do you want to delete the hole?",
+      );
+      if (response.response) {
+        const targetId = [ht.project, ht.hole, null, null];
+
+        await undo("save");//undo
+        const result = await window.LCapi.deleteHole(targetId);
+        if(result == true){
+          console.log("[Renderer]: Delete hole.")
+          await loadModel();
+          await loadAge(document.getElementById("AgeModelSelect").value);
+          await loadPlotData();
+          updateView();
+        }
+      }
+    }
+    document.removeEventListener("click", objOpts.edit.handleClick);
+    document.removeEventListener("mousemove", objOpts.edit.handleMove);
     objOpts.edit.contextmenu_enable = true;
     objOpts.edit.hittest = null;
     objOpts.edit.marker_from = null;
@@ -1632,6 +1702,7 @@ document.addEventListener("DOMContentLoaded", () => {
   window.LCapi.receive("rendererLog", async (data) => {
     console.log(data);
   });
+  //============================================================================================
   //============================================================================================
   //FInder send event (move to)
   window.LCapi.receive("MoveToHorizonFromFinder", async (data) => {
@@ -2274,17 +2345,23 @@ document.addEventListener("DOMContentLoaded", () => {
             section_plot_order.push(i);
           }
 
-          /*
-          if (hit_object_idx !== null) {
-            if (h == hit_object_idx[0]) {
-              //extract hit object
-              const hitObj = section_plot_order.slice(hit_object_idx[1], 1)[0];
-  
-              //insert last order
-              section_plot_order.push(hitObj);
+          //show live hitttest
+          if(objOpts.edit.hittest){
+            if(objOpts.edit.hittest.hole == hole.id[1]){
+              if(["change_hole_name","delete_hole"].includes(objOpts.edit.mode)){
+                sketch.push();//save
+                sketch.fill(0,0,0,0);
+                sketch.strokeWeight(3);
+                sketch.stroke("Red");
+                const hole_ht_x0 = (hole_x0 + shift_x) * xMag + pad_x - 3;
+                const hole_ht_y0 = (hole_top + shift_y) * yMag + pad_y - 3;
+                const hole_ht_w  = objOpts.section.width * xMag + 6;
+                const hole_ht_h  = (hole_bottom - hole_top) * yMag + 6;
+                sketch.rect(hole_ht_x0, hole_ht_y0, hole_ht_w, hole_ht_h, 3, 3, 3, 3); //rounded
+                sketch.pop();
+              }
             }
           }
-          */
 
           for (let s_o = 0; s_o < hole.sections.length; s_o++) {
             const s = section_plot_order[s_o];
@@ -2335,7 +2412,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
             //hittest
             if(objOpts.edit.hittest){
-              if(["change_section_name"].includes(objOpts.edit.mode)){
+              if(["change_section_name","delete_section"].includes(objOpts.edit.mode)){
                 if(objOpts.edit.hittest.hole == hole.id[1] && objOpts.edit.hittest.section == section.id[2]){
                   sketch.strokeWeight(3);
                   sketch.stroke("Red");

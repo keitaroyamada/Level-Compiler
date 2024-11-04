@@ -488,33 +488,11 @@ function createMainWIndow() {
   });
 
   ipcMain.handle("progressbar", async (_e, tit, txt) => {
-    progressBar = new ProgressBar({
-      title: tit,
-      icon: "./icon/levelcompiler.png",
-      indeterminate: false,
-      text: txt,
-      detail: "Please wait...(0%)",
-      browserWindow: {
-        parent: mainWindow,
-        modal: true,
-        resizable: false,
-        webPreferences: {
-          nodeIntegration: true,
-          contextIsolation: false,
-        },
-      },
-    });
-
-    progressBar
-      .on("completed", () => {
-        //console.info("Task completed.");
-        progressBar.detail = "Task completed. Exiting...";
-      })
-      .on("aborted", (value) => {
-        console.info(`Task aborted... ${value}`);
-      });
+    progressBar = progressDialog(mainWindow, tit, txt);
   });
-
+  ipcMain.handle("updateProgressbar", async (_e, n, N) => {
+    progressBar = await updateProgress(progressBar, n, N);
+  });
   ipcMain.handle("makeModelImage", async (_e, imPath, sectionData, imHeight, depthScale) => {
     try {
       //path.join(__dirname.replace(/\\/g, "/"), im_path)
@@ -624,18 +602,6 @@ function createMainWIndow() {
       }
     }
 
-  });
-
-  ipcMain.handle("updateProgressbar", (_e, n, N) => {
-    if (progressBar) {
-      progressBar.value = (n / N) * 100;
-      progressBar.detail =
-        "Please wait..." + n + "/" + N + "  (" + round((n / N) * 100, 2) + "%)";
-
-      if (n / N >= 1) {
-        progressBar.setCompleted();
-      }
-    }
   });
 
   ipcMain.handle("askdialog", (_e, tit, txt) => {
@@ -1813,6 +1779,50 @@ function createMainWIndow() {
     }
     
   });
+  ipcMain.handle("deleteHole", async(_e, holeId) => {
+    //define function
+    progressBar = progressDialog(mainWindow, "Delete Hole", "Deleting markers in the hole.");
+
+    // Promiseを使って、削除処理が完了するまで待機する
+    return new Promise((resolve, reject) => {
+      // 進捗バーの準備完了時に削除処理を開始
+      progressBar.on("ready", async () => {
+        // 進捗更新用のコールバック関数
+        const progressCallback = (current, total) => {
+          if (progressBar && !progressBar.isCompleted()) {
+            const progress = Math.round((current / total) * 100);
+            progressBar.value = progress;  // 進捗バーのパーセンテージを更新
+            progressBar.detail = `Please wait... ${current} / ${total} (${progress}%)`;
+          }
+        };
+
+        try {
+          // メインの削除処理を非同期で実行し、完了を待機
+          const result = await LCCore.deleteHole(holeId, progressCallback);
+
+          // 結果に応じて進捗バーを閉じる
+          if (result) {
+            console.log("MAIN: Delete hole completed.");
+          } else {
+            console.log("MAIN: Failed to delete hole.");
+          }
+
+          resolve(result); // 処理結果をresolveで返す
+        } catch (error) {
+          console.error("Error deleting hole:", error);
+          reject(false); // エラーの場合はfalseを返す
+        } finally {
+          // 処理完了後に進捗バーを確実に閉じる
+          if (progressBar && !progressBar.isCompleted()) {
+            progressBar.setCompleted();
+          }
+        }
+      });
+    });
+
+    
+    
+  });
   ipcMain.handle("changeHole", (_e, holeId, type, value) => {
     //
     const idx = LCCore.search_idx_list[holeId.toString()];
@@ -1829,7 +1839,47 @@ function createMainWIndow() {
 //===================================================================================================================================
 
 //--------------------------------------------------------------------------------------------------
+function progressDialog(window, tit, txt){
+  let progress = new ProgressBar({
+    title: tit,
+    icon: "./icon/levelcompiler.png",
+    indeterminate: false,
+    text: txt,
+    detail: "Please wait...(0%)",
+    browserWindow: {
+      parent: window,
+      modal: true,
+      resizable: false,
+      webPreferences: {
+        nodeIntegration: true,
+        contextIsolation: false,
+      },
+    },
+  });
 
+  progress
+    .on("completed", () => {
+      //console.info("Task completed.");
+      progress.detail = "Task completed. Exiting...";
+    })
+    .on("aborted", (value) => {
+      console.info(`Task aborted... ${value}`);
+    });
+
+  return progress;
+}
+async function updateProgress(progress, n, N){
+  if (progress) {
+    progress.value = (n / N) * 100;
+    progress.detail =
+      "Please wait..." + n + "/" + N + "  (" + round((n / N) * 100, 2) + "%)";
+
+    if (n / N >= 1) {
+      progress.setCompleted();
+    }
+  }
+  return progress;
+}
 async function getfile(mainWindow, title, ext) {
   const options = {
     title: title,

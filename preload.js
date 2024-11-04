@@ -65,6 +65,7 @@ contextBridge.exposeInMainWorld("LCapi", {
   changeSection: (args1,args2,args3) => ipcRenderer.invoke("changeSection", args1,args2,args3),
   deleteSection: (args1) => ipcRenderer.invoke("deleteSection", args1),
   changeHole: (args1,args2,args3) => ipcRenderer.invoke("changeHole", args1,args2,args3),
+  deleteHole: (args1) => ipcRenderer.invoke("deleteHole", args1),
 
   sendUndo: () => ipcRenderer.invoke('sendUndo'),
   sendRedo: () => ipcRenderer.invoke('sendRedo'),

@@ -546,6 +546,11 @@ class LevelCompilerCore {
     let masterDfsList = [];
     for (let p=0; p<this.projects.length; p++){
       //calc composite depth by limited DFS method
+      if(zeroPoints[p] == null){
+        //case no zero point in the project
+        console.log("LCCore: There is no Zero point in the project: "+this.projects[p].name);
+        continue;
+      }
       const [id_zero_point, startVal, isBaseProject] = zeroPoints[p];
 
       if(calcRange == "project" || (calcRange == "all" && isBaseProject == true)){
@@ -683,7 +688,7 @@ class LevelCompilerCore {
       for(let h=0;h<this.projects[p].holes.length;h++){
         for(let s=0;s<this.projects[p].holes[h].sections.length;s++){
           for(let m=0;m<this.projects[p].holes[h].sections[s].markers.length;m++){
-            const currentMarkerData = this.projects[p].holes[h].sections[s].markers[m];
+            const currentMarkerData = JSON.parse(JSON.stringify(this.projects[p].holes[h].sections[s].markers[m]));
             for(let c=0;c<this.projects[p].holes[h].sections[s].markers[m].h_connection.length;c++){
               const hConnectedId = this.projects[p].holes[h].sections[s].markers[m].h_connection[c];
               if(hConnectedId[0]==this.base_project_id[0]){
@@ -692,15 +697,18 @@ class LevelCompilerCore {
                     //add all hconnection into visited
                     visited.add(this.projects[p].holes[h].sections[s].markers[m].h_connection[n].toString());
                   } 
-                  const hConnectedMarkerData = this.getDataByIdx(this.search_idx_list[hConnectedId.toString()]);
-                  comparisonData.push([
-                    hConnectedMarkerData.id,              //base project
-                    hConnectedMarkerData.composite_depth, //base project
-                    hConnectedMarkerData.event_free_depth,//base project
-                    currentMarkerData.id,                 //duo project
-                    currentMarkerData.composite_depth,    //duo project
-                    currentMarkerData.event_free_depth    //duo project
-                  ]);
+                  const hConnectedMarkerData = JSON.parse(JSON.stringify(this.getDataByIdx(this.search_idx_list[hConnectedId.toString()])));
+                  if(hConnectedMarkerData[calcType]!==null){
+                    comparisonData.push([
+                      hConnectedMarkerData.id,              //base project
+                      hConnectedMarkerData.composite_depth, //base project
+                      hConnectedMarkerData.event_free_depth,//base project
+                      currentMarkerData.id,                 //duo project
+                      currentMarkerData.composite_depth,    //duo project
+                      currentMarkerData.event_free_depth    //duo project
+                    ]);
+                  }
+                  
                 }
               }
             }
@@ -713,7 +721,6 @@ class LevelCompilerCore {
      
       comparisonChart.push([this.projects[p].id.toString(), comparisonData]);      
     }
-
     //apply base CD/EFD
     for(let p=0;p<this.projects.length; p++){
       const [comparisonId, comparisonData] = comparisonChart[p];
@@ -740,10 +747,35 @@ class LevelCompilerCore {
                 break;
               }
             }
+
+            //chec end of project
+            if(lowerIdx !== -1){
+              let val = null;
+              if(calcType == "event_free_depth"){
+                val = comparisonData[lowerIdx][2];//efd
+              }else{
+                val = comparisonData[lowerIdx][1];//cd
+              }
+              if(val==null){
+                lowerIdx = -1;//extrapolate
+              }
+            }
+            if(upperIdx !== -1){
+              let val = null;
+              if(calcType == "event_free_depth"){
+                val = comparisonData[upperIdx][2];//efd
+              }else{
+                val = comparisonData[upperIdx][1];//cd
+              }
+              if(val==null){
+                upperIdx = -1;//extrapolate
+              }
+            }
+
            //console.log(upperIdx, lowerIdx);
 
             if(upperIdx == -1 && lowerIdx == -1){
-              console.log("Undefiened marker detected. " + this.getMarkerNameFromId(currentMarkerData.id));
+              console.log("LCCore: Undefiened marker detected durind connecintg duo model. " + this.getMarkerNameFromId(currentMarkerData.id));
             }
 
             if(upperIdx == -1 && lowerIdx !== -1){
@@ -764,7 +796,12 @@ class LevelCompilerCore {
                 d2 = currentMarkerData.composite_depth;
               }
               
-              D2  = D3  - (d3 - d2);
+              if(false){
+                //master model is null
+                D2 = null;  
+              }else{
+                D2  = D3  - (d3 - d2);
+              }
               
               this.projects[p].holes[h].sections[s].markers[m][calcType]  = D2;
             }
@@ -786,7 +823,12 @@ class LevelCompilerCore {
                 d2 = currentMarkerData.composite_depth;
               }
               
-              D2 = D1 + (d2 - d1);
+              if(false){
+                //master model is null
+                D2 = null;
+              }else{
+                D2 = D1 + (d2 - d1);
+              }
               
               this.projects[p].holes[h].sections[s].markers[m][calcType] = D2;
             }
@@ -799,7 +841,6 @@ class LevelCompilerCore {
               let d2 = null;
               let d3 = null;
 
-              
               if(calcType == "event_free_depth"){
                 D1 = comparisonData[upperIdx][2]; //base project
                 d1 = comparisonData[upperIdx][5]; //duo project
@@ -813,11 +854,15 @@ class LevelCompilerCore {
                 d3 = comparisonData[lowerIdx][4];
                 d2 = currentMarkerData.composite_depth;
               }
-                
-              const d2d1 = d2 - d1;
-              const d3d1 = d3 - d1;
-              D2 = this.linearInterp(D1, D3, d2d1, d3d1);
-
+               
+              if(true){
+                const d2d1 = d2 - d1;
+                const d3d1 = d3 - d1;
+                D2 = this.linearInterp(D1, D3, d2d1, d3d1);
+              }else{
+                //master model is null
+                D2 = null;
+              }
               //console.log(this.getMarkerNameFromId(comparisonData[lowerIdx][3])+"--"+this.getMarkerNameFromId(currentMarkerData.id)+"--"+this.getMarkerNameFromId(comparisonData[upperIdx][3]));
               this.projects[p].holes[h].sections[s].markers[m][calcType] = D2;
             }
@@ -1030,8 +1075,8 @@ class LevelCompilerCore {
       const D3_rank = this.projects[lowerIdxs[0][0]].holes[lowerIdxs[0][1]].sections[lowerIdxs[0][2]].markers[lowerIdxs[0][3]].connection_rank;
       
       if (D1 == null || D3 == null) {
-        console.log("ERROR: " + calcType + " of value is empty.");
-        console.log("D1:" + D1 + "/D3:" + D3 + "/d1:" + d1 + "/d3:" + d3);
+        //console.log("ERROR: " + calcType + " of value is empty.");
+        //console.log("D1:" + D1 + "/D3:" + D3 + "/d1:" + d1 + "/d3:" + d3);
 
         output.push([null, null, null]);
         continue;
@@ -2029,7 +2074,8 @@ class LevelCompilerCore {
   findZeroPointId() {
     let output = [];
     
-    this.projects.forEach((project) => {
+    this.projects.forEach((project,p) => {
+      output.push(null);
       project.holes.forEach((hole) => {
         hole.sections.forEach((section) => {
           section.markers.forEach((marker) => {
@@ -2040,7 +2086,8 @@ class LevelCompilerCore {
               } else {
                 isBaseProject = false;
               }
-              output.push([marker.id, parseFloat(marker.isZeroPoint), isBaseProject]);
+
+              output[p] = [marker.id, parseFloat(marker.isZeroPoint), isBaseProject];
             }
           });
         });
@@ -2135,9 +2182,6 @@ class LevelCompilerCore {
           }
         }
       }
-      
-        
-      
     }
 
     //get vertivcal connection
@@ -2747,7 +2791,7 @@ class LevelCompilerCore {
     //remove event layers
     if(targetMarkerData.event !== 0){
       for(let e of targetMarkerData.event){
-        console.log(e)
+        //console.log(e)
         //["deposition", "upward", connected_marker_id, [label], (value))]
         if(e[1] == "through-up"){
           if(targetMarkerData.v_connection.length==2){
@@ -2771,25 +2815,22 @@ class LevelCompilerCore {
           const connectedMarkerData = JSON.parse(JSON.stringify(this.getDataByIdx(connectedMarkerIdx)));
           //if downward, remove
           this.projects[connectedMarkerIdx[0]].holes[connectedMarkerIdx[1]].sections[connectedMarkerIdx[2]].markers[connectedMarkerIdx[3]].event 
-              = connectedMarkerData.event.filter(e2=>!(e[0] == e2[0] && e2[1] == "downward"));
+              = connectedMarkerData.event.filter(e2=>!(e2[0] == e[0] && e2[1] == "downward" || e2[1] == "through-down" || e2[1] == "through-up"));
+
           //if through, replace
-          this.projects[connectedMarkerIdx[0]].holes[connectedMarkerIdx[1]].sections[connectedMarkerIdx[2]].markers[connectedMarkerIdx[3]].event 
-              = connectedMarkerData.event.filter(e2=>!(e[0] == e2[0] && (e2[1] == "through-down" || e2[1] == "through-up")));
-          let newEvent = connectedMarkerData.event.filter(e2=>(e[0] == e2[0] && e2[1] == "through-up"));
+          let newEvent = connectedMarkerData.event.filter(e2=>(e2[0] == e[0] && e2[1] == "through-up"));
           if(newEvent.length !== 0){
             newEvent[0][1] = e[1];
             newEvent = newEvent[0];
           }          
-          this.projects[connectedMarkerIdx[0]].holes[connectedMarkerIdx[1]].sections[connectedMarkerIdx[2]].markers[connectedMarkerIdx[3]].event.push(newEvent);
+          this.projects[connectedMarkerIdx[0]].holes[connectedMarkerIdx[1]].sections[connectedMarkerIdx[2]].markers[connectedMarkerIdx[3]].event.push(newEvent);        
         } else if(e[1] == "downward"){
           const connectedMarkerIdx = this.search_idx_list[e[2].toString()];
           const connectedMarkerData = JSON.parse(JSON.stringify(this.getDataByIdx(connectedMarkerIdx)));
-          //if downward, remove
+          //if upward, remove
           this.projects[connectedMarkerIdx[0]].holes[connectedMarkerIdx[1]].sections[connectedMarkerIdx[2]].markers[connectedMarkerIdx[3]].event 
-              = connectedMarkerData.event.filter(e2=>!(e[0] == e2[0] && e2[1] == "upward"));
+              = connectedMarkerData.event.filter(e2=>!(e[0] == e2[0] && e2[1] == "upward" || e2[1] == "through-down" || e2[1] == "through-up"));
           //if through, replace
-          this.projects[connectedMarkerIdx[0]].holes[connectedMarkerIdx[1]].sections[connectedMarkerIdx[2]].markers[connectedMarkerIdx[3]].event 
-              = connectedMarkerData.event.filter(e2=>!(e[0] == e2[0] && (e2[1] == "through-down" || e2[1] == "through-up")));
           let newEvent = connectedMarkerData.event.filter(e2=>(e[0] == e2[0] && e2[1] == "through-down"));          
           if(newEvent.length !== 0){
             newEvent[0][1] = e[1];
@@ -3057,6 +3098,28 @@ class LevelCompilerCore {
     //delete top/bottom
     this.projects[sectionIdx[0]].holes[sectionIdx[1]].sections = this.projects[sectionIdx[0]].holes[sectionIdx[1]].sections.filter(sec=>sec.id[2]!==sectionId[2]);
     this.projects[sectionIdx[0]].holes[sectionIdx[1]].reserved_section_ids = this.projects[sectionIdx[0]].holes[sectionIdx[1]].reserved_section_ids.filter(secid=>secid!==sectionId[2]);
+
+    return true;
+  }
+  deleteHole(holeId, callback){
+    const holeIdx = this.search_idx_list[holeId.toString()];
+    const holeData = JSON.parse(JSON.stringify(this.projects[holeIdx[0]].holes[holeIdx[1]]));
+    const projectData = JSON.parse(JSON.stringify(this.projects[holeIdx[0]]));
+
+    //remove sections in the hole
+    const N = holeData.sections.length;
+    let i = 0;
+    for(let sectionData of holeData.sections){
+      i++;
+
+      this.deleteSection(sectionData.id);
+      this.calcCompositeDepth();
+      callback(i,N);
+    }
+    
+    //delete hole
+    this.projects[holeIdx[0]].holes = this.projects[holeIdx[0]].holes.filter(hole=>hole.id[1]!==holeId[1]);
+    this.projects[holeIdx[0]].reserved_hole_ids = this.projects[holeIdx[0]].reserved_hole_ids.filter(id=>id !== holeId[1]);
 
     return true;
   }
