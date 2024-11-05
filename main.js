@@ -741,7 +741,7 @@ function createMainWIndow() {
             label:"Section",
             submenu:[
               { 
-                label: 'Add new section(under construction)', 
+                label: 'Add new section', 
                 click: () => {
                   console.log('MAIN: Add new section'); 
                   resolve("addSection");                  
@@ -790,6 +790,34 @@ function createMainWIndow() {
                 click: () => {
                   console.log('MAIN: Edit marker distance'); 
                   resolve("changeMarkerDistance");                      
+                } 
+              },
+              { 
+                label: 'Add Zero Horizon (under construction)', 
+                click: () => {
+                  console.log('MAIN: Edit zero point'); 
+                  resolve("changeZeroPoint");                      
+                } 
+              },
+              { 
+                label: 'Edit master (under construction)', 
+                click: () => {
+                  console.log('MAIN: Edit master'); 
+                  resolve("changeMaster");                      
+                } 
+              },
+              { 
+                label: 'Add event (under construction)', 
+                click: () => {
+                  console.log('MAIN: Add event'); 
+                  resolve("addEvent");                      
+                } 
+              },
+              { 
+                label: 'Delete event (under construction)', 
+                click: () => {
+                  console.log('MAIN: Delete event'); 
+                  resolve("deleteEvent");                      
                 } 
               },
               { type: 'separator' },
