@@ -43,6 +43,7 @@ document.addEventListener("DOMContentLoaded", () => {
   let finderEnable = false;
   let dividerEnable = false;
   let isSVG = false;
+  let isLoadedLCModel = false;
   //============================================================================================
 
   //--------------------------------------------------------------------------------------------
@@ -68,7 +69,7 @@ document.addEventListener("DOMContentLoaded", () => {
   objOpts.canvas.dpir = 1; //window.devicePixelRatio || 1;
   objOpts.canvas.mouse_over_colour = "red";
   objOpts.canvas.pad_x = 200; //[px]
-  objOpts.canvas.pad_y = 800; //[px]
+  objOpts.canvas.pad_y = 100; //[px]
   objOpts.canvas.shift_x = 0; //[cm]
   objOpts.canvas.shift_y = 0; //[cm]
   objOpts.canvas.bottom_pad = 100; //[cm]
@@ -84,6 +85,9 @@ document.addEventListener("DOMContentLoaded", () => {
   objOpts.canvas.finder_y = 0;
 
   objOpts.project.interval = 0;
+  objOpts.project.font = "Arial";
+  objOpts.project.font_size = 25;
+  objOpts.project.font_colour = "black";
 
   objOpts.hole.distance = 20;
   objOpts.hole.width = 20;
@@ -154,6 +158,7 @@ document.addEventListener("DOMContentLoaded", () => {
   objOpts.edit.marker_to = null;
   objOpts.edit.handleClick = null;
   objOpts.edit.handleMove = null;
+  objOpts.edit.passwards = "admin";
 
   objOpts.pen.colour = "Red";
 
@@ -270,7 +275,7 @@ document.addEventListener("DOMContentLoaded", () => {
       );
       if (response.response) {
         modelImages.image_dir = photo_path;
-        modelImages.load_target_ids = [[1,1,1,null],[1,1,2,null],[1,1,3,null],[1,2,1,null],[1,2,2,null],[1,2,3,null]]; //= [];//load all
+        modelImages.load_target_ids = [[1,1,1,null],[1,1,2,null],[1,1,3,null],[1,2,1,null],[1,2,2,null],[1,2,3,null],[1,3,1,null]]; //= [];//load all
 
         //load images
         let originalImages = await loadCoreImages(modelImages, LCCore, "drilling_depth");
@@ -361,12 +366,9 @@ document.addEventListener("DOMContentLoaded", () => {
           modelImages.load_target_ids = []; //= [];//load all
   
           //load images
-          let originalImages = await loadCoreImages(modelImages, LCCore, "drilling_depth");
-          modelImages["drilling_depth"] = originalImages;
-          let compositeImages = await loadCoreImages(modelImages, LCCore, "composite_depth");
-          modelImages["composite_depth"] = compositeImages;
-          let eventFreeImages = await loadCoreImages(modelImages, LCCore, "event_free_depth");
-          modelImages["event_free_depth"] = eventFreeImages;
+          modelImages["drilling_depth"] =  await loadCoreImages(modelImages, LCCore, "drilling_depth");
+          modelImages["composite_depth"] = await loadCoreImages(modelImages, LCCore, "composite_depth");
+          modelImages["event_free_depth"] = await loadCoreImages(modelImages, LCCore, "event_free_depth");
         }
       } else if(fileParseData.ext == ".csv"){
         if(fileParseData.base.includes("[correlation]") || fileParseData.base.includes("[duo]")){
@@ -593,8 +595,9 @@ document.addEventListener("DOMContentLoaded", () => {
       await initiariseAgeModel();
       await initiariseCanvas();
       await initiarisePlot();
+      isLoadedLCModel = false;
       console.log("[Renderer]: Unload Models of Correlations, Ages and Canvas.");
-      console.log(LCa)
+      console.log(LCCore)
     } else {
       //no
       return;
@@ -661,12 +664,9 @@ document.addEventListener("DOMContentLoaded", () => {
     //load images
     modelImages.image_dir = path;
     modelImages.load_target_ids = [];//load all
-    let originalImages = await loadCoreImages(modelImages, LCCore, "drilling_depth");
-    modelImages["drilling_depth"] = originalImages;
-    let compositeImages = await loadCoreImages(modelImages, LCCore, "composite_depth");
-    modelImages["composite_depth"] = compositeImages;
-    let eventFreeImages = await loadCoreImages(modelImages, LCCore, "event_free_depth");
-    modelImages["event_free_depth"] = eventFreeImages;
+    modelImages["drilling_depth"] = await loadCoreImages(modelImages, LCCore, "drilling_depth");
+    modelImages["composite_depth"] = await loadCoreImages(modelImages, LCCore, "composite_depth");
+    modelImages["event_free_depth"] = await loadCoreImages(modelImages, LCCore, "event_free_depth");
 
     //update plot
     updateView();
@@ -730,11 +730,38 @@ document.addEventListener("DOMContentLoaded", () => {
       updateView();
     }
   });
+//============================================================================================
+  //load correlation model
+  window.LCapi.receive("LoadLCModelMenuClicked", async () => {
+    isLoadedLCModel = true;
+    //load
+    await loadModel();
+    await registerModelFromLCCore()
+    await registerAgeFromLCAge();
+    const selected_age_model_id = document.getElementById("AgeModelSelect").value;
+    await loadAge(selected_age_model_id)
+    await registerAgePlotFromLCAge();
+    await loadPlotData();
+    updateView();      
+  });
+  
   //============================================================================================
   //Edit correlation model
   window.LCapi.receive("EditCorrelation", async () => {
-    if(!LCCore){   
-       return  
+    if(!developerMode){   
+      response = await window.LCapi.inputdialog(
+        "Change marker name",
+        "Please input new name",
+        "password",
+      );
+      if(response !==null){
+        if(response !== objOpts.edit.passwards){
+          alert("Please input correct paswards.");
+          return
+        }
+      }else{
+        return;
+      }
     };
 
     if(objOpts.edit.editable){
@@ -812,7 +839,10 @@ document.addEventListener("DOMContentLoaded", () => {
       objOpts.edit.marker_to = null;
       objOpts.edit.mode = "change_marker_name";
       objOpts.edit.handleMove = handleMarkerMouseMove;
-      objOpts.edit.handleClick = null;
+      if(objOpts.edit.handleClick !== null){
+        document.removeEventListener('click', objOpts.edit.handleClick);
+        objOpts.edit.handleClick = null;
+      }
       document.addEventListener("mousemove", objOpts.edit.handleMove);
     }else if(clickResult == "changeMarkerDistance"){
       objOpts.edit.contextmenu_enable = false;
@@ -821,7 +851,10 @@ document.addEventListener("DOMContentLoaded", () => {
       objOpts.edit.marker_to = null;
       objOpts.edit.mode = "change_marker_distance";
       objOpts.edit.handleMove = handleMarkerMouseMove;
-      objOpts.edit.handleClick = null;
+      if(objOpts.edit.handleClick !== null){
+        document.removeEventListener('click', objOpts.edit.handleClick);
+        objOpts.edit.handleClick = null;
+      }
       document.addEventListener("mousemove", objOpts.edit.handleMove);
     }else if(clickResult == "changeSectionName"){
       objOpts.edit.contextmenu_enable = false;
@@ -830,7 +863,10 @@ document.addEventListener("DOMContentLoaded", () => {
       objOpts.edit.marker_to = null;
       objOpts.edit.mode = "change_section_name";
       objOpts.edit.handleMove = handleSectionMouseMove;
-      objOpts.edit.handleClick = null;
+      if(objOpts.edit.handleClick !== null){
+        document.removeEventListener('click', objOpts.edit.handleClick);
+        objOpts.edit.handleClick = null;
+      }
       document.addEventListener("mousemove", objOpts.edit.handleMove);
     }else if(clickResult == "addSection"){
       objOpts.edit.contextmenu_enable = false;
@@ -838,8 +874,11 @@ document.addEventListener("DOMContentLoaded", () => {
       objOpts.edit.marker_from = null;
       objOpts.edit.marker_to = null;
       objOpts.edit.mode = "add_section";
-      objOpts.edit.handleMove = handleSectionMouseMove;
-      objOpts.edit.handleClick = null;
+      objOpts.edit.handleMove = handleHoleMouseMove;
+      if(objOpts.edit.handleClick !== null){
+        document.removeEventListener('click', objOpts.edit.handleClick);
+        objOpts.edit.handleClick = null;
+      }
       document.addEventListener("mousemove", objOpts.edit.handleMove);
     }else if(clickResult == "deleteSection"){
       objOpts.edit.contextmenu_enable = false;
@@ -848,7 +887,10 @@ document.addEventListener("DOMContentLoaded", () => {
       objOpts.edit.marker_to = null;
       objOpts.edit.mode = "delete_section";
       objOpts.edit.handleMove = handleSectionMouseMove;
-      objOpts.edit.handleClick = null;
+      if(objOpts.edit.handleClick !== null){
+        document.removeEventListener('click', objOpts.edit.handleClick);
+        objOpts.edit.handleClick = null;
+      }
       document.addEventListener("mousemove", objOpts.edit.handleMove);
     }else if(clickResult == "changeHoleName"){
       objOpts.edit.contextmenu_enable = false;
@@ -857,16 +899,10 @@ document.addEventListener("DOMContentLoaded", () => {
       objOpts.edit.marker_to = null;
       objOpts.edit.mode = "change_hole_name";
       objOpts.edit.handleMove = handleHoleMouseMove;
-      objOpts.edit.handleClick = null;
-      document.addEventListener("mousemove", objOpts.edit.handleMove);
-    }else if(clickResult == "addHole"){
-      objOpts.edit.contextmenu_enable = false;
-      objOpts.edit.hittest = null;
-      objOpts.edit.marker_from = null;
-      objOpts.edit.marker_to = null;
-      objOpts.edit.mode = "add_hole";
-      objOpts.edit.handleMove = handleHoleMouseMove;
-      objOpts.edit.handleClick = null;
+      if(objOpts.edit.handleClick !== null){
+        document.removeEventListener('click', objOpts.edit.handleClick);
+        objOpts.edit.handleClick = null;
+      }
       document.addEventListener("mousemove", objOpts.edit.handleMove);
     }else if(clickResult == "deleteHole"){
       objOpts.edit.contextmenu_enable = false;
@@ -875,8 +911,25 @@ document.addEventListener("DOMContentLoaded", () => {
       objOpts.edit.marker_to = null;
       objOpts.edit.mode = "delete_hole";
       objOpts.edit.handleMove = handleHoleMouseMove;
-      objOpts.edit.handleClick = null;
+      if(objOpts.edit.handleClick !== null){
+        document.removeEventListener('click', objOpts.edit.handleClick);
+        objOpts.edit.handleClick = null;
+      }
       document.addEventListener("mousemove", objOpts.edit.handleMove);
+    }else if(clickResult == "addHole"){
+      objOpts.edit.contextmenu_enable = false;
+      objOpts.edit.hittest = null;
+      objOpts.edit.marker_from = null;
+      objOpts.edit.marker_to = null;
+      objOpts.edit.mode = "add_hole";
+      objOpts.edit.handleMove = handleProjectMouseMove;
+      if(objOpts.edit.handleClick !== null){
+        document.removeEventListener('click', objOpts.edit.handleClick);
+        objOpts.edit.handleClick = null;
+      }
+      document.addEventListener("mousemove", objOpts.edit.handleMove);
+    }else if(clickResult == "addProject"){
+      ProjectAdd();
     }else{
       objOpts.edit.contextmenu_enable = true;
       objOpts.edit.hittest = null;
@@ -947,6 +1000,12 @@ document.addEventListener("DOMContentLoaded", () => {
           await undo("save");//undo
           await window.LCapi.connectMarkers(fromId, toId, "horizontal");
           await loadModel();
+
+          const affectedSections = getConnectedSectionIds([fromId, toId]);
+          modelImages.load_target_ids = affectedSections;
+          modelImages["composite_depth"] = await loadCoreImages(modelImages, LCCore, "composite_depth");
+          modelImages["event_free_depth"] = await loadCoreImages(modelImages, LCCore, "event_free_depth");
+          
           updateView();
         }
       } else if(objOpts.edit.mode == "disconnect_marker"){
@@ -1195,7 +1254,9 @@ document.addEventListener("DOMContentLoaded", () => {
         }
       }
 
+      
     }
+    objOpts.edit.mode=null;
     objOpts.edit.contextmenu_enable = true;
     objOpts.edit.hittest = null;
     objOpts.edit.marker_from = null;
@@ -1310,6 +1371,45 @@ document.addEventListener("DOMContentLoaded", () => {
     objOpts.edit.handleMove = null;
     updateView();
   }
+  //3 Section click--------------------------------------------
+  async function handleSectionAddClick(event) {
+    const rect = document.getElementById("p5Canvas").getBoundingClientRect(); 
+    const mouseX = event.clientX - rect.left;
+    const mouseY = event.clientY - rect.top;
+    const ht = JSON.parse(JSON.stringify(getClickedItemIdx(mouseX, mouseY, LCCore, objOpts)));
+    event.preventDefault();
+
+    
+    if(objOpts.edit.mode == "add_section"){
+      //let inData = {name:"00",distance_top:0, distance_bottom:100,dd_top:1000,dd_bottom:1100};
+      let inData = {};
+      inData.name            = await window.LCapi.inputdialog("Add a new section","Section Name?","text");
+      inData.distance_top    = parseFloat(await window.LCapi.inputdialog("Add a new section","Section TOP distance (cm)?","number"));
+      inData.distance_bottom = parseFloat(await window.LCapi.inputdialog("Add a new section","Section BOTTOM distance (cm)?","number"));
+      inData.dd_top          = parseFloat(await window.LCapi.inputdialog("Add a new section","Section TOP drilling depth (cm)?","number"));
+      inData.dd_bottom       = parseFloat(await window.LCapi.inputdialog("Add a new section","Section BOTTOM drilling depth (cm)?","number"));
+
+      if (Object.values(inData).every(value => value !== null)) {
+        const targetId = [ht.project, ht.hole, null, null];
+        
+        await undo("save");//undo
+        const result = await window.LCapi.addSection(targetId, inData);
+        await loadModel();
+        await loadAge(document.getElementById("AgeModelSelect").value);
+        await loadPlotData();
+        updateView();
+      }
+    }
+    document.removeEventListener("click", objOpts.edit.handleClick);
+    document.removeEventListener("mousemove", objOpts.edit.handleMove);
+    objOpts.edit.contextmenu_enable = true;
+    objOpts.edit.hittest = null;
+    objOpts.edit.marker_from = null;
+    objOpts.edit.marker_to = null;
+    objOpts.edit.handleClick = null;
+    objOpts.edit.handleMove = null;
+    updateView();
+  }
   //4 Hole move--------------------------------------------
   function handleHoleMouseMove(event) {
     const rect = document.getElementById("p5Canvas").getBoundingClientRect(); 
@@ -1317,6 +1417,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const mouseY = event.clientY - rect.top;
     const ht = JSON.parse(JSON.stringify(getClickedItemIdx(mouseX, mouseY, LCCore, objOpts)));
     objOpts.edit.hittest = ht;
+   // console.log(ht.project,ht.hole)
     updateView();
   
     //context menu
@@ -1324,6 +1425,9 @@ document.addEventListener("DOMContentLoaded", () => {
       //on the section
       if(objOpts.edit.mode == "change_hole_name"){
         objOpts.edit.handleClick = handleHoleChangeClick;
+        document.addEventListener('click', objOpts.edit.handleClick);
+      }else if(objOpts.edit.mode == "add_section"){
+        objOpts.edit.handleClick = handleSectionAddClick;
         document.addEventListener('click', objOpts.edit.handleClick);
       }else if(objOpts.edit.mode == "delete_hole"){
         objOpts.edit.handleClick = handleHoleDeleteClick;
@@ -1337,9 +1441,7 @@ document.addEventListener("DOMContentLoaded", () => {
       if(objOpts.edit.handleClick !== null){
         document.removeEventListener('click', objOpts.edit.handleClick);
       }
-    }
-
-    
+    }   
   }
   //4 Hole click--------------------------------------------
   async function handleHoleChangeClick(event) {
@@ -1358,7 +1460,7 @@ document.addEventListener("DOMContentLoaded", () => {
       );
       if (response !== null) {
         const targetId = [ht.project, ht.hole, null, null];
-
+        console.log(targetId)
         await undo("save");//undo
         const result = await window.LCapi.changeHole(targetId, target, response);
         if(result=="used"){
@@ -1415,6 +1517,122 @@ document.addEventListener("DOMContentLoaded", () => {
     objOpts.edit.handleClick = null;
     objOpts.edit.handleMove = null;
     updateView();
+  }
+  //4 Hole click--------------------------------------------
+  async function handleHoleAddClick(event) {
+    const rect = document.getElementById("p5Canvas").getBoundingClientRect(); 
+    const mouseX = event.clientX - rect.left;
+    const mouseY = event.clientY - rect.top;
+    const ht = JSON.parse(JSON.stringify(getClickedItemIdx(mouseX, mouseY, LCCore, objOpts)));
+    event.preventDefault();
+
+    if(objOpts.edit.mode == "add_hole"){
+      const response = await window.LCapi.inputdialog(
+        "Add hole",
+        "Please input a name of a new hole.",
+        "text",
+      );
+      if (response !== null) {
+        const targetId = [ht.project, null, null, null];
+
+        await undo("save");//undo
+        const result = await window.LCapi.addHole(targetId, response);
+        if(result == true){
+          console.log("[Renderer]: Add hole.")
+          await loadModel();
+          await loadAge(document.getElementById("AgeModelSelect").value);
+          await loadPlotData();
+          updateView();
+        }else if(result=="used"){
+          console.log("[Renderer]: "+response+" has already been used. Please input a unique name that has not been used.");
+          alert("[ "+response+" ] has already been used. Please input a unique name that has not been used.");
+        }
+      }
+    }
+    document.removeEventListener("click", objOpts.edit.handleClick);
+    document.removeEventListener("mousemove", objOpts.edit.handleMove);
+    objOpts.edit.contextmenu_enable = true;
+    objOpts.edit.hittest = null;
+    objOpts.edit.marker_from = null;
+    objOpts.edit.marker_to = null;
+    objOpts.edit.handleClick = null;
+    objOpts.edit.handleMove = null;
+    updateView();
+  }
+  //5 Project Move--------------------------------------------
+  function handleProjectMouseMove(event) {
+    const rect = document.getElementById("p5Canvas").getBoundingClientRect(); 
+    const mouseX = event.clientX - rect.left;
+    const mouseY = event.clientY - rect.top;
+    const ht = JSON.parse(JSON.stringify(getClickedItemIdx(mouseX, mouseY, LCCore, objOpts)));
+    objOpts.edit.hittest = ht;
+    updateView();
+  
+    //context menu
+    if(ht.project !== null){
+      //on the section
+      if(objOpts.edit.mode == "add_hole"){
+        objOpts.edit.handleClick = handleHoleAddClick;
+        document.addEventListener('click', objOpts.edit.handleClick);
+      }else{
+        if(objOpts.edit.handleClick !== null){
+          document.removeEventListener('click', objOpts.edit.handleClick);
+        }
+      }
+    }else{
+      if(objOpts.edit.handleClick !== null){
+        document.removeEventListener('click', objOpts.edit.handleClick);
+      }
+    }   
+  }
+  //5 Project click--------------------------------------------
+  async function ProjectAdd(){
+    const response = await window.LCapi.inputdialog(
+      "Add new project",
+      "Please input a type of a new Project: 'correlation' OR 'duo'.",
+      "text",
+    );
+    if (response !== null) {
+      if(response == "correlation" || response == "duo"){
+        const response2 = await window.LCapi.inputdialog(
+          "Add new project",
+          "Please input a unique name of a new Project.",
+          "text",
+        );
+
+
+        await undo("save");//undo
+        const result = await window.LCapi.addProject(response, response2);
+        if(result == true){
+          console.log("[Renderer]: Add hole.")
+          await loadModel();
+          await loadAge(document.getElementById("AgeModelSelect").value);
+          await loadPlotData();
+          updateView();
+        }else if(result=="used"){
+          console.log("[Renderer]: "+response+" has already been used. Please input a unique name that has not been used.");
+          alert("[ "+response+" ] has already been used. Please input a unique name that has not been used.");
+        }else if(result == "correlation_exist"){
+          console.log("[Renderer]: Base Correlation Model has already been registered. Please use duo model.");
+          alert("Base Correlation Model has already been registered. Please use duo model.");
+        }else if(result == "no_correlation"){
+          console.log("[Renderer]: 'Duo' model requires Base Correlation Model. Please use correlation model first.");
+          alert("'Duo' model requires Base Correlation Model. Please use correlation model first.");
+        }
+        
+      }else{
+        console.log("[Renderer]: "+response+" is incorrect type. Please select the type from 'correlation' or 'duo'.");
+        alert("[ "+response+" ] is incorrect type. Please select the type from 'correlation' or 'duo'.");
+      }
+    }
+    document.removeEventListener("click", objOpts.edit.handleClick);
+    document.removeEventListener("mousemove", objOpts.edit.handleMove);
+    objOpts.edit.contextmenu_enable = true;
+    objOpts.edit.hittest = null;
+    objOpts.edit.marker_from = null;
+    objOpts.edit.marker_to = null;
+    objOpts.edit.handleClick = null;
+    objOpts.edit.handleMove = null;
   }
   //============================================================================================
   //load correlation model
@@ -1492,7 +1710,7 @@ document.addEventListener("DOMContentLoaded", () => {
   //============================================================================================
   //reload
   document.getElementById("bt_reload").addEventListener("click", async (event) => {
-      if (correlation_model_list.length == 0) {
+      if (correlation_model_list.length == 0 || isLoadedLCModel==true) {
         return;
       }
 
@@ -2015,13 +2233,12 @@ document.addEventListener("DOMContentLoaded", () => {
 
     for (let p = 0; p < LCCore.projects.length; p++) {
       for (let h = 0; h < LCCore.projects[p].holes.length; h++) {
-        let hole_top =
-          LCCore.projects[p].holes[h].sections[0].markers[0][
-            objOpts.canvas.depth_scale
-          ];
-        let hole_bottom = LCCore.projects[p].holes[h].sections
-          .slice(-1)[0]
-          .markers.slice(-1)[0][objOpts.canvas.depth_scale];
+        if(LCCore.projects[p].holes[h].sections.length == 0){
+          continue
+        }
+        let hole_top = LCCore.projects[p].holes[h].sections[0].markers[0][objOpts.canvas.depth_scale];
+        let hole_bottom = LCCore.projects[p].holes[h].sections.slice(-1)[0].markers.slice(-1)[0][objOpts.canvas.depth_scale];
+        
         if (holes_top > hole_top) {
           holes_top = hole_top;
         }
@@ -2293,7 +2510,63 @@ document.addEventListener("DOMContentLoaded", () => {
       //main
       let num_disable = {total: 0, hole: 0};
       for (let p = 0; p < LCCore.projects.length; p++) {
+        //make project objects===================================================================================
         const project = LCCore.projects[p];
+        //show project name
+        let num_enable_left = 0;
+        LCCore.projects.filter(p=>p.order<project.order).forEach(p=>p.holes.forEach(h=>{if(h.enable){num_enable_left++;}}))
+        const project_x0 = ((objOpts.section.width + objOpts.hole.distance) * num_enable_left + shift_x) * xMag + pad_x;
+        let project_y0 = pad_y;
+        if(project.composite_depth_top !== null){
+          project_y0 = (project.composite_depth_top + shift_y) * yMag + pad_y;
+        }     
+
+        sketch.drawingContext.setLineDash([]);
+        sketch.fill(objOpts.project.font_colour);
+        sketch.stroke(objOpts.project.font_colour);
+        sketch.textFont(objOpts.project.font);
+        sketch.textSize(objOpts.project.font_size);
+        sketch.text(
+          project.name,
+          project_x0,
+          project_y0 - 50,
+        );
+
+        //live hittest
+        if(objOpts.edit.hittest){
+          if(objOpts.edit.mode == "add_hole"){
+            if(objOpts.edit.hittest.project == project.id[0]){
+              
+              let num_enable_right = 0;
+              
+              project.holes.forEach(hc=>{
+                if(hc.enable){
+                  num_enable_right++;
+                }
+              })
+              
+              let num_enable_left = 0;
+              LCCore.projects.filter(p=>p.order<project.order).forEach(p=>p.holes.forEach(h=>{if(h.enable){num_enable_left++;}}))
+
+              sketch.push();//save
+              sketch.fill(0,0,0,0);
+              sketch.strokeWeight(3);
+              sketch.stroke("Red");
+              
+              const project_ht_x0 = ((objOpts.section.width + objOpts.hole.distance) * num_enable_left + shift_x) * xMag + pad_x - 3;
+              const project_ht_y0 = (project.composite_depth_top + shift_y) * yMag + pad_y - 3;
+              let project_ht_w  = (objOpts.section.width + objOpts.hole.distance) * num_enable_right * xMag - objOpts.hole.distance/2;
+              if(project_ht_w<=0){
+                project_ht_w = 100;
+              }
+              const project_ht_h  = (project.composite_depth_bottom - project.composite_depth_top) * yMag + 6;
+              sketch.rect(project_ht_x0, project_ht_y0, project_ht_w, project_ht_h, 3, 3, 3, 3); //rounded
+              sketch.pop();
+
+            }
+          }
+        }
+        
         for (let h = 0; h < LCCore.projects[p].holes.length; h++) {
           //make hole objects===================================================================================
           //load hole data
@@ -2307,24 +2580,13 @@ document.addEventListener("DOMContentLoaded", () => {
           }
 
           //calc position excluding diable holes------------------------------
-          let hole_top = hole.sections[0].markers[0][objOpts.canvas.depth_scale];
-          let hole_bottom = hole.sections.slice(-1)[0].markers.slice(-1)[0][objOpts.canvas.depth_scale];
-          let hole_x0 = (objOpts.hole.distance + objOpts.hole.width) * (num_disable.total + hole.order - num_disable.hole);
-
-          //check position
-          if (hole_top == null && hole_bottom == null && hole_x0 == null) {
-            //console.log(h + " th hole has any problem in the position.");
-            // draw hole line --------------------------------------------------
-            sketch.drawingContext.setLineDash([5, 5]);
-            sketch.strokeWeight(objOpts.hole.line_width);
-            sketch.stroke(objOpts.hole.line_colour);
-            sketch.line(
-              (hole_x0 + shift_x + objOpts.hole.width / 2) * xMag + pad_x,
-              (hole_top + shift_y) * yMag + pad_y,
-              (hole_x0 + shift_x + objOpts.hole.width / 2) * xMag + pad_x,
-              (hole_bottom + shift_y) * yMag + pad_y
-            );
+          let hole_top    = null;
+          let hole_bottom = null;
+          if(hole.sections.length!==0){
+            hole_top = hole.sections[0].markers[0][objOpts.canvas.depth_scale];
+            hole_bottom = hole.sections.slice(-1)[0].markers.slice(-1)[0][objOpts.canvas.depth_scale];
           }
+          let hole_x0 = (objOpts.hole.distance + objOpts.hole.width) * (num_disable.total + hole.order - num_disable.hole);
 
           //add  hole name---------------------------------------------------
           sketch.drawingContext.setLineDash([]);
@@ -2338,6 +2600,34 @@ document.addEventListener("DOMContentLoaded", () => {
             (hole_top + shift_y) * yMag + pad_y - 20
           );
 
+          //check position --------------------------------------------------
+          if (hole_top == null && hole_bottom == null) {
+            // draw hole line
+            console.log("[Renderer]: No section in the hole.")
+            sketch.drawingContext.setLineDash([5, 5]);
+            sketch.strokeWeight(objOpts.hole.line_width);
+            sketch.stroke(objOpts.hole.line_colour);
+            sketch.line(
+              (hole_x0 + shift_x + objOpts.hole.width / 2) * xMag + pad_x,
+              100,
+              (hole_x0 + shift_x + objOpts.hole.width / 2) * xMag + pad_x,
+              1000,
+            );
+
+            sketch.drawingContext.setLineDash([]);
+            sketch.fill(objOpts.hole.font_colour);
+            sketch.stroke(objOpts.hole.font_colour);
+            sketch.textFont(objOpts.hole.font);
+            sketch.textSize(objOpts.hole.font_size);
+            sketch.text(
+              hole.name,
+              (hole_x0 + shift_x + objOpts.hole.width * 0.3) * xMag + pad_x,
+              100
+            );
+
+            continue
+          }
+
           //get plot order for hit test--------------------------------------
 
           let section_plot_order = [];
@@ -2347,8 +2637,20 @@ document.addEventListener("DOMContentLoaded", () => {
 
           //show live hitttest
           if(objOpts.edit.hittest){
-            if(objOpts.edit.hittest.hole == hole.id[1]){
-              if(["change_hole_name","delete_hole"].includes(objOpts.edit.mode)){
+            if(objOpts.edit.hittest.project == hole.id[0] && objOpts.edit.hittest.hole == hole.id[1]){
+              if(["change_hole_name","delete_hole","add_section"].includes(objOpts.edit.mode)){
+                let hole_bottom_e = null;
+                if(hole_bottom == null){
+                  if(project.composite_depth_bottom !== null){
+                    hole_bottom_e = project.composite_depth_bottom;
+                  }else{
+                    hole_bottom_e = 100;
+                  }
+                  
+                }else{
+                  hole_bottom_e = hole_bottom;
+                }
+                
                 sketch.push();//save
                 sketch.fill(0,0,0,0);
                 sketch.strokeWeight(3);
@@ -2356,7 +2658,8 @@ document.addEventListener("DOMContentLoaded", () => {
                 const hole_ht_x0 = (hole_x0 + shift_x) * xMag + pad_x - 3;
                 const hole_ht_y0 = (hole_top + shift_y) * yMag + pad_y - 3;
                 const hole_ht_w  = objOpts.section.width * xMag + 6;
-                const hole_ht_h  = (hole_bottom - hole_top) * yMag + 6;
+                const hole_ht_h  = (hole_bottom_e - hole_top) * yMag + 6;
+                console.log(hole_ht_x0,hole_ht_y0,hole_ht_w,hole_ht_h)
                 sketch.rect(hole_ht_x0, hole_ht_y0, hole_ht_w, hole_ht_h, 3, 3, 3, 3); //rounded
                 sketch.pop();
               }
@@ -4014,7 +4317,23 @@ document.addEventListener("DOMContentLoaded", () => {
     //console.log(results);
     return true;
   }
+  async function registerModelFromLCCore() {
+  
+    //mount model into LCCore
+    const results = await window.LCapi.RegisterModelFromLCCore();
 
+    if (results == null && results.length==0) {
+      console.error("[Renderer]: Failed to resister correlation model.")
+      return null;
+    }
+
+    for(let model of results){
+      correlation_model_list.push(model); //{id,name,path}
+      console.log("[Renderer]: Correlation Model has been resistered into the LCCore: " + model.name +".");
+    }
+    
+    return true;
+  }
   async function loadModel() {
     //load model into LCCore
     //now, LC is able to hold one project file, model_id is dummy
@@ -4072,7 +4391,19 @@ document.addEventListener("DOMContentLoaded", () => {
       sortHoleByOrder(LCCore);
 
       //update position
-      let newPad_y = 100 - LCCore.projects[0].composite_depth_top * 10;
+      let yMag = objOpts.canvas.dpir * objOpts.canvas.zoom_level[1];
+      let pad_y = objOpts.canvas.pad_y;
+      const shift_y = objOpts.canvas.shift_y;
+
+      if (objOpts.canvas.depth_scale == "age") {
+        yMag = yMag * objOpts.canvas.age_zoom_correction[0];
+        pad_y = pad_y + objOpts.canvas.age_zoom_correction[1];
+      }
+
+      let newPad_y = objOpts.canvas.pad_y;;
+      if(LCCore.projects[0].composite_depth_top !==null){
+        newPad_y = (LCCore.projects[0].composite_depth_top + shift_y) * yMag + pad_y;
+      }
       objOpts.canvas.pad_y = newPad_y;
 
       //shwo model summary
@@ -4114,6 +4445,30 @@ document.addEventListener("DOMContentLoaded", () => {
       //console.log(results);
     }
   }
+  async function registerAgeFromLCAge() {
+    //initiarise dropdown
+    const parentElement = document.getElementById("AgeModelSelect");
+    while (parentElement.firstChild) {
+      parentElement.removeChild(parentElement.firstChild);
+    }
+
+    const results = await window.LCapi.RegisterAgeFromLCAge();
+
+    if (results.length !== 0 && results !==null) {
+      //add list
+      for(let data of results){
+        age_model_list.push(data); //{id,name,path}
+        //add dropdown
+        const newOption = document.createElement("option");
+        newOption.value = data.id;
+        newOption.textContent = data.name;
+        parentElement .appendChild(newOption);
+
+        console.log("[Renderer]: Age Model has been registered into the LCAge: "+data.name);
+      }
+      //console.log(results);
+    }
+  }
 
   async function loadAge(age_id) {
     //load age model
@@ -4144,9 +4499,11 @@ document.addEventListener("DOMContentLoaded", () => {
   }
   async function registerAgePlotFromLCAge() {
     if (correlation_model_list.length == 0) {
+      console.error("[Renderer]: Failed to register age plot data because correlation model list is empty.", correlation_model_list);
       return;
     }
     if (age_model_list.length == 0) {
+      console.error("[Renderer]: Failed to register age plot data because age list is empty.", age_model_list);
       return;
     }
     //load age model
@@ -4162,8 +4519,9 @@ document.addEventListener("DOMContentLoaded", () => {
       const num_data_collections= results.data_collections.length;
       console.log("[Renderer]: Plot Data have been loaded into the renderer.");
       console.log(
-        "Age points: " + num_age_collections,
-        "\nData points:" + num_data_collections,
+        "Plot data summary:",
+        "\nAge dataset: " + num_age_collections,
+        "\nData dataset:" + num_data_collections,
         "\nData: ", results
       );
     }
@@ -4257,6 +4615,29 @@ document.addEventListener("DOMContentLoaded", () => {
     if (penObject.penCanvas) {
       penObject.penCanvas.redraw();
     }
+  }
+  function getConnectedSectionIds(markerIds){
+    let outIdList = new Set();
+    for(let id of markerIds){
+      const idx = getIdxById(LCCore, id);
+      if(idx==null){
+        console.log(id)
+        continue
+      }
+      const sectionData = LCCore.projects[idx[0]].holes[idx[1]].sections[idx[0]];
+      sectionData.markers.forEach(m=>{
+        m.h_connection.forEach(h=>{
+          outIdList.add(JSON.stringify([h[0],h[1],h[2],null]));
+        })
+      });
+    }
+
+    let output = [];
+    for(let id of outIdList){
+      output.push(JSON.parse(id));
+    }
+
+    return output;
   }
   //============================================================================================
 });
@@ -4515,31 +4896,33 @@ function getNearestConnectedMarkerIdx(LCCore, idFrom, objOpts) {
 function getIdxById(LCCore, id) {
   let relative_idxs = [null, null, null, null];
 
-  if (id[0] !== null || id[0] !== "") {
-    for (let p = 0; p < LCCore.projects.length; p++) {
-      const projectData = LCCore.projects[p];
-      if (projectData.id[0] == id[0]) {
-        relative_idxs[0] = p;
-        if (id[1] !== null || id[1] !== "") {
-          const num_holes = projectData.holes.length;
-          for (let h = 0; h < num_holes; h++) {
-            const holeData = projectData.holes[h];
-            if (holeData.id[1] == id[1]) {
-              relative_idxs[1] = h;
+  try{
+    if (id[0] !== null || id[0] !== "") {
+      for (let p = 0; p < LCCore.projects.length; p++) {
+        const projectData = LCCore.projects[p];
+        if (projectData.id[0] == id[0]) {
+          relative_idxs[0] = p;
+          if (id[1] !== null || id[1] !== "") {
+            const num_holes = projectData.holes.length;
+            for (let h = 0; h < num_holes; h++) {
+              const holeData = projectData.holes[h];
+              if (holeData.id[1] == id[1]) {
+                relative_idxs[1] = h;
 
-              if (id[2] !== null || id[2] !== "") {
-                const num_sections = holeData.sections.length;
-                for (let s = 0; s < num_sections; s++) {
-                  const sectionData = holeData.sections[s];
-                  if (sectionData.id[2] == id[2]) {
-                    relative_idxs[2] = s;
+                if (id[2] !== null || id[2] !== "") {
+                  const num_sections = holeData.sections.length;
+                  for (let s = 0; s < num_sections; s++) {
+                    const sectionData = holeData.sections[s];
+                    if (sectionData.id[2] == id[2]) {
+                      relative_idxs[2] = s;
 
-                    if (id[3] !== null || id[3] !== "") {
-                      const num_markers = sectionData.markers.length;
-                      for (let m = 0; m < num_markers; m++) {
-                        const markerData = sectionData.markers[m];
-                        if (markerData.id[3] == id[3]) {
-                          relative_idxs[3] = m;
+                      if (id[3] !== null || id[3] !== "") {
+                        const num_markers = sectionData.markers.length;
+                        for (let m = 0; m < num_markers; m++) {
+                          const markerData = sectionData.markers[m];
+                          if (markerData.id[3] == id[3]) {
+                            relative_idxs[3] = m;
+                          }
                         }
                       }
                     }
@@ -4551,9 +4934,11 @@ function getIdxById(LCCore, id) {
         }
       }
     }
-  }
 
-  return relative_idxs;
+    return relative_idxs;
+  }catch(err){
+    return null;
+  }
 }
 
 function isPointInRect(point, rect) {
@@ -4826,7 +5211,7 @@ async function undo(type){
 }
 async function loadCoreImages(modelImages, LCCore, depthScale) {
   return new Promise(async (resolve, reject) => {
-  //const prom = new Promise((resolve, reject) => {
+    //initiarise
     let results = {};
 
     //check
@@ -4838,16 +5223,15 @@ async function loadCoreImages(modelImages, LCCore, depthScale) {
       console.log("[Renderer]: There is no LCCore.");
       resolve(results);
     }
-
     
-    if (depthScale == "composite_depth" || depthScale == "event_free_depth" || depthScale == "age") {
+    if (["composite_depth", "event_free_depth", "age"].includes(depthScale)) {
       if (Object.keys(modelImages.drilling_depth).length == 0) {
         console.log("[Renderer]: There is no original image.");
         resolve(results);
       }
     }
 
-    //main get num images
+    //get target image list
     let N = 0;
     if(modelImages.load_target_ids.length == 0){
       //case all
@@ -4860,6 +5244,7 @@ async function loadCoreImages(modelImages, LCCore, depthScale) {
         });
       });
     } else {
+      //case target
       N = modelImages.load_target_ids.length;
     }
     
@@ -4879,6 +5264,10 @@ async function loadCoreImages(modelImages, LCCore, depthScale) {
 
         for(let t=0; t<N;t++){
           const targeIdx = getIdxById(LCCore, modelImages.load_target_ids[t]);
+          if(targeIdx == null){
+            //there is no image in the target section
+            continue
+          }
           const project = LCCore.projects[targeIdx[0]];
           const hole    = project.holes[targeIdx[1]];
           const section = hole.sections[targeIdx[2]];
@@ -5030,9 +5419,30 @@ function getClickedItemIdx(mouseX, mouseY, LCCore, objOpts){
     upper_marker:null,
     lower_marker:null,
   };
-
+  
   breakpoint:
   for(let p=0; p<LCCore.projects.length; p++){
+    let num_enable_right = 0;
+    LCCore.projects[p].holes.forEach(hc=>{
+      if(hc.enable){
+        num_enable_right++;
+      }
+    })
+    let num_enable_left = 0;
+    LCCore.projects.filter(p1=>p1.order<LCCore.projects[p].order).forEach(p2=>p2.holes.forEach(h1=>{if(h1.enable){num_enable_left++;}}))
+      
+    //const project_x0 = ((objOpts.section.width + objOpts.hole.distance) * num_enable_left + shift_x) * xMag + pad_x - 3;
+    //const project_w  = (objOpts.section.width + objOpts.hole.distance) * num_enable_right * xMag - objOpts.hole.distance/2;
+    const project_x0 = (objOpts.section.width + objOpts.hole.distance) * num_enable_left;
+    let project_w  = (objOpts.section.width + objOpts.hole.distance) * num_enable_right;
+    if(project_w == 0){
+      project_w = 100;
+    }
+    const project_x1 = project_x0 + project_w;
+    if(x >= project_x0 && x <= project_x1){
+      results.project = LCCore.projects[p].id[0];
+    }
+
     for(let h=0; h<LCCore.projects[p].holes.length; h++){     
       if(!LCCore.projects[p].holes[h].enable){
         num_hole.disable += 1;
@@ -5040,7 +5450,6 @@ function getClickedItemIdx(mouseX, mouseY, LCCore, objOpts){
       const hole_x0 = (objOpts.hole.distance + objOpts.hole.width) * (num_hole.total + LCCore.projects[p].holes[h].order - num_hole.disable);
       const hole_x1 = hole_x0 + objOpts.hole.width;
       if(x >= hole_x0 && x <= hole_x1){
-        results.project = LCCore.projects[p].holes[h].id[0];
         results.hole    = LCCore.projects[p].holes[h].id[1];
         for(let s=0; s<LCCore.projects[p].holes[h].sections.length; s++){
           const sec_y0 = LCCore.projects[p].holes[h].sections[s].markers[0][objOpts.canvas.depth_scale];//cd/efd

@@ -2161,6 +2161,7 @@ class LevelCompilerCore {
     //get horizontal connection
     for (let h = 0; h < hNeighborMarkerIds.length; h++) {
       //get marker data
+      //console.log(currentMarkerId+"=>"+hNeighborMarkerIds[h])
       const neighborMarkerIdx = this.search_idx_list[hNeighborMarkerIds[h].toString()];
       const neighborMarkerData = this.projects[neighborMarkerIdx[0]].holes[neighborMarkerIdx[1]].sections[neighborMarkerIdx[2]].markers[neighborMarkerIdx[3]];
      
@@ -2664,7 +2665,7 @@ class LevelCompilerCore {
         if(h[0] == toId[0] && h[1] == toId[1]){
           //if connected same hole
           if(!(h[2] == toId[2] && h[3] == toId[3])){
-            console.log("Fail to connect to " +this.getMarkerNameFromId(toId) + "markers because "+this.getMarkerNameFromId(fromId)+ " have been connected the 'to hole' at " + this.getMarkerNameFromId(h));
+            console.error("Fail to connect to " +this.getMarkerNameFromId(toId) + "markers because "+this.getMarkerNameFromId(fromId)+ " have been connected the 'to hole' at " + this.getMarkerNameFromId(h));
             return;
           }
         }
@@ -2674,7 +2675,7 @@ class LevelCompilerCore {
         if(h[0] == fromId[0] && h[1] == fromId[1]){
           //if connected same hole
           if(!(h[2] == fromId[2] && h[3] == fromId[3])){
-            console.log("Fail to connect to "+this.getMarkerNameFromId(fromId)+ " markers because "+this.getMarkerNameFromId(toId)+ " have been connected the 'to hole' at " + this.getMarkerNameFromId(h));
+            console.error("Fail to connect to "+this.getMarkerNameFromId(fromId)+ " markers because "+this.getMarkerNameFromId(toId)+ " have been connected the 'to hole' at " + this.getMarkerNameFromId(h));
             return;
           }
         }
@@ -2867,6 +2868,7 @@ class LevelCompilerCore {
     }
   }
   addMarker(sectionId, depth, depthScale){
+    this.updateSearchIdx()
     const sectionIdx  = this.search_idx_list[sectionId.toString()];
     const sectionData = this.getDataByIdx(sectionIdx);
 
@@ -2923,6 +2925,8 @@ class LevelCompilerCore {
     this.connectMarkers(upperId, newMarkerId, "vertical");
     this.connectMarkers(newMarkerId, lowerId, "vertical");
     this.projects[sectionIdx[0]].holes[sectionIdx[1]].sections[sectionIdx[2]].reserved_marker_ids.push(newId);
+    this.sortModel();
+    return true
   }
   changeDistance(markerId, distance){
     const markerIdx = this.search_idx_list[markerId.toString()];
@@ -3066,62 +3070,177 @@ class LevelCompilerCore {
   }
   deleteSection(sectionId){
     const sectionIdx = this.search_idx_list[sectionId.toString()];
-    const sectionData = JSON.parse(JSON.stringify(this.projects[sectionIdx[0]].holes[sectionIdx[1]].sections[sectionIdx[2]]));
-    const holeData = JSON.parse(JSON.stringify(this.projects[sectionIdx[0]].holes[sectionIdx[1]]));
-
-    //remove marker in the section
-    for(let markerData of sectionData.markers){
-      if(!markerData.name.includes("top") && !markerData.name.includes("bottom")){
-        this.deleteMarker(markerData.id);
-        this.calcCompositeDepth();
+    let deleteList = new Set();
+    for(let markerData of this.projects[sectionIdx[0]].holes[sectionIdx[1]].sections[sectionIdx[2]].markers){
+      deleteList.add(markerData.id.toString());
+    }
+    
+    //delete connection
+    for(let p=0; p<this.projects.length;p++){
+      for(let h=0;h<this.projects[p].holes.length;h++){
+        for(let s=0;s<this.projects[p].holes[h].sections.length;s++){
+          for(let m=0;m<this.projects[p].holes[h].sections[s].markers.length;m++){
+            //remove deleted h_connection
+            this.projects[p].holes[h].sections[s].markers[m].h_connection
+              = this.projects[p].holes[h].sections[s].markers[m].h_connection.filter(hc=>!deleteList.has(hc.toString()));
+            //remove deleted v_connection
+            this.projects[p].holes[h].sections[s].markers[m].v_connection
+              = this.projects[p].holes[h].sections[s].markers[m].v_connection.filter(vc=>!deleteList.has(vc.toString()));
+            //initiarise
+            this.projects[p].holes[h].sections[s].markers[m].composite_depth = null;
+            this.projects[p].holes[h].sections[s].markers[m].event_free_depth = null;
+          }
+        }
       }
     }
-
-    //case piston hole
-    for(let markerId of this.projects[sectionIdx[0]].holes[sectionIdx[1]].sections[sectionIdx[2]].markers[0].v_connection){
-      if(markerId.toString() !== this.projects[sectionIdx[0]].holes[sectionIdx[1]].sections[sectionIdx[2]].markers[1]){
-        //connected other sections
-        const otherSecIdx = this.search_idx_list[markerId.toString()];
-        this.projects[otherSecIdx[0]].holes[otherSecIdx[1]].sections[otherSecIdx[2]].markers[otherSecIdx[3]].v_connection 
-          = this.projects[otherSecIdx[0]].holes[otherSecIdx[1]].sections[otherSecIdx[2]].markers[otherSecIdx[3]].v_connection.filter(vc=>vc.toString()!==this.projects[sectionIdx[0]].holes[sectionIdx[1]].sections[sectionIdx[2]].markers[0].id.toString());
-      }
-    }
-    for(let markerId of this.projects[sectionIdx[0]].holes[sectionIdx[1]].sections[sectionIdx[2]].markers[1].v_connection){
-      if(markerId.toString() !== this.projects[sectionIdx[0]].holes[sectionIdx[1]].sections[sectionIdx[2]].markers[0]){
-        //connected other sections
-        const otherSecIdx = this.search_idx_list[markerId.toString()];
-        this.projects[otherSecIdx[0]].holes[otherSecIdx[1]].sections[otherSecIdx[2]].markers[otherSecIdx[3]].v_connection 
-          = this.projects[otherSecIdx[0]].holes[otherSecIdx[1]].sections[otherSecIdx[2]].markers[otherSecIdx[3]].v_connection.filter(vc=>vc.toString()!==this.projects[sectionIdx[0]].holes[sectionIdx[1]].sections[sectionIdx[2]].markers[0].id.toString());
-      }
-    }
-
-    //delete top/bottom
-    this.projects[sectionIdx[0]].holes[sectionIdx[1]].sections = this.projects[sectionIdx[0]].holes[sectionIdx[1]].sections.filter(sec=>sec.id[2]!==sectionId[2]);
-    this.projects[sectionIdx[0]].holes[sectionIdx[1]].reserved_section_ids = this.projects[sectionIdx[0]].holes[sectionIdx[1]].reserved_section_ids.filter(secid=>secid!==sectionId[2]);
-
+    
+    //delete section
+    this.projects[sectionIdx[0]].holes[sectionIdx[1]].sections 
+      = this.projects[sectionIdx[0]].holes[sectionIdx[1]].sections.filter(sec=>sec.id[2].toString()!==sectionId[2].toString());
+    this.projects[sectionIdx[0]].holes[sectionIdx[1]].reserved_section_ids
+      = this.projects[sectionIdx[0]].holes[sectionIdx[1]].reserved_section_ids.filter(sid=>sid!==sectionId[2]);
+    
+    
+    this.calcCompositeDepth();
+    this.calcEventFreeDepth();
+    this.updateSearchIdx();
     return true;
   }
-  deleteHole(holeId, callback){
+  addSection(holeId, inData){
+    this.updateSearchIdx();
     const holeIdx = this.search_idx_list[holeId.toString()];
-    const holeData = JSON.parse(JSON.stringify(this.projects[holeIdx[0]].holes[holeIdx[1]]));
-    const projectData = JSON.parse(JSON.stringify(this.projects[holeIdx[0]]));
+    const holeData = this.projects[holeIdx[0]].holes[holeIdx[1]];
+    let newSectionData    = new Section();
+    let topMarkerData     = new Marker();
+    let bottomMarkerData  = new Marker();
 
-    //remove sections in the hole
-    const N = holeData.sections.length;
-    let i = 0;
-    for(let sectionData of holeData.sections){
-      i++;
+    const newSectionId = [holeId[0], holeId[1], Math.max(...this.projects[holeIdx[0]].holes[holeIdx[1]].reserved_section_ids)+1,null];
+    newSectionData.name = lcfnc.zeroPadding(inData.name);
+    newSectionData.id = newSectionId;
 
-      this.deleteSection(sectionData.id);
-      this.calcCompositeDepth();
-      callback(i,N);
+    topMarkerData.name = holeData.name+"-"+inData.name+"-top";
+    topMarkerData.distance = inData.distance_top;
+    topMarkerData.drilling_depth = inData.dd_top;
+    topMarkerData.id = [newSectionId[0],newSectionId[1],newSectionId[2],1];
+    bottomMarkerData.name = holeData.name+"-"+inData.name+"-bottom";
+    bottomMarkerData.distance =inData.distance_bottom;
+    bottomMarkerData.drilling_depth =inData.dd_bottom;
+    bottomMarkerData.id = [newSectionId[0],newSectionId[1],newSectionId[2],2];
+
+    newSectionData.markers.push(topMarkerData);
+    newSectionData.markers.push(bottomMarkerData);
+    newSectionData.reserved_marker_ids.push(1);
+    newSectionData.reserved_marker_ids.push(2);
+
+    this.projects[holeIdx[0]].holes[holeIdx[1]].sections.push(newSectionData);
+    this.projects[holeIdx[0]].holes[holeIdx[1]].reserved_section_ids.push(newSectionId[2]);
+
+    return true
+  }
+  deleteHole(holeId){
+    this.updateSearchIdx();
+    const holeIdx = this.search_idx_list[holeId.toString()];
+    let deleteList = new Set();
+
+    for(let s=0;s<this.projects[holeIdx[0]].holes[holeIdx[1]].sections.length;s++){
+      for(let m=0;m<this.projects[holeIdx[0]].holes[holeIdx[1]].sections[s].markers.length;m++){
+        const markerData = this.projects[holeIdx[0]].holes[holeIdx[1]].sections[s].markers[m];
+        deleteList.add(markerData.id.toString());
+      }
+    }
+    
+    //delete connection
+    for(let p=0; p<this.projects.length;p++){
+      for(let h=0;h<this.projects[p].holes.length;h++){
+        for(let s=0;s<this.projects[p].holes[h].sections.length;s++){
+          for(let m=0;m<this.projects[p].holes[h].sections[s].markers.length;m++){
+            //remove deleted h_connection
+            this.projects[p].holes[h].sections[s].markers[m].h_connection
+              = this.projects[p].holes[h].sections[s].markers[m].h_connection.filter(hc=>!deleteList.has(hc.toString()));
+            //remove deleted v_connection
+            this.projects[p].holes[h].sections[s].markers[m].v_connection
+              = this.projects[p].holes[h].sections[s].markers[m].v_connection.filter(vc=>!deleteList.has(vc.toString()));
+            //initiarise
+            this.projects[p].holes[h].sections[s].markers[m].composite_depth = null;
+            this.projects[p].holes[h].sections[s].markers[m].event_free_depth = null;
+          }
+        }
+      }
     }
     
     //delete hole
-    this.projects[holeIdx[0]].holes = this.projects[holeIdx[0]].holes.filter(hole=>hole.id[1]!==holeId[1]);
-    this.projects[holeIdx[0]].reserved_hole_ids = this.projects[holeIdx[0]].reserved_hole_ids.filter(id=>id !== holeId[1]);
-
+    this.projects[holeIdx[0]].holes = this.projects[holeIdx[0]].holes.filter(hole=>hole.id[1].toString()!==holeId[1].toString());      
+    this.projects[holeIdx[0]].reserved_hole_ids = this.projects[holeIdx[0]].reserved_hole_ids.filter(hid=>hid!==holeId[1]);
+    
+    this.calcCompositeDepth();
+    this.calcEventFreeDepth();
+    this.updateSearchIdx();
     return true;
+    
+  }
+  addHole(projectId, name){
+    this.updateSearchIdx()
+    const projectIdx = this.search_idx_list[projectId.toString()];
+    let newHole = new Hole();
+    const newHoleId = [projectId[0], Math.max(...this.projects[projectIdx[0]].reserved_hole_ids) + 1, null, null];
+    newHole.id = newHoleId;
+    newHole.order = this.projects[projectIdx[0]].holes.length+1;
+    if(this.projects[projectIdx[0]].holes.filter(h=>h.name == name).length !== 0){
+      return "used";
+    } else{
+      newHole.name = name;
+    }
+    
+    //set hole data
+    this.projects[projectIdx[0]].holes.push(newHole);
+    this.projects[projectIdx[0]].reserved_hole_ids.push(newHole.id[1]);
+
+    ////set dummy section
+    let secData={};
+    secData.name = "example";
+    secData.distance_top = 0;
+    secData.distance_bottom = 100;
+    secData.dd_top = 0;
+    secData.dd_bottom = 100;
+    this.addSection(newHoleId, secData);
+    return true;
+  }
+  addProject(type, name){
+    this.updateSearchIdx()
+    //check type
+    if(!["correlation","duo"].includes(type)){
+      return "incorrect_type"
+    }
+
+    if(this.projects.filter(p=>p.model_type=="correlation").length !== 0){
+      if(type == "correlation"){
+        return "correlation_exist";
+      }
+    }else{
+      if(type == "duo"){
+        return "no_correlation";
+      }
+    }
+    
+    //check name
+    if(this.projects.filter(p=>p.name==name).length !== 0){
+      return "used";
+    }
+
+    let newProject = new Project();
+    newProject.name = name;
+    newProject.id = [Math.max(...this.reserved_project_ids)+1, null, null, null];
+    newProject.order = this.projects.length+1;
+    newProject.model_type = type;
+    if(type == "correlation"){
+      if(this.base_project_id==null){
+        this.base_project_id = newProject.id;
+      }
+    }
+
+    this.projects.push(newProject);
+    return true;
+
   }
   changeName(targetId, value){
     console.log(targetId)

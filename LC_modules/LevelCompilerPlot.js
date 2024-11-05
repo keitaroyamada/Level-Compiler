@@ -25,6 +25,11 @@ class LevelCompilerPlot {
   //methods
   initiariseAgeCollection(){
     this.age_collections = [];
+    this.age_selected_id = null;
+  }
+  initiariseDataCollection(){
+    this.data_collections = [];
+    this.data_selected_id = null;
   }
   addNewAgeCollection(name, age_id) {
     const newCollection = new PlotCollection();

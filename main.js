@@ -109,6 +109,35 @@ function createMainWIndow() {
       label: "File",
       submenu: [
         {
+          label: "Load LC model",
+          //accelerator: "CmdOrCtrl+S",
+          click: async () => {
+            const inData = await loadmodelfile()
+            console.log(inData)
+            if(inData!==null){
+              Object.assign(LCCore, inData.LCCore);
+              Object.assign(LCAge, inData.LCAge);
+              //Object.assign(LCPlot, inData.LCPlot);
+
+              mainWindow.webContents.send("LoadLCModelMenuClicked");
+            }
+          },
+        },
+        {
+          label: "Save LC model",
+          accelerator: "CmdOrCtrl+S",
+          click: async () => {
+            
+            //remove plot data
+            let outLCPlot = JSON.parse(JSON.stringify(LCPlot));
+            outLCPlot.data_collections = [];
+            outLCPlot.data_selected_id = null;
+            const outData = {LCCore:LCCore, LCAge:LCAge, LCPlotAge:outLCPlot};
+            await putmodelfile(outData);       
+          },
+        },
+        { type: "separator" },
+        {
           label: "Load Correlation Model",
           accelerator: "CmdOrCtrl+M",
           click: () => {
@@ -166,6 +195,7 @@ function createMainWIndow() {
           },
         },
         { type: "separator" },
+        
         {
           label: "Export correlation as csv",
           accelerator: "CmdOrCtrl+E",
@@ -448,7 +478,23 @@ function createMainWIndow() {
       return null;
     }
   });
+  ipcMain.handle("RegisterModelFromLCCore", async (_e) => {
+    try {
+      //register model
+      let outData =[];
 
+      for(let p=0; p<LCCore.projects.length;p++){
+        outData.push({id:LCCore.projects[p].id, name:LCCore.projects[p].name, path:null});
+      }
+
+      return outData;
+      
+    } catch (error) {
+      console.log(error);
+      console.error("MAIN: Correlation model register error.");
+      return null;
+    }
+  });
   ipcMain.handle("LoadModelFromLCCore", async (_e) => {
     //import model
     console.log("MAIN: Load correlation model.");
@@ -643,8 +689,36 @@ function createMainWIndow() {
       if(type == "editContextMenu"){
         template = [
           {
+            label:"Project",
+            submenu:[
+              { 
+                label: 'Add new Project', 
+                click: () => {
+                  console.log('MAIN: Add new Project'); 
+                  resolve("addProject"); 
+                } 
+              },
+              { type: 'separator' },
+              { 
+                label: 'Delete Project', 
+                click: () => {
+                  console.log('MAIN: Delete Project'); 
+                  resolve("deleteProject"); 
+                } 
+              },
+            ]
+          },
+          {
             label:"Hole",
             submenu:[
+              { 
+                label: 'Add new Hole', 
+                click: () => {
+                  console.log('MAIN: Add new Hole'); 
+                  resolve("addHole"); 
+                } 
+              },
+              { type: 'separator' },
               { 
                 label: 'Edit name', 
                 click: () => {
@@ -653,15 +727,9 @@ function createMainWIndow() {
                  
                 } 
               },
+              { type: 'separator' },
               { 
-                label: 'Add new Hole(under construction)', 
-                click: () => {
-                  console.log('MAIN: Add new Hole'); 
-                  resolve("addHole"); 
-                } 
-              },
-              { 
-                label: 'Delete Hole(under construction)', 
+                label: 'Delete Hole', 
                 click: () => {
                   console.log('MAIN: Delete target Hole'); 
                   resolve("deleteHole"); 
@@ -784,6 +852,24 @@ function createMainWIndow() {
       return null;
     }
   });
+  ipcMain.handle("RegisterAgeFromLCAge", async (_e) => {
+    if(LCAge !== null){
+      //apply latest age model to the depth model
+      let outData = [];
+
+      for(let model of LCAge.AgeModels){
+
+        outData.push({ id: model.id, name: model.name, path: null });
+
+      }
+      console.log(outData)
+
+      console.log("MAIN: Registered age model from LCAge");
+      return outData;
+    }else{
+      return null;
+    }
+  });
 
   ipcMain.handle("LoadAgeFromLCAge", async (_e, age_id) => {
     //apply latest age model to the depth model
@@ -814,7 +900,7 @@ function createMainWIndow() {
   });
   ipcMain.handle("RegisterAgePlotFromLCAge", async (_e) => {
     LCPlot.initiariseAgeCollection();
-    try {
+    try {      
       //register all LCAge models
       for (let i = 0; i < LCAge.AgeModels.length; i++) {
         //make new collection
@@ -835,13 +921,10 @@ function createMainWIndow() {
           LCPlot.age_selected_id, //new made lotdata id
           LCAge.AgeModels[age_idx]
         );
-
-
         console.log("MAIN: Registered age plot data from " + LCAge.AgeModels[age_idx].name);
       }
     } catch (error) {
-      console.error("ERROR: Plot data register from LCAge error.");
-      console.log(error);
+      console.error("ERROR: Plot data register from LCAge error.", error);
     }
   });
   ipcMain.handle("RegisterDataPlot", async (_e, data) => {
@@ -1769,7 +1852,7 @@ function createMainWIndow() {
   });
   ipcMain.handle("deleteSection", (_e, sectionId) => {
     //    
-    const result = LCCore.deleteSection(sectionId);
+    const result = LCCore.deleteSection(sectionId);//LCCore.deleteSection(sectionId);
     if(result == true){
       console.log("MAIN: Delete section.")
       return result;  
@@ -1779,48 +1862,42 @@ function createMainWIndow() {
     }
     
   });
-  ipcMain.handle("deleteHole", async(_e, holeId) => {
-    //define function
-    progressBar = progressDialog(mainWindow, "Delete Hole", "Deleting markers in the hole.");
-
-    // Promiseを使って、削除処理が完了するまで待機する
-    return new Promise((resolve, reject) => {
-      // 進捗バーの準備完了時に削除処理を開始
-      progressBar.on("ready", async () => {
-        // 進捗更新用のコールバック関数
-        const progressCallback = (current, total) => {
-          if (progressBar && !progressBar.isCompleted()) {
-            const progress = Math.round((current / total) * 100);
-            progressBar.value = progress;  // 進捗バーのパーセンテージを更新
-            progressBar.detail = `Please wait... ${current} / ${total} (${progress}%)`;
-          }
-        };
-
-        try {
-          // メインの削除処理を非同期で実行し、完了を待機
-          const result = await LCCore.deleteHole(holeId, progressCallback);
-
-          // 結果に応じて進捗バーを閉じる
-          if (result) {
-            console.log("MAIN: Delete hole completed.");
-          } else {
-            console.log("MAIN: Failed to delete hole.");
-          }
-
-          resolve(result); // 処理結果をresolveで返す
-        } catch (error) {
-          console.error("Error deleting hole:", error);
-          reject(false); // エラーの場合はfalseを返す
-        } finally {
-          // 処理完了後に進捗バーを確実に閉じる
-          if (progressBar && !progressBar.isCompleted()) {
-            progressBar.setCompleted();
-          }
-        }
-      });
-    });
-
+  ipcMain.handle("addSection", (_e, sectionId, data) => {
+    //    
+    const result = LCCore.addSection(sectionId,data);//LCCore.deleteSection(sectionId);
+    if(result == true){
+      console.log("MAIN: Add section.")
+      return result;  
+    }else{
+      console.log("MAIN: Failed to add section.")
+      return result;  
+    }
     
+  });
+  ipcMain.handle("addHole", async(_e, projectId, name) => {
+    
+    const result = LCCore.addHole(projectId, name);
+
+    if (result == true) {
+      console.log("MAIN: Add hole completed.");
+      return result;
+    } else {
+      console.log("MAIN: Failed to add a new hole.");
+      return result
+    }
+  });
+  ipcMain.handle("deleteHole", async(_e, holeId) => {
+    
+    const result = LCCore.deleteHole(holeId);
+
+    if (result == true) {
+      console.log("MAIN: Delete hole completed.");
+      return result;
+    } else {
+      console.log("MAIN: Failed to delete hole.");
+      return result
+    }
+
     
   });
   ipcMain.handle("changeHole", (_e, holeId, type, value) => {
@@ -1830,6 +1907,18 @@ function createMainWIndow() {
     if(type=="name"){
       const result = LCCore.changeName(holeId, value);
       return result;
+    }
+  });
+  ipcMain.handle("addProject", async(_e, type, name) => {
+    
+    const result = LCCore.addProject(type, name);
+
+    if (result == true) {
+      console.log("MAIN: Add project completed.");
+      return result;
+    } else {
+      console.log("MAIN: Failed to add a new project.");
+      return result
     }
   });
 
@@ -1935,6 +2024,49 @@ async function putcsvfile(mainWindow, data) {
     .catch((err) => {
       console.log(err);
     });
+}
+//--------------------------------------------------------------------------------------------------
+async function putmodelfile(data) {
+  try{
+    const file = await dialog.showSaveDialog({
+      title: "Please select save path",
+      defaultPath: app.getPath("desktop"),
+      buttonLabel: "Save",
+      filters: [{ name: "Level Compiler model", extensions: ["lcmodel"] }],
+    })
+  
+    if (!file.canceled && file.filePath) {
+      //convert array --> csv
+      const saveData = JSON.stringify(data);
+      fs.writeFileSync(file.filePath,saveData);
+    }
+    
+  }catch(err) {
+      console.log(err);
+  };
+}
+//--------------------------------------------------------------------------------------------------
+async function loadmodelfile() {
+  try{
+    const file = await dialog.showOpenDialog({
+      title: "Please select file to load",
+      defaultPath: app.getPath("desktop"),
+      buttonLabel: "Load",
+      filters: [{ name: "Level Compiler model", extensions: ["lcmodel"] }],
+      properties: ['openFile']
+    });
+    if (!file.canceled && file.filePaths[0]) {
+      const fileContent = fs.readFileSync(file.filePaths[0], 'utf8');
+      const loadedData = JSON.parse(fileContent);
+      console.log('File loaded successfully:', loadedData);
+
+      return loadedData;
+    }
+  }catch(err){
+    console.error('Error loading file:', err);
+    return null;
+  }
+
 }
 //--------------------------------------------------------------------------------------------------
 //create sub window

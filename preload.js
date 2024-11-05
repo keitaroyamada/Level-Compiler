@@ -16,6 +16,7 @@ contextBridge.exposeInMainWorld("LCapi", {
 
   //register and load models
   RegisterModelFromCsv: (args) => ipcRenderer.invoke("RegisterModelFromCsv", args),
+  RegisterModelFromLCCore: () => ipcRenderer.invoke("RegisterModelFromLCCore"),
   LoadModelFromLCCore: () => ipcRenderer.invoke("LoadModelFromLCCore"),
   RegisterAgeFromCsv: (args) => ipcRenderer.invoke("RegistertAgeFromCsv", args),
   LoadAgeFromLCAge: (args) => ipcRenderer.invoke("LoadAgeFromLCAge", args),
@@ -63,9 +64,14 @@ contextBridge.exposeInMainWorld("LCapi", {
   addMarker: (args1,args2,args3) => ipcRenderer.invoke("addMarker", args1,args2,args3),
   changeMarker: (args1,args2,args3) => ipcRenderer.invoke("changeMarker", args1,args2,args3),
   changeSection: (args1,args2,args3) => ipcRenderer.invoke("changeSection", args1,args2,args3),
-  deleteSection: (args1) => ipcRenderer.invoke("deleteSection", args1),
+  changeSection: (args1,args2,args3) => ipcRenderer.invoke("changeSection", args1,args2,args3),
+  deleteSection: (args1,args2) => ipcRenderer.invoke("deleteSection", args1,args2),
+  addSection: (args1,args2) => ipcRenderer.invoke("addSection", args1,args2),
   changeHole: (args1,args2,args3) => ipcRenderer.invoke("changeHole", args1,args2,args3),
   deleteHole: (args1) => ipcRenderer.invoke("deleteHole", args1),
+  addHole: (args1,args2) => ipcRenderer.invoke("addHole", args1,args2),
+  addProject: (args1,args2) => ipcRenderer.invoke("addProject", args1,args2),
+  RegisterAgeFromLCAge: () => ipcRenderer.invoke('RegisterAgeFromLCAge'),
 
   sendUndo: () => ipcRenderer.invoke('sendUndo'),
   sendRedo: () => ipcRenderer.invoke('sendRedo'),
