@@ -162,7 +162,7 @@ document.addEventListener("DOMContentLoaded", () => {
   objOpts.edit.passwards = "admin";
 
   objOpts.pen.colour = "Red";
-  objOpts.image.dpcm = 80;
+  objOpts.image.dpcm = 30;
 
   objOpts.age.incon_size = 20;
   objOpts.age.alt_radius = 3;
@@ -2745,9 +2745,7 @@ document.addEventListener("DOMContentLoaded", () => {
             sketch.rect(sec_x0, sec_y0, sec_w, sec_h, 3, 3, 3, 3); //rounded
 
             //check zoom level for ignoring plot markers
-            if (
-              objOpts.canvas.zoom_level[1] < objOpts.marker.ignore_zoom_level
-            ) {
+            if (objOpts.canvas.zoom_level[1] < objOpts.marker.ignore_zoom_level) {
               continue;
             }
 
@@ -5018,11 +5016,7 @@ function getEventPosiotion(LCCore, event, marker_top, objOpts) {
         );
       }
     } else if (event[0] == "erosion") {
-      if (
-        objOpts.canvas.depth_scale == "event_free_depth" ||
-        //objOpts.canvas.depth_scale == "composite_depth" ||
-        objOpts.canvas.depth_scale == "age"
-      ) {
+      if (objOpts.canvas.depth_scale == "event_free_depth" || objOpts.canvas.depth_scale == "age") {
         const conIdx = this.getIdxById(LCCore, event[2]); //event layer connected MarkerId
         lowerDepth = LCCore.projects[conIdx[0]].holes[conIdx[1]].sections[conIdx[2]].markers[conIdx[3]][objOpts.canvas.depth_scale];
         eventThickness = marker_top - lowerDepth;

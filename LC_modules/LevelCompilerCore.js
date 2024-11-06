@@ -224,12 +224,12 @@ class LevelCompilerCore {
                 //add 2 events for upward and downward
                 eventData.push(["deposition", "through-up", null, eventCategory, null]);
                 eventData.push(["deposition", "through-down", null, eventCategory, null]);
-              } else if (event[1] == "upward") {
+              } else if (event[1] == "upward" || event[1]) {
                 let thickness = parseFloat(event[2]);
                 if (!isNaN(thickness)) {
                   eventData.push(["deposition", "upward", -thickness, eventCategory, -thickness]);
                 }
-              } else if (event[1] == "downward") {
+              } else if (event[1] == "downward" || event[1]) {
                 let thickness = parseFloat(event[2]);
                 if (!isNaN(thickness)) {
                   eventData.push(["deposition", "downward", thickness, eventCategory, thickness]);
@@ -244,17 +244,21 @@ class LevelCompilerCore {
               let thickness = parseFloat(event[2]);
               if (!isNaN(thickness)) {
                 thickness = Math.abs(thickness);
-                if (event[1] == "downward" || event[1] == "d" || event[1] == "D") {
-                  eventData.push(["erosion", "downward", thickness, "erosion", thickness]);
-                } else if (event[1] == "upward" || event[1] == "u" || event[1] == "u") {
-                  eventData.push(["erosion", "upward", -thickness, "erosion", -thickness]);
-                } else {
-                  console.log(
+                
+                if (event[1] == "upper" || event[1] == "u" || event[1] == "U") {
+                  eventData.push(["erosion", "downward", null, "erosion", -thickness]);
+                } else if (event[1] == "lower" || event[1] == "l" || event[1] == "L") {
+                  eventData.push(["erosion", "upward", null, "erosion", thickness]);
+                } else if (event[1] == "erosion" || event[0] == "e" || event[0] == "E") {
+                  eventData.push(["erosion", "downward", -thickness, "erosion", -thickness]);
+                }else {
+                  console.error(
                     "LCCore: Undifined erosion event data detected at ID:" +
                       markerData.id
                   );
                   continue;
                 }
+
               }
             } else if (event[0] == "markup" || event[0] == "m" || event[0] == "M") {
               let thickness = parseFloat(event[2]);
@@ -265,9 +269,9 @@ class LevelCompilerCore {
               } else if (event[1] == "through" || event[1] == "t" || event[1] == "T") {
                 eventData.push(["markup", "through-up", null, eventCategory, null]);
                 eventData.push(["markup", "through-down", null, eventCategory, null]);
-              } else if (event[1] == "upward" || event[1] == "u" || event[1] == "U") {
+              } else if (event[1] == "upward") {
                 eventData.push(["markup", "downward", thickness, eventCategory, thickness]);
-              } else if (event[1] == "downward" || event[1] == "l"|| event[1] == "L") {
+              } else if (event[1] == "downward") {
                 eventData.push(["markup", "upward", -thickness, eventCategory, -thickness]);
               } else {
                 console.log("LCCore: Undifined markup data detected at ID:" + markerData.id);
@@ -1413,7 +1417,7 @@ class LevelCompilerCore {
             if (event[0] == "deposition" || event[0] == "markup" || event[0] == "erosion") {
               if (event[2] == null) {
                 //----------------------------------------------------------------------------------------------------
-                //case defined by upper/lower/through
+                //case defined by upper/lower/through, set connected event pair id
                 if (event[1] == "downward" || event[1] == "through-down") {
                   //get lower marker
                   const currentIdx = this.search_idx_list[this.projects[projectIdx[0]].holes[h].sections[s].markers[m].id.toString()];
@@ -1442,8 +1446,8 @@ class LevelCompilerCore {
 
                   for (let i = 0; i < events_next.length; i++) {
                     const event_next = events_next[i];
-                    if (event_next[0] == "deposition" || event_next[0] == "markup") {
-                      if (event_next[1] == "upward" || event_next[1] == "through-up") {
+                    if (["deposition", "markup", "erosion"].includes(event_next[0])) {
+                      if (["upward", "through-up"].includes(event_next[1])) {
                         //connect current -> next
                         if (
                           this.projects[projectIdx[0]].holes[currentIdx[1]].sections[currentIdx[2]].markers[currentIdx[3]].event[e][2] == null
@@ -1492,14 +1496,8 @@ class LevelCompilerCore {
 
                   for (let i = 0; i < events_next.length; i++) {
                     const event_next = events_next[i];
-                    if (
-                      event_next[0] == "deposition" ||
-                      event_next[0] == "markup"
-                    ) {
-                      if (
-                        event_next[1] == "downward" ||
-                        event_next[1] == "through-down"
-                      ) {
+                    if (["deposition", "markup", "erosion"].includes(event_next[0])) {
+                      if (["downward", "through-down"].includes(event_next[1])) {
                         //connect current -> next
                         if (
                           this.projects[projectIdx[0]].holes[currentIdx[1]]
@@ -1525,6 +1523,7 @@ class LevelCompilerCore {
                 } 
               }
 
+              //if null, after set pair id
               if (event[2] == null) {
                 console.log(
                   "ERROR: There is no pair event maker at " +
@@ -1533,6 +1532,7 @@ class LevelCompilerCore {
                 return;
               }
 
+              //if num of set events are less than 2.
               if (event[2][2] === undefined) {
                 //----------------------------------------------------------------------------------------------------
                 //case defined by numerical thickness(upward/downward)
@@ -1714,6 +1714,7 @@ class LevelCompilerCore {
                       }
 
                       //connect to
+                      /*
                       this.projects[projectIdx[0]].holes[currentIdx[1]].sections[currentIdx[2]].markers[currentIdx[3]].event.push([
                         event[0],
                         "downward-up",
@@ -1721,6 +1722,7 @@ class LevelCompilerCore {
                         event[3],
                         event[4],
                       ]);
+                      */
 
                       //finish process
                       isMakeNewMarker = false;
@@ -1731,7 +1733,7 @@ class LevelCompilerCore {
                       break;
                     }
                   }
-                }
+                } 
 
                 //----------------------------------------------------------------------------------------------------
                 //defined and insert new marker
@@ -1742,20 +1744,17 @@ class LevelCompilerCore {
                   let lower_marker_id = null; 
                   let rate_upper = null;
                   let rate_lower = null;
+                  let name = "";
                   if (event[0]=="deposition" || event[0]=="markup"){
                     [upper_marker_id, lower_marker_id, rate_upper, rate_lower] = this.getMarkerIdsByDistance(targetSectionData.id, event_border_distance);
                     newDistance = event_border_distance;     
                     //console.log(this.getMarkerNameFromId(upper_marker_id) +"=="+this.getMarkerNameFromId(lower_marker_id));                  
                   } else if (event[0]=="erosion"){
-                    if (event[1] == "upward"){
-                      [upper_marker_id, lower_marker_id, rate_upper, rate_lower] = this.getMarkerIdsByDistance(targetSectionData.id, event_border_distance-0.00001);
-                      lower_marker_id = this.projects[projectIdx[0]].holes[h].sections[s].markers[m].id;
-                      newDistance = event_start_distance;   
-                    }
-                    else if (event[1] == "downward"){
+                    if (event[1] == "downward"){
                       [upper_marker_id, lower_marker_id, rate_upper, rate_lower] = this.getMarkerIdsByDistance(targetSectionData.id, event_border_distance+0.00001);
                       upper_marker_id = this.projects[projectIdx[0]].holes[h].sections[s].markers[m].id;
                       newDistance = event_start_distance;   
+                      name = "errosion_bottom";
                     }    
                     //console.log(this.getMarkerNameFromId(upper_marker_id) +"=="+this.getMarkerNameFromId(lower_marker_id));      
                   }
@@ -1777,7 +1776,7 @@ class LevelCompilerCore {
                   //update reserved ids
                   this.projects[projectIdx[0]].holes[startIdx[1]].sections[startIdx[2]].reserved_marker_ids.push(newid);
                   newMarkerData.distance = newDistance;
-                  
+                  newMarkerData.name = name;
                   newMarkerData.drilling_depth = event_border_drilling_depth;
                   newMarkerData.reliability += 1;
                   newMarkerData.event = [];
@@ -1786,14 +1785,18 @@ class LevelCompilerCore {
                     newMarkerData.event.push([event[0], "downward", lower_marker_id, event[3], event[4]]);
                   } else if (event[1] == "downward") {
                     newMarkerData.name = "";
-                    newMarkerData.event.push([event[0], "upward", upper_marker_id, event[3], event[4]]);
+                    if(event[0]=="erosion"){
+                      newMarkerData.event.push([event[0], "upward", upper_marker_id, event[3], -event[4]]);
+                    }else{
+                      newMarkerData.event.push([event[0], "upward", upper_marker_id, event[3], event[4]]);
+                    }
                   }
 
                   newMarkerData.h_connection = [];
                   newMarkerData.v_connection = [];
                   const upperOrder = this.projects[projectIdx[0]].holes[upper_marker_idx[1]].sections[upper_marker_idx[2]].markers[upper_marker_idx[3]].order;
                   const lowerOrder = this.projects[projectIdx[0]].holes[lower_marker_idx[1]].sections[lower_marker_idx[2]].markers[lower_marker_idx[3]].order;
-                  newMarkerData.order = (parseFloat(upperOrder)+parseFloat(lowerOrder)) / 2; //temp data
+                  newMarkerData.order = (parseFloat(upperOrder)+parseFloat(lowerOrder)) / 2; //temp value
                   if (
                     this.projects[projectIdx[0]].holes[upper_marker_idx[1]].sections[upper_marker_idx[2]].markers[upper_marker_idx[3]].isMaster == true &&
                     this.projects[projectIdx[0]].holes[lower_marker_idx[1]].sections[lower_marker_idx[2]].markers[lower_marker_idx[3]].isMaster == true
@@ -2553,7 +2556,7 @@ class LevelCompilerCore {
                 if (eventType == "deposition"){
                   eventThickness += connectedMarkerData.distance - currentMarkerData.distance;
                 } else if (eventType == "erosion"){
-                  eventThickness += currentMarkerData.event[e][4];
+                  eventThickness += connectedMarkerData.distance - currentMarkerData.distance + currentMarkerData.event[e][4];
                 } else {
                   //case "markup"
                   eventThickness += 0;
@@ -3677,6 +3680,7 @@ class LevelCompilerCore {
               let eventFlag = "";
               for(let e=0;e<markerData.event.length;e++){
                 
+                //============UNDER CONSTRUCTION=======================
                 if(markerData.event[e][0]=="erosion" && markerData.event[e][1]=="upward"){
                   if(eventFlag !==""){eventFlag += "/";}
                   eventFlag += markerData.event[e][0] +"-downward("+markerData.event[e][4]+")";
