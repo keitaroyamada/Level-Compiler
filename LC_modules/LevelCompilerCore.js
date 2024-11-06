@@ -639,8 +639,8 @@ class LevelCompilerCore {
     //apply 1st order interpolation -> extrapolation 
     let NoCDmarkers = this.applyMarkerPolation(calcRange, calcType);
     if (NoCDmarkers.length !== 0){
-      console.log("There are some markers without " + calcType);
-      console.log(NoCDmarkers);
+      console.error("LCCore: "+NoCDmarkers.length+" markers without " + calcType);
+      //console.log(NoCDmarkers);
     }
           
     //calc & submit project top/bottom
@@ -685,6 +685,7 @@ class LevelCompilerCore {
       //case duo project
       let visited = new Set();
       let comparisonData = [];
+
       for(let h=0;h<this.projects[p].holes.length;h++){
         for(let s=0;s<this.projects[p].holes[h].sections.length;s++){
           for(let m=0;m<this.projects[p].holes[h].sections[s].markers.length;m++){
@@ -775,7 +776,7 @@ class LevelCompilerCore {
            //console.log(upperIdx, lowerIdx);
 
             if(upperIdx == -1 && lowerIdx == -1){
-              console.log("LCCore: Undefiened marker detected durind connecintg duo model. " + this.getMarkerNameFromId(currentMarkerData.id));
+              console.log("LCCore: Undefiened marker detected during connecintg duo model. " + this.getMarkerNameFromId(currentMarkerData.id));
             }
 
             if(upperIdx == -1 && lowerIdx !== -1){
@@ -870,6 +871,26 @@ class LevelCompilerCore {
           }
         }
       }
+    }
+
+    //get project top/bottom  
+    for(let p=0;p<this.projects.length; p++){
+      let projectCdTop = Infinity;
+      let projectCdBottom = -Infinity;
+      for(let h=0;h<this.projects[p].holes.length;h++){
+        for(let s=0;s<this.projects[p].holes[h].sections.length;s++){
+          for(let m=0;m<this.projects[p].holes[h].sections[s].markers.length;m++){
+            if(this.projects[p].holes[h].sections[s].markers[m].composite_depth > projectCdBottom){
+              projectCdBottom = this.projects[p].holes[h].sections[s].markers[m].composite_depth;
+            }
+            if(this.projects[p].holes[h].sections[s].markers[m].composite_depth < projectCdTop){
+              projectCdTop = this.projects[p].holes[h].sections[s].markers[m].composite_depth;
+            }
+          }
+        }
+      }
+      this.projects[p].composite_depth_top = projectCdTop;
+      this.projects[p].composite_depth_bottom = projectCdBottom;
     }
    
 
@@ -1341,8 +1362,8 @@ class LevelCompilerCore {
             );
           }
         } else {
-          console.log(
-            "ERROR: Hole names does not matched.[Line: " +
+          console.error(
+            "LCCore: Hole names does not matched.[Line: " +
               topIndices[i][0] +
               ", " +
               topStr +
@@ -2240,8 +2261,21 @@ class LevelCompilerCore {
       skippedList = polationList.filter(item => item[0] == "floating");
       this.polation(extrapolationList, calcRange, calcType);
       
+      //apply 2nd interpolation    
+      polationList = this.getPolationList(p, calcType);
+      interpolationList = polationList.filter(item => item[0] == "interpolation");
+      extrapolationList = polationList.filter(item => item[0] == "extrapolation");
+      skippedList = polationList.filter(item => item[0] == "floating");
+      this.polation(interpolationList, calcRange, calcType);
+
+      //calc result
+      polationList = this.getPolationList(p, calcType);
+      interpolationList = polationList.filter(item => item[0] == "interpolation");
+      extrapolationList = polationList.filter(item => item[0] == "extrapolation");
+      skippedList = polationList.filter(item => item[0] == "floating");
+      
       if(interpolationList.length!==0){
-        console.log("Secand order interpolation exist. Secand order interpolation is not suportted.", interpolationList);
+        console.log("The 3rd order interpolation exist. The 3rd order interpolation is not suportted.", interpolationList);
       }
     }    
     return skippedList;

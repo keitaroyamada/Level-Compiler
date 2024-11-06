@@ -62,6 +62,7 @@ document.addEventListener("DOMContentLoaded", () => {
     edit:[],
     plot:[],
     edit:[],
+    image:[],
   };
   objOpts.canvas.depth_scale = "composite_depth";
   objOpts.canvas.zoom_level = [4, 3]; //[x, y](1pix/2cm)
@@ -161,6 +162,7 @@ document.addEventListener("DOMContentLoaded", () => {
   objOpts.edit.passwards = "admin";
 
   objOpts.pen.colour = "Red";
+  objOpts.image.dpcm = 80;
 
   objOpts.age.incon_size = 20;
   objOpts.age.alt_radius = 3;
@@ -238,10 +240,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
       //get model path
       const model_path1 = 
-        "C:/Users/slinn/Dropbox/Prj_LevelCompiler/_LC test data/[correlation]SG06 Correlation(24 Nov. 2023).csv";
+        "C:/Users/slinn/Dropbox/Prj_LevelCompiler/_LC test data/[correlation]SG06(24 Nov. 2023).csv";
 
       const model_path2 =
-        "C:/Users/slinn/Dropbox/Prj_LevelCompiler/_LC test data/[duo]SG14 Correlation(temp).csv";
+        "C:/Users/slinn/Dropbox/Prj_LevelCompiler/_LC test data/[duo]SG14(temp).csv";
       //const model_path =     "C:/Users/slinn/Dropbox/Prj_LevelCompiler/_LC test data/[correlation]SG14 LC test model with event(temp).csv";
       const age1_path =
         "C:/Users/slinn/Dropbox/Prj_LevelCompiler/_LC test data/[age]SG IntCal20 yr BP chronology for LC (01 Jun. 2021).csv";
@@ -278,11 +280,11 @@ document.addEventListener("DOMContentLoaded", () => {
         modelImages.load_target_ids = [[1,1,1,null],[1,1,2,null],[1,1,3,null],[1,2,1,null],[1,2,2,null],[1,2,3,null],[1,3,1,null]]; //= [];//load all
 
         //load images
-        let originalImages = await loadCoreImages(modelImages, LCCore, "drilling_depth");
+        let originalImages = await loadCoreImages(modelImages, LCCore, objOpts, "drilling_depth");
         modelImages["drilling_depth"] = originalImages;
-        let compositeImages = await loadCoreImages(modelImages, LCCore, "composite_depth");
+        let compositeImages = await loadCoreImages(modelImages, LCCore, objOpts, "composite_depth");
         modelImages["composite_depth"] = compositeImages;
-        let eventFreeImages = await loadCoreImages(modelImages, LCCore, "event_free_depth");
+        let eventFreeImages = await loadCoreImages(modelImages, LCCore, objOpts, "event_free_depth");
         modelImages["event_free_depth"] = eventFreeImages;
 
       }
@@ -366,9 +368,9 @@ document.addEventListener("DOMContentLoaded", () => {
           modelImages.load_target_ids = []; //= [];//load all
   
           //load images
-          modelImages["drilling_depth"] =  await loadCoreImages(modelImages, LCCore, "drilling_depth");
-          modelImages["composite_depth"] = await loadCoreImages(modelImages, LCCore, "composite_depth");
-          modelImages["event_free_depth"] = await loadCoreImages(modelImages, LCCore, "event_free_depth");
+          modelImages["drilling_depth"] =  await loadCoreImages(modelImages, LCCore, objOpts, "drilling_depth");
+          modelImages["composite_depth"] = await loadCoreImages(modelImages, LCCore, objOpts, "composite_depth");
+          modelImages["event_free_depth"] = await loadCoreImages(modelImages, LCCore, objOpts, "event_free_depth");
         }
       } else if(fileParseData.ext == ".csv"){
         if(fileParseData.base.includes("[correlation]") || fileParseData.base.includes("[duo]")){
@@ -664,9 +666,9 @@ document.addEventListener("DOMContentLoaded", () => {
     //load images
     modelImages.image_dir = path;
     modelImages.load_target_ids = [];//load all
-    modelImages["drilling_depth"] = await loadCoreImages(modelImages, LCCore, "drilling_depth");
-    modelImages["composite_depth"] = await loadCoreImages(modelImages, LCCore, "composite_depth");
-    modelImages["event_free_depth"] = await loadCoreImages(modelImages, LCCore, "event_free_depth");
+    modelImages["drilling_depth"] = await loadCoreImages(modelImages, LCCore, objOpts, "drilling_depth");
+    modelImages["composite_depth"] = await loadCoreImages(modelImages, LCCore, objOpts, "composite_depth");
+    modelImages["event_free_depth"] = await loadCoreImages(modelImages, LCCore, objOpts, "event_free_depth");
 
     //update plot
     updateView();
@@ -1003,8 +1005,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
           const affectedSections = getConnectedSectionIds([fromId, toId]);
           modelImages.load_target_ids = affectedSections;
-          modelImages["composite_depth"] = await loadCoreImages(modelImages, LCCore, "composite_depth");
-          modelImages["event_free_depth"] = await loadCoreImages(modelImages, LCCore, "event_free_depth");
+          modelImages["composite_depth"] = await loadCoreImages(modelImages, LCCore, objOpts, "composite_depth");
+          modelImages["event_free_depth"] = await loadCoreImages(modelImages, LCCore, objOpts, "event_free_depth");
           
           updateView();
         }
@@ -1698,9 +1700,23 @@ document.addEventListener("DOMContentLoaded", () => {
         } else {
           //case hole selected
           LCCore.projects[target_idx[0]].holes[target_idx[1]].enable = setVal;
-          console.log("[Renderer]: Hole "+LCCore.projects[target_idx[0]].holes[target_idx[1]].name +" is "+setType+".");
-        }
+          console.log("[Renderer]: Hole "+LCCore.projects[target_idx[0]].holes[target_idx[1]].name +" is "+LCCore.projects[target_idx[0]].holes[target_idx[1]].enable +".");
 
+          //case all holes are disable
+          let isAllHoleDisable = true;
+          LCCore.projects[target_idx[0]].holes.forEach((hole) => {
+            if(hole.enable==true){
+              isAllHoleDisable = false;
+            }
+          });
+          if(isAllHoleDisable==true){
+            document.getElementById([target_id[0],null,null,null].toString()).checked = false;
+            LCCore.projects[target_idx[0]].enable = false;
+          }else{
+            document.getElementById([target_id[0],null,null,null].toString()).checked = true;
+            LCCore.projects[target_idx[0]].enable = true;
+          }
+        }
         //console.log(LCCore);
         //update plot
         updateView();
@@ -2513,24 +2529,27 @@ document.addEventListener("DOMContentLoaded", () => {
         //make project objects===================================================================================
         const project = LCCore.projects[p];
         //show project name
-        let num_enable_left = 0;
-        LCCore.projects.filter(p=>p.order<project.order).forEach(p=>p.holes.forEach(h=>{if(h.enable){num_enable_left++;}}))
-        const project_x0 = ((objOpts.section.width + objOpts.hole.distance) * num_enable_left + shift_x) * xMag + pad_x;
-        let project_y0 = pad_y;
-        if(project.composite_depth_top !== null){
-          project_y0 = (project.composite_depth_top + shift_y) * yMag + pad_y;
-        }     
-
-        sketch.drawingContext.setLineDash([]);
-        sketch.fill(objOpts.project.font_colour);
-        sketch.stroke(objOpts.project.font_colour);
-        sketch.textFont(objOpts.project.font);
-        sketch.textSize(objOpts.project.font_size);
-        sketch.text(
-          project.name,
-          project_x0,
-          project_y0 - 50,
-        );
+        if(project.enable == true){
+          let num_enable_left = 0;
+          LCCore.projects.filter(p=>p.order<project.order).forEach(p=>p.holes.forEach(h=>{if(h.enable){num_enable_left++;}}))
+          const project_x0 = ((objOpts.section.width + objOpts.hole.distance) * num_enable_left + shift_x) * xMag + pad_x;
+          let project_y0 = pad_y;
+          if(project.composite_depth_top !== null){
+            project_y0 = (project.composite_depth_top + shift_y) * yMag + pad_y;
+          }     
+  
+          sketch.drawingContext.setLineDash([]);
+          sketch.fill(objOpts.project.font_colour);
+          sketch.stroke(objOpts.project.font_colour);
+          sketch.textFont(objOpts.project.font);
+          sketch.textSize(objOpts.project.font_size);
+          sketch.text(
+            project.name,
+            project_x0,
+            project_y0 - 50,
+          );
+        }
+        
 
         //live hittest
         if(objOpts.edit.hittest){
@@ -5209,7 +5228,7 @@ async function undo(type){
      resolve(result);
   })
 }
-async function loadCoreImages(modelImages, LCCore, depthScale) {
+async function loadCoreImages(modelImages, LCCore, objOpts, depthScale) {
   return new Promise(async (resolve, reject) => {
     //initiarise
     let results = {};
@@ -5300,7 +5319,7 @@ async function loadCoreImages(modelImages, LCCore, depthScale) {
             }
           } else if ( depthScale == "composite_depth" ||  depthScale == "event_free_depth"  ) {
             //case CD, EF, convert original to CD EFD image
-            const dpcm = 30; //pix/cm}
+            const dpcm = objOpts.image.dpcm; //pix/cm}
             const im_height = Math.round(
               dpcm * (section.markers[section.markers.length - 1].distance - section.markers[0].distance),
               0
