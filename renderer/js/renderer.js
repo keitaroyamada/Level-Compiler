@@ -1,6 +1,6 @@
 document.addEventListener("DOMContentLoaded", () => {
  
-  //============================================================================================
+  //============================================================================================xxxxxxxxxx
   let developerMode = true;
   //base properties
   const scroller = document.getElementById("scroller");
@@ -72,7 +72,7 @@ document.addEventListener("DOMContentLoaded", () => {
   objOpts.canvas.pad_x = 200; //[px]
   objOpts.canvas.pad_y = 100; //[px]
   objOpts.canvas.shift_x = 0; //[cm]
-  objOpts.canvas.shift_y = 0; //[cm]
+  objOpts.canvas.shift_y = 100; //[cm]
   objOpts.canvas.bottom_pad = 100; //[cm]
   objOpts.canvas.background_colour = "white";
   objOpts.canvas.target_horizon = false;
@@ -162,7 +162,7 @@ document.addEventListener("DOMContentLoaded", () => {
   objOpts.edit.passwards = "admin";
 
   objOpts.pen.colour = "Red";
-  objOpts.image.dpcm = 30;
+  objOpts.image.dpcm = 40;
 
   objOpts.age.incon_size = 20;
   objOpts.age.alt_radius = 3;
@@ -280,12 +280,9 @@ document.addEventListener("DOMContentLoaded", () => {
         modelImages.load_target_ids = [[1,1,1,null],[1,1,2,null],[1,1,3,null],[1,2,1,null],[1,2,2,null],[1,2,3,null],[1,3,1,null]]; //= [];//load all
 
         //load images
-        let originalImages = await loadCoreImages(modelImages, LCCore, objOpts, "drilling_depth");
-        modelImages["drilling_depth"] = originalImages;
-        let compositeImages = await loadCoreImages(modelImages, LCCore, objOpts, "composite_depth");
-        modelImages["composite_depth"] = compositeImages;
-        let eventFreeImages = await loadCoreImages(modelImages, LCCore, objOpts, "event_free_depth");
-        modelImages["event_free_depth"] = eventFreeImages;
+        modelImages = await loadCoreImages(modelImages, LCCore, objOpts, "drilling_depth");
+        modelImages = await loadCoreImages(modelImages, LCCore, objOpts, "composite_depth");
+        modelImages = await loadCoreImages(modelImages, LCCore, objOpts, "event_free_depth");;
 
       }
 
@@ -368,32 +365,43 @@ document.addEventListener("DOMContentLoaded", () => {
           modelImages.load_target_ids = []; //= [];//load all
   
           //load images
-          modelImages["drilling_depth"] =  await loadCoreImages(modelImages, LCCore, objOpts, "drilling_depth");
-          modelImages["composite_depth"] = await loadCoreImages(modelImages, LCCore, objOpts, "composite_depth");
-          modelImages["event_free_depth"] = await loadCoreImages(modelImages, LCCore, objOpts, "event_free_depth");
+          modelImages = await loadCoreImages(modelImages, LCCore, objOpts, "drilling_depth");
+          modelImages = await loadCoreImages(modelImages, LCCore, objOpts, "composite_depth");
+          modelImages = await loadCoreImages(modelImages, LCCore, objOpts, "event_free_depth");
         }
       } else if(fileParseData.ext == ".csv"){
-        if(fileParseData.base.includes("[correlation]") || fileParseData.base.includes("[duo]")){
+        if(fileParseData.base.includes("[correlation]") || fileParseData.base.includes("[duo]") ){
           //case model file
           console.log("[Renderer]: Correlation model file load from drop.");
           //register correlation model
           await registerModel(fileParseData.fullpath);
   
           //load model into renderer
-          await loadModel();
-      
-        } else if (fileParseData.base.includes("[age]")){
+          await loadModel();       
+          if(age_model_list.length >0){
+            await registerAge(fileParseData.fullpath);
+
+            //load age model into LCCore
+            await loadAge(age_model_list[0].id);
+
+            //register age into LCplot
+            await registerAgePlotFromLCAge();
+
+            //load LCplot
+            await loadPlotData();
+          }   
+        } else if(fileParseData.base.includes("[age]")){
           //case age file
           console.log("[Renderer]: Age model file load from drop.");
           //register age model
           await registerAge(fileParseData.fullpath);
-  
+
           //load age model into LCCore
           await loadAge(age_model_list[0].id);
-  
+
           //register age into LCplot
           await registerAgePlotFromLCAge();
-  
+
           //load LCplot
           await loadPlotData();
         }
@@ -666,9 +674,9 @@ document.addEventListener("DOMContentLoaded", () => {
     //load images
     modelImages.image_dir = path;
     modelImages.load_target_ids = [];//load all
-    modelImages["drilling_depth"] = await loadCoreImages(modelImages, LCCore, objOpts, "drilling_depth");
-    modelImages["composite_depth"] = await loadCoreImages(modelImages, LCCore, objOpts, "composite_depth");
-    modelImages["event_free_depth"] = await loadCoreImages(modelImages, LCCore, objOpts, "event_free_depth");
+    modelImages = await loadCoreImages(modelImages, LCCore, objOpts, "drilling_depth");
+    modelImages = await loadCoreImages(modelImages, LCCore, objOpts, "composite_depth");
+    modelImages = await loadCoreImages(modelImages, LCCore, objOpts, "event_free_depth");
 
     //update plot
     updateView();
@@ -846,12 +854,72 @@ document.addEventListener("DOMContentLoaded", () => {
         objOpts.edit.handleClick = null;
       }
       document.addEventListener("mousemove", objOpts.edit.handleMove);
+    }else if(clickResult == "setZeroPoint"){
+      objOpts.edit.contextmenu_enable = false;
+      objOpts.edit.hittest = null;
+      objOpts.edit.marker_from = null;
+      objOpts.edit.marker_to = null;
+      objOpts.edit.mode = "set_zero_point";
+      objOpts.edit.handleMove = handleMarkerMouseMove;
+      if(objOpts.edit.handleClick !== null){
+        document.removeEventListener('click', objOpts.edit.handleClick);
+        objOpts.edit.handleClick = null;
+      }
+      document.addEventListener("mousemove", objOpts.edit.handleMove);
+    }else if(clickResult == "addMaster"){
+      objOpts.edit.contextmenu_enable = false;
+      objOpts.edit.hittest = null;
+      objOpts.edit.marker_from = null;
+      objOpts.edit.marker_to = null;
+      objOpts.edit.mode = "enable_master";
+      objOpts.edit.handleMove = handleMarkerMouseMove;
+      if(objOpts.edit.handleClick !== null){
+        document.removeEventListener('click', objOpts.edit.handleClick);
+        objOpts.edit.handleClick = null;
+      }
+      document.addEventListener("mousemove", objOpts.edit.handleMove);
+    }else if(clickResult == "deleteMaster"){
+      objOpts.edit.contextmenu_enable = false;
+      objOpts.edit.hittest = null;
+      objOpts.edit.marker_from = null;
+      objOpts.edit.marker_to = null;
+      objOpts.edit.mode = "disable_master";
+      objOpts.edit.handleMove = handleMarkerMouseMove;
+      if(objOpts.edit.handleClick !== null){
+        document.removeEventListener('click', objOpts.edit.handleClick);
+        objOpts.edit.handleClick = null;
+      }
+      document.addEventListener("mousemove", objOpts.edit.handleMove);
     }else if(clickResult == "changeMarkerDistance"){
       objOpts.edit.contextmenu_enable = false;
       objOpts.edit.hittest = null;
       objOpts.edit.marker_from = null;
       objOpts.edit.marker_to = null;
       objOpts.edit.mode = "change_marker_distance";
+      objOpts.edit.handleMove = handleMarkerMouseMove;
+      if(objOpts.edit.handleClick !== null){
+        document.removeEventListener('click', objOpts.edit.handleClick);
+        objOpts.edit.handleClick = null;
+      }
+      document.addEventListener("mousemove", objOpts.edit.handleMove);
+    }else if(clickResult == "addEvent"){
+      objOpts.edit.contextmenu_enable = false;
+      objOpts.edit.hittest = null;
+      objOpts.edit.marker_from = null;
+      objOpts.edit.marker_to = null;
+      objOpts.edit.mode = "add_event";
+      objOpts.edit.handleMove = handleMarkerMouseMove;
+      if(objOpts.edit.handleClick !== null){
+        document.removeEventListener('click', objOpts.edit.handleClick);
+        objOpts.edit.handleClick = null;
+      }
+      document.addEventListener("mousemove", objOpts.edit.handleMove);
+    }else if(clickResult == "deleteEvent"){
+      objOpts.edit.contextmenu_enable = false;
+      objOpts.edit.hittest = null;
+      objOpts.edit.marker_from = null;
+      objOpts.edit.marker_to = null;
+      objOpts.edit.mode = "delete_event";
       objOpts.edit.handleMove = handleMarkerMouseMove;
       if(objOpts.edit.handleClick !== null){
         document.removeEventListener('click', objOpts.edit.handleClick);
@@ -932,6 +1000,23 @@ document.addEventListener("DOMContentLoaded", () => {
       document.addEventListener("mousemove", objOpts.edit.handleMove);
     }else if(clickResult == "addProject"){
       ProjectAdd();
+    }else if(clickResult == "cancel"){
+      console.log("[Renderer]: Edit cancelled.")
+      objOpts.edit.editable = true;
+      objOpts.edit.contextmenu_enable = true;
+      objOpts.edit.hittest = null;
+      objOpts.edit.marker_from = null;
+      objOpts.edit.marker_to = null;
+      document.body.style.cursor = "default";
+      if(objOpts.edit.handleClick !== null){
+        document.removeEventListener('click', objOpts.edit.handleClick);
+        objOpts.edit.handleClick = null;
+      }
+      if(objOpts.edit.handleMove !== null){
+        document.removeEventListener('mousemove', objOpts.edit.handleMove);
+        objOpts.edit.handleMove = null;
+      }
+      updateView();
     }else{
       objOpts.edit.contextmenu_enable = true;
       objOpts.edit.hittest = null;
@@ -1005,8 +1090,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
           const affectedSections = getConnectedSectionIds([fromId, toId]);
           modelImages.load_target_ids = affectedSections;
-          modelImages["composite_depth"] = await loadCoreImages(modelImages, LCCore, objOpts, "composite_depth");
-          modelImages["event_free_depth"] = await loadCoreImages(modelImages, LCCore, objOpts, "event_free_depth");
+          modelImages = await loadCoreImages(modelImages, LCCore, objOpts, "composite_depth");
+          modelImages = await loadCoreImages(modelImages, LCCore, objOpts, "event_free_depth");
           
           updateView();
         }
@@ -1027,7 +1112,6 @@ document.addEventListener("DOMContentLoaded", () => {
           updateView();
         }
       }
-      console.log(LCCore);
 
       //exit process
       document.removeEventListener("click", handleConnectClick);
@@ -1066,11 +1150,19 @@ document.addEventListener("DOMContentLoaded", () => {
           document.removeEventListener('click', objOpts.edit.handleClick);
           objOpts.edit.handleClick = null;
         }
-      }else if(["change_marker_name","change_marker_distance"].includes(objOpts.edit.mode)){
+      }else if(["change_marker_name","change_marker_distance", "set_zero_point", "enable_master","disable_master"].includes(objOpts.edit.mode)){
         if (Math.abs(ht.nearest_distance) < objOpts.edit.sensibility) {
           objOpts.edit.handleClick = handleMarkerChangeClick;
           document.addEventListener('click', objOpts.edit.handleClick);
         }else if(objOpts.edit.handleClick !== null){
+          document.removeEventListener('click', objOpts.edit.handleClick);
+          objOpts.edit.handleClick = null;
+        }
+      }else if(["add_event","delete_event"].includes(objOpts.edit.mode)){
+        if(objOpts.edit.handleClick == null){
+          objOpts.edit.handleClick = handleEventAddClick;
+          document.addEventListener('click', objOpts.edit.handleClick);
+        }else{
           document.removeEventListener('click', objOpts.edit.handleClick);
           objOpts.edit.handleClick = null;
         }
@@ -1151,6 +1243,100 @@ document.addEventListener("DOMContentLoaded", () => {
             
           }
         }
+      }else if(objOpts.edit.mode == "enable_master"){
+        //check
+        const targetId = [ht.project, ht.hole, ht.section, ht.nearest_marker];
+        const idx = getIdxById(LCCore, targetId);
+        console.log(LCCore.projects[idx[0]].holes[idx[1]].sections[idx[2]].markers[idx[3]])
+        let numMaster = 0;
+        for(let hc of LCCore.projects[idx[0]].holes[idx[1]].sections[idx[2]].markers[idx[3]].h_connection){
+          const idxh = getIdxById(LCCore, hc);
+          console.log(idx, idxh)
+          if(idxh[0] == idx[0]){
+            if(LCCore.projects[idxh[0]].holes[idxh[1]].sections[idxh[2]].markers[idxh[3]].isMaster == true){
+              numMaster++;
+            }
+          }          
+        }
+        if(numMaster>2){
+          alert("Only up to 2 master markers can beset in the same horizon. Please delete any unnecessary masters first.");
+          return;
+        }
+        
+        //apply
+        await undo("save");//undo
+        const result = await window.LCapi.SetMaster(targetId, "enable");
+        if(result==true){
+          await loadModel();
+          await loadAge(document.getElementById("AgeModelSelect").value);
+          await loadPlotData();
+          updateView();
+          console.log("[Renderer]: Set a new master.");
+        }else{
+          console.log("[Renderer]: Failed to set a new master.");
+        }
+      }else if(objOpts.edit.mode == "disable_master"){
+        //apply
+        const targetId = [ht.project, ht.hole, ht.section, ht.nearest_marker];
+        await undo("save");//undo
+        const result = await window.LCapi.SetMaster(targetId, "disable");
+        if(result==true){
+          await loadModel();
+          await loadAge(document.getElementById("AgeModelSelect").value);
+          await loadPlotData();
+          updateView();
+          console.log("[Renderer]: Delete master.");
+        }else{
+          console.log("[Renderer]: Failed to delete master.");
+        }
+      }else if(objOpts.edit.mode == "set_zero_point"){
+        //check
+        let isExistZeroPoint = false;
+        breakpoint:
+        for(let p of LCCore.projects){
+          for(let h of p.holes){
+            for(let s of h.sections){
+              for(let m of s.markers){
+                if(m.isZeroPoint !== false){
+                  isExistZeroPoint = true;
+                  break breakpoint;
+                }
+              }
+            }
+          }
+        }
+        
+        if(isExistZeroPoint == true){
+          let response = await window.LCapi.askdialog(
+            "Set Zero Point",
+            "The Zero point has alrady been defined. Do you want to replace this?"
+          );
+          if (response.response) {
+            response = await window.LCapi.inputdialog(
+              "Set Zero Point",
+              "Please input new composite depth (cm) at the Zero Point.",
+              "number",
+            );
+            if(response !== null){
+              const targetId = [ht.project, ht.hole, ht.section, ht.nearest_marker];
+              await undo("save");//undo
+              const result = await window.LCapi.SetZeroPoint(targetId, response);
+              if(result==true){
+                await loadModel();
+                await loadAge(document.getElementById("AgeModelSelect").value);
+                await loadPlotData();
+                updateView();
+                console.log("[Renderer]: Set a new Zero point.");
+              }else{
+                console.log("[Renderer]: Failed to set zero point.");
+              }
+            }            
+          }else{
+            return;
+          }
+        }else{
+          return;
+        }
       }
 
     }
@@ -1163,6 +1349,32 @@ document.addEventListener("DOMContentLoaded", () => {
     objOpts.edit.marker_to = null;
     objOpts.edit.handleClick = null;
     objOpts.edit.handleMove = null;
+    ///update scroller position
+    let canvasPosY = null;
+    let canvasPosX = (ht.x + objOpts.canvas.shift_y) * (objOpts.canvas.dpir * objOpts.canvas.zoom_level[1]) + objOpts.canvas.pad_y;
+    if (objOpts.canvas.depth_scale == "age") {
+      canvasPosY = ((ht.y+ objOpts.canvas.shift_y) * (objOpts.canvas.dpir * objOpts.canvas.zoom_level[1]) + objOpts.canvas.pad_y + objOpts.canvas.age_zoom_correction[1])  * objOpts.canvas.age_zoom_correction[0];
+    } else {
+      canvasPosY = (ht.y + objOpts.canvas.shift_y) * (objOpts.canvas.dpir * objOpts.canvas.zoom_level[1]) + objOpts.canvas.pad_y;
+    }
+
+    //if move to centre
+    //scroller.scrollTop = canvasPosY - scroller.clientHeight / 2;
+    //scroller.moveTo(scroller.scrollLeft, pos_y);
+
+    //move canvas
+    let newPosY = canvasPosY - scroller.clientHeight / 2;
+    let newPosX = canvasPosX - scroller.clientWidth / 2;
+    if(newPosY <= 0){
+      newPosY = 0;
+    }
+    if(newPosX <= 0){
+      newPosX = 0;
+    }
+
+    canvasPos[0] = newPosY;
+    canvasPos[1] = newPosY;
+
     updateView();
   }
   //2 Marker click--------------------------------------------
@@ -1228,8 +1440,6 @@ document.addEventListener("DOMContentLoaded", () => {
     if(objOpts.edit.marker_from !== null ){
       objOpts.edit.marker_from = null;
       objOpts.edit.marker_to = 999999;//dummy
-      objOpts.edit.mode = null;
-      return;
     }
 
     if(objOpts.edit.marker_from == null && ht.nearest_marker !== null){
@@ -1267,6 +1477,147 @@ document.addEventListener("DOMContentLoaded", () => {
     document.removeEventListener("mousemove", objOpts.edit.handleMove);
     objOpts.edit.handleClick = null;
     objOpts.edit.handleMove = null;
+
+    ///update scroller position
+    let canvasPosY = null;
+    let canvasPosX = (ht.x + objOpts.canvas.shift_y) * (objOpts.canvas.dpir * objOpts.canvas.zoom_level[1]) + objOpts.canvas.pad_y;
+    if (objOpts.canvas.depth_scale == "age") {
+      canvasPosY = ((ht.y+ objOpts.canvas.shift_y) * (objOpts.canvas.dpir * objOpts.canvas.zoom_level[1]) + objOpts.canvas.pad_y + objOpts.canvas.age_zoom_correction[1])  * objOpts.canvas.age_zoom_correction[0];
+    } else {
+      canvasPosY = (ht.y + objOpts.canvas.shift_y) * (objOpts.canvas.dpir * objOpts.canvas.zoom_level[1]) + objOpts.canvas.pad_y;
+    }
+
+    //if move to centre
+    //scroller.scrollTop = canvasPosY - scroller.clientHeight / 2;
+    //scroller.moveTo(scroller.scrollLeft, pos_y);
+
+    //move canvas
+    let newPosY = canvasPosY - scroller.clientHeight / 2;
+    let newPosX = canvasPosX - scroller.clientWidth / 2;
+    if(newPosY <= 0){
+      newPosY = 0;
+    }
+    if(newPosX <= 0){
+      newPosX = 0;
+    }
+
+    canvasPos[0] = newPosX;
+    canvasPos[1] = newPosY;
+
+    updateView();
+  }
+  //2 Marker click--------------------------------------------
+  async function handleEventAddClick(event) {
+    console.log("[Renderer]: Event select clicked.")
+    const rect = document.getElementById("p5Canvas").getBoundingClientRect(); 
+    const mouseX = event.clientX - rect.left;
+    const mouseY = event.clientY - rect.top;
+    const ht = JSON.parse(JSON.stringify(getClickedItemIdx(mouseX, mouseY, LCCore, objOpts)));
+    event.preventDefault();
+    /*
+    let results = {
+    x:x, 
+    y:y, 
+    depth_scale:objOpts.canvas.depth_scale, 
+    project:null, 
+    hole:null, 
+    section:null, 
+    distance:null, 
+    nearest_marker: null, 
+    nearest_distance:null,
+    upper_marker:null,
+    lower_marker:null,
+    };
+    */
+  
+    //
+    if(objOpts.edit.mode == "add_event"){
+      const response1 = await window.LCapi.inputdialog(
+        "Add new event",
+        "Please enter a deposition type from: \n'deposition', 'erosion', 'markup'.",
+        "text",
+      );
+
+      if (response1 !== null) {
+        let response2 = null;
+        if(["deposition","d","markup","m"].includes(response1.toLowerCase())){
+          response2 = await window.LCapi.inputdialog(
+            "Add new event",
+            "Please enter a colour type from: \n'general', 'tephra', 'disturbed','void'.",
+            "text",
+          )
+        }else if(["erosion","e"].includes(response1.toLowerCase())){
+          response2 = await window.LCapi.inputdialog(
+            "Add new event",
+            "Please enter a estimated erosion distance (cm).",
+            "number",
+          )
+        }
+
+        if(response2 !== null){
+          const upperId   = [ht.project, ht.hole, ht.section, ht.upper_marker];
+          const lowerId   = [ht.project, ht.hole, ht.section, ht.lower_marker];
+          console.log("[Editor]: Add event between " + upperId +" and "+lowerId);
+
+          let result = null;
+          if(["deposition","d","markup","m"].includes(response1.toLowerCase())){
+            if(["general","tephra","disturbed","void","g","t","d","v"].includes(response2.toLowerCase())){
+              await undo("save");//undo
+              result = await window.LCapi.AddEvent(upperId, lowerId, response1, response2);
+            }
+          }else  if(["erosion","e"].includes(response1.toLowerCase())){
+            await undo("save");//undo
+            result = await window.LCapi.AddEvent(upperId, lowerId, response1, response2);
+          }
+          if(result == true){
+            await loadModel();
+            await loadAge(document.getElementById("AgeModelSelect").value);
+            await loadPlotData();
+            updateView();
+            console.log("[Renderer]: Add a new event.]");
+          }else if(result == "occupied"){
+            alert("The input deposition type of event has already used between the markers.");
+          }
+        }        
+      }
+    }
+
+    objOpts.edit.mode=null;
+    objOpts.edit.contextmenu_enable = true;
+    objOpts.edit.hittest = null;
+    objOpts.edit.marker_from = null;
+    objOpts.edit.marker_to = null;
+    document.removeEventListener("click", objOpts.edit.handleClick);
+    document.removeEventListener("mousemove", objOpts.edit.handleMove);
+    objOpts.edit.handleClick = null;
+    objOpts.edit.handleMove = null;
+
+    ///update scroller position
+    let canvasPosY = null;
+    let canvasPosX = (ht.x + objOpts.canvas.shift_y) * (objOpts.canvas.dpir * objOpts.canvas.zoom_level[1]) + objOpts.canvas.pad_y;
+    if (objOpts.canvas.depth_scale == "age") {
+      canvasPosY = ((ht.y+ objOpts.canvas.shift_y) * (objOpts.canvas.dpir * objOpts.canvas.zoom_level[1]) + objOpts.canvas.pad_y + objOpts.canvas.age_zoom_correction[1])  * objOpts.canvas.age_zoom_correction[0];
+    } else {
+      canvasPosY = (ht.y + objOpts.canvas.shift_y) * (objOpts.canvas.dpir * objOpts.canvas.zoom_level[1]) + objOpts.canvas.pad_y;
+    }
+
+    //if move to centre
+    //scroller.scrollTop = canvasPosY - scroller.clientHeight / 2;
+    //scroller.moveTo(scroller.scrollLeft, pos_y);
+
+    //move canvas
+    let newPosY = canvasPosY - scroller.clientHeight / 2;
+    let newPosX = canvasPosX - scroller.clientWidth / 2;
+    if(newPosY <= 0){
+      newPosY = 0;
+    }
+    if(newPosX <= 0){
+      newPosX = 0;
+    }
+
+    canvasPos[0] = newPosX;
+    canvasPos[1] = newPosY;
+
     updateView();
   }
   //3 Section move--------------------------------------------
@@ -2000,6 +2351,7 @@ document.addEventListener("DOMContentLoaded", () => {
     } else {
       rect = document.getElementById("rasterCanvas").getBoundingClientRect(); // Canvas position and size
     }
+    //console.log(objOpts.edit.handleMove, objOpts.edit.handleClick)
 
     var mouseX = event.clientX - rect.left;
     var mouseY = event.clientY - rect.top;
@@ -2052,6 +2404,7 @@ document.addEventListener("DOMContentLoaded", () => {
       //show depth/age
       //const xMag = objOpts.canvas.zoom_level[0] * objOpts.canvas.dpir;
       let yMag = objOpts.canvas.zoom_level[1] * objOpts.canvas.dpir;
+      let xMag = objOpts.canvas.zoom_level[0] * objOpts.canvas.dpir;
       //const pad_x = objOpts.canvas.pad_x;
       let pad_y = objOpts.canvas.pad_y;
       //const shift_x = objOpts.canvas.shift_x;
@@ -2068,8 +2421,8 @@ document.addEventListener("DOMContentLoaded", () => {
       document.getElementById("footerLeftText").innerText = txt;
 
       ///scroller position
-      canvasPos[0] = scroller.scrollLeft; //* xMag;
-      canvasPos[1] = scroller.scrollTop; //* yMag;
+      canvasPos[0] = scroller.scrollLeft;//* xMag;
+      canvasPos[1] = scroller.scrollTop;//* yMag;
 
       //update plot
       updateView();
@@ -2103,7 +2456,7 @@ document.addEventListener("DOMContentLoaded", () => {
       if (event.shiftKey) {
         //change hole distance
         event.preventDefault();
-        objOpts.hole.distance += 0.01 * deltaY;
+        objOpts.hole.distance -= 0.01 * deltaY;
         objOpts.connection.indexWidth = objOpts.hole.distance * 0.7;
         //objOpts.connection.indexWidth += 0.015 * deltaY;
         if (objOpts.connection.indexWidth < 0) {
@@ -2255,16 +2608,16 @@ document.addEventListener("DOMContentLoaded", () => {
         let hole_top = LCCore.projects[p].holes[h].sections[0].markers[0][objOpts.canvas.depth_scale];
         let hole_bottom = LCCore.projects[p].holes[h].sections.slice(-1)[0].markers.slice(-1)[0][objOpts.canvas.depth_scale];
         
-        if (holes_top > hole_top) {
+        if (hole_top !== null && holes_top > hole_top) {
           holes_top = hole_top;
         }
-        if (holes_bottom < hole_bottom) {
+        if (hole_bottom !== null && holes_bottom < hole_bottom) {
           holes_bottom = hole_bottom;
         }
       }
     }
 
-    objOpts.canvas.shift_y = holes_top;
+    objOpts.canvas.shift_y =  holes_top;
 
     //scale factor
     const dpir = objOpts.canvas.dpir; //window.devicePixelRatio || 1;
@@ -2622,7 +2975,7 @@ document.addEventListener("DOMContentLoaded", () => {
           //check position --------------------------------------------------
           if (hole_top == null && hole_bottom == null) {
             // draw hole line
-            console.log("[Renderer]: No section in the hole.")
+            //console.log("[Renderer]: No section in the hole.")
             sketch.drawingContext.setLineDash([5, 5]);
             sketch.strokeWeight(objOpts.hole.line_width);
             sketch.stroke(objOpts.hole.line_colour);
@@ -2842,6 +3195,30 @@ document.addEventListener("DOMContentLoaded", () => {
                   }
                 }
               }
+              
+              //live hittest
+              if(objOpts.edit.hittest){
+                if(objOpts.edit.mode == "add_event"){
+                  const uid = [objOpts.edit.hittest.project, objOpts.edit.hittest.hole, objOpts.edit.hittest.section, objOpts.edit.hittest.upper_marker];
+                  const lid = [objOpts.edit.hittest.project, objOpts.edit.hittest.hole, objOpts.edit.hittest.section, objOpts.edit.hittest.lower_marker];
+                  if(marker.id.toString() == lid.toString()){
+                    const upper_depth = section.markers.filter((m)=>m.id.toString()==uid.toString())[0][objOpts.canvas.depth_scale];
+                    const lower_depth = marker[objOpts.canvas.depth_scale];
+                    sketch.push()
+                    sketch.noFill();
+                    sketch.stroke("Red");
+                    sketch.strokeWeight(3);
+                    sketch.rect(
+                      (hole_x0 + shift_x) * xMag + pad_x + 3,
+                      (upper_depth + shift_y) * yMag + pad_y,
+                      objOpts.section.width * ew * xMag - 6,
+                      ((lower_depth-upper_depth)) * yMag,
+                      1,1,1,1 //rounded option
+                    );
+                    sketch.pop()
+                  }
+                }
+              }
 
               //make marker objects=================================================================================
               // remove top and bottom markers
@@ -2864,7 +3241,7 @@ document.addEventListener("DOMContentLoaded", () => {
               if(objOpts.edit.editable){
                 //live hittest
                 if(objOpts.edit.hittest !== null){
-                  if(["connect_marker", "disconnect_marker", "delete_marker","change_marker_name","change_marker_distance"].includes(objOpts.edit.mode)){
+                  if(["connect_marker", "disconnect_marker", "delete_marker","change_marker_name","change_marker_distance","set_zero_point","enable_master","disable_master"].includes(objOpts.edit.mode)){
                     const hitId = [objOpts.edit.hittest.project, objOpts.edit.hittest.hole, objOpts.edit.hittest.section, objOpts.edit.hittest.nearest_marker];
                     if(Math.abs(objOpts.edit.hittest.nearest_distance) < objOpts.edit.sensibility){
                       if(hitId.toString() == marker.id.toString()){
@@ -2965,6 +3342,15 @@ document.addEventListener("DOMContentLoaded", () => {
                   (marker_top + shift_y) * yMag + pad_y,
                   8
                 );
+                if (marker.isMaster){
+                  sketch.noFill();
+                  sketch.stroke("Blue");
+                  sketch.ellipse(
+                    (hole_x0 + shift_x) * xMag + pad_x,
+                    (marker_top + shift_y) * yMag + pad_y,
+                    11
+                  );
+                }
               }
 
               //add marker name--------------------------------------------
@@ -3211,7 +3597,7 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     }
 
-    objOpts.canvas.shift_y = holes_top;
+    objOpts.canvas.shift_y = -1 * holes_top;
 
     //scale factor
     const dpir = objOpts.canvas.dpir; //window.devicePixelRatio || 1;
@@ -4641,7 +5027,7 @@ document.addEventListener("DOMContentLoaded", () => {
         console.log(id)
         continue
       }
-      const sectionData = LCCore.projects[idx[0]].holes[idx[1]].sections[idx[0]];
+      const sectionData = LCCore.projects[idx[0]].holes[idx[1]].sections[idx[2]];
       sectionData.markers.forEach(m=>{
         m.h_connection.forEach(h=>{
           outIdList.add(JSON.stringify([h[0],h[1],h[2],null]));
@@ -5040,23 +5426,20 @@ function calcCanvasBaseSize(LCCore, objOpts) {
 
   for (let p = 0; p < LCCore.projects.length; p++) {
     for (let h = 0; h < LCCore.projects[p].holes.length; h++) {
-      let hole_top =
-        LCCore.projects[p].holes[h].sections[0].markers[0][
-          objOpts.canvas.depth_scale
-        ];
-      let hole_bottom = LCCore.projects[p].holes[h].sections
-        .slice(-1)[0]
-        .markers.slice(-1)[0][objOpts.canvas.depth_scale];
-      if (holes_top > hole_top) {
+      let hole_top = LCCore.projects[p].holes[h].sections[0].markers[0][objOpts.canvas.depth_scale];
+      let hole_bottom = LCCore.projects[p].holes[h].sections.slice(-1)[0].markers.slice(-1)[0][objOpts.canvas.depth_scale];
+      hole_top 
+      if (hole_top !== null && holes_top > hole_top) {
         holes_top = hole_top;
       }
-      if (holes_bottom < hole_bottom) {
+      if (hole_bottom !== null && holes_bottom < hole_bottom) {
         holes_bottom = hole_bottom;
       }
     }
   }
 
-  objOpts.canvas.shift_y = holes_top;
+  console.log(holes_top)
+  objOpts.canvas.shift_y = -1 * holes_top;
 
   //scale factor
   const dpir = objOpts.canvas.dpir; //window.devicePixelRatio || 1;
@@ -5225,22 +5608,25 @@ async function undo(type){
 async function loadCoreImages(modelImages, LCCore, objOpts, depthScale) {
   return new Promise(async (resolve, reject) => {
     //initiarise
-    let results = {};
+    let results = modelImages;
 
     //check
-    if (modelImages.image_dir.length == 0) {
+    if (modelImages.image_dir == "") {
       console.log("[Renderer]: There is no image path.");
       resolve(results);
+      return;
     }
     if (LCCore == null) {
       console.log("[Renderer]: There is no LCCore.");
       resolve(results);
+      return;
     }
     
     if (["composite_depth", "event_free_depth", "age"].includes(depthScale)) {
       if (Object.keys(modelImages.drilling_depth).length == 0) {
         console.log("[Renderer]: There is no original image.");
         resolve(results);
+        return;
       }
     }
 
@@ -5261,13 +5647,20 @@ async function loadCoreImages(modelImages, LCCore, objOpts, depthScale) {
       N = modelImages.load_target_ids.length;
     }
     
+    if(N==0){
+      console.log("[Renderer]: There is no update image.")
+      resolve(results);
+      return;
+    }
 
     //main Progress
     let txt = "Converting section images to " + depthScale + " scale...";
     if (depthScale == "drilling_depth") {
       txt = "Loading original section images...";
     }
-    window.LCapi.progressbar("Load images", txt);
+
+    console.log(modelImages.load_target_ids)
+    await window.LCapi.progressbar("Load images", txt);
     let n = 0;
   
     let suc = 0;
@@ -5279,6 +5672,7 @@ async function loadCoreImages(modelImages, LCCore, objOpts, depthScale) {
           const targeIdx = getIdxById(LCCore, modelImages.load_target_ids[t]);
           if(targeIdx == null){
             //there is no image in the target section
+            n+=1;
             continue
           }
           const project = LCCore.projects[targeIdx[0]];
@@ -5295,29 +5689,26 @@ async function loadCoreImages(modelImages, LCCore, objOpts, depthScale) {
               const imageBase64 = await window.LCapi.LoadRasterImage(modelImages.image_dir +"/" +project.name +"/" +im_name +".jpg", im_height);
 
               if (imageBase64 !== undefined) {
-                results[im_name] = await p.loadImage("data:image/png;base64," + imageBase64,
+                results[depthScale][im_name] = await p.loadImage("data:image/png;base64," + imageBase64,
                   async () => {
                     //console.log("");
                     suc++;
                   },
                   async () => {
-                    console.log("Fail to load image of " + im_name);
+                    console.log("[Renderer]: Fail to load image of " + im_name);
                   }
                 );
               } else {
-                results[im_name] = undefined;
+                results[depthScale][im_name] = undefined;
               }
             } catch (error) {
-              //console.log(error);
-              results[im_name] = undefined;
+              console.log(error);
+              results[depthScale][im_name] = undefined;
             }
           } else if ( depthScale == "composite_depth" ||  depthScale == "event_free_depth"  ) {
             //case CD, EF, convert original to CD EFD image
             const dpcm = objOpts.image.dpcm; //pix/cm}
-            const im_height = Math.round(
-              dpcm * (section.markers[section.markers.length - 1].distance - section.markers[0].distance),
-              0
-            );
+            const im_height = Math.round( dpcm * (section.markers[section.markers.length - 1].distance - section.markers[0].distance), 0);
 
             //load image
             try {
@@ -5329,26 +5720,31 @@ async function loadCoreImages(modelImages, LCCore, objOpts, depthScale) {
               );//[imPath, sectionData, imHeight, depthScale]
 
               if (imageBase64 !== undefined) {
-                results[im_name] = await p.loadImage(
+                results[depthScale][im_name] = await p.loadImage(
                   "data:image/png;base64," + imageBase64,
                   async () => {
                     //console.log("");
                     suc++;
                   },
                   async () => {
-                    console.log("Fail to load image of " + im_name);
+                    console.log("[Renderer]: Fail to load image of " + im_name);
                   }
                 );
               } else {
-                results[im_name] = undefined;
+                results[depthScale][im_name] = undefined;
               }
             } catch (error) {
-              //console.log(error);
-              results[im_name] = undefined;
+              console.error(error);
+              results[depthScale][im_name] = undefined;
+              n+=1;
+              continue
             }
           }
-          n += 1;
-          window.LCapi.updateProgressbar(n, N);
+
+
+          n+=1;
+          console.log(n,N)
+          await window.LCapi.updateProgressbar(n, N);
         }
         p5resolve();
       });

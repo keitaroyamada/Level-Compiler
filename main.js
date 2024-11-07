@@ -197,8 +197,7 @@ function createMainWIndow() {
         { type: "separator" },
         
         {
-          label: "Export correlation as csv",
-          accelerator: "CmdOrCtrl+E",
+          label: "Export correlation as csv (under construction)",          
           click: () => {
             mainWindow.webContents.send("ExportCorrelationAsCsvMenuClicked");
           },
@@ -263,7 +262,7 @@ function createMainWIndow() {
         },
         {
           label: "Edit correlation",
-          //accelerator: "CmdOrCtrl+M",
+          accelerator: "CmdOrCtrl+E",
           click: () => {
             mainWindow.webContents.send("EditCorrelation");
           },
@@ -424,10 +423,11 @@ function createMainWIndow() {
   ipcMain.handle("InitiariseCorrelationModel", async (_e) => {
     //import modeln
     console.log("MAIN: Initiarise correlation model");
-    LCCore.projects = [];
-    LCCore.search_idx_list = {};
-    LCCore.selected_id = null;
-    LCCore.reserved_project_ids = [0];
+    LCCore = new LevelCompilerCore();
+    //LCCore.projects = [];
+    //LCCore.search_idx_list = {};
+    //LCCore.selected_id = null;
+    //LCCore.reserved_project_ids = [0];
 
     console.log("MAIN: Project correlation data is initiarised.");
     return LCCore;
@@ -541,6 +541,7 @@ function createMainWIndow() {
   });
   ipcMain.handle("makeModelImage", async (_e, imPath, sectionData, imHeight, depthScale) => {
     try {
+      
       //path.join(__dirname.replace(/\\/g, "/"), im_path)
       let imageBuffer = fs.readFileSync(imPath);
       if (imHeight != 0) {
@@ -571,6 +572,8 @@ function createMainWIndow() {
       const d0 = sectionData.markers[0].distance;
       const m0 = sectionData.markers[0][depthScale];
       for (let i = 0; i < sectionData.markers.length - 1; i++) {
+        const id = sectionData.markers[i].id;
+        const name = sectionData.markers[i].name;
         const dTop = sectionData.markers[i].distance;
         const dBottom = sectionData.markers[i + 1].distance;
         const mTop = sectionData.markers[i][depthScale];
@@ -582,6 +585,8 @@ function createMainWIndow() {
         const toP1 = (mBottom - m0) * pixPerCm;
 
         operations.push({
+          id:id,
+          name:name,
           fromTop: fromP0,
           fromBottom: fromP1,
           toTop: toP0,
@@ -604,12 +609,17 @@ function createMainWIndow() {
       //extract and resize
       let compositeOperations = [];
       for (const ope of operations) {
-        if (
-          round(ope.fromBottom - ope.fromTop, 0) === 0 ||
-          round(ope.toBottom - ope.toTop, 0) === 0
-        )
+        if (round(ope.fromBottom - ope.fromTop, 0) === 0 || round(ope.toBottom - ope.toTop, 0) === 0){
           continue; // if 0cm thick(event layer), skip
-        const baseIm = sharp(imageBuffer);
+        }
+          
+        const baseIm = sharp(imageBuffer); 
+
+        if(round(ope.toBottom - ope.toTop, 0)<0){
+          console.log(depthScale, imPath);
+          console.log(ope.id, round(ope.toBottom - ope.toTop, 0))
+        }
+
         const currSection = await baseIm
           .extract({
             left: 0,
@@ -642,7 +652,7 @@ function createMainWIndow() {
       
     } catch (error) {
       if (error.code === "ENOENT") {
-        //case there is no such a file.
+        //（Error NO ENTry）case there is no such a file.
       } else {
         throw error;
       }
@@ -792,35 +802,20 @@ function createMainWIndow() {
                   resolve("changeMarkerDistance");                      
                 } 
               },
-              { 
-                label: 'Add Zero Horizon (under construction)', 
-                click: () => {
-                  console.log('MAIN: Edit zero point'); 
-                  resolve("changeZeroPoint");                      
-                } 
-              },
-              { 
-                label: 'Edit master (under construction)', 
-                click: () => {
-                  console.log('MAIN: Edit master'); 
-                  resolve("changeMaster");                      
-                } 
-              },
-              { 
-                label: 'Add event (under construction)', 
-                click: () => {
-                  console.log('MAIN: Add event'); 
-                  resolve("addEvent");                      
-                } 
-              },
-              { 
-                label: 'Delete event (under construction)', 
-                click: () => {
-                  console.log('MAIN: Delete event'); 
-                  resolve("deleteEvent");                      
-                } 
-              },
               { type: 'separator' },
+              { 
+                label: 'Delete marker', 
+                click: () => {
+                  console.log('MAIN: Delete marker'); 
+                  resolve("deleteMarker"); 
+                 
+                } 
+              },
+            ]
+          }, 
+          {
+            label:"Connection",
+            submenu:[
               { 
                 label: 'Connect markers', 
                 click: () => {
@@ -838,15 +833,49 @@ function createMainWIndow() {
               },
               { type: 'separator' },
               { 
-                label: 'Delete marker', 
+                label: 'Add event', 
                 click: () => {
-                  console.log('MAIN: Delete marker'); 
-                  resolve("deleteMarker"); 
-                 
+                  console.log('MAIN: Add event'); 
+                  resolve("addEvent");                      
+                } 
+              },
+              { 
+                label: 'Delete event (under construction)', 
+                click: () => {
+                  console.log('MAIN: Delete event'); 
+                  resolve("deleteEvent");                      
+                } 
+              },
+              { type: 'separator' },
+              { 
+                label: 'Set Zero Horizon', 
+                click: () => {
+                  console.log('MAIN: Edit zero point'); 
+                  resolve("setZeroPoint");                      
+                } 
+              },
+              { 
+                label: 'Add master flag', 
+                click: () => {
+                  console.log('MAIN: Edit master'); 
+                  resolve("addMaster");                      
+                } 
+              },
+              { 
+                label: 'Remove master flag', 
+                click: () => {
+                  console.log('MAIN: Edit master'); 
+                  resolve("deleteMaster");                      
                 } 
               },
             ]
-          }, 
+          },
+          {
+            label:"Cancel",
+            click: () => {
+              resolve("cancel"); 
+            }
+          },
         ];
         
       }
@@ -1851,6 +1880,54 @@ function createMainWIndow() {
 
     console.log("MAIN: Add a new marker on the section: " + sectionId +" of " + depth +" cm "+depthScale);
   });
+  ipcMain.handle("SetZeroPoint", async(_e, markerId, value) => {
+    
+    const result = LCCore.setZeroPoint(markerId, value);
+
+    if (result == true) {
+      console.log("MAIN: Add hole completed.");
+      return result;
+    } else {
+      console.log("MAIN: Failed to add a new hole.");
+      return result
+    }
+  });
+  ipcMain.handle("SetMaster", async(_e, markerId, type) => {
+    
+    const result = LCCore.setMaster(markerId, type);
+
+    if (result == true) {
+      console.log("MAIN: Change master flag.");
+      return result;
+    } else {
+      console.log("MAIN: Failed to chnage master flag.");
+      return result
+    }
+  });
+  ipcMain.handle("AddEvent", async(_e, upperId, lowerId, depositionType, value) => {
+    
+    const result = LCCore.addEvent(upperId, lowerId, depositionType, value);
+
+    if (result == true) {
+      console.log("MAIN: Add event layer.");
+      return result;
+    } else {
+      console.log("MAIN: Failed to add event layer.");
+      return result
+    }
+  });
+  ipcMain.handle("DeleteEvent", async(_e, upperId, lowerId,type) => {
+    
+    const result = LCCore.deleteEvent(upperId, lowerId, type);
+
+    if (result == true) {
+      console.log("MAIN: Delete event layer.");
+      return result;
+    } else {
+      console.log("MAIN: Failed to delete event layer.");
+      return result
+    }
+  });
   ipcMain.handle("changeMarker", (_e, markerId, type, value) => {
     //
     const idx = LCCore.search_idx_list[markerId.toString()];
@@ -1950,6 +2027,7 @@ function createMainWIndow() {
     }
   });
 
+
   //--------------------------------------------------------------------------------------------------
   //--------------------------------------------------------------------------------------------------
 }
@@ -1965,37 +2043,47 @@ function progressDialog(window, tit, txt){
     detail: "Please wait...(0%)",
     browserWindow: {
       parent: window,
-      modal: true,
-      resizable: false,
+      modal: false,
+      resizable: true,
       webPreferences: {
         nodeIntegration: true,
         contextIsolation: false,
       },
     },
+    closeOnComplete:true,
   });
 
+  /*
   progress
     .on("completed", () => {
       //console.info("Task completed.");
       progress.detail = "Task completed. Exiting...";
+      progress.close();
     })
     .on("aborted", (value) => {
       console.info(`Task aborted... ${value}`);
     });
-
+  */
   return progress;
 }
 async function updateProgress(progress, n, N){
-  if (progress) {
-    progress.value = (n / N) * 100;
-    progress.detail =
-      "Please wait..." + n + "/" + N + "  (" + round((n / N) * 100, 2) + "%)";
+  try{
+    if (progress ) {
+      progress.value = (n / N) * 100;
+      progress.detail ="Please wait..." + n + "/" + N + "  (" + round((n / N) * 100, 2) + "%)";
 
-    if (n / N >= 1) {
-      progress.setCompleted();
+      if (n / N >= 1) {
+        progress.setCompleted();
+        progress.close();
+      }
     }
+    return progress;
+  }catch(err){
+    progress.on("aborted");
+    console.error("MAIN: In progressbar", err);
+    progress.close();
+    return progress;
   }
-  return progress;
 }
 async function getfile(mainWindow, title, ext) {
   const options = {

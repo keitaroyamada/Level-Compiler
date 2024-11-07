@@ -72,7 +72,13 @@ contextBridge.exposeInMainWorld("LCapi", {
   addHole: (args1,args2) => ipcRenderer.invoke("addHole", args1,args2),
   addProject: (args1,args2) => ipcRenderer.invoke("addProject", args1,args2),
   RegisterAgeFromLCAge: () => ipcRenderer.invoke('RegisterAgeFromLCAge'),
+  SetZeroPoint: (args1,args2) => ipcRenderer.invoke("SetZeroPoint", args1,args2),
+  SetMaster: (args1,args2) => ipcRenderer.invoke("SetMaster", args1,args2),
+  AddEvent: (args1,args2,args3,args4) => ipcRenderer.invoke("AddEvent", args1,args2,args3,args4),
+  DeleteEvent: (args1,args2,args3,args4) => ipcRenderer.invoke("DeleteEvent", args1,args2,args3,args4),
 
+
+  
   sendUndo: () => ipcRenderer.invoke('sendUndo'),
   sendRedo: () => ipcRenderer.invoke('sendRedo'),
   sendSaveState: () => ipcRenderer.invoke('sendSaveState'),  

@@ -55,9 +55,17 @@ class LevelCompilerCore {
         }
       } else if (this.projects.length > 0) {
         if (match[1].toLowerCase().includes("correlation")) {
-          console.log("LCCore: Correlation file is not supported as a second model.");
-          //console.log("LCCore: Additional Correlation Model is loaded.");
-          return;
+          if (this.projects[0].model_type == "duo"){
+            //if duo, replace
+            model_info.name = match[2];
+            model_info.version = match[3];
+            projectData.model_type = "correlation";
+            isDuo = false;
+            console.log("LCCore: Load correlation file after duo model.");
+          }else{
+            console.log("LCCore: Correlation file is not supported as a second model.");
+            return;
+          }          
         } else if (match[1].toLowerCase().includes("duo")) {
           model_info.name = match[2];
           model_info.version = match[3];
@@ -81,7 +89,7 @@ class LevelCompilerCore {
     //add project data
     const newProjectId = lcfnc.getUniqueId(this.reserved_project_ids);
     this.reserved_project_ids.push(newProjectId);
-    const p = this.projects.length;
+    let p = this.projects.length;
     projectData.id = [newProjectId, null, null, null];
     projectData.name = model_info.name;
     projectData.correlation_version = model_info.version;
@@ -249,7 +257,7 @@ class LevelCompilerCore {
                   eventData.push(["erosion", "downward", null, "erosion", -thickness]);
                 } else if (event[1] == "lower" || event[1] == "l" || event[1] == "L") {
                   eventData.push(["erosion", "upward", null, "erosion", thickness]);
-                } else if (event[1] == "erosion" || event[0] == "e" || event[0] == "E") {
+                } else if (event[1] == "erosion" || event[1] == "e" || event[1] == "E") {
                   eventData.push(["erosion", "downward", -thickness, "erosion", -thickness]);
                 }else {
                   console.error(
@@ -301,6 +309,15 @@ class LevelCompilerCore {
     }
     this.projects.push(projectData);
     this.search_idx_list[projectData.id.toString()] = [p, null, null, null];
+    if (this.projects[0].model_type == "duo"){
+      if(projectData.model_type== "correlation"){
+        [this.projects[0], this.projects[this.projects.length-1]] = [this.projects[this.projects.length-1], this.projects[0]];
+        this.updateSearchIdx();
+        this.base_project_id = projectData.id;
+        [this.projects[0].order, this.projects[this.projects.length-1].order] = [this.projects[this.projects.length-1].order, this.projects[0].order];
+      }
+    }
+    
 
     //add unique id for each markers
 
@@ -367,8 +384,7 @@ class LevelCompilerCore {
                 if (model_r[1] !== "") {
                   const duo_connected_hole = lcfnc.zeroPadding(model_r[1]);
                   const duo_connected_sec = lcfnc.zeroPadding(model_r[2]);
-                  const duo_connected_dist =
-                    Math.round(parseFloat(model_r[3]) * 10) / 10;
+                  const duo_connected_dist = Math.round(parseFloat(model_r[3]) * 10) / 10;
                   this.projects[projectIdx[0]].duo_connection[correlated_marker_id.toString()] = [
                     duo_connected_hole,
                     duo_connected_sec,
@@ -384,11 +400,8 @@ class LevelCompilerCore {
           if (m == 0) {
             //let previousMarker = this.projects[projectIdx[0]].holes[h].sections[s].markers[m - 1];
             //let currentMarker = this.projects[projectIdx[0]].holes[h].sections[s].markers[m];
-            let nextMarker =
-              this.projects[projectIdx[0]].holes[h].sections[s].markers[m + 1];
-            this.projects[projectIdx[0]].holes[h].sections[s].markers[
-              m
-            ].v_connection.push(nextMarker.id);
+            let nextMarker = this.projects[projectIdx[0]].holes[h].sections[s].markers[m + 1];
+            this.projects[projectIdx[0]].holes[h].sections[s].markers[m].v_connection.push(nextMarker.id);
             //case piston core
             if (isContinuousSection == true) {
               if (s > 0) {
@@ -438,14 +451,24 @@ class LevelCompilerCore {
     const isMakeNewMarker = this.connectEventPairs(projectIdx);
 
     //connect duo
-    this.connectDuoModel();
+    if(this.projects.length>1){
+      const baseIdx = this.search_idx_list[this.base_project_id];
+      if(this.projects[baseIdx[0]].model_type == "correlation"){
+        this.connectDuoModel();
+      }
+    }
+    
 
-    this.sortModelByOrder();
+    //this.sortModelByOrder();
+    this.sortModel();
 
     console.log("LCCore: Model loaded from csv.");
     return true;
   }
   connectDuoModel() {
+    //if no connected markers in the master project, create a new marker.
+    let isAllowAddMarker = true;
+
     if (this.projects.length < 1) {
       return;
     }
@@ -466,11 +489,38 @@ class LevelCompilerCore {
             }
             //search previously loaded model
             let connectedMarkerIdx = [];
-            for (let i = 0; i < p; i++) {
-              const tempIdx = this.getIdxFromTrinity(this.projects[i].id, masterTrinity);
+            for (let i = 0; i < 1; i++) {
+              //search only in master
+              //for (let i = 0; i < p; i++) {
+              let tempIdx = this.getIdxFromTrinity(this.projects[i].id, masterTrinity);
               if (tempIdx[3] == null) {
-                console.log("LCCore: There is no correlated marker with :" + masterTrinity.join("-"));
-                continue;
+                console.log("LCCore: There is no correlated marker with :" + masterTrinity.join("-")+"cm");
+                if(isAllowAddMarker == true){
+                  try{
+                    let targetData = new Trinity();
+                    targetData.name = "";
+                    targetData.project_name = this.projects[tempIdx[0]].name;
+                    targetData.hole_name = masterTrinity[0];
+                    targetData.section_name = masterTrinity[1];
+                    targetData.distance = masterTrinity[2];
+                    
+                    const targetId = this.projects[tempIdx[0]].holes[tempIdx[1]].sections[tempIdx[2]].id;
+                    const depth = this.getDepthFromTrinity(targetId, [targetData], "composite_depth")
+                    const result = this.addMarker(targetId, depth[0][1], "composite_depth");
+                    if(result == true){
+                      this.updateSearchIdx();
+                      tempIdx = this.getIdxFromTrinity(this.projects[i].id, masterTrinity);
+  
+                      this.projects[tempIdx[0]].holes[tempIdx[1]].sections[tempIdx[2]].markers[tempIdx[3]].name = "duo_connection";
+                      console.log("        -> Add a new marker of "+masterTrinity.join("-")+"cm");
+                      connectedMarkerIdx.push(tempIdx);
+                    }                  
+                  }catch(err){
+                    console.error("        -> Failed to add a new connection.", err);
+                    continue
+                  } 
+                }
+                               
               } else {
                 connectedMarkerIdx.push(tempIdx);
               }
@@ -501,6 +551,7 @@ class LevelCompilerCore {
     }
   }
   calcCompositeDepth() {
+    this.initiariseCDEFD();
     //"all(not recommended)": All mode contains some problems in 2nd order interpolation and matchs between extrapolations.
     const calcRange = "project";
     
@@ -780,7 +831,7 @@ class LevelCompilerCore {
            //console.log(upperIdx, lowerIdx);
 
             if(upperIdx == -1 && lowerIdx == -1){
-              console.log("LCCore: Undefiened marker detected during connecintg duo model. " + this.getMarkerNameFromId(currentMarkerData.id));
+              //console.log("LCCore: Undefiened marker detected during connecintg duo model. " + this.getMarkerNameFromId(currentMarkerData.id));
             }
 
             if(upperIdx == -1 && lowerIdx !== -1){
@@ -1217,7 +1268,19 @@ class LevelCompilerCore {
 
     return interpolatedEFD;
   }
-
+  initiariseCDEFD(){
+    for(let p=0; p<this.projects.length;p++){
+      for(let h=0;h<this.projects[p].holes.length;h++){
+        for(let s=0;s<this.projects[p].holes[h].sections.length;s++){
+          for(let m=0;m<this.projects[p].holes[h].sections[s].markers.length;m++){
+            //initiarise
+            this.projects[p].holes[h].sections[s].markers[m].composite_depth = null;
+            this.projects[p].holes[h].sections[s].markers[m].event_free_depth = null;
+          }
+        }
+      }
+    }
+  }
   calcMarkerAges(LCAge) {
     if (this.projects.length == 0) {
       console.log("LCCore: There is no correlation model.");
@@ -1446,8 +1509,8 @@ class LevelCompilerCore {
 
                   for (let i = 0; i < events_next.length; i++) {
                     const event_next = events_next[i];
-                    if (["deposition", "markup", "erosion"].includes(event_next[0])) {
-                      if (["upward", "through-up"].includes(event_next[1])) {
+                    if (event_next[0]=="deposition"||event_next[0]=="markup"||event_next[0]=="erosion") {
+                      if (event_next[1] =="upward" || event_next[1] =="through-up") {
                         //connect current -> next
                         if (
                           this.projects[projectIdx[0]].holes[currentIdx[1]].sections[currentIdx[2]].markers[currentIdx[3]].event[e][2] == null
@@ -1496,8 +1559,8 @@ class LevelCompilerCore {
 
                   for (let i = 0; i < events_next.length; i++) {
                     const event_next = events_next[i];
-                    if (["deposition", "markup", "erosion"].includes(event_next[0])) {
-                      if (["downward", "through-down"].includes(event_next[1])) {
+                    if (event_next[0]=="deposition"||event_next[0]=="markup"||event_next[0]=="erosion") {
+                      if (event_next[1]=="downward" || event_next[1] == "through-down") {
                         //connect current -> next
                         if (
                           this.projects[projectIdx[0]].holes[currentIdx[1]]
@@ -1714,7 +1777,6 @@ class LevelCompilerCore {
                       }
 
                       //connect to
-                      /*
                       this.projects[projectIdx[0]].holes[currentIdx[1]].sections[currentIdx[2]].markers[currentIdx[3]].event.push([
                         event[0],
                         "downward-up",
@@ -1722,7 +1784,6 @@ class LevelCompilerCore {
                         event[3],
                         event[4],
                       ]);
-                      */
 
                       //finish process
                       isMakeNewMarker = false;
@@ -2965,6 +3026,58 @@ class LevelCompilerCore {
     this.sortModel();
     return true
   }
+  setZeroPoint(markerId, value){
+    //remove previous zero point
+    breakpoint:
+    for(let p of this.projects){
+      for(let h of p.holes){
+        for(let s of h.sections){
+          for(let m of s.markers){
+            if(m.isZeroPoint !== false){
+              m.isZeroPoint = false;
+              break breakpoint;
+            }
+          }
+        }
+      }
+    }
+
+    //set new
+    const idx = this.search_idx_list[markerId.toString()];
+    this.projects[idx[0]].holes[idx[1]].sections[idx[2]].markers[[idx[3]]].isZeroPoint = parseFloat(value);
+
+    this.calcCompositeDepth();
+    this.calcEventFreeDepth();
+    return true;
+
+  }
+  setMaster(markerid, type){
+    const idx = this.search_idx_list[markerid.toString()];
+    if(type == "disable"){
+      this.projects[idx[0]].holes[idx[1]].sections[idx[2]].markers[idx[3]].isMaster = false;
+    }else if(type == "enable"){
+      //check
+      let numMaster = 0;
+      for(let hc of this.projects[idx[0]].holes[idx[1]].sections[idx[2]].markers[idx[3]].h_connection){
+        const idxh = this.search_idx_list[hc.toString()];
+        if(idx[0] == idxh[0]){
+          if(this.projects[idxh[0]].holes[idxh[1]].sections[idxh[2]].markers[idxh[3]].isMaster == true){
+            numMaster++;
+          }
+        }
+        
+      }
+      if(numMaster>2){
+        return "too_much_master";
+      }
+
+      this.projects[idx[0]].holes[idx[1]].sections[idx[2]].markers[idx[3]].isMaster = true;
+    }
+
+    this.calcCompositeDepth();
+    this.calcEventFreeDepth();
+    return true;
+  }
   changeDistance(markerId, distance){
     const markerIdx = this.search_idx_list[markerId.toString()];
     let markerData = JSON.parse(JSON.stringify(this.getDataByIdx(markerIdx)));
@@ -3104,6 +3217,79 @@ class LevelCompilerCore {
     }
 
     
+  }
+  addEvent(upperId, lowerId, depositionType, value){
+    //depositionType: deposition, erosion, markup
+    //value: [deposition, markup]:disturbed, tephra, void
+    //value: [erosion]: erosion distance
+    const upperIdx = this.search_idx_list[upperId.toString()];
+    const lowerIdx = this.search_idx_list[lowerId.toString()];
+
+    //check number of previous event connection
+    let prevEvent = {deposition:0,erosion:0,markup:0};
+    for(let e of this.projects[upperIdx[0]].holes[upperIdx[1]].sections[upperIdx[2]].markers[upperIdx[3]].event){
+      if(e[2].toString() == lowerId.toString()){
+        //if connected
+        if(e[0] == "deposition"){
+          prevEvent.deposition++;
+        }else if(e[0] == "erosion"){
+          prevEvent.erosion++;
+        }else if(e[0] == "markup"){
+          prevEvent.markup++;
+        }
+      }
+    }
+
+    if(["deposition","markup", "d","D","m","M"].includes(depositionType)){
+      if(prevEvent[depositionType] > 0){
+        console.log("LCCore: Failed to add event later because input type of event has already been set.");
+        return "occupied"
+      }
+      let deposition_type = depositionType;
+      let colour_type = value;
+      if(value == "g"){
+        colour_type = "general";
+      }else if(value == "t"){
+        colour_type = "tephra";
+      }else if(value == "v"){
+        colour_type = "void";
+      }else if(value == "d"){
+        colour_type = "disturbed";
+      }
+
+      if(["d","D"].includes(depositionType)){
+        deposition_type = "deposition";
+      }if(["m","M"].includes(depositionType)){
+        deposition_type = "markup";
+      }
+
+      let upperEvent = [deposition_type, "downward", lowerId, colour_type, null];
+      let lowerEvent = [deposition_type, "upward",   upperId, colour_type, null];
+
+      this.projects[upperIdx[0]].holes[upperIdx[1]].sections[upperIdx[2]].markers[upperIdx[3]].event.push(upperEvent);
+      this.projects[lowerIdx[0]].holes[lowerIdx[1]].sections[lowerIdx[2]].markers[lowerIdx[3]].event.push(lowerEvent);
+      console.log(upperEvent, lowerEvent)
+
+    }else if(["erosion","e","E"].includes(depositionType)){
+      if(prevEvent[depositionType] > 0){
+        console.log("LCCore: Failed to add event later because input type of event has already been set.");
+        return "occupied"
+      }
+
+      let upperEvent = [depositionType, "downward", lowerId, "erosion", -Math.abs(parseFloat(value))];
+      let lowerEvent = [depositionType, "upward",   upperId, "erosion",  Math.abs(parseFloat(value))];
+
+      this.projects[upperIdx[0]].holes[upperIdx[1]].sections[upperIdx[2]].markers[upperIdx[3]].event.push(upperEvent);
+      this.projects[lowerIdx[0]].holes[lowerIdx[1]].sections[lowerIdx[2]].markers[lowerIdx[3]].event.push(lowerEvent);
+      console.log(upperEvent, lowerEvent)
+    }else{
+      return "unsuspected"  
+    }
+
+    this.updateSearchIdx();
+    this.calcCompositeDepth();
+    this.calcEventFreeDepth();
+    return true;
   }
   deleteSection(sectionId){
     const sectionIdx = this.search_idx_list[sectionId.toString()];
