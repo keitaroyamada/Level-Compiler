@@ -44,6 +44,7 @@ document.addEventListener("DOMContentLoaded", () => {
   let dividerEnable = false;
   let isSVG = false;
   let isLoadedLCModel = false;
+  let backup_hole_enable = {};
   //============================================================================================
 
   //--------------------------------------------------------------------------------------------
@@ -1383,7 +1384,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
     //canvasPos[0] = newPosY;
     //canvasPos[1] = newPosY;
-
+    
+    //canvasPos[1] = newPosY;
     updateView();
   }
   //2 Marker click--------------------------------------------
@@ -1511,7 +1513,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     //canvasPos[0] = newPosX;
-    //canvasPos[1] = newPosY;
+    //canvasPos[1] = objOpts.canvas.shift_y;////newPosY;
 
     updateView();
   }
@@ -1654,6 +1656,7 @@ document.addEventListener("DOMContentLoaded", () => {
       newPosX = 0;
     }
 
+    //scroller.scrollTop = newPosY - canvasPos[1]; 
     //canvasPos[1] = newPosY;
 
     updateView();
@@ -2097,15 +2100,21 @@ document.addEventListener("DOMContentLoaded", () => {
         if (target_id[1] == "") {
           //case project selected
           LCCore.projects[target_idx[0]].enable = setVal;
+          //backup
+          backup_hole_enable[LCCore.projects[target_idx[0]].id.toString()] = setVal;
           LCCore.projects[target_idx[0]].holes.forEach((hole) => {
             hole.enable = setVal;
             const el = document.getElementById(hole.id.toString());
             el.checked = setVal;
+            //backup
+            backup_hole_enable[hole.id.toString()] = setVal;
             console.log("[Renderer]: Hole "+hole.name +" is "+setType+".");
           });
         } else {
           //case hole selected
           LCCore.projects[target_idx[0]].holes[target_idx[1]].enable = setVal;
+          //backup
+          backup_hole_enable[LCCore.projects[target_idx[0]].holes[target_idx[1]].id.toString()] = setVal;
           console.log("[Renderer]: Hole "+LCCore.projects[target_idx[0]].holes[target_idx[1]].name +" is "+LCCore.projects[target_idx[0]].holes[target_idx[1]].enable +".");
 
           //case all holes are disable
@@ -2116,13 +2125,19 @@ document.addEventListener("DOMContentLoaded", () => {
             }
           });
           if(isAllHoleDisable==true){
-            document.getElementById([target_id[0],null,null,null].toString()).checked = false;
+            document.getElementById([target_id[0],null,null,null].toString()).checked = false;            
             LCCore.projects[target_idx[0]].enable = false;
+            //backup
+            backup_hole_enable[LCCore.projects[target_idx[0]].id.toString()] = false;
           }else{
             document.getElementById([target_id[0],null,null,null].toString()).checked = true;
             LCCore.projects[target_idx[0]].enable = true;
+            //backup
+           backup_hole_enable[LCCore.projects[target_idx[0]].id.toString()] = true;
           }
         }
+
+         
         //console.log(LCCore);
         //update plot
         updateView();
@@ -2138,9 +2153,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
       const temp_correlation_model_list = correlation_model_list;
       const temp_age_model_list = age_model_list;
-      const selecteed_cprrelation_model_id = 1;
-      const selected_age_model_id =
-        document.getElementById("AgeModelSelect").value;
+      const selected_age_model_id = document.getElementById("AgeModelSelect").value;
 
       //initiarise
       await initiariseCorrelationModel();
@@ -2153,7 +2166,7 @@ document.addEventListener("DOMContentLoaded", () => {
       for (let i = 0; i < temp_correlation_model_list.length; i++) {
         await registerModel(temp_correlation_model_list[i].path);
       }
-      await loadModel(selecteed_cprrelation_model_id);
+      await loadModel();
 
       //reload age model
       for (let i = 0; i < temp_age_model_list.length; i++) {
@@ -2710,16 +2723,8 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     });
 
-    let canvasBaseWidth = parseInt(
-      (objOpts.hole.distance + objOpts.hole.width + shift_x) *
-        (num_total_holes + 1) *
-        xMag +
-        pad_x
-    );
-    let canvasBaseHeight = parseInt(
-      (holes_bottom - holes_top + shift_y + objOpts.canvas.bottom_pad) * yMag +
-        pad_y
-    );
+    let canvasBaseWidth = parseInt((objOpts.hole.distance + objOpts.hole.width + shift_x) * (num_total_holes + 1) * xMag + pad_x);
+    let canvasBaseHeight = parseInt((holes_bottom - holes_top + shift_y + objOpts.canvas.bottom_pad) * yMag + pad_y);
 
     //case base is too small
     if (canvasBaseWidth < scroller.clientWidth) {
@@ -2968,7 +2973,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
         //live hittest
         if(objOpts.edit.hittest){
-          console.log(objOpts.edit.hittest.project, objOpts.edit.hittest.hole)
+          //console.log(objOpts.edit.hittest.project, objOpts.edit.hittest.hole)
           if(objOpts.edit.mode == "add_hole"){
             if(objOpts.edit.hittest.project == project.id[0]){
               
@@ -4829,6 +4834,25 @@ document.addEventListener("DOMContentLoaded", () => {
     LCCore = await window.LCapi.LoadModelFromLCCore();
 
     if (LCCore) {
+      //apply enable info
+      for(let  project of LCCore.projects){
+        let en = backup_hole_enable[project.id.toString()];
+        if(en === undefined){
+          //initial case
+          project.enable = true;
+        }else{
+          project.enable = en;
+        }
+        for(let hole of project.holes){
+          en = backup_hole_enable[hole.id.toString()];
+          if(en === undefined){
+            hole.enable = true;
+          }else{
+            hole.enable = en;
+          }
+        }
+      }
+
       //initiarise hole list
       while (document.getElementById("hole_list").firstChild) {
         document.getElementById("hole_list").removeChild(document.getElementById("hole_list").firstChild);
@@ -4840,7 +4864,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const projListCheck = document.createElement("input");
         projListCheck.type = "checkbox";
         projListCheck.id = project.id;
-        projListCheck.checked = true;
+        projListCheck.checked = project.enable;
         const projListlabel = document.createElement("label");
         projListlabel.htmlFor = projListCheck.id;
         projListlabel.textContent = project.name;
@@ -4855,7 +4879,7 @@ document.addEventListener("DOMContentLoaded", () => {
           checkbox.type = "checkbox";
           checkbox.id = hole.id.toString();
           checkbox.name = hole.name;
-          checkbox.checked = true;
+          checkbox.checked = hole.enable;
           const label = document.createElement("label");
           label.htmlFor = hole.id.toString();
           label.textContent = hole.name;
@@ -4889,11 +4913,13 @@ document.addEventListener("DOMContentLoaded", () => {
         pad_y = pad_y + objOpts.canvas.age_zoom_correction[1];
       }
 
+      /*
       let newPad_y = objOpts.canvas.pad_y;;
       if(LCCore.projects[0].composite_depth_top !==null){
         newPad_y = (LCCore.projects[0].composite_depth_top + shift_y) * yMag + pad_y;
       }
       objOpts.canvas.pad_y = newPad_y;
+      */
 
       //shwo model summary
       console.log("[Renderer]: Correlation Model has been loaded into the renderer.");
