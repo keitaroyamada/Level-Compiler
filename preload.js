@@ -53,7 +53,7 @@ contextBridge.exposeInMainWorld("LCapi", {
   progressbar: (args1, args2) => ipcRenderer.invoke("progressbar", args1, args2),
   updateProgressbar: (args1, args2) => ipcRenderer.invoke("updateProgressbar", args1, args2),
   askdialog: (args1, args2) => ipcRenderer.invoke("askdialog", args1, args2),
-  inputdialog: (args1, args2, args3) => ipcRenderer.invoke("inputdialog", args1, args2, args3),
+  inputdialog: (args1) => ipcRenderer.invoke("inputdialog", args1),
   makeModelImage: (args1, args2, args3, args4) =>  ipcRenderer.invoke("makeModelImage", args1, args2, args3, args4),
   getResourcePath: () => ipcRenderer.sendSync("getResourcePath"),
   toggleDevTools: (args1) => ipcRenderer.send('toggle-devtools',args1),
@@ -75,7 +75,7 @@ contextBridge.exposeInMainWorld("LCapi", {
   SetZeroPoint: (args1,args2) => ipcRenderer.invoke("SetZeroPoint", args1,args2),
   SetMaster: (args1,args2) => ipcRenderer.invoke("SetMaster", args1,args2),
   AddEvent: (args1,args2,args3,args4) => ipcRenderer.invoke("AddEvent", args1,args2,args3,args4),
-  DeleteEvent: (args1,args2,args3,args4) => ipcRenderer.invoke("DeleteEvent", args1,args2,args3,args4),
+  DeleteEvent: (args1,args2,args3) => ipcRenderer.invoke("DeleteEvent", args1,args2,args3),
 
 
   

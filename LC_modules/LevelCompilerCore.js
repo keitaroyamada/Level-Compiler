@@ -576,7 +576,7 @@ class LevelCompilerCore {
   }
   calcDFSDepth(calcRange, calcType){
     //check data
-    if (this.projects[0].model_data == null) {
+    if (this.projects.length == 0) {
       console.log("There is no correlation model.");
       return;
     }
@@ -715,13 +715,15 @@ class LevelCompilerCore {
             })
           })
         })
+
         if(CD_bottom == -Infinity){
-          CD_bottom = 10000;
+          CD_bottom = 1000;
         }
         if(CD_top == Infinity){
-          CD_top = 100;
+          CD_top = 0;
         }
 
+        
         this.projects[p].composite_depth_top = CD_top;
         this.projects[p].composite_depth_bottom = CD_bottom;
       }
@@ -943,6 +945,13 @@ class LevelCompilerCore {
             }
           }
         }
+      }
+
+      if(projectCdBottom  == -Infinity){
+        projectCdBottom  = 1000;
+      }
+      if(projectCdTop == Infinity){
+        projectCdTop= 0;
       }
       this.projects[p].composite_depth_top = projectCdTop;
       this.projects[p].composite_depth_bottom = projectCdBottom;
@@ -3004,6 +3013,17 @@ class LevelCompilerCore {
     newMarkerData.id = newMarkerId;
     newMarkerData[depthScale] = depth
     newMarkerData.distance = results.distance;
+    if(depthScale !== "drilling_depth"){
+      const D1 = upperMarkerData.drilling_depth;
+      const D3 = lowerMarkerData.drilling_depth;
+      const d1 = upperMarkerData[depthScale];
+      const d2 = depth;
+      const d3 = lowerMarkerData[depthScale];
+      const d3d1 = d3 - d1;
+      const d2d1 = d2 - d1;
+      newMarkerData.drilling_depth = this.linearInterp(D1, D3, d2d1, d3d1);
+    }
+    
     if(this.projects[sectionIdx[0]].holes[sectionIdx[1]].sections[sectionIdx[2]].markers[upperIdx].isMaster == true && this.projects[sectionIdx[0]].holes[sectionIdx[1]].sections[sectionIdx[2]].markers[lowerIdx].isMaster == true){
       newMarkerData.isMaster = true;
     }
@@ -3027,23 +3047,22 @@ class LevelCompilerCore {
     return true
   }
   setZeroPoint(markerId, value){
-    //remove previous zero point
-    breakpoint:
-    for(let p of this.projects){
-      for(let h of p.holes){
-        for(let s of h.sections){
-          for(let m of s.markers){
-            if(m.isZeroPoint !== false){
-              m.isZeroPoint = false;
-              break breakpoint;
-            }
+    //remove previous zero point in the same prohject
+    this.updateSearchIdx();
+    const idx = this.search_idx_list[markerId.toString()];
+    //breakpoint:
+    for(let h of this.projects[idx[0]].holes){
+      for(let s of h.sections){
+        for(let m of s.markers){
+          if(m.isZeroPoint !== false){
+            m.isZeroPoint = false;
+            //break breakpoint;
           }
         }
       }
     }
 
     //set new
-    const idx = this.search_idx_list[markerId.toString()];
     this.projects[idx[0]].holes[idx[1]].sections[idx[2]].markers[[idx[3]]].isZeroPoint = parseFloat(value);
 
     this.calcCompositeDepth();
@@ -3223,7 +3242,6 @@ class LevelCompilerCore {
     //value: [deposition, markup]:disturbed, tephra, void
     //value: [erosion]: erosion distance
     const upperIdx = this.search_idx_list[upperId.toString()];
-    const lowerIdx = this.search_idx_list[lowerId.toString()];
 
     //check number of previous event connection
     let prevEvent = {deposition:0,erosion:0,markup:0};
@@ -3240,11 +3258,14 @@ class LevelCompilerCore {
       }
     }
 
+    if(prevEvent[depositionType] > 0){
+      console.log("LCCore: Failed to add event later because input type of event has already been set.");
+      return "occupied"
+    }
+
     if(["deposition","markup", "d","D","m","M"].includes(depositionType)){
-      if(prevEvent[depositionType] > 0){
-        console.log("LCCore: Failed to add event later because input type of event has already been set.");
-        return "occupied"
-      }
+      const lowerIdx = this.search_idx_list[lowerId.toString()];
+
       let deposition_type = depositionType;
       let colour_type = value;
       if(value == "g"){
@@ -3271,17 +3292,29 @@ class LevelCompilerCore {
       console.log(upperEvent, lowerEvent)
 
     }else if(["erosion","e","E"].includes(depositionType)){
-      if(prevEvent[depositionType] > 0){
-        console.log("LCCore: Failed to add event later because input type of event has already been set.");
-        return "occupied"
+      
+      let deposition_type = depositionType;
+      if(["e","E"].includes(depositionType)){
+        deposition_type = "erosion";
       }
+    
+      //make lower marker
+      this.addMarker(
+        this.projects[upperIdx[0]].holes[upperIdx[1]].sections[upperIdx[2]].id, 
+        this.projects[upperIdx[0]].holes[upperIdx[1]].sections[upperIdx[2]].markers[upperIdx[3]].distance, 
+        "distance",
+      )
+      const lowerId = [upperId[0],upperId[1],upperId[2],Math.max(...this.projects[upperIdx[0]].holes[upperIdx[1]].sections[upperIdx[2]].reserved_marker_ids)];
+      const lowerIdx = this.search_idx_list[lowerId.toString()];
 
-      let upperEvent = [depositionType, "downward", lowerId, "erosion", -Math.abs(parseFloat(value))];
-      let lowerEvent = [depositionType, "upward",   upperId, "erosion",  Math.abs(parseFloat(value))];
+      //make event data
+      let upperEvent = [deposition_type, "downward", lowerId, "erosion", -Math.abs(parseFloat(value))];
+      let lowerEvent = [deposition_type, "upward",   upperId, "erosion",  Math.abs(parseFloat(value))];
 
+      //add event into upper
       this.projects[upperIdx[0]].holes[upperIdx[1]].sections[upperIdx[2]].markers[upperIdx[3]].event.push(upperEvent);
-      this.projects[lowerIdx[0]].holes[lowerIdx[1]].sections[lowerIdx[2]].markers[lowerIdx[3]].event.push(lowerEvent);
-      console.log(upperEvent, lowerEvent)
+      this.projects[lowerIdx[0]].holes[lowerIdx[1]].sections[lowerIdx[2]].markers[lowerIdx[3]].event = [lowerEvent];
+      
     }else{
       return "unsuspected"  
     }
@@ -3290,6 +3323,58 @@ class LevelCompilerCore {
     this.calcCompositeDepth();
     this.calcEventFreeDepth();
     return true;
+  }
+  deleteEvent(upperId, lowerId, type){
+    let targetTypes = type;
+    if(type.length==0){
+      //delete all
+      targetTypes = ["deposition","markup","erosion"];
+    }
+    const upperIdx = this.search_idx_list[upperId.toString()];
+    const lowerIdx = this.search_idx_list[lowerId.toString()];
+
+    let deleteIdx = [];
+    //delete upper
+    for(let e=0; e<this.projects[upperIdx[0]].holes[upperIdx[1]].sections[upperIdx[2]].markers[upperIdx[3]].event.length;e++){
+      const ev = this.projects[upperIdx[0]].holes[upperIdx[1]].sections[upperIdx[2]].markers[upperIdx[3]].event[e];
+      if(ev[2].toString() == lowerId.toString()){
+        //if connected
+        
+        if(targetTypes.includes(ev[0])){      
+          deleteIdx.push(e);
+        }
+      }
+    }
+    for(let idx of deleteIdx){
+      this.projects[upperIdx[0]].holes[upperIdx[1]].sections[upperIdx[2]].markers[upperIdx[3]].event.splice(idx, 1);
+    }
+    
+    //delete lower
+    deleteIdx = [];
+    for(let e=0; e<this.projects[lowerIdx[0]].holes[lowerIdx[1]].sections[lowerIdx[2]].markers[lowerIdx[3]].event.length;e++){
+      const ev = this.projects[lowerIdx[0]].holes[lowerIdx[1]].sections[lowerIdx[2]].markers[lowerIdx[3]].event[e];
+      if(ev[2].toString() == upperId.toString()){
+        //if connected
+        if(targetTypes.includes(ev[0])){          
+          deleteIdx.push(e);
+        }
+      }
+    }
+    for(let idx of deleteIdx){
+      this.projects[lowerIdx[0]].holes[lowerIdx[1]].sections[lowerIdx[2]].markers[lowerIdx[3]].event.splice(idx, 1);
+    }
+
+    //case erosion remove lower marker
+    if(targetTypes == "erosion"){
+      this.deleteMarker(lowerId);
+    }
+
+    this.updateSearchIdx();
+    this.calcCompositeDepth();
+    this.calcEventFreeDepth();
+    console.log("LCCore: Delete deposite/markup event.")
+    return true;
+
   }
   deleteSection(sectionId){
     const sectionIdx = this.search_idx_list[sectionId.toString()];
@@ -3407,7 +3492,7 @@ class LevelCompilerCore {
     let newHole = new Hole();
     const newHoleId = [projectId[0], Math.max(...this.projects[projectIdx[0]].reserved_hole_ids) + 1, null, null];
     newHole.id = newHoleId;
-    newHole.order = this.projects[projectIdx[0]].holes.length+1;
+    newHole.order = this.projects[projectIdx[0]].holes.length;
     if(this.projects[projectIdx[0]].holes.filter(h=>h.name == name).length !== 0){
       return "used";
     } else{
@@ -3418,14 +3503,6 @@ class LevelCompilerCore {
     this.projects[projectIdx[0]].holes.push(newHole);
     this.projects[projectIdx[0]].reserved_hole_ids.push(newHole.id[1]);
 
-    ////set dummy section
-    let secData={};
-    secData.name = "example";
-    secData.distance_top = 0;
-    secData.distance_bottom = 100;
-    secData.dd_top = 0;
-    secData.dd_bottom = 100;
-    this.addSection(newHoleId, secData);
     return true;
   }
   addProject(type, name){
@@ -3462,6 +3539,7 @@ class LevelCompilerCore {
     }
 
     this.projects.push(newProject);
+    this.reserved_project_ids.push(newProject.id[0]);
     return true;
 
   }

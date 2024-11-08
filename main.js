@@ -672,14 +672,18 @@ function createMainWIndow() {
     const response = dialog.showMessageBox(null, options);
     return response;
   });
-  ipcMain.handle("inputdialog", async (_e, tit, txt, type) => {
+  ipcMain.handle("inputdialog", async (_e, data,) => {
     //type:text, password, email, number, url, date, time, color, range
     try {
       const result = await prompt({
-          title: tit,
-          label: txt,
+          title: data.title,
+          label: data.label,
+          value: data.value,
+          height:200,
+          width:500,
+          alwaysOnTop:true,
           inputAttrs: {
-              type: type,
+              type: data.type,
               required: true,
               step: '0.0001' ,
           },
@@ -840,7 +844,7 @@ function createMainWIndow() {
                 } 
               },
               { 
-                label: 'Delete event (under construction)', 
+                label: 'Delete event', 
                 click: () => {
                   console.log('MAIN: Delete event'); 
                   resolve("deleteEvent");                      
@@ -1905,8 +1909,7 @@ function createMainWIndow() {
     }
   });
   ipcMain.handle("AddEvent", async(_e, upperId, lowerId, depositionType, value) => {
-    
-    const result = LCCore.addEvent(upperId, lowerId, depositionType, value);
+    let result = LCCore.addEvent(upperId, lowerId, depositionType, value);
 
     if (result == true) {
       console.log("MAIN: Add event layer.");
@@ -1916,9 +1919,9 @@ function createMainWIndow() {
       return result
     }
   });
-  ipcMain.handle("DeleteEvent", async(_e, upperId, lowerId,type) => {
+  ipcMain.handle("DeleteEvent", async(_e, upperId, lowerId, type) => {
     
-    const result = LCCore.deleteEvent(upperId, lowerId, type);
+    const result = LCCore.deleteEvent(upperId, lowerId, []);
 
     if (result == true) {
       console.log("MAIN: Delete event layer.");

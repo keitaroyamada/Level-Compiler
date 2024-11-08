@@ -999,7 +999,14 @@ document.addEventListener("DOMContentLoaded", () => {
       }
       document.addEventListener("mousemove", objOpts.edit.handleMove);
     }else if(clickResult == "addProject"){
-      ProjectAdd();
+      if(LCCore.projects[LCCore.projects.length-1].holes.length  > 0){
+        //previous project has holes
+        ProjectAdd();
+      }else{
+        alert("Previous project is empty. Please add a hole to the previous project first.");
+        return
+      }
+      
     }else if(clickResult == "cancel"){
       console.log("[Renderer]: Edit cancelled.")
       objOpts.edit.editable = true;
@@ -1130,6 +1137,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const ht = JSON.parse(JSON.stringify(getClickedItemIdx(mouseX, mouseY, LCCore, objOpts)));
     objOpts.edit.hittest = ht;
     updateView();
+    //console.log(ht.hole+"-"+ht.section+"-"+ht.upper_marker+"/"+ht.lower_marker)
   
     //context menu
     if(ht.section !== null){
@@ -1305,38 +1313,39 @@ document.addEventListener("DOMContentLoaded", () => {
             }
           }
         }
-        
+        let response = true;
         if(isExistZeroPoint == true){
-          let response = await window.LCapi.askdialog(
+          response = await window.LCapi.askdialog(
             "Set Zero Point",
             "The Zero point has alrady been defined. Do you want to replace this?"
           );
-          if (response.response) {
-            response = await window.LCapi.inputdialog(
-              "Set Zero Point",
-              "Please input new composite depth (cm) at the Zero Point.",
-              "number",
-            );
-            if(response !== null){
-              const targetId = [ht.project, ht.hole, ht.section, ht.nearest_marker];
-              await undo("save");//undo
-              const result = await window.LCapi.SetZeroPoint(targetId, response);
-              if(result==true){
-                await loadModel();
-                await loadAge(document.getElementById("AgeModelSelect").value);
-                await loadPlotData();
-                updateView();
-                console.log("[Renderer]: Set a new Zero point.");
-              }else{
-                console.log("[Renderer]: Failed to set zero point.");
-              }
-            }            
-          }else{
-            return;
-          }
-        }else{
-          return;
         }
+
+        if (response.response == false) {
+          return
+        }
+
+        response = await window.LCapi.inputdialog(
+          "Set Zero Point",
+          "Please input new composite depth (cm) at the Zero Point.",
+          "number",
+        );
+        if(response !== null){
+          const targetId = [ht.project, ht.hole, ht.section, ht.nearest_marker];
+          console.log(targetId,response)
+          await undo("save");//undo
+          const result = await window.LCapi.SetZeroPoint(targetId, response);
+          if(result==true){
+            await loadModel();
+            await loadAge(document.getElementById("AgeModelSelect").value);
+            await loadPlotData();
+            updateView();
+            console.log("[Renderer]: Set a new Zero point.");
+          }else{
+            console.log("[Renderer]: Failed to set zero point.");
+          }
+        }            
+        
       }
 
     }
@@ -1372,8 +1381,8 @@ document.addEventListener("DOMContentLoaded", () => {
       newPosX = 0;
     }
 
-    canvasPos[0] = newPosY;
-    canvasPos[1] = newPosY;
+    //canvasPos[0] = newPosY;
+    //canvasPos[1] = newPosY;
 
     updateView();
   }
@@ -1501,8 +1510,8 @@ document.addEventListener("DOMContentLoaded", () => {
       newPosX = 0;
     }
 
-    canvasPos[0] = newPosX;
-    canvasPos[1] = newPosY;
+    //canvasPos[0] = newPosX;
+    //canvasPos[1] = newPosY;
 
     updateView();
   }
@@ -1532,26 +1541,34 @@ document.addEventListener("DOMContentLoaded", () => {
   
     //
     if(objOpts.edit.mode == "add_event"){
-      const response1 = await window.LCapi.inputdialog(
-        "Add new event",
-        "Please enter a deposition type from: \n'deposition', 'erosion', 'markup'.",
-        "text",
-      );
+      let data = {
+        title:"Add new event",
+        label:'Event type? ["deposition", "erosion", "markup"]',
+        value:"deposition",
+        type:"text"
+      };
+      
+
+      const response1 = await window.LCapi.inputdialog(data);
 
       if (response1 !== null) {
         let response2 = null;
         if(["deposition","d","markup","m"].includes(response1.toLowerCase())){
-          response2 = await window.LCapi.inputdialog(
-            "Add new event",
-            "Please enter a colour type from: \n'general', 'tephra', 'disturbed','void'.",
-            "text",
-          )
+          data = {
+            title:"Add new event",
+            label:'Colour tyep? ["general", "tephra", "disturbed","void"]',
+            value:"general",
+            type:"text"
+          };
+          response2 = await window.LCapi.inputdialog(data);
         }else if(["erosion","e"].includes(response1.toLowerCase())){
-          response2 = await window.LCapi.inputdialog(
-            "Add new event",
-            "Please enter a estimated erosion distance (cm).",
-            "number",
-          )
+          data = {
+            title:"Add new event",
+            label:"Erosion thickness? (cm).",
+            value:1.1,
+            type:"number"
+          };
+          response2 = await window.LCapi.inputdialog(data);
         }
 
         if(response2 !== null){
@@ -1567,7 +1584,7 @@ document.addEventListener("DOMContentLoaded", () => {
             }
           }else  if(["erosion","e"].includes(response1.toLowerCase())){
             await undo("save");//undo
-            result = await window.LCapi.AddEvent(upperId, lowerId, response1, response2);
+            result = await window.LCapi.AddEvent(upperId, [], response1, response2);
           }
           if(result == true){
             await loadModel();
@@ -1580,6 +1597,28 @@ document.addEventListener("DOMContentLoaded", () => {
           }
         }        
       }
+    }else if(objOpts.edit.mode == "delete_event"){
+      const response = await window.LCapi.askdialog(
+        "Delete event",
+        "Are you sure you want to REMOVE all events?",
+      );
+      if(response.response){
+        const upperId   = [ht.project, ht.hole, ht.section, ht.upper_marker];
+        const lowerId   = [ht.project, ht.hole, ht.section, ht.lower_marker];
+        console.log("[Editor]: Add event between " + upperId +" and "+lowerId);
+        await undo("save");//undo
+        result = await window.LCapi.DeleteEvent(upperId, lowerId,[]);
+        if(result == true){
+          await loadModel();
+          await loadAge(document.getElementById("AgeModelSelect").value);
+          await loadPlotData();
+          updateView();
+          console.log("[Renderer]: Delete event")
+        }
+
+      }
+      
+      
     }
 
     objOpts.edit.mode=null;
@@ -1615,8 +1654,7 @@ document.addEventListener("DOMContentLoaded", () => {
       newPosX = 0;
     }
 
-    canvasPos[0] = newPosX;
-    canvasPos[1] = newPosY;
+    //canvasPos[1] = newPosY;
 
     updateView();
   }
@@ -1734,6 +1772,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     
     if(objOpts.edit.mode == "add_section"){
+      
       //let inData = {name:"00",distance_top:0, distance_bottom:100,dd_top:1000,dd_bottom:1100};
       let inData = {};
       inData.name            = await window.LCapi.inputdialog("Add a new section","Section Name?","text");
@@ -1741,16 +1780,28 @@ document.addEventListener("DOMContentLoaded", () => {
       inData.distance_bottom = parseFloat(await window.LCapi.inputdialog("Add a new section","Section BOTTOM distance (cm)?","number"));
       inData.dd_top          = parseFloat(await window.LCapi.inputdialog("Add a new section","Section TOP drilling depth (cm)?","number"));
       inData.dd_bottom       = parseFloat(await window.LCapi.inputdialog("Add a new section","Section BOTTOM drilling depth (cm)?","number"));
-
-      if (Object.values(inData).every(value => value !== null)) {
-        const targetId = [ht.project, ht.hole, null, null];
+      
+      //check data
+      if(inData.distance_top !== null && inData.distance_bottom !== null && inData.dd_top !== null && inData.dd_bottom !== null){
+        if(inData.distance_top<inData.distance_bottom && inData.dd_top<inData.dd_bottom){
+          const targetId = [ht.project, ht.hole, null, null];
         
-        await undo("save");//undo
-        const result = await window.LCapi.addSection(targetId, inData);
-        await loadModel();
-        await loadAge(document.getElementById("AgeModelSelect").value);
-        await loadPlotData();
-        updateView();
+          await undo("save");//undo
+          const result = await window.LCapi.addSection(targetId, inData);
+          if(result==true){
+            await loadModel();
+            await loadAge(document.getElementById("AgeModelSelect").value);
+            await loadPlotData();
+            updateView();
+          }else{
+            console.log("[Renderer]: Failed to add section.")
+          }
+        }else{
+          alert("Incrrect input values are detected.")
+          console.log("[Renderer]: Input data is incorrect values.")
+        }
+      }else{
+        return;
       }
     }
     document.removeEventListener("click", objOpts.edit.handleClick);
@@ -1770,7 +1821,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const mouseY = event.clientY - rect.top;
     const ht = JSON.parse(JSON.stringify(getClickedItemIdx(mouseX, mouseY, LCCore, objOpts)));
     objOpts.edit.hittest = ht;
-   // console.log(ht.project,ht.hole)
+   console.log(ht.project+"-"+ht.hole)
     updateView();
   
     //context menu
@@ -1893,6 +1944,10 @@ document.addEventListener("DOMContentLoaded", () => {
         if(result == true){
           console.log("[Renderer]: Add hole.")
           await loadModel();
+
+          //add dummy section for plot
+
+
           await loadAge(document.getElementById("AgeModelSelect").value);
           await loadPlotData();
           updateView();
@@ -1957,7 +2012,7 @@ document.addEventListener("DOMContentLoaded", () => {
         await undo("save");//undo
         const result = await window.LCapi.addProject(response, response2);
         if(result == true){
-          console.log("[Renderer]: Add hole.")
+          console.log("[Renderer]: Add project.")
           await loadModel();
           await loadAge(document.getElementById("AgeModelSelect").value);
           await loadPlotData();
@@ -2357,8 +2412,6 @@ document.addEventListener("DOMContentLoaded", () => {
     var mouseY = event.clientY - rect.top;
     let age_mod = 1;
 
-    
-
     const xMag = objOpts.canvas.zoom_level[0] * objOpts.canvas.dpir;
     let yMag = objOpts.canvas.zoom_level[1] * objOpts.canvas.dpir;
     const pad_x = objOpts.canvas.pad_x;
@@ -2370,6 +2423,10 @@ document.addEventListener("DOMContentLoaded", () => {
       pad_y = pad_y + objOpts.canvas.age_zoom_correction[1];
     }
     
+    //hittest
+    //const ht = getClickedItemIdx(mouseX, mouseY, LCCore, objOpts);
+    //console.log(ht.project+"-"+ht.hole+"-"+ht.section+"-"+ht.upper_marker+"/"+ht.lower_marker);
+
 
     //mouse position
     let x = (scroller.scrollLeft + mouseX - pad_x) / xMag - shift_x;
@@ -2595,7 +2652,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (LCCore == null) {
       return;
     }
-
+    //console.log(objOpts.canvas)
     //get hole length
     let holes_top = Infinity;
     let holes_bottom = -Infinity;
@@ -2617,7 +2674,13 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     }
 
-    objOpts.canvas.shift_y =  holes_top;
+    if(holes_top == Infinity){
+      holes_top = 0;
+    }
+    if(holes_bottom == -Infinity){
+      holes_bottom = 1000;
+    }
+    objOpts.canvas.shift_y =  -1 * holes_top  + 50;
 
     //scale factor
     const dpir = objOpts.canvas.dpir; //window.devicePixelRatio || 1;
@@ -2886,11 +2949,10 @@ document.addEventListener("DOMContentLoaded", () => {
           let num_enable_left = 0;
           LCCore.projects.filter(p=>p.order<project.order).forEach(p=>p.holes.forEach(h=>{if(h.enable){num_enable_left++;}}))
           const project_x0 = ((objOpts.section.width + objOpts.hole.distance) * num_enable_left + shift_x) * xMag + pad_x;
-          let project_y0 = pad_y;
+          let project_y0 = (shift_y) * yMag + pad_y;;//pad_y;
           if(project.composite_depth_top !== null){
             project_y0 = (project.composite_depth_top + shift_y) * yMag + pad_y;
           }     
-  
           sketch.drawingContext.setLineDash([]);
           sketch.fill(objOpts.project.font_colour);
           sketch.stroke(objOpts.project.font_colour);
@@ -2899,13 +2961,14 @@ document.addEventListener("DOMContentLoaded", () => {
           sketch.text(
             project.name,
             project_x0,
-            project_y0 - 50,
+            project_y0 - 70,
           );
         }
         
 
         //live hittest
         if(objOpts.edit.hittest){
+          console.log(objOpts.edit.hittest.project, objOpts.edit.hittest.hole)
           if(objOpts.edit.mode == "add_hole"){
             if(objOpts.edit.hittest.project == project.id[0]){
               
@@ -2931,7 +2994,11 @@ document.addEventListener("DOMContentLoaded", () => {
               if(project_ht_w<=0){
                 project_ht_w = 100;
               }
-              const project_ht_h  = (project.composite_depth_bottom - project.composite_depth_top) * yMag + 6;
+              let project_ht_h = 1000;
+              if(project.composite_depth_bottom !== null &&  project.composite_depth_top !== null){
+                project_ht_h = (project.composite_depth_bottom - project.composite_depth_top) * yMag + 6;
+              }
+
               sketch.rect(project_ht_x0, project_ht_y0, project_ht_w, project_ht_h, 3, 3, 3, 3); //rounded
               sketch.pop();
 
@@ -2959,9 +3026,7 @@ document.addEventListener("DOMContentLoaded", () => {
             hole_bottom = hole.sections.slice(-1)[0].markers.slice(-1)[0][objOpts.canvas.depth_scale];
           }
           let hole_x0 = (objOpts.hole.distance + objOpts.hole.width) * (num_disable.total + hole.order - num_disable.hole);
-
           //add  hole name---------------------------------------------------
-          sketch.drawingContext.setLineDash([]);
           sketch.fill(objOpts.hole.font_colour);
           sketch.stroke(objOpts.hole.font_colour);
           sketch.textFont(objOpts.hole.font);
@@ -2973,31 +3038,27 @@ document.addEventListener("DOMContentLoaded", () => {
           );
 
           //check position --------------------------------------------------
-          if (hole_top == null && hole_bottom == null) {
-            // draw hole line
-            //console.log("[Renderer]: No section in the hole.")
+          // draw empty hole line
+          if (hole_top == null && hole_bottom == null) { 
+            let Htop = 0;
+            let Hbot = 2000;
+            if(project.composite_depth_top !== null){
+              Htop = project.composite_depth_top;
+            }
+            if(project.composite_depth_bottom !== null){
+              Hbot = project.composite_depth_bottom;
+            }       
+            sketch.push();
             sketch.drawingContext.setLineDash([5, 5]);
             sketch.strokeWeight(objOpts.hole.line_width);
             sketch.stroke(objOpts.hole.line_colour);
             sketch.line(
+              (hole_x0 + shift_x + objOpts.hole.width / 2) * xMag + pad_x, //if centre, + objOpts.hole.width / 2
+              (Htop + shift_y) * yMag + pad_y,
               (hole_x0 + shift_x + objOpts.hole.width / 2) * xMag + pad_x,
-              100,
-              (hole_x0 + shift_x + objOpts.hole.width / 2) * xMag + pad_x,
-              1000,
+              (Hbot + shift_y) * yMag + pad_y,
             );
-
-            sketch.drawingContext.setLineDash([]);
-            sketch.fill(objOpts.hole.font_colour);
-            sketch.stroke(objOpts.hole.font_colour);
-            sketch.textFont(objOpts.hole.font);
-            sketch.textSize(objOpts.hole.font_size);
-            sketch.text(
-              hole.name,
-              (hole_x0 + shift_x + objOpts.hole.width * 0.3) * xMag + pad_x,
-              100
-            );
-
-            continue
+            sketch.pop();
           }
 
           //get plot order for hit test--------------------------------------
@@ -3016,7 +3077,7 @@ document.addEventListener("DOMContentLoaded", () => {
                   if(project.composite_depth_bottom !== null){
                     hole_bottom_e = project.composite_depth_bottom;
                   }else{
-                    hole_bottom_e = 100;
+                    hole_bottom_e = 1000;
                   }
                   
                 }else{
@@ -3198,7 +3259,7 @@ document.addEventListener("DOMContentLoaded", () => {
               
               //live hittest
               if(objOpts.edit.hittest){
-                if(objOpts.edit.mode == "add_event"){
+                if(["add_event","delete_event"].includes(objOpts.edit.mode)){
                   const uid = [objOpts.edit.hittest.project, objOpts.edit.hittest.hole, objOpts.edit.hittest.section, objOpts.edit.hittest.upper_marker];
                   const lid = [objOpts.edit.hittest.project, objOpts.edit.hittest.hole, objOpts.edit.hittest.section, objOpts.edit.hittest.lower_marker];
                   if(marker.id.toString() == lid.toString()){
@@ -3499,10 +3560,29 @@ document.addEventListener("DOMContentLoaded", () => {
       //get position & plot
       const posList = getPlotPosiotion(ageSet, [shift_x, pad_x, xMag], [shift_y, pad_y, yMag], LCCore, objOpts, "age")
 
-      for (let a = 0; a < ageSet.data_series.length; a++) {
+      const view_rect = {
+        x: scroller.scrollLeft,
+        y: scroller.scrollTop,
+        width: offScreenCanvas.width,
+        height: offScreenCanvas.height,
+      };
+
+      
+      for (let a = 0; a < ageSet.data_series.length; a++) {       
         const posXY = posList[a];
         const posX = posXY.x0;
         const posY = posXY.y0;
+        //check inside
+        const age_rect = {
+          x: posX,
+          y: posY,
+          width: objOpts.age.incon_size,
+          height: objOpts.age.incon_size,
+        };
+        if (!isInside(view_rect, age_rect, 500)) {
+          continue;
+        }
+
         //plot main
         if (ageSet.data_series[a].source_type == "") {
           sketch.image(
@@ -3597,7 +3677,13 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     }
 
-    objOpts.canvas.shift_y = -1 * holes_top;
+    if(holes_top == Infinity){
+      holes_top = 0;
+    }
+    if(holes_bottom == -Infinity){
+      holes_bottom = 0;
+    }
+    objOpts.canvas.shift_y = -1 * holes_top  + 50;
 
     //scale factor
     const dpir = objOpts.canvas.dpir; //window.devicePixelRatio || 1;
@@ -5438,8 +5524,13 @@ function calcCanvasBaseSize(LCCore, objOpts) {
     }
   }
 
-  console.log(holes_top)
-  objOpts.canvas.shift_y = -1 * holes_top;
+  if(holes_top == Infinity){
+    holes_top = 0;
+  }
+  if(holes_bottom == -Infinity){
+    holes_bottom = 0;
+  }
+  objOpts.canvas.shift_y = -1 * holes_top + 50;
 
   //scale factor
   const dpir = objOpts.canvas.dpir; //window.devicePixelRatio || 1;
@@ -5842,10 +5933,10 @@ function getClickedItemIdx(mouseX, mouseY, LCCore, objOpts){
       
     //const project_x0 = ((objOpts.section.width + objOpts.hole.distance) * num_enable_left + shift_x) * xMag + pad_x - 3;
     //const project_w  = (objOpts.section.width + objOpts.hole.distance) * num_enable_right * xMag - objOpts.hole.distance/2;
-    const project_x0 = (objOpts.section.width + objOpts.hole.distance) * num_enable_left;
-    let project_w  = (objOpts.section.width + objOpts.hole.distance) * num_enable_right;
-    if(project_w == 0){
-      project_w = 100;
+    const project_x0 = (objOpts.section.width + objOpts.hole.distance) * num_enable_left  + 1;
+    let project_w    = (objOpts.section.width + objOpts.hole.distance) * num_enable_right + 1;
+    if(num_enable_right == 0){
+      project_w = (objOpts.hole.distance + objOpts.hole.width);
     }
     const project_x1 = project_x0 + project_w;
     if(x >= project_x0 && x <= project_x1){
