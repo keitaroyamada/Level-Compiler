@@ -4834,25 +4834,6 @@ document.addEventListener("DOMContentLoaded", () => {
     LCCore = await window.LCapi.LoadModelFromLCCore();
 
     if (LCCore) {
-      //apply enable info
-      for(let  project of LCCore.projects){
-        let en = backup_hole_enable[project.id.toString()];
-        if(en === undefined){
-          //initial case
-          project.enable = true;
-        }else{
-          project.enable = en;
-        }
-        for(let hole of project.holes){
-          en = backup_hole_enable[hole.id.toString()];
-          if(en === undefined){
-            hole.enable = true;
-          }else{
-            hole.enable = en;
-          }
-        }
-      }
-
       //initiarise hole list
       while (document.getElementById("hole_list").firstChild) {
         document.getElementById("hole_list").removeChild(document.getElementById("hole_list").firstChild);
@@ -4864,7 +4845,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const projListCheck = document.createElement("input");
         projListCheck.type = "checkbox";
         projListCheck.id = project.id;
-        projListCheck.checked = project.enable;
+        projListCheck.checked = backup_hole_enable[project.id.toString()] !== undefined?  backup_hole_enable[project.id.toString()]:true;
         const projListlabel = document.createElement("label");
         projListlabel.htmlFor = projListCheck.id;
         projListlabel.textContent = project.name;
@@ -4879,7 +4860,7 @@ document.addEventListener("DOMContentLoaded", () => {
           checkbox.type = "checkbox";
           checkbox.id = hole.id.toString();
           checkbox.name = hole.name;
-          checkbox.checked = hole.enable;
+          checkbox.checked = backup_hole_enable[hole.id.toString()] !== undefined ?  backup_hole_enable[hole.id.toString()] : true;
           const label = document.createElement("label");
           label.htmlFor = hole.id.toString();
           label.textContent = hole.name;
@@ -4902,6 +4883,25 @@ document.addEventListener("DOMContentLoaded", () => {
 
       //sort
       sortHoleByOrder(LCCore);
+
+      //apply enable info
+      for(let  project of LCCore.projects){
+        let en = backup_hole_enable[project.id.toString()];
+        if(en === undefined){
+          //initial case
+          project.enable = true;
+        }else{
+          project.enable = en;
+        }
+        for(let hole of project.holes){
+          en = backup_hole_enable[hole.id.toString()];
+          if(en === undefined){
+            hole.enable = true;
+          }else{
+            hole.enable = en;
+          }
+        }
+      }
 
       //update position
       let yMag = objOpts.canvas.dpir * objOpts.canvas.zoom_level[1];
@@ -4992,6 +4992,24 @@ document.addEventListener("DOMContentLoaded", () => {
     if (results) {
       //shwo model summary
       LCCore = results;
+      //apply enable info
+      for(let  project of LCCore.projects){
+        let en = backup_hole_enable[project.id.toString()];
+        if(en === undefined){
+          //initial case
+          project.enable = true;
+        }else{
+          project.enable = en;
+        }
+        for(let hole of project.holes){
+          en = backup_hole_enable[hole.id.toString()];
+          if(en === undefined){
+            hole.enable = true;
+          }else{
+            hole.enable = en;
+          }
+        }
+      }
 
       let name = "";
       age_model_list.forEach((a) => {
