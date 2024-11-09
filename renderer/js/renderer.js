@@ -2721,7 +2721,8 @@ document.addEventListener("DOMContentLoaded", () => {
           scroller.scrollTop / scroller.scrollHeight;
 
         //calc new canvas size
-        makeRasterObjects(false); //make only base canvas
+        //makeRasterObjects(false); //make only base canvas
+        makeP5CanvasBase();
         const canvasBase_height = parseInt(
           canvasBase.style.height.match(/\d+/)[0],
           10
@@ -2887,7 +2888,6 @@ document.addEventListener("DOMContentLoaded", () => {
     if (canvasBaseHeight < scroller.clientHeight) {
       canvasBaseHeight = scroller.clientHeight;
     }
-
     //change scroller size from canvas base(make full size canvas area)
     canvasBase.style.width = canvasBaseWidth.toString() + "px"; //offsetWidth
     canvasBase.style.height = canvasBaseHeight.toString() + "px";
@@ -3897,6 +3897,7 @@ document.addEventListener("DOMContentLoaded", () => {
     offScreenCanvas.width = offScreenCanvasWidth;
     offScreenCanvas.height = offScreenCanvasHeight;
 
+    
     //console.log(      "Viertual size" + offScreenCanvas.height + "x" + offScreenCanvas.width    );
 
     offScreenCtx = offScreenCanvas.getContext("2d");
