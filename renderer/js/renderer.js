@@ -781,11 +781,13 @@ document.addEventListener("DOMContentLoaded", () => {
   //Edit correlation model
   window.LCapi.receive("EditCorrelation", async () => {
     if(!developerMode){   
-      response = await window.LCapi.inputdialog(
-        "Change marker name",
-        "Please input new name",
-        "password",
-      );
+      const askData = {
+        title:"Edit model",
+        label:"Please enter passwards.",
+        value:"",
+        type:"password",
+      };
+      response = await window.LCapi.inputdialog(askData);
       if(response !==null){
         if(response !== objOpts.edit.passwards){
           alert("Please input correct paswards.");
@@ -1195,7 +1197,8 @@ document.addEventListener("DOMContentLoaded", () => {
     if(ht.section !== null){
       //on the section
       if(objOpts.edit.mode == "add_marker"){
-        if(objOpts.edit.handleClick == null){
+        if(objOpts.edit.handleClick == null || objOpts.edit.handleClick !== handleMarkerAddClick){
+          //console.log(ht.hole+"-"+ht.section+"-"+ht.nearest_marker)
           objOpts.edit.handleClick = handleMarkerAddClick;
           document.addEventListener('click', objOpts.edit.handleClick);
         }else{
@@ -1227,7 +1230,7 @@ document.addEventListener("DOMContentLoaded", () => {
           objOpts.edit.handleClick = null;
         }
       }
-    }     
+    }     else{console.log(ht)}
   }
   //2 Marker click--------------------------------------------
   async function handleMarkerChangeClick(event) {
@@ -1257,19 +1260,24 @@ document.addEventListener("DOMContentLoaded", () => {
         let response=null;
         if(objOpts.edit.mode == "change_marker_name"){
           target = "name";
-          response = await window.LCapi.inputdialog(
-            "Change marker name",
-            "Please input new name",
-            "text",
-          );
+          const askData = {
+            title:"Change marker name",
+            label:"Please input new name",
+            value:"",
+            type:"text",
+          };
+          response = await window.LCapi.inputdialog(askData);
           console.log("[Editor]: Change marker: " + target);
         }else if(objOpts.edit.mode == "change_marker_distance"){
           target = "distance";
-          response = await window.LCapi.inputdialog(
-            "Change marker distance",
-            "Please input new distance(cm).",
-            "number",
-          );
+          const askData = {
+            title:"Change marker distance",
+            label:"Please input new distance(cm).",
+            value:0.0,
+            type:"number",
+          };
+          response = await window.LCapi.inputdialog(askData);
+            
           console.log("[Editor]: Change marker: " + target);
         }
          
@@ -1377,11 +1385,13 @@ document.addEventListener("DOMContentLoaded", () => {
           return
         }
 
-        response = await window.LCapi.inputdialog(
-          "Set Zero Point",
-          "Please input new composite depth (cm) at the Zero Point.",
-          "number",
-        );
+        const askData = {
+          title:"Set Zero Point",
+          label:"Please input new composite depth (cm) at the Zero Point.",
+          value:0.0,
+          type:"number",
+        };
+        response = await window.LCapi.inputdialog(askData);
         if(response !== null){
           const targetId = [ht.project, ht.hole, ht.section, ht.nearest_marker];
           console.log(targetId,response)
@@ -1495,41 +1505,30 @@ document.addEventListener("DOMContentLoaded", () => {
     const mouseX = event.clientX - rect.left;
     const mouseY = event.clientY - rect.top;
     const ht = JSON.parse(JSON.stringify(getClickedItemIdx(mouseX, mouseY, LCCore, objOpts)));
-    event.preventDefault();
-    
+    event.preventDefault();    
 
     //initiarise
-    if(objOpts.edit.marker_from !== null ){
-      objOpts.edit.marker_from = null;
-      objOpts.edit.marker_to = 999999;//dummy
-    }
+    objOpts.edit.marker_from = null;
+    objOpts.edit.marker_to = 999999;//dummy
 
-    if(objOpts.edit.marker_from == null && ht.nearest_marker !== null){
-      objOpts.edit.marker_from = ht;
-      objOpts.edit.marker_to = 999999;//dummy
-    }
-    
-    if (objOpts.edit.marker_from !== null) {
-      //if get both markers
-      if(objOpts.edit.mode == "add_marker"){
-        const response = await window.LCapi.askdialog(
-          "Add new markers",
-          "Do you want to ADD a new marker?"
-        );
-        if (response.response) {
-          const upperId   = [objOpts.edit.marker_from.project, objOpts.edit.marker_from.hole, objOpts.edit.marker_from.section, objOpts.edit.marker_from.upper_marker];
-          const lowerId   = [objOpts.edit.marker_from.project, objOpts.edit.marker_from.hole, objOpts.edit.marker_from.section, objOpts.edit.marker_from.lower_marker];
-          const sectionId = [objOpts.edit.marker_from.project, objOpts.edit.marker_from.hole, objOpts.edit.marker_from.section, null];
-          console.log("[Editor]: Add marker between " + upperId +" and "+lowerId);
+    //if get both markers
+    if(objOpts.edit.mode == "add_marker"){
+      const response = await window.LCapi.askdialog(
+        "Add new markers",
+        "Do you want to ADD a new marker?"
+      );
+      if (response.response) {
+        const upperId   = [objOpts.edit.marker_from.project, objOpts.edit.marker_from.hole, objOpts.edit.marker_from.section, objOpts.edit.marker_from.upper_marker];
+        const lowerId   = [objOpts.edit.marker_from.project, objOpts.edit.marker_from.hole, objOpts.edit.marker_from.section, objOpts.edit.marker_from.lower_marker];
+        const sectionId = [objOpts.edit.marker_from.project, objOpts.edit.marker_from.hole, objOpts.edit.marker_from.section, null];
+        console.log("[Editor]: Add marker between " + upperId +" and "+lowerId);
 
-          await undo("save");//undo
-          await window.LCapi.addMarker(sectionId, objOpts.edit.marker_from.y, objOpts.canvas.depth_scale);
-          await loadModel();
-        }
+        await undo("save");//undo
+        await window.LCapi.addMarker(sectionId, objOpts.edit.marker_from.y, objOpts.canvas.depth_scale);
+        await loadModel();
       }
-
-      
     }
+
     objOpts.edit.mode=null;
     objOpts.edit.contextmenu_enable = true;
     objOpts.edit.hittest = null;
@@ -1594,31 +1593,30 @@ document.addEventListener("DOMContentLoaded", () => {
   
     //
     if(objOpts.edit.mode == "add_event"){
-      let data = {
+      let askData = {
         title:"Add new event",
         label:'Event type? ["deposition", "erosion", "markup"]',
         value:"deposition",
         type:"text"
       };
       
-
-      const response1 = await window.LCapi.inputdialog(data);
+      const response1 = await window.LCapi.inputdialog(askData);
 
       if (response1 !== null) {
         let response2 = null;
         if(["deposition","d","markup","m"].includes(response1.toLowerCase())){
-          data = {
+          askData = {
             title:"Add new event",
             label:'Colour tyep? ["general", "tephra", "disturbed","void"]',
             value:"general",
             type:"text"
           };
-          response2 = await window.LCapi.inputdialog(data);
+          response2 = await window.LCapi.inputdialog(askData);
         }else if(["erosion","e"].includes(response1.toLowerCase())){
           data = {
             title:"Add new event",
             label:"Erosion thickness? (cm).",
-            value:1.1,
+            value:0.0,
             type:"number"
           };
           response2 = await window.LCapi.inputdialog(data);
@@ -1753,11 +1751,13 @@ document.addEventListener("DOMContentLoaded", () => {
 
     if(objOpts.edit.mode == "change_section_name"){
       let target = "name";
-      const response = await window.LCapi.inputdialog(
-        "Change section name",
-        "Please input a new section name.",
-        "text",
-      );
+      const askData = {
+        title:"Change section name",
+        label:"Please input a new section name.",
+        value:"",
+        type:"text",
+      };
+      const response = await window.LCapi.inputdialog(askData);
       if (response !== null) {
         const targetId = [ht.project, ht.hole, ht.section, null];
 
@@ -1829,11 +1829,41 @@ document.addEventListener("DOMContentLoaded", () => {
       
       //let inData = {name:"00",distance_top:0, distance_bottom:100,dd_top:1000,dd_bottom:1100};
       let inData = {};
-      inData.name            = await window.LCapi.inputdialog("Add a new section","Section Name?","text");
-      inData.distance_top    = parseFloat(await window.LCapi.inputdialog("Add a new section","Section TOP distance (cm)?","number"));
-      inData.distance_bottom = parseFloat(await window.LCapi.inputdialog("Add a new section","Section BOTTOM distance (cm)?","number"));
-      inData.dd_top          = parseFloat(await window.LCapi.inputdialog("Add a new section","Section TOP drilling depth (cm)?","number"));
-      inData.dd_bottom       = parseFloat(await window.LCapi.inputdialog("Add a new section","Section BOTTOM drilling depth (cm)?","number"));
+      let askData = {
+        title:"Add a new section",
+        label:"Section Name?",
+        value:"",
+        type:"text",
+      };
+      inData.name            = await window.LCapi.inputdialog(askData);
+      askData = {
+        title:"Add a new section",
+        label:"Section TOP distance (cm)?",
+        value:0.0,
+        type:"number",
+      };
+      inData.distance_top    = parseFloat(await window.LCapi.inputdialog(askData));
+      askData = {
+        title:"Add a new section",
+        label:"Section BOTTOM distance (cm)?",
+        value:100.0,
+        type:"number",
+      };
+      inData.distance_bottom = parseFloat(await window.LCapi.inputdialog(askData));
+      askData = {
+        title:"Add a new section",
+        label:"Section TOP drilling depth (cm)?",
+        value:0.0,
+        type:"number",
+      };
+      inData.dd_top          = parseFloat(await window.LCapi.inputdialog(askData));
+      askData = {
+        title:"Add a new section",
+        label:"Section BOTTOM drilling depth (cm)?",
+        value:100.0,
+        type:"number",
+      };
+      inData.dd_bottom       = parseFloat(await window.LCapi.inputdialog(askData));
       
       //check data
       if(inData.distance_top !== null && inData.distance_bottom !== null && inData.dd_top !== null && inData.dd_bottom !== null){
@@ -1911,11 +1941,13 @@ document.addEventListener("DOMContentLoaded", () => {
 
     if(objOpts.edit.mode == "change_hole_name"){
       let target = "name";
-      const response = await window.LCapi.inputdialog(
-        "Change hole name",
-        "Please input a new hole name.",
-        "text",
-      );
+      const askData = {
+        title:"Change hole name",
+        label:"Please input a new hole name.",
+        value:"",
+        type:"text",
+      };
+      const response = await window.LCapi.inputdialog(askData);
       if (response !== null) {
         const targetId = [ht.project, ht.hole, null, null];
         console.log(targetId)
@@ -1985,11 +2017,13 @@ document.addEventListener("DOMContentLoaded", () => {
     event.preventDefault();
 
     if(objOpts.edit.mode == "add_hole"){
-      const response = await window.LCapi.inputdialog(
-        "Add hole",
-        "Please input a name of a new hole.",
-        "text",
-      );
+      const askData = {
+        title:"Add hole",
+        label:"Please input a name of a new hole.",
+        value:"",
+        type:"text",
+      };
+      const response = await window.LCapi.inputdialog(askData);
       if (response !== null) {
         const targetId = [ht.project, null, null, null];
 
@@ -2055,18 +2089,22 @@ document.addEventListener("DOMContentLoaded", () => {
   }
   //5 Project click--------------------------------------------
   async function ProjectAdd(){
-    const response = await window.LCapi.inputdialog(
-      "Add new project",
-      "Please input a type of a new Project: 'correlation' OR 'duo'.",
-      "text",
-    );
+    let askData = {
+      title:"Add new project",
+      label:"Please input a type of a new Project: 'correlation' OR 'duo'.",
+      value:"correlation",
+      type:"text",
+    };
+    const response = await window.LCapi.inputdialog(askData);
     if (response !== null) {
       if(response == "correlation" || response == "duo"){
-        const response2 = await window.LCapi.inputdialog(
-          "Add new project",
-          "Please input a unique name of a new Project.",
-          "text",
-        );
+        askData = {
+          title:"Add new project",
+          label:"Please input a unique name of a new Project.",
+          value:"",
+          type:"text",
+        };
+        const response2 = await window.LCapi.inputdialog(askData);
 
 
         await undo("save");//undo
@@ -2130,11 +2168,13 @@ document.addEventListener("DOMContentLoaded", () => {
         }
       }
     }else if(objOpts.edit.mode == "change_project_name"){
-      const response = await window.LCapi.inputdialog(
-        "Change project name",
-        "Please input new project name.",
-        "text",
-      );
+      const askData = {
+        title:"Change project name",
+        label:"Please input new project name.",
+        value:"",
+        type:"text",
+      };
+      const response = await window.LCapi.inputdialog(askData);
       if(response !== null){
         const targetId = [ht.project, null, null, null];
         const result = await window.LCapi.changeProject(targetId, "name",response);
