@@ -3543,6 +3543,49 @@ class LevelCompilerCore {
     return true;
 
   }
+  deleteProject(projectId){
+    this.updateSearchIdx();
+    const projectIdx = this.search_idx_list[projectId.toString()];
+    let deleteList = new Set();
+
+    for(let h=0; h<this.projects[projectIdx[0]].holes;h++){
+      for(let s=0;s<this.projects[projectIdx[0]].holes[holeIdx[1]].sections.length;s++){
+        for(let m=0;m<this.projects[holeIdx[0]].holes[holeIdx[1]].sections[s].markers.length;m++){
+          const markerData = this.projects[holeIdx[0]].holes[holeIdx[1]].sections[s].markers[m];
+          deleteList.add(markerData.id.toString());
+        }
+      }
+    }
+        
+    //delete connection
+    for(let p=0; p<this.projects.length;p++){
+      for(let h=0;h<this.projects[p].holes.length;h++){
+        for(let s=0;s<this.projects[p].holes[h].sections.length;s++){
+          for(let m=0;m<this.projects[p].holes[h].sections[s].markers.length;m++){
+            //remove deleted h_connection
+            this.projects[p].holes[h].sections[s].markers[m].h_connection
+              = this.projects[p].holes[h].sections[s].markers[m].h_connection.filter(hc=>!deleteList.has(hc.toString()));
+            //remove deleted v_connection
+            this.projects[p].holes[h].sections[s].markers[m].v_connection
+              = this.projects[p].holes[h].sections[s].markers[m].v_connection.filter(vc=>!deleteList.has(vc.toString()));
+            //initiarise
+            this.projects[p].holes[h].sections[s].markers[m].composite_depth = null;
+            this.projects[p].holes[h].sections[s].markers[m].event_free_depth = null;
+          }
+        }
+      }
+    }
+    
+    //delete project
+    this.projects = this.projects.filter(project=>project.id[0].toString()!==projectId[0].toString());   
+    this.reserved_project_ids = this.reserved_project_ids.filter(pid=>pid!==projectId[0]);
+    
+    this.calcCompositeDepth();
+    this.calcEventFreeDepth();
+    this.updateSearchIdx();
+    return true;
+    
+  }
   changeName(targetId, value){
     console.log(targetId)
     const idx = this.search_idx_list[targetId.toString()];

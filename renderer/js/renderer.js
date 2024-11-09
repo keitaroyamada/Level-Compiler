@@ -244,7 +244,7 @@ document.addEventListener("DOMContentLoaded", () => {
         "C:/Users/slinn/Dropbox/Prj_LevelCompiler/_LC test data/[correlation]SG06(24 Nov. 2023).csv";
 
       const model_path2 =
-        "C:/Users/slinn/Dropbox/Prj_LevelCompiler/_LC test data/[duo]SG14(temp).csv";
+        "C:/Users/slinn/Dropbox/Prj_LevelCompiler/_LC test data/[duo]SG14(08 Nov. 2024).csv";
       //const model_path =     "C:/Users/slinn/Dropbox/Prj_LevelCompiler/_LC test data/[correlation]SG14 LC test model with event(temp).csv";
       const age1_path =
         "C:/Users/slinn/Dropbox/Prj_LevelCompiler/_LC test data/[age]SG IntCal20 yr BP chronology for LC (01 Jun. 2021).csv";
@@ -313,12 +313,21 @@ document.addEventListener("DOMContentLoaded", () => {
 
     //check
     let order = [];
-    //check correlatiob model
+
+    //check LCMODEL first
+    dataList.forEach((data,i)=>{
+      if(data.ext == ".lcmodel"){
+        order.push(i);
+      }
+    })
+
+    //check correlation model
     dataList.forEach((data,i)=>{
       if(data.base.includes("[correlation]")){
         order.push(i);
       }
     })
+
     if(order.length>1){
       alert("Multiple [correlation] model detected. Please load base [correlation] model first.");
       return;
@@ -406,6 +415,18 @@ document.addEventListener("DOMContentLoaded", () => {
           //load LCplot
           await loadPlotData();
         }
+      }else if(fileParseData.ext == ".lcmodel"){
+        console.log("[Renderer]: LCmodel load from drop..");
+        isLoadedLCModel = true;
+        //load
+        await loadModel();
+        await registerModelFromLCCore()
+        await registerAgeFromLCAge();
+        const selected_age_model_id = document.getElementById("AgeModelSelect").value;
+        await loadAge(selected_age_model_id)
+        await registerAgePlotFromLCAge();
+        await loadPlotData();
+        updateView(); 
       }
     }
 
@@ -1007,6 +1028,32 @@ document.addEventListener("DOMContentLoaded", () => {
         alert("Previous project is empty. Please add a hole to the previous project first.");
         return
       }
+      
+    }else if(clickResult == "deleteProject"){
+      objOpts.edit.contextmenu_enable = false;
+      objOpts.edit.hittest = null;
+      objOpts.edit.marker_from = null;
+      objOpts.edit.marker_to = null;
+      objOpts.edit.mode = "delete_project";
+      objOpts.edit.handleMove = handleProjectMouseMove;
+      if(objOpts.edit.handleClick !== null){
+        document.removeEventListener('click', objOpts.edit.handleClick);
+        objOpts.edit.handleClick = null;
+      }
+      document.addEventListener("mousemove", objOpts.edit.handleMove);
+      
+    }else if(clickResult == "changeProjectName"){
+      objOpts.edit.contextmenu_enable = false;
+      objOpts.edit.hittest = null;
+      objOpts.edit.marker_from = null;
+      objOpts.edit.marker_to = null;
+      objOpts.edit.mode = "change_project_name";
+      objOpts.edit.handleMove = handleProjectMouseMove;
+      if(objOpts.edit.handleClick !== null){
+        document.removeEventListener('click', objOpts.edit.handleClick);
+        objOpts.edit.handleClick = null;
+      }
+      document.addEventListener("mousemove", objOpts.edit.handleMove);
       
     }else if(clickResult == "cancel"){
       console.log("[Renderer]: Edit cancelled.")
@@ -1985,6 +2032,12 @@ document.addEventListener("DOMContentLoaded", () => {
       if(objOpts.edit.mode == "add_hole"){
         objOpts.edit.handleClick = handleHoleAddClick;
         document.addEventListener('click', objOpts.edit.handleClick);
+      }else if(objOpts.edit.mode == "delete_project"){
+        objOpts.edit.handleClick = handleProjectDeleteClick;
+        document.addEventListener('click', objOpts.edit.handleClick);
+      }else if(objOpts.edit.mode == "change_project_name"){
+        objOpts.edit.handleClick = handleProjectDeleteClick;
+        document.addEventListener('click', objOpts.edit.handleClick);
       }else{
         if(objOpts.edit.handleClick !== null){
           document.removeEventListener('click', objOpts.edit.handleClick);
@@ -2044,6 +2097,64 @@ document.addEventListener("DOMContentLoaded", () => {
     objOpts.edit.marker_to = null;
     objOpts.edit.handleClick = null;
     objOpts.edit.handleMove = null;
+  }
+  //5 Project click--------------------------------------------
+  async function handleProjectDeleteClick(event) {
+    const rect = document.getElementById("p5Canvas").getBoundingClientRect(); 
+    const mouseX = event.clientX - rect.left;
+    const mouseY = event.clientY - rect.top;
+    const ht = JSON.parse(JSON.stringify(getClickedItemIdx(mouseX, mouseY, LCCore, objOpts)));
+    event.preventDefault();
+
+    if(objOpts.edit.mode == "delete_project"){
+      const response = await window.LCapi.askdialog(
+        "Delete project",
+        "Are you sure to delete this project?",
+      );
+      if (response.response) {
+        const targetId = [ht.project, null, null, null];
+
+        await undo("save");//undo
+        const result = await window.LCapi.deleteProject(targetId);
+        if(result == true){
+          console.log("[Renderer]: Delete project.")
+          await loadModel();
+
+          await loadAge(document.getElementById("AgeModelSelect").value);
+          await loadPlotData();
+          updateView();
+        }
+      }
+    }else if(objOpts.edit.mode == "change_project_name"){
+      const response = await window.LCapi.inputdialog(
+        "Change project name",
+        "Please input new project name.",
+        "text",
+      );
+      if(response !== null){
+        const targetId = [ht.project, null, null, null];
+        const result = await window.LCapi.changeProject(targetId, "name",response);
+        if(result == true){
+          console.log("[Renderer]: Chnage project name.")
+          await loadModel();
+          await loadAge(document.getElementById("AgeModelSelect").value);
+          await loadPlotData();
+          updateView();
+        }else if(result=="used"){
+          console.log("[Renderer]: "+response+" has already been used. Please input a unique name that has not been used.");
+          alert("[ "+response+" ] has already been used. Please input a unique name that has not been used.");
+        }
+      }
+    }
+    document.removeEventListener("click", objOpts.edit.handleClick);
+    document.removeEventListener("mousemove", objOpts.edit.handleMove);
+    objOpts.edit.contextmenu_enable = true;
+    objOpts.edit.hittest = null;
+    objOpts.edit.marker_from = null;
+    objOpts.edit.marker_to = null;
+    objOpts.edit.handleClick = null;
+    objOpts.edit.handleMove = null;
+    updateView();
   }
   //============================================================================================
   //load correlation model
@@ -2974,7 +3085,7 @@ document.addEventListener("DOMContentLoaded", () => {
         //live hittest
         if(objOpts.edit.hittest){
           //console.log(objOpts.edit.hittest.project, objOpts.edit.hittest.hole)
-          if(objOpts.edit.mode == "add_hole"){
+          if(["add_hole","delete_project","change_project_name"].includes(objOpts.edit.mode)){
             if(objOpts.edit.hittest.project == project.id[0]){
               
               let num_enable_right = 0;

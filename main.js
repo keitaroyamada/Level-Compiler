@@ -718,10 +718,10 @@ function createMainWIndow() {
               },
               { type: 'separator' },
               { 
-                label: 'Delete Project', 
+                label: 'Edit name', 
                 click: () => {
-                  console.log('MAIN: Delete Project'); 
-                  resolve("deleteProject"); 
+                  console.log('MAIN: Change Project name'); 
+                  resolve("changeProjectName"); 
                 } 
               },
             ]
@@ -2033,8 +2033,26 @@ function createMainWIndow() {
       return result
     }
   });
+  ipcMain.handle("deleteProject", async(_e, projectId) => {
+    
+    const result = LCCore.deleteProject(projectId);
 
+    if (result == true) {
+      console.log("MAIN: Delete project completed.");
+      return result;
+    } else {
+      console.log("MAIN: Failed to delete project.");
+      return result
+    }
 
+    
+  });
+  ipcMain.handle("changeProject", (_e, projectId, type, value) => {
+    if(type=="name"){
+      const result = LCCore.changeName(projectId, value);
+      return result;
+    }
+  });
   //--------------------------------------------------------------------------------------------------
   //--------------------------------------------------------------------------------------------------
 }
