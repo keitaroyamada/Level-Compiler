@@ -1021,13 +1021,17 @@ document.addEventListener("DOMContentLoaded", () => {
       }
       document.addEventListener("mousemove", objOpts.edit.handleMove);
     }else if(clickResult == "addProject"){
-      if(LCCore.projects[LCCore.projects.length-1].holes.length  > 0){
-        //previous project has holes
-        ProjectAdd();
+      if(LCCore){
+        if(LCCore.projects[LCCore.projects.length-1].holes.length  <= 0){
+          alert("Previous project is empty. Please add a hole to the previous project first.");
+          return
+        }else{
+          ProjectAdd();
+        }
       }else{
-        alert("Previous project is empty. Please add a hole to the previous project first.");
-        return
+        ProjectAdd();
       }
+      
       
     }else if(clickResult == "deleteProject"){
       objOpts.edit.contextmenu_enable = false;
