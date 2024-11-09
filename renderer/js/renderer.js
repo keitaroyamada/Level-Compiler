@@ -1170,6 +1170,12 @@ document.addEventListener("DOMContentLoaded", () => {
           await undo("save");//undo
           await window.LCapi.disconnectMarkers(fromId, toId, "horizontal");
           await loadModel();
+
+          const affectedSections = getConnectedSectionIds([fromId, toId]);
+          modelImages.load_target_ids = affectedSections;
+          modelImages = await loadCoreImages(modelImages, LCCore, objOpts, "composite_depth");
+          modelImages = await loadCoreImages(modelImages, LCCore, objOpts, "event_free_depth");
+
           updateView();
         }
       }
@@ -1640,6 +1646,10 @@ document.addEventListener("DOMContentLoaded", () => {
             await loadModel();
             await loadAge(document.getElementById("AgeModelSelect").value);
             await loadPlotData();
+            const affectedSections = getConnectedSectionIds([upperId, lowerId]);
+            modelImages.load_target_ids = affectedSections;
+            modelImages = await loadCoreImages(modelImages, LCCore, objOpts, "composite_depth");
+            modelImages = await loadCoreImages(modelImages, LCCore, objOpts, "event_free_depth");
             updateView();
             console.log("[Renderer]: Add a new event.]");
           }else if(result == "occupied"){
@@ -1662,6 +1672,10 @@ document.addEventListener("DOMContentLoaded", () => {
           await loadModel();
           await loadAge(document.getElementById("AgeModelSelect").value);
           await loadPlotData();
+          const affectedSections = getConnectedSectionIds([upperId, lowerId]);
+          modelImages.load_target_ids = affectedSections;
+          modelImages = await loadCoreImages(modelImages, LCCore, objOpts, "composite_depth");
+          modelImages = await loadCoreImages(modelImages, LCCore, objOpts, "event_free_depth");
           updateView();
           console.log("[Renderer]: Delete event")
         }
@@ -2878,8 +2892,10 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     });
 
+    const bottom_padding = 100;
+
     let canvasBaseWidth = parseInt((objOpts.hole.distance + objOpts.hole.width + shift_x) * (num_total_holes + 1) * xMag + pad_x);
-    let canvasBaseHeight = parseInt((holes_bottom - holes_top + shift_y + objOpts.canvas.bottom_pad) * yMag + pad_y);
+    let canvasBaseHeight = parseInt((holes_bottom + bottom_padding - holes_top + shift_y + objOpts.canvas.bottom_pad) * yMag + pad_y);
 
     //case base is too small
     if (canvasBaseWidth < scroller.clientWidth) {
@@ -5710,7 +5726,13 @@ function calcCanvasBaseSize(LCCore, objOpts) {
   }
 
   for (let p = 0; p < LCCore.projects.length; p++) {
+    if(LCCore.projects[p].holes.length==0){
+      return
+    }
     for (let h = 0; h < LCCore.projects[p].holes.length; h++) {
+      if(LCCore.projects[p].holes[h].markers.length==0){
+        continue
+      }
       let hole_top = LCCore.projects[p].holes[h].sections[0].markers[0][objOpts.canvas.depth_scale];
       let hole_bottom = LCCore.projects[p].holes[h].sections.slice(-1)[0].markers.slice(-1)[0][objOpts.canvas.depth_scale];
       hole_top 
@@ -5759,15 +5781,12 @@ function calcCanvasBaseSize(LCCore, objOpts) {
   });
 
   let canvasBaseWidth = parseInt(
-    (objOpts.hole.distance + objOpts.hole.width + shift_x) *
-      (num_total_holes + 1) *
-      xMag +
-      pad_x
+    (objOpts.hole.distance + objOpts.hole.width + shift_x) * (num_total_holes + 1) * xMag + pad_x
   );
   let canvasBaseHeight = parseInt(
-    (holes_bottom - holes_top + shift_y + objOpts.canvas.bottom_pad) * yMag +
-      pad_y
+    (holes_bottom - holes_top + shift_y + objOpts.canvas.bottom_pad) * yMag + pad_y
   );
+  console.log(canvasBaseWidth, canvasBaseHeight)
   return [canvasBaseWidth, canvasBaseHeight];
 }
 
