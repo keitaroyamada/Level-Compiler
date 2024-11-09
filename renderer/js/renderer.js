@@ -1230,7 +1230,7 @@ document.addEventListener("DOMContentLoaded", () => {
           objOpts.edit.handleClick = null;
         }
       }
-    }     else{console.log(ht)}
+    } 
   }
   //2 Marker click--------------------------------------------
   async function handleMarkerChangeClick(event) {
@@ -1505,10 +1505,9 @@ document.addEventListener("DOMContentLoaded", () => {
     const mouseX = event.clientX - rect.left;
     const mouseY = event.clientY - rect.top;
     const ht = JSON.parse(JSON.stringify(getClickedItemIdx(mouseX, mouseY, LCCore, objOpts)));
-    event.preventDefault();    
-
+  
     //initiarise
-    objOpts.edit.marker_from = null;
+    objOpts.edit.marker_from = ht;
     objOpts.edit.marker_to = 999999;//dummy
 
     //if get both markers
