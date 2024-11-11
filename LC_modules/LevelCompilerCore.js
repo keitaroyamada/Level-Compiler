@@ -3855,6 +3855,7 @@ class LevelCompilerCore {
  }
   getIdxFromTrinity(projectId, [holeName, sectionName, distance]) {
     //get idx
+    console.log(projectId)
     let projectIdx = null;
     this.projects.forEach((project, p) => {
       if (project.id[0] == projectId[0]) {

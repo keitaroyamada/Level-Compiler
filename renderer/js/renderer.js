@@ -2383,9 +2383,15 @@ document.addEventListener("DOMContentLoaded", () => {
           scroller.scrollTop / scroller.scrollHeight;
 
         //calc new canvas size
-        const [canvasBase_width, canvasBase_height] = calcCanvasBaseSize(
-          LCCore,
-          objOpts
+        //makeRasterObjects(false); //make only base canvas
+        makeP5CanvasBase();
+        const canvasBase_height = parseInt(
+          canvasBase.style.height.match(/\d+/)[0],
+          10
+        );
+        const canvasBase_width = parseInt(
+          canvasBase.style.width.match(/\d+/)[0],
+          10
         );
 
         //get new scroll pos
@@ -2397,7 +2403,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
         scroller.scrollTo(x, y); //move scroll position
 
-        //update plot
+        //update data
         canvasPos = [x, y];
 
         //update plot
@@ -2412,26 +2418,37 @@ document.addEventListener("DOMContentLoaded", () => {
 
       
       //mouse position
-      const relative_scroll_pos_x = scroller.scrollLeft / scroller.scrollWidth;
-      const relative_scroll_pos_y = scroller.scrollTop / scroller.scrollHeight;
+      const relative_scroll_pos_x =
+      scroller.scrollLeft / scroller.scrollWidth;
+    const relative_scroll_pos_y =
+      scroller.scrollTop / scroller.scrollHeight;
 
-      //calc new canvas size
-      const [canvasBase_width, canvasBase_height] = calcCanvasBaseSize(LCCore, objOpts);
+    //calc new canvas size
+    //makeRasterObjects(false); //make only base canvas
+    makeP5CanvasBase();
+    const canvasBase_height = parseInt(
+      canvasBase.style.height.match(/\d+/)[0],
+      10
+    );
+    const canvasBase_width = parseInt(
+      canvasBase.style.width.match(/\d+/)[0],
+      10
+    );
 
-      //get new scroll pos
-      const new_scroll_pos_x = canvasBase_width * relative_scroll_pos_x;
-      const new_scroll_pos_y = canvasBase_height * relative_scroll_pos_y;
+    //get new scroll pos
+    const new_scroll_pos_x = canvasBase_width * relative_scroll_pos_x;
+    const new_scroll_pos_y = canvasBase_height * relative_scroll_pos_y;
 
-      let x = new_scroll_pos_x;
-      let y = new_scroll_pos_y;
+    let x = new_scroll_pos_x;
+    let y = new_scroll_pos_y;
 
-      scroller.scrollTo(x, y); //move scroll position
+    scroller.scrollTo(x, y); //move scroll position
 
-      //update plot
-      canvasPos = [x, y];
+    //update data
+    canvasPos = [x, y];
 
-      //update plot
-      updateView();
+    //update plot
+    updateView();
     }
   });  
   //============================================================================================
@@ -2459,9 +2476,15 @@ document.addEventListener("DOMContentLoaded", () => {
           scroller.scrollTop / scroller.scrollHeight;
 
         //calc new canvas size
-        const [canvasBase_width, canvasBase_height] = calcCanvasBaseSize(
-          LCCore,
-          objOpts
+        //makeRasterObjects(false); //make only base canvas
+        makeP5CanvasBase();
+        const canvasBase_height = parseInt(
+          canvasBase.style.height.match(/\d+/)[0],
+          10
+        );
+        const canvasBase_width = parseInt(
+          canvasBase.style.width.match(/\d+/)[0],
+          10
         );
 
         //get new scroll pos
@@ -2473,7 +2496,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
         scroller.scrollTo(x, y); //move scroll position
 
-        //update plot
+        //update data
         canvasPos = [x, y];
 
         //update plot
@@ -6062,7 +6085,6 @@ async function loadCoreImages(modelImages, LCCore, objOpts, depthScale) {
 
 
           n+=1;
-          console.log(n,N)
           await window.LCapi.updateProgressbar(n, N);
         }
         p5resolve();

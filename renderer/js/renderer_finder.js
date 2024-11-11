@@ -185,14 +185,15 @@ document.addEventListener("DOMContentLoaded", () => {
     let calcedData = {};
     if (calcType == "trinity") {
       //get trinity data
-      const holeName    = holeList[document.getElementById("holeOptions").value][2];
-      const sectionName = sectionList[document.getElementById("holeOptions").value][document.getElementById("sectionOptions").value][2];
+      let holeName    = holeList[document.getElementById("holeOptions").value][2];
+      let sectionName = sectionList[document.getElementById("holeOptions").value][document.getElementById("sectionOptions").value][2];
       const distance    = parseFloat(document.getElementById("distanceInput").value);
-      const sectionId   = sectionList[document.getElementById("holeOptions").value][document.getElementById("sectionOptions").value][1];
+      let sectionId   = sectionList[document.getElementById("holeOptions").value][document.getElementById("sectionOptions").value][1];
       const cd          = parseFloat(document.getElementById("cdInput").value);
 
       //calc
       if(targetId[1] == null){
+        console.log("FInder: Target hole is exist.")
         //case changed section and distance
         await window.FinderApi.rendererLog(["", holeName, sectionName, distance]);
         calcedData = await window.FinderApi.finderConvert(["", ["", holeName, sectionName, distance], targetId], "trinity", "linear");
@@ -204,6 +205,7 @@ document.addEventListener("DOMContentLoaded", () => {
         document.getElementById("ageUpperInput").value  = Math.round(calcedData.age_upper * 10) / 10;
         document.getElementById("ageLowerInput").value  = Math.round(calcedData.age_lower * 10) / 10;
       } else {
+        console.log("FInder: There is no target hole.")
         //case changed hole
         //try to find same CD in selected hole
         calcedData = await window.FinderApi.finderConvert(["", cd, targetId], "composite_depth", "linear");
@@ -242,14 +244,72 @@ document.addEventListener("DOMContentLoaded", () => {
           document.getElementById("ageUpperInput").value  = Math.round(calcedData.age_upper * 10) / 10;
           document.getElementById("ageLowerInput").value  = Math.round(calcedData.age_lower * 10) / 10;
         } else {
+          console.log("FInder: Replace trinity")
           //if selected hole is not exist
           //await window.FinderApi.rendererLog(previousValue); 
-    
+          const alterType = "top";
+
           //apply
-          document.getElementById("holeOptions").value    = previousValue.hole;
-          updateSectionList();
-          document.getElementById("sectionOptions").value  = previousValue.section;
-          
+          if(alterType == "top"){
+            holeName    = holeList[document.getElementById("holeOptions").value][2];
+            sectionId   = sectionList[document.getElementById("holeOptions").value][document.getElementById("sectionOptions").value][1];
+            sectionName = sectionList[document.getElementById("holeOptions").value][document.getElementById("sectionOptions").value][2];
+            const secLimit = await window.FinderApi.getSectionLimit([sectionId[0], null, null, null],holeName,sectionName);
+            const topDistance    = secLimit[0];
+
+            //calc
+            await window.FinderApi.rendererLog(["", holeName, sectionName, distance]);
+            calcedData = await window.FinderApi.finderConvert(["", ["", holeName, sectionName, topDistance], targetId], "trinity", "linear");
+            await window.FinderApi.rendererLog(calcedData);
+            //apply
+            document.getElementById("distanceInput").value  = isNaN(calcedData.distance) ? "" : Math.round(calcedData.distance * 10) / 10;
+            document.getElementById("cdInput").value        = Math.round(calcedData.cd * 10) / 10;
+            document.getElementById("efdInput").value       = Math.round(calcedData.efd * 10) / 10;
+            document.getElementById("ageInput").value       = Math.round(calcedData.age_mid * 10) / 10;
+            document.getElementById("ageUpperInput").value  = Math.round(calcedData.age_upper * 10) / 10;
+            document.getElementById("ageLowerInput").value  = Math.round(calcedData.age_lower * 10) / 10;
+
+          }else if(alterType == "bottom"){
+            holeName    = holeList[document.getElementById("holeOptions").value][2];
+            sectionId   = sectionList[document.getElementById("holeOptions").value][document.getElementById("sectionOptions").value][1];
+            sectionName = sectionList[document.getElementById("holeOptions").value][document.getElementById("sectionOptions").value][2];
+            const secLimit = await window.FinderApi.getSectionLimit([sectionId[0], null, null, null],holeName,sectionName);
+            const topDistance    = secLimit[1];
+
+            //calc
+            await window.FinderApi.rendererLog(["", holeName, sectionName, distance]);
+            calcedData = await window.FinderApi.finderConvert(["", ["", holeName, sectionName, topDistance], targetId], "trinity", "linear");
+            await window.FinderApi.rendererLog(calcedData);
+            //apply
+            document.getElementById("cdInput").value        = Math.round(calcedData.cd * 10) / 10;
+            document.getElementById("efdInput").value       = Math.round(calcedData.efd * 10) / 10;
+            document.getElementById("ageInput").value       = Math.round(calcedData.age_mid * 10) / 10;
+            document.getElementById("ageUpperInput").value  = Math.round(calcedData.age_upper * 10) / 10;
+            document.getElementById("ageLowerInput").value  = Math.round(calcedData.age_lower * 10) / 10;
+
+          }if(alterType == "centre"){
+            holeName    = holeList[document.getElementById("holeOptions").value][2];
+            sectionId   = sectionList[document.getElementById("holeOptions").value][document.getElementById("sectionOptions").value][1];
+            sectionName = sectionList[document.getElementById("holeOptions").value][document.getElementById("sectionOptions").value][2];
+            const secLimit = await window.FinderApi.getSectionLimit([sectionId[0], null, null, null],holeName,sectionName);
+            const topDistance    = (secLimit[0] + secLimit[1]) / 2;
+
+            //calc
+            await window.FinderApi.rendererLog(["", holeName, sectionName, distance]);
+            calcedData = await window.FinderApi.finderConvert(["", ["", holeName, sectionName, topDistance], targetId], "trinity", "linear");
+            await window.FinderApi.rendererLog(calcedData);
+            //apply
+            document.getElementById("cdInput").value        = Math.round(calcedData.cd * 10) / 10;
+            document.getElementById("efdInput").value       = Math.round(calcedData.efd * 10) / 10;
+            document.getElementById("ageInput").value       = Math.round(calcedData.age_mid * 10) / 10;
+            document.getElementById("ageUpperInput").value  = Math.round(calcedData.age_upper * 10) / 10;
+            document.getElementById("ageLowerInput").value  = Math.round(calcedData.age_lower * 10) / 10;
+
+          }else if(alterType == "none"){
+            document.getElementById("holeOptions").value    = previousValue.hole;
+            updateSectionList();
+            document.getElementById("sectionOptions").value  = previousValue.section;  
+          }          
         }
       }
             
