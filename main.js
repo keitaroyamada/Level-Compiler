@@ -1407,7 +1407,7 @@ function createMainWIndow() {
     finderWindow.once("ready-to-show", () => {
       finderWindow.show();
       //finderWindow.webContents.openDevTools();
-      finderWindow.setAlwaysOnTop(true, "normal");
+      finderWindow.setAlwaysOnTop(true, "floating");
       finderWindow.webContents.send("FinderToolClicked", "");
     });
   });
