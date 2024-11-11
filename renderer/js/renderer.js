@@ -3626,8 +3626,11 @@ document.addEventListener("DOMContentLoaded", () => {
                 if (section.markers[m + 1] !== undefined) {
                   if (section.markers[m + 1].isMaster) {
                     sketch.drawingContext.setLineDash([]);
-                    sketch.strokeWeight(4);
+                    sketch.strokeWeight(4);                    
                     sketch.stroke("blue"); //(markerLineColour);
+                    if(project.model_type == "duo"){
+                      sketch.stroke(115,167,209);
+                    }
                     const next_marker_top = section.markers[m + 1][objOpts.canvas.depth_scale];
                     sketch.line(
                       (hole_x0 + shift_x) * xMag + pad_x,
@@ -3706,6 +3709,9 @@ document.addEventListener("DOMContentLoaded", () => {
                 //draw connection---------------------------------------------
                 sketch.strokeWeight(connection_line_width);
                 sketch.stroke(connection_colour);
+                if(project.model_type == "duo"){
+                  sketch.stroke(115,167,209);
+                }
 
                 sketch.line(cn_x0, cn_y0, cn_x1, cn_y1); //start point
                 sketch.line(cn_x1, cn_y1, cn_x2, cn_y2); //index left
