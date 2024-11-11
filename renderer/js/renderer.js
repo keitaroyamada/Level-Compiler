@@ -418,6 +418,10 @@ document.addEventListener("DOMContentLoaded", () => {
       }else if(fileParseData.ext == ".lcmodel"){
         console.log("[Renderer]: LCmodel load from drop..");
         isLoadedLCModel = true;
+        //load into LCCore
+        await window.LCapi.loadLCmodel(fileParseData.fullpath);
+
+
         //load
         await loadModel();
         await registerModelFromLCCore()

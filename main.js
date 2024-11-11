@@ -499,6 +499,19 @@ function createMainWIndow() {
       return null;
     }
   });
+  ipcMain.handle("loadLCmodel", async (_e,filepath) => {
+    try {
+      const inData = await loadmodelfile(filepath)
+      if(inData!==null){
+        Object.assign(LCCore, inData.LCCore);
+        Object.assign(LCAge, inData.LCAge);
+      }
+      return
+    }catch(err){
+      console.log("MAIN: Failed to load LC model.",err);
+    }
+  });
+  
   ipcMain.handle("LoadModelFromLCCore", async (_e) => {
     //import model
     console.log("MAIN: Load correlation model.");
@@ -935,7 +948,6 @@ function createMainWIndow() {
       return null;
     }
   });
-
   ipcMain.handle("LoadAgeFromLCAge", async (_e, age_id) => {
     //apply latest age model to the depth model
     let model_name = null;
@@ -2187,17 +2199,28 @@ async function putmodelfile(data) {
   };
 }
 //--------------------------------------------------------------------------------------------------
-async function loadmodelfile() {
+async function loadmodelfile(...args) {
   try{
-    const file = await dialog.showOpenDialog({
-      title: "Please select file to load",
-      defaultPath: app.getPath("desktop"),
-      buttonLabel: "Load",
-      filters: [{ name: "Level Compiler model", extensions: ["lcmodel"] }],
-      properties: ['openFile']
-    });
-    if (!file.canceled && file.filePaths[0]) {
-      const fileContent = fs.readFileSync(file.filePaths[0], 'utf8');
+    let filepath = null;
+    if(args.length == 0){
+      //cane no path
+      const file = await dialog.showOpenDialog({
+        title: "Please select file to load",
+        defaultPath: app.getPath("desktop"),
+        buttonLabel: "Load",
+        filters: [{ name: "Level Compiler model", extensions: ["lcmodel"] }],
+        properties: ['openFile']
+      });
+      if (!file.canceled && file.filePaths[0]) {
+        filepath = file.filePaths[0];
+      }
+    }else if(args.length == 1){
+      //case input path
+      filepath = args[0];
+    }
+    
+    if (filepath !== null) {
+      const fileContent = fs.readFileSync(filepath, 'utf8');
       const loadedData = JSON.parse(fileContent);
       console.log('File loaded successfully:', loadedData);
 

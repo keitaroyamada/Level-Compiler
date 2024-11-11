@@ -77,7 +77,7 @@ contextBridge.exposeInMainWorld("LCapi", {
   SetMaster: (args1,args2) => ipcRenderer.invoke("SetMaster", args1,args2),
   AddEvent: (args1,args2,args3,args4) => ipcRenderer.invoke("AddEvent", args1,args2,args3,args4),
   DeleteEvent: (args1,args2,args3) => ipcRenderer.invoke("DeleteEvent", args1,args2,args3),
-
+  loadLCmodel:(args1) => ipcRenderer.invoke("loadLCmodel",args1),
 
   
   sendUndo: () => ipcRenderer.invoke('sendUndo'),
