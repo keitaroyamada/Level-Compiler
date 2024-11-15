@@ -30,7 +30,10 @@ const { LevelCompilerAge } = require("./LC_modules/LevelCompilerAge.js");
 const { LevelCompilerPlot } = require("./LC_modules/LevelCompilerPlot.js");
 const { UndoManager } = require("./LC_modules/UndoManager.js");
 const { Trinity } = require("./LC_modules/Trinity.js");
+const { Section } = require("./LC_modules/Section.js");
+const { Marker } = require("./LC_modules/Marker.js");
 const { send } = require("process");
+const { Worker } = require('worker_threads');
 
 //properties
 const isMac = process.platform === "darwin";
@@ -39,12 +42,14 @@ let LCCore = new LevelCompilerCore();
 let LCAge  = new LevelCompilerAge();
 let LCPlot = new LevelCompilerPlot();
 const history = new UndoManager();
+let tempCore = null;
 
 //
 let finderWindow = null;
 let dividerWindow = null;
 let converterWindow = null;
 let importerWindow = null;
+let labelerWindow = null;
 let progressBar = null;
 
 function createMainWIndow() {
@@ -164,7 +169,7 @@ function createMainWIndow() {
           },
         },
         {
-          label: "Load Plot Data",
+          label: "Load Plot Data (under construction)",
           accelerator: "CmdOrCtrl+P",
           click: () => {
             if (converterWindow) {
@@ -264,6 +269,46 @@ function createMainWIndow() {
             });
           },
         },
+        {
+          label: "Labeler(under construction)",
+          click: () => {
+            if (labelerWindow) {
+              labelerWindow.focus();
+              return;
+            }
+        
+            tempCore = new LevelCompilerCore();
+            tempCore.addProject("correlation","temp");
+            tempCore.addHole([1,null,null,null],"temp");
+
+            //create finder window
+            labelerWindow = new BrowserWindow({
+              title: "labeler",
+              width: 800,
+              height: 800,
+              webPreferences: {preload: path.join(__dirname, "preload_labeler.js"),},
+            });
+            
+            //converterWindow.setAlwaysOnTop(true, "normal");
+            labelerWindow.on("closed", () => {
+              labelerWindow = null;
+              tempCore = null;
+              mainWindow.webContents.send("LabelerClosed", "");
+            });
+            labelerWindow.setMenu(null);
+        
+            labelerWindow.loadFile(path.join(__dirname, "./renderer/labeler.html"));
+        
+            labelerWindow.once("ready-to-show", () => {
+              labelerWindow.show();
+              //labelerWindow.setAlwaysOnTop(true, "normal");
+              labelerWindow.webContents.openDevTools();
+              //converterWindow.setAlwaysOnTop(true, "normal");
+              labelerWindow.webContents.send("LabelerMenuClicked", "export");
+            });
+          },
+        },
+        { type: "separator" },
         {
           label: "Edit correlation",
           accelerator: "CmdOrCtrl+E",
@@ -374,7 +419,8 @@ function createMainWIndow() {
         path.join(resourcePath, "resources","plot","tephra.png"),
         "Red",
       ],
-      climate: [path.join(resourcePath, "resources","plot","climate.png"),
+      climate: [
+        path.join(resourcePath, "resources","plot","climate.png"),
         "Yellow",
       ],
       orbital: [
@@ -396,22 +442,23 @@ function createMainWIndow() {
     };
 
     let tool_icons ={
-      bt_reload:path.join(resourcePath, "resources","tool","reload.png"),
-      bt_finder:path.join(resourcePath, "resources","tool","finder.png"),
-      bt_zoomin:path.join(resourcePath, "resources","tool","zoomin.png"),
-      bt_zoom0:path.join(resourcePath, "resources","tool","zoom0.png"),
-      bt_zoomout:path.join(resourcePath, "resources","tool","zoomout.png"),
-      bt_measure:path.join(resourcePath, "resources","tool","measure.png"),
-      bt_snapshot:path.join(resourcePath, "resources","tool","snapshot.png"),
-      bt_pen:path.join(resourcePath, "resources","tool","pen.png"),
-      bt_divider:path.join(resourcePath, "resources","tool","divider.png"),
-      bt_grid:path.join(resourcePath, "resources","tool","grid.png"),
-      bt_rank:path.join(resourcePath, "resources","tool","rank.png"),
-      bt_target:path.join(resourcePath, "resources","tool","target.png"),
-      bt_event_layer:path.join(resourcePath, "resources","tool","event.png"),
-      bt_core_photo:path.join(resourcePath, "resources","tool","core_photo.png"),
-      bt_connection:path.join(resourcePath, "resources","tool","connection.png"),
-      bt_chart:path.join(resourcePath, "resources","tool","chart.png"),
+      bt_reload:      path.join(resourcePath, "resources","tool","reload.png"),
+      bt_finder:      path.join(resourcePath, "resources","tool","finder.png"),
+      bt_zoomin:      path.join(resourcePath, "resources","tool","zoomin.png"),
+      bt_zoom0:       path.join(resourcePath, "resources","tool","zoom0.png"),
+      bt_zoomout:     path.join(resourcePath, "resources","tool","zoomout.png"),
+      bt_measure:     path.join(resourcePath, "resources","tool","measure.png"),
+      bt_snapshot:    path.join(resourcePath, "resources","tool","snapshot.png"),
+      bt_pen:         path.join(resourcePath, "resources","tool","pen.png"),
+      bt_divider:     path.join(resourcePath, "resources","tool","divider.png"),
+      bt_grid:        path.join(resourcePath, "resources","tool","grid.png"),
+      bt_rank:        path.join(resourcePath, "resources","tool","rank.png"),
+      bt_target:      path.join(resourcePath, "resources","tool","target.png"),
+      bt_event_layer: path.join(resourcePath, "resources","tool","event.png"),
+      bt_core_photo:  path.join(resourcePath, "resources","tool","core_photo.png"),
+      bt_connection:  path.join(resourcePath, "resources","tool","connection.png"),
+      bt_chart:       path.join(resourcePath, "resources","tool","chart.png"),
+      bt_show_labels: path.join(resourcePath, "resources","tool","label.png"),
     };
     
     let finder_icons ={
@@ -420,8 +467,16 @@ function createMainWIndow() {
       fix:path.join(resourcePath, "resources","tool","fix.png"),
       link:path.join(resourcePath, "resources","tool","link.png"),
     };
+
+    let labeler_icons = {
+      bt_change_distance: path.join(resourcePath, "resources","tool","change_distance.png"),
+      bt_change_name:     path.join(resourcePath, "resources","tool","tag.png"),
+      bt_add_marker:      path.join(resourcePath, "resources","tool","add.png"),
+      bt_delete_marker:   path.join(resourcePath, "resources","tool","delete.png"),
+
+    };
   
-    _e.returnValue = {plot:plot_icons, tool:tool_icons, finder:finder_icons};
+    _e.returnValue = {plot:plot_icons, tool:tool_icons, finder:finder_icons, labeler:labeler_icons};
   });
   //============================================================================================
   ipcMain.handle("InitiariseCorrelationModel", async (_e) => {
@@ -460,6 +515,15 @@ function createMainWIndow() {
     let results = path.parse(pathData);
     results.fullpath = path.join(results.dir, results.base);
     return results;
+  });
+  ipcMain.handle("getFilesInDir", async (_e, dir, name) => {
+    const results = findFileInDir(dir, name)
+    if(results.length == 1){
+      //console.log("MAIN: Successfully get fullpath.");
+      return results;
+    }else{
+      console.log("MAIN: Failed to find fullpath.")
+    }
   });
   ipcMain.handle("RegisterModelFromCsv", async (_e, model_path) => {
     try {
@@ -522,7 +586,7 @@ function createMainWIndow() {
     try {
       //path.join(__dirname.replace(/\\/g, "/"), im_path)
       const imageBuffer = fs.readFileSync(im_path);
-
+      console.log(im_path)
       if (Resize != 0) {
         const metadata = await sharp(imageBuffer).metadata();
         const new_size = { height: Resize, width: 1 };
@@ -551,122 +615,19 @@ function createMainWIndow() {
   });
 
   ipcMain.handle("progressbar", async (_e, tit, txt) => {
+    progressBar = null;
     progressBar = progressDialog(mainWindow, tit, txt);
+
+    await new Promise(resolve => setTimeout(resolve, 100));
+    progressBar.detail = "Processing...";
   });
   ipcMain.handle("updateProgressbar", async (_e, n, N) => {
     progressBar = await updateProgress(progressBar, n, N);
   });
   ipcMain.handle("makeModelImage", async (_e, imPath, sectionData, imHeight, depthScale) => {
     try {
-      
-      //path.join(__dirname.replace(/\\/g, "/"), im_path)
-      let imageBuffer = fs.readFileSync(imPath);
-      if (imHeight != 0) {
-        const metadata = await sharp(imageBuffer).metadata();
-        const new_size = { height: imHeight, width: 1 };
-
-        imageBuffer = await sharp(imageBuffer)
-            .resize({ height: new_size.height })
-            .toBuffer();
-      }
-
-      //check
-      const undifBuffer = Buffer.from([0xba, 0x77, 0x5e, 0x7e, 0x29, 0xde]);
-      if (imageBuffer.equals(undifBuffer)) {
-        //if no image data
-        return undefined;
-      }
-
-      //get image info
-      const im = sharp(imageBuffer);
-      const metadata = await im.metadata();
-      const pixPerCm = imHeight / (sectionData.markers[sectionData.markers.length - 1].distance - sectionData.markers[0].distance);
-      //const pixPerCm = metadata.height / (sectionData.markers[sectionData.markers.length - 1].distance - sectionData.markers[0].distance);//original size
-
-      //get operations
-      let newHeight = 0;
-      let operations = [];
-      const d0 = sectionData.markers[0].distance;
-      const m0 = sectionData.markers[0][depthScale];
-      for (let i = 0; i < sectionData.markers.length - 1; i++) {
-        const id = sectionData.markers[i].id;
-        const name = sectionData.markers[i].name;
-        const dTop = sectionData.markers[i].distance;
-        const dBottom = sectionData.markers[i + 1].distance;
-        const mTop = sectionData.markers[i][depthScale];
-        const mBottom = sectionData.markers[i + 1][depthScale];
-
-        const fromP0 = (dTop - d0) * pixPerCm;
-        const fromP1 = (dBottom - d0) * pixPerCm;
-        const toP0 = (mTop - m0) * pixPerCm;
-        const toP1 = (mBottom - m0) * pixPerCm;
-
-        operations.push({
-          id:id,
-          name:name,
-          fromTop: fromP0,
-          fromBottom: fromP1,
-          toTop: toP0,
-          toBottom: toP1,
-        });
-        newHeight += toP1 - toP0;
-      }
-
-      //make blank base
-      if (newHeight < 0.5) return [];
-      let newIm = sharp({
-        create: {
-          width: metadata.width,
-          height: round(newHeight, 0),
-          channels: 3,
-          background: { r: 0, g: 0, b: 0 },
-        },
-      }).jpeg();
-
-      //extract and resize
-      let compositeOperations = [];
-      for (const ope of operations) {
-        if (round(ope.fromBottom - ope.fromTop, 0) === 0 || round(ope.toBottom - ope.toTop, 0) === 0){
-          continue; // if 0cm thick(event layer), skip
-        }
-          
-        const baseIm = sharp(imageBuffer); 
-
-        if(round(ope.toBottom - ope.toTop, 0)<0){
-          console.log(depthScale, imPath);
-          console.log(ope.id, round(ope.toBottom - ope.toTop, 0))
-        }
-
-        const currSection = await baseIm
-          .extract({
-            left: 0,
-            top: round(ope.fromTop, 0),
-            width: metadata.width,
-            height: round(ope.fromBottom - ope.fromTop, 0),
-          })
-          .resize({
-            width: metadata.width,
-            height: round(ope.toBottom - ope.toTop, 0),
-            fit: "fill",
-          })
-          .toBuffer();
-
-        compositeOperations.push({
-          input: currSection,
-          top: round(ope.toTop, 0),
-          left: 0,
-        });
-      }
-
-      if (compositeOperations.length > 0) {
-        newIm = await newIm.composite(compositeOperations).toBuffer();
-      }
-
-      //to base64
-      return newIm.toString("base64");
-
-      //-------------------------------------------------------
-      
+      const result = await startMakeModelImageWorker({ imPath, sectionData, imHeight, depthScale });
+      return result;
     } catch (error) {
       if (error.code === "ENOENT") {
         //（Error NO ENTry）case there is no such a file.
@@ -674,6 +635,7 @@ function createMainWIndow() {
         throw error;
       }
     }
+    
 
   });
 
@@ -735,6 +697,21 @@ function createMainWIndow() {
                 click: () => {
                   console.log('MAIN: Change Project name'); 
                   resolve("changeProjectName"); 
+                } 
+              },
+              { 
+                label: 'Merge projects', 
+                click: () => {
+                  console.log('MAIN: Merge Projects'); 
+                  resolve("mergeProjects"); 
+                } 
+              },
+              { type: 'separator' },
+              { 
+                label: 'Delete project', 
+                click: () => {
+                  console.log('MAIN: Delete Project'); 
+                  resolve("deleteProject"); 
                 } 
               },
             ]
@@ -877,6 +854,7 @@ function createMainWIndow() {
               },
               { 
                 label: 'Add master flag', 
+                accelerator: "CmdOrCtrl+q",
                 click: () => {
                   console.log('MAIN: Edit master'); 
                   resolve("addMaster");                      
@@ -903,8 +881,6 @@ function createMainWIndow() {
        
       const menu = Menu.buildFromTemplate(template);
       menu.popup(BrowserWindow.fromWebContents(event.sender));
-
-     
     });
   });
   ipcMain.handle("RegistertAgeFromCsv", async (_e, age_path) => {
@@ -1023,6 +999,84 @@ function createMainWIndow() {
 
     
   });
+  ipcMain.handle("InitiariseTempCore", async (_e) => {
+    //import modeln
+    tempCore = new LevelCompilerCore();
+    tempCore.addProject("correlation","temp");
+    tempCore.addHole([1,null,null,null],"temp");
+    console.log("MAIN: Project correlation data is initiarised.");
+    return tempCore;
+  });
+  
+  ipcMain.handle("LabelerAddSectionData", async (_e, holeName, sectionName) => {
+    //change temp hole name
+    tempCore.changeName([1,1,null,null],holeName);
+
+    //add section
+    let inData = {
+      name:null,
+      distance_top:null,
+      distance_bottom:null,
+      dd_top:null,
+      dd_bottom:null,
+    };
+    inData.name = sectionName;
+    inData.distance_top = 0;
+    inData.distance_bottom = 100;
+    inData.dd_top = 0;
+    inData.dd_bottom = 100;
+    tempCore.addSection([1,1,null,null], inData);
+
+    return tempCore;
+  });
+  ipcMain.handle("LabelerAddMarkerData", async (_e, name, depth, relative_x) => {
+    console.log(name, depth, relative_x)
+    //add marker
+    tempCore.addMarker([1,1,1,null],depth,"distance",relative_x);
+    const nearMarkers = tempCore.getMarkerIdsByDistance([1,1,1,null],depth);
+
+    if(nearMarkers[2]==0){
+      tempCore.changeName(nearMarkers[0], name);
+    }else if(nearMarkers[3]==0){
+      tempCore.changeName(nearMarkers[1], name);
+    }
+    tempCore.sortModel();
+
+    return tempCore;
+  });
+  ipcMain.handle("LabelerChangeMarker", (_e, markerId, type, value) => {
+    //
+    const idx = tempCore.search_idx_list[markerId.toString()];
+    
+    if(type == "distance"){
+      //value:distance
+      const result = tempCore.changeDistance(markerId, parseFloat(value));
+      if(result == true){
+        return tempCore;
+      }else{
+        console.log("LABELER: "+result)
+        return tempCore;
+      }
+    }else if(type=="name"){
+      const result = tempCore.changeName(markerId, value)
+      if(result == true){
+        return tempCore;
+      }else{
+        console.log("LABELER: "+result)
+        return tempCore;
+      }
+    }
+  });
+  ipcMain.handle("LabelerDeleteMarker", (_e, markerId) => {
+    const result = tempCore.deleteMarker(markerId);
+    if(result == true){
+      return tempCore;
+    }else{
+      console.log("LABELER: "+result)
+      return tempCore;
+    }
+
+  });
   ipcMain.handle("OpenImporter", async (_e) => {
     if (importerWindow) {
       importerWindow.focus();
@@ -1118,6 +1172,7 @@ function createMainWIndow() {
     }
 
     const efd = LCCore.getEFDfromCD(cd);
+    console.log("1175EFD:      "+efd)
     if (efd == null) {
       return NaN;
     }
@@ -1462,7 +1517,13 @@ function createMainWIndow() {
       } else {
         converterWindow.webContents.openDevTools();
       }
-    } else if(data == "importer"){
+    } else if(data == "labeler"){
+      if (labelerWindow.webContents.isDevToolsOpened()) {
+        labelerWindow.webContents.closeDevTools();
+      } else {
+        labelerWindow.webContents.openDevTools();
+      }
+    }else if(data == "importer"){
       if (importerWindow.webContents.isDevToolsOpened()) {
         importerWindow.webContents.closeDevTools();
       } else {
@@ -1894,9 +1955,9 @@ function createMainWIndow() {
     LCCore.deleteMarker(targetId);
     console.log("MAIN: Delete target marker.");
   });
-  ipcMain.handle("addMarker", (_e, sectionId, depth, depthScale) => {
+  ipcMain.handle("addMarker", (_e, sectionId, depth, depthScale,relativeX) => {
     //add
-    LCCore.addMarker(sectionId, depth, depthScale);
+    LCCore.addMarker(sectionId, depth, depthScale, relativeX);
 
     console.log("MAIN: Add a new marker on the section: " + sectionId +" of " + depth +" cm "+depthScale);
   });
@@ -2065,12 +2126,44 @@ function createMainWIndow() {
       return result;
     }
   });
+  ipcMain.handle("mergeProjects", (_e) => {
+    const result = LCCore.mergeProjects();
+
+    if (result == true) {
+      console.log("MAIN: Merge projects completed.");
+      return result;
+    } else {
+      console.log("MAIN: Failed to merge projects.");
+      return result
+    }
+  });
   //--------------------------------------------------------------------------------------------------
   //--------------------------------------------------------------------------------------------------
 }
 //===================================================================================================================================
 
 //--------------------------------------------------------------------------------------------------
+let activeThreads = 0;
+function startMakeModelImageWorker(data) {
+  return new Promise((resolve, reject) => {
+    activeThreads++;
+    //console.log(`Active threads: ${activeThreads}`);
+
+    const worker = new Worker(path.join(__dirname, './LC_modules/makeModelImageWorker.js'), {
+      workerData: { data },
+    });
+
+    worker.on('message', result=>{
+      activeThreads--;
+      //console.log(`Active threads: ${activeThreads}`);
+      resolve(result)
+    });
+    worker.on('error', reject);
+    worker.on('exit', (code) => {
+      if (code !== 0) reject(new Error(`MAIN: Worker stopped with exit code ${code}`));
+    });
+  });
+}
 function progressDialog(window, tit, txt){
   let progress = new ProgressBar({
     title: tit,
@@ -2089,18 +2182,7 @@ function progressDialog(window, tit, txt){
     },
     closeOnComplete:true,
   });
-
-  /*
-  progress
-    .on("completed", () => {
-      //console.info("Task completed.");
-      progress.detail = "Task completed. Exiting...";
-      progress.close();
-    })
-    .on("aborted", (value) => {
-      console.info(`Task aborted... ${value}`);
-    });
-  */
+  
   return progress;
 }
 async function updateProgress(progress, n, N){
@@ -2157,6 +2239,23 @@ async function getDirectory(mainWindow, title) {
     console.log(err);
     return null;
   }
+}
+function findFileInDir(dir, fileName) {
+  let results = [];
+
+  const files = fs.readdirSync(dir);
+  for (const file of files) {
+      const filePath = path.join(dir, file);
+      const stat = fs.statSync(filePath);
+
+      if (stat.isDirectory()) {
+          results = results.concat(findFileInDir(filePath, fileName));
+      } else if (file === fileName) {
+          results.push(filePath);
+      }
+  }
+
+  return results;
 }
 //--------------------------------------------------------------------------------------------------
 async function putcsvfile(mainWindow, data) {

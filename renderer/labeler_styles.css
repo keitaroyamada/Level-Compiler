@@ -1,0 +1,163 @@
+body{
+  display: flex;
+  flex-direction: row;
+  overflow-y: hidden;
+  overflow-x: hidden;
+}
+
+html {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  overflow-y: hidden;
+  overflow-x: hidden;
+  display: flex;
+  flex-direction: row;
+}
+
+.container {
+  display: flex;
+  height: 100%;
+  overflow-y: hidden;
+  overflow-x: hidden;
+  position: relative;
+  background-color: transparent;
+}
+
+.base {
+  height: 100%;
+  overflow-y: hidden;
+  overflow-x: hidden;
+  position: relative;
+  background-color: transparent;
+}
+
+#options {
+  display: flex;
+  flex-direction: row;
+}
+
+#importButton {
+  width: 100px;
+  height: 20px;
+  margin-top: 10px;
+  margin-left: 100px;
+}
+
+#exportButton {
+  width: 100px;
+  height: 20px;
+  margin-top: 10px;
+  margin-left: 20px;
+}
+
+
+#scroller {
+  /*Size is displayed size*/
+  top: 0px;
+  width: 100%;
+  height: 500px;
+  /*border: 1px solid lightblue;*/
+  overflow-y: scroll;
+  overflow-x: scroll;
+  display: block;
+  z-index: 1;
+  background-color: transparent;
+}
+
+#canvasBase {
+  /*Size is virtual full size. make blank area for getting scroll.*/
+  overflow: hidden;
+  position: relative;
+
+  width: 2000px;
+  height: 2000px;
+  background-color: transparent;
+}
+
+#p5Canvas {
+  width: 1000px;
+  height: 1000px;
+  top: 0px;
+  left: 0px;
+  z-index: 0;
+  position: absolute;
+  pointer-events: none;
+  background-color: transparent;
+}
+
+#toolbar {
+  width: 100%;
+  height: 40px;
+  flex-shrink: 0;
+  display: flex;
+  background-color: transparent;/*#f0f0f0;*/
+  flex-direction: row;
+  gap: 0px;
+  padding: 0px;
+  z-index: 100;
+}
+#bt_change_distance {
+  box-sizing: border-box;
+  width: 40px;
+  height: 40px;
+  border: 1px solid gray;
+  z-index: 10;
+}
+#bt_change_distance img {
+  height: 75%;
+  width: 100%;
+  z-index: 10;
+}
+#bt_change_name {
+  box-sizing: border-box;
+  width: 40px;
+  height: 40px;
+  border: 1px solid gray;
+  z-index: 10;
+}
+#bt_change_name img {
+  height: 75%;
+  width: 100%;
+  z-index: 10;
+}
+#bt_add_marker {
+  box-sizing: border-box;
+  width: 40px;
+  height: 40px;
+  border: 1px solid gray;
+  z-index: 10;
+}
+#bt_add_marker img {
+  height: 75%;
+  width: 100%;
+  z-index: 10;
+}
+#bt_delete_marker {
+  box-sizing: border-box;
+  width: 40px;
+  height: 40px;
+  border: 1px solid gray;
+  z-index: 10;
+}
+#bt_delete_marker img {
+  height: 75%;
+  width: 100%;
+  z-index: 10;
+}
+
+footer {
+  display: flex;
+  justify-content: space-between;
+  margin: 0px;
+  height: 30px; /* height */
+  background-color: #f0f0f0; /* colour */
+  color: #333;
+  text-align: left;
+  line-height: 0px;
+  position: fixed;
+  bottom: 0;
+  width: 100%;
+  z-index: 10;
+}

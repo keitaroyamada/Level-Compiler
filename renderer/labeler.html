@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="Content-Security-Policy" content="script-src 'self'" />
+    <title>LC Labeler</title>
+    <link rel="stylesheet" href="labeler_styles.css" />
+    <script src="js/renderer_labeler.js" defer></script>
+    <script src="js/p5.min.js"></script>
+    <script src="js/p5.svg.js" defer></script>
+  </head>
+  <body>
+    <div class="container">
+      <div class="base">
+        <div id="options">
+          <div id="toolbar">
+            <button id="bt_change_distance" title="change_distance">
+              <img src="" alt="Redistance" />
+            </button>
+            <button id="bt_change_name" title="change_name">
+              <img src="" alt="Rename" />
+            </button>
+            <button id="bt_add_marker" title="add_marker">
+              <img src="" alt="Add marker" />
+            </button>
+            <button id="bt_delete_marker" title="delete_marker">
+              <img src="" alt="Delete marker" />
+            </button>
+    
+            <div id="importDiv">
+              <button id="importButton" title="import into Level Compiler">Import</button>
+            </div>
+            <div id="exportDiv">
+              <button id="exportButton" title="export as image">Export</button>
+            </div>
+          </div>
+        </div>
+        <hr>
+        <div class="base">
+        <div id="scroller">
+          <div id="canvasBase"></div>
+        </div>
+        <div id="p5Canvas"></div>  </body>
+      </div>
+    </div>
+  </body>
+  <footer id="footer">
+    <p id="footerLeftText">---</p>
+  </footer>
+    
+</html>

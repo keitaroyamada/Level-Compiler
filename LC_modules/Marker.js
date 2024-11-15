@@ -14,10 +14,11 @@ class Marker {
     this.connection_rank = null;
     this.isMaster = false;
     this.isZeroPoint = false; //if NOT zerpoint,"false", if START point, "value"(e.g. 8.4)
-    this.reliability = 1; //use calculation for CD and EFD. Core with smaller value is used preferenticall.
+    this.reliability = 1;  //legacy, use calculation for CD and EFD. Core with smaller value is used preferenticall.
     this.order = null;
     this.enable = true;
     this.depth_source = ["", null, null];
+    this.definition_relative_x = 0; //[0~1]: definitoin position on the photo
   }
 }
 

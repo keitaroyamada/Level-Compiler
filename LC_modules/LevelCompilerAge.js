@@ -8,6 +8,7 @@ const { Event } = require("./Event.js");
 const { Age } = require("./Age.js");
 const { AgeSet } = require("./AgeSet.js");
 var ss = require("simple-statistics");
+const { layouts } = require("chart.js");
 
 class LevelCompilerAge {
   //private properties
@@ -251,7 +252,6 @@ class LevelCompilerAge {
   getAgeFromEFD(efd, method) {
     const targetAgeModelId = this.selected_id;
     let output = {age: { type: null, mid: null, upper: null, lower: null }, age_idx:null};
-    let interpolatedAge = null;
 
     if(method == "linear"){
       //get access index
@@ -300,6 +300,28 @@ class LevelCompilerAge {
     return output;
   }
   //sub functions
+  linearInterp(D1, D3, d2d1, d3d1){
+    //D1:   upper marker depth (e.g. CD/EFD) parseFloat(upperMarkerData[calcType]);
+    //D3:   lower marker depth (e.g. CD/EFD) parseFloat(lowerMarkerData[calcType]);
+    //d2d1: distance between target-upper (e.g. distance) -1 * parseFloat(this.calcCDistance(upperMarkerData, targetMarkerData));
+    //d3d1: distance between target-lower (e.g. distance) parseFloat(this.calcCDistance(lowerMarkerData, targetMarkerData)) - parseFloat(this.calcCDistance(upperMarkerData, targetMarkerData));
+    //output(D2): target marker depth(e.g.CD/EFD)
+
+    let output = null;
+    d2d1 = Math.abs(d2d1);
+    d3d1 = Math.abs(d3d1);
+    let D2 = null;
+    if (d3d1 == 0) {
+      //case defined markers on the duplicated same distance marker(e.g. core top)
+      D2 = D1;
+    } else {
+      D2 = D1 + (d2d1 / d3d1) * (D3 - D1);
+    }
+    if (!isNaN(D2) && D2 !== null) {
+      output = D2;
+    }
+    return output;
+  }
   interpolate(upperAgeData, lowerAgeData, target, efd, method) {
     if (method == "linear") {
       //simply interpolate by linear method
@@ -325,17 +347,16 @@ class LevelCompilerAge {
       const l_age_u = l_age - parseFloat(lowerAgeData.age_upper_1std);
       const l_age_l = l_age + parseFloat(lowerAgeData.age_lower_1std);
 
-      //console.log(u_efd + "/" + l_efd + "/" + u_age + "/" + l_age + "/" + efd);
       //calc
       let interp_mid = null;
       let interp_upper = null;
       let interp_lower = null;
       if (target == "age") {
-        interp_mid = interp([u_efd, l_efd], [u_age, l_age], efd);
+        interp_mid   = interp([u_efd, l_efd], [u_age, l_age], efd);
         interp_upper = interp([u_efd, l_efd], [u_age_u, l_age_u], efd);
         interp_lower = interp([u_efd, l_efd], [u_age_l, l_age_l], efd);
       } else if (target == "efd") {
-        interp_mid = interp([u_age, l_age], [u_efd, l_efd], efd);
+        interp_mid   = interp([u_age, l_age], [u_efd, l_efd], efd);
         interp_upper = interp([u_age_u, l_age_u], [u_efd, l_efd], efd);
         interp_lower = interp([u_age_l, l_age_l], [u_efd, l_efd], efd);
       }

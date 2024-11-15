@@ -4,6 +4,7 @@ const { contextBridge, ipcRenderer, webUtils } = require("electron");
 contextBridge.exposeInMainWorld("LCapi", {
 
   getFilePath: (args) => ipcRenderer.invoke("getFilePath", webUtils.getPathForFile(args)),
+  getFilesInDir: (args1,args2) => ipcRenderer.invoke("getFilesInDir",args1,args2),
 
   //rederer <-> main
   Test: (args1, args2) => ipcRenderer.invoke("test", args1, args2),
@@ -61,7 +62,7 @@ contextBridge.exposeInMainWorld("LCapi", {
   connectMarkers: (args1,args2,args3) => ipcRenderer.invoke("connectMarkers", args1,args2,args3),
   disconnectMarkers: (args1,args2,args3) => ipcRenderer.invoke("disconnectMarkers", args1,args2,args3),
   deleteMarker: (args1) => ipcRenderer.invoke("deleteMarker", args1),
-  addMarker: (args1,args2,args3) => ipcRenderer.invoke("addMarker", args1,args2,args3),
+  addMarker: (args1,args2,args3,args4) => ipcRenderer.invoke("addMarker", args1,args2,args3,args4),
   changeMarker: (args1,args2,args3) => ipcRenderer.invoke("changeMarker", args1,args2,args3),
   changeSection: (args1,args2,args3) => ipcRenderer.invoke("changeSection", args1,args2,args3),
   deleteSection: (args1,args2) => ipcRenderer.invoke("deleteSection", args1,args2),
@@ -72,6 +73,7 @@ contextBridge.exposeInMainWorld("LCapi", {
   addProject: (args1,args2) => ipcRenderer.invoke("addProject", args1,args2),
   deleteProject: (args1) => ipcRenderer.invoke("deleteProject", args1),
   changeProject: (args1,args2,args3) => ipcRenderer.invoke("changeProject", args1,args2,args3),
+  mergeProjects: () => ipcRenderer.invoke("mergeProjects"),
   RegisterAgeFromLCAge: () => ipcRenderer.invoke('RegisterAgeFromLCAge'),
   SetZeroPoint: (args1,args2) => ipcRenderer.invoke("SetZeroPoint", args1,args2),
   SetMaster: (args1,args2) => ipcRenderer.invoke("SetMaster", args1,args2),
