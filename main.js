@@ -122,7 +122,7 @@ function createMainWIndow() {
           //accelerator: "CmdOrCtrl+S",
           click: async () => {
             const inData = await loadmodelfile()
-            console.log(inData)
+            //console.log(inData)
             if(inData!==null){
               Object.assign(LCCore, inData.LCCore);
               Object.assign(LCAge, inData.LCAge);
@@ -270,7 +270,7 @@ function createMainWIndow() {
           },
         },
         {
-          label: "Labeler(under construction)",
+          label: "Labeler",
           click: () => {
             if (labelerWindow) {
               labelerWindow.focus();
@@ -302,7 +302,7 @@ function createMainWIndow() {
             labelerWindow.once("ready-to-show", () => {
               labelerWindow.show();
               //labelerWindow.setAlwaysOnTop(true, "normal");
-              labelerWindow.webContents.openDevTools();
+              //labelerWindow.webContents.openDevTools();
               //converterWindow.setAlwaysOnTop(true, "normal");
               labelerWindow.webContents.send("LabelerMenuClicked", "export");
             });
@@ -462,10 +462,10 @@ function createMainWIndow() {
     };
     
     let finder_icons ={
-      fixed:path.join(resourcePath, "resources","tool","fixed.png"),
-      linked:path.join(resourcePath, "resources","tool","linked.png"),
-      fix:path.join(resourcePath, "resources","tool","fix.png"),
-      link:path.join(resourcePath, "resources","tool","link.png"),
+      fixed:  path.join(resourcePath, "resources","tool","fixed.png"),
+      linked: path.join(resourcePath, "resources","tool","linked.png"),
+      fix:    path.join(resourcePath, "resources","tool","fix.png"),
+      link:   path.join(resourcePath, "resources","tool","link.png"),
     };
 
     let labeler_icons = {
@@ -586,8 +586,8 @@ function createMainWIndow() {
     try {
       //path.join(__dirname.replace(/\\/g, "/"), im_path)
       const imageBuffer = fs.readFileSync(im_path);
-      console.log(im_path)
-      if (Resize != 0) {
+      //console.log(im_path)
+      if (Resize !== 0) {
         const metadata = await sharp(imageBuffer).metadata();
         const new_size = { height: Resize, width: 1 };
 
@@ -600,7 +600,10 @@ function createMainWIndow() {
           return resizedBuffer.toString("base64");
         } else {
           //console.log("original");
-          return imageBuffer.toString("base64");
+          const resizedBuffer = await sharp(imageBuffer)
+            .resize({ height: new_size.height })
+            .toBuffer();
+          return resizedBuffer.toString("base64");
         }
       } else {
         return imageBuffer.toString("base64");
@@ -1004,7 +1007,7 @@ function createMainWIndow() {
     tempCore = new LevelCompilerCore();
     tempCore.addProject("correlation","temp");
     tempCore.addHole([1,null,null,null],"temp");
-    console.log("MAIN: Project correlation data is initiarised.");
+    console.log("MAIN: Labeler Project data is initiarised.");
     return tempCore;
   });
   
@@ -1030,7 +1033,6 @@ function createMainWIndow() {
     return tempCore;
   });
   ipcMain.handle("LabelerAddMarkerData", async (_e, name, depth, relative_x) => {
-    console.log(name, depth, relative_x)
     //add marker
     tempCore.addMarker([1,1,1,null],depth,"distance",relative_x);
     const nearMarkers = tempCore.getMarkerIdsByDistance([1,1,1,null],depth);
@@ -1172,7 +1174,6 @@ function createMainWIndow() {
     }
 
     const efd = LCCore.getEFDfromCD(cd);
-    console.log("1175EFD:      "+efd)
     if (efd == null) {
       return NaN;
     }

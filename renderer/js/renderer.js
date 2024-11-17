@@ -2878,6 +2878,48 @@ document.addEventListener("DOMContentLoaded", () => {
         updateView();
       }
     }
+
+    // Ctrl + Z => Undo model
+    if (event.ctrlKey && event.key === "0") {
+      //reset zoom
+      if (LCCore) {
+        objOpts.canvas.zoom_level = [4,3];
+  
+        
+        //mouse position
+        const relative_scroll_pos_x =
+        scroller.scrollLeft / scroller.scrollWidth;
+      const relative_scroll_pos_y =
+        scroller.scrollTop / scroller.scrollHeight;
+  
+      //calc new canvas size
+      //makeRasterObjects(false); //make only base canvas
+      makeP5CanvasBase();
+      const canvasBase_height = parseInt(
+        canvasBase.style.height.match(/\d+/)[0],
+        10
+      );
+      const canvasBase_width = parseInt(
+        canvasBase.style.width.match(/\d+/)[0],
+        10
+      );
+  
+      //get new scroll pos
+      const new_scroll_pos_x = canvasBase_width * relative_scroll_pos_x;
+      const new_scroll_pos_y = canvasBase_height * relative_scroll_pos_y;
+  
+      let x = new_scroll_pos_x;
+      let y = new_scroll_pos_y;
+  
+      scroller.scrollTo(x, y); //move scroll position
+  
+      //update data
+      canvasPos = [x, y];
+  
+      //update plot
+      updateView();
+      }
+    }
     //Shift +1/2 => add masterflag
     if(LCCore){
       if(objOpts.edit.editable){

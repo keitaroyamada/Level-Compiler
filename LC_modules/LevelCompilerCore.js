@@ -3726,11 +3726,9 @@ class LevelCompilerCore {
     
   }
   changeName(targetId, value){
-    console.log(targetId)
     this.updateSearchIdx();
     const idx = this.search_idx_list[targetId.toString()];
     const targetData = this.getDataByIdx(idx);
-    console.log(targetData.name)
 
      //check duplicate
     let isUsed = false;

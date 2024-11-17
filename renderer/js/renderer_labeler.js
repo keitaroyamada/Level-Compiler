@@ -2,12 +2,12 @@ document.addEventListener("DOMContentLoaded", () => {
   //-------------------------------------------------------------------------------------------
   const scroller = document.getElementById("scroller");
   let canvasBase = document.getElementById("canvasBase");
-  let original_image_height = 20000;
+  let original_image_height = 10000;
   let zoom_rate = [0.3, 0.3];
   let relative_pos = [0, 0];
   let mousePos = [0,0];
   let canvasPos = [0, 0]; //canvas scroller position
-  let pad = [500,200];
+  let pad = [0,0];
   let tempCore = null;
   //initiarise
   let vectorObjects = null; //p5 instance data
@@ -18,7 +18,7 @@ document.addEventListener("DOMContentLoaded", () => {
   let rect = null;
   loadToolIcons();
   resizeScroller();
-  document.body.style.cursor = "crosshair"; 
+  
   let modelImages = {
     image_dir: [],
     load_target_ids: [],
@@ -45,9 +45,10 @@ document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("scroller").addEventListener("drop", async (e) => {
     e.preventDefault(e);
     if(tempCore !== null){
-      tempCore = await window.LabelerApi.InitiariseTempCore();
+      
     }
-
+    initiarise();
+    resizeScroller();
 
     //get list
     let dataList = [];
@@ -55,7 +56,6 @@ document.addEventListener("DOMContentLoaded", () => {
       const fileParseData = await window.LabelerApi.getFilePath(file);
       dataList.push(fileParseData);
     }
-
     //check
     let order = [];
 
@@ -68,7 +68,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
     if(order.length > 0){
       //load first image
+      console.log(modelImages)
       modelImages = await loadCoreImage(modelImages, dataList[0])
+
       console.log(modelImages)
       if(Object.keys(modelImages.drilling_depth).length>0){
         console.log("[Labeler]: Section image loaded: "+holeName+"-"+sectionName);
@@ -198,6 +200,7 @@ document.addEventListener("DOMContentLoaded", () => {
     console.log(objOpts.tool_on)
     //main
     if (objOpts.tool_on !== "add_marker") {
+      document.body.style.cursor = "crosshair"; 
       
       objOpts.tool_on = "add_marker";
       document.getElementById("bt_add_marker").style.backgroundColor = "#ccc";
@@ -206,6 +209,8 @@ document.addEventListener("DOMContentLoaded", () => {
       objOpts.handleMove = handleMarkerMouseMove;
       document.addEventListener("mousemove", objOpts.handleMove);
     } else {
+      document.body.style.cursor = "default"; 
+
       objOpts.tool_on = false;
       document.getElementById("bt_add_marker").style.backgroundColor = "#f0f0f0";
       
@@ -236,6 +241,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
     //main
     if (objOpts.tool_on!=="change_marker_distance") {
+      document.body.style.cursor = "crosshair"; 
+
       objOpts.tool_on = "change_marker_distance";
       document.getElementById("bt_change_distance").style.backgroundColor = "#ccc";
 
@@ -243,6 +250,8 @@ document.addEventListener("DOMContentLoaded", () => {
       objOpts.handleMove = handleMarkerMouseMove;
       document.addEventListener("mousemove", objOpts.handleMove);
     } else {
+      document.body.style.cursor = "default"; 
+
       objOpts.tool_on = false;
       document.getElementById("bt_change_distance").style.backgroundColor = "#f0f0f0";
       
@@ -273,6 +282,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
     //main
     if (objOpts.tool_on !== "change_marker_name") {
+      document.body.style.cursor = "crosshair"; 
+
       objOpts.tool_on= "change_marker_name";
       document.getElementById("bt_change_name").style.backgroundColor = "#ccc";
 
@@ -280,6 +291,8 @@ document.addEventListener("DOMContentLoaded", () => {
       objOpts.handleMove = handleMarkerMouseMove;
       document.addEventListener("mousemove", objOpts.handleMove);
     } else {
+      document.body.style.cursor = "default"; 
+
       objOpts.tool_on = false;
       document.getElementById("bt_change_name").style.backgroundColor = "#f0f0f0";
       
@@ -300,6 +313,7 @@ document.addEventListener("DOMContentLoaded", () => {
       objOpts.handleMove = null;
     }
     if(objOpts.handleClick !== null){
+      document.body.style.cursor = "default"; 
       document.removeEventListener('click', objOpts.handleClick);
       objOpts.handleClick = null;
     }
@@ -310,6 +324,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
     //main
     if (objOpts.tool_on !== "delete_marker") {
+      document.body.style.cursor = "crosshair"; 
+
       objOpts.tool_on = "delete_marker";
       document.getElementById("bt_delete_marker").style.backgroundColor = "#ccc";
 
@@ -317,6 +333,8 @@ document.addEventListener("DOMContentLoaded", () => {
       objOpts.handleMove = handleMarkerMouseMove;
       document.addEventListener("mousemove", objOpts.handleMove);
     } else {
+      document.body.style.cursor = "default"; 
+
       objOpts.tool_on = false;
       document.getElementById("bt_change_name").style.backgroundColor = "#f0f0f0";
       
@@ -602,18 +620,30 @@ document.addEventListener("DOMContentLoaded", () => {
     
   }
   document.getElementById("exportButton").addEventListener("click", async (event) => {
+    //initiarise
+    objOpts.hittest = null;
+    objOpts.marker_from = null;
+    objOpts.marker_to = null;
+    objOpts.mode = null;
+    if(objOpts.handleMove!==null){
+      document.removeEventListener('mousemove', objOpts.handleMove);
+      objOpts.handleMove = null;
+    }
+    if(objOpts.handleClick !== null){
+      document.removeEventListener('click', objOpts.handleClick);
+      objOpts.handleClick = null;
+    }
+    document.getElementById("bt_change_distance").style.backgroundColor = "#f0f0f0";
+    document.getElementById("bt_change_name").style.backgroundColor = "#f0f0f0";
+    document.getElementById("bt_add_marker").style.backgroundColor = "#f0f0f0";
+    document.getElementById("bt_delete_marker").style.backgroundColor = "#f0f0f0";
+
+    //main
     if(tempCore){
-      const sectionData = tempCore.projects[0].holes[0].sections[0];
-      const sectionHeight = sectionData.markers[sectionData.markers.length-1].distance - sectionData.markers[0];
-      const dpcm = 50;
-      const canvasWidth = 2000;
-      const canvasHeight= parseInt(dpcm * sectionHeight);
-    
+
+      zoom_rate = [1.0,1.0];
       const targetCanvas = new p5(exportSketch);
-
       saveBuffer();
-
-
       
     }
   });
@@ -621,12 +651,50 @@ document.addEventListener("DOMContentLoaded", () => {
     if (e.key === "F12") {
       window.LabelerApi.toggleDevTools("labeler");
     }
-    if (e.code === "Space") {
+    if (e.ctrlKey && e.key === "0") {
       zoom_rate = [0.3, 0.3];
       scroller.scrollTo(0,0); 
     }
   });
 //-------------------------------------------------------------------------------------------
+  async function initiarise(){
+    await window.LabelerApi.InitiariseTempCore();
+
+    original_image_height = 10000;
+    zoom_rate = [0.3, 0.3];
+    relative_pos = [0, 0];
+    mousePos = [0,0];
+    canvasPos = [0, 0]; //canvas scroller position
+    pad = [1200,500];
+    tempCore = null;
+    //initiarise
+    //vectorObjects = null; //p5 instance data
+    isSVG = false;
+    isDev = true;
+    holeName = "";
+    sectionName = "";
+    rect = null;
+    modelImages = {
+      image_dir: [],
+      load_target_ids: [],
+      drilling_depth: {},
+      composite_depth: {},
+      event_free_depth: {},
+      age:{},
+    };
+    objOpts = {
+      tool_on: false,
+      hittest: null,
+      marker_from: null,
+      marker_to: null,
+      mode: null,
+      handleMove: null,
+      handleClick: null,
+      sensibility:20,
+    };
+    return
+  }
+
   function wait(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
   }
@@ -677,6 +745,7 @@ document.addEventListener("DOMContentLoaded", () => {
                       console.log("[Labeler]: Fail to load image of " + im_name);
                     }
                   );
+                  console.log("Loaded image Info: \n", results["drilling_depth"][im_name])
                 } else {
                   results["drilling_depth"][im_name] = undefined;
                 }
@@ -698,11 +767,14 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
   function resizeScroller() {
-    const toolbarHeight = document.getElementById('toolbar').offsetHeight;
-    const optionsHeight = document.getElementById('options').offsetHeight;
-    const footerHeight = document.getElementById('footer').offsetHeight;
+    const toolbarHeight  = document.getElementById('toolbar').offsetHeight;
+    const optionsHeight  = document.getElementById('options').offsetHeight;
+    const footerHeight   = document.getElementById('footer').offsetHeight;
     const scrollerHeight = window.innerHeight - toolbarHeight - optionsHeight - footerHeight/2;
+    //const scrollerWidth  = window.innerWidth;
+    
     document.getElementById('scroller').style.height = `${scrollerHeight}px`;
+    //document.getElementById('scroller').style.width  = `${scrollerWidth}px`;
   }
   function makeP5CanvasBase() {
     let canvasBaseWidth  = 5000;//scroller.clientWidth 
@@ -722,17 +794,17 @@ document.addEventListener("DOMContentLoaded", () => {
   function updateView() {
     if (vectorObjects == null) {
       vectorObjects = new p5(p5Sketch);
-    }
-
-    resizeScroller();
-    document.getElementById("p5Canvas").style.display = "block";
-
-    makeP5CanvasBase();
-    //vectorObjects.clear();
-    vectorObjects.clear();
-    vectorObjects.redraw();
-
- 
+      resizeScroller();
+      document.getElementById("p5Canvas").style.display = "block";
+      makeP5CanvasBase();
+      vectorObjects.redraw();
+    }else{
+      resizeScroller();
+      document.getElementById("p5Canvas").style.display = "block";
+      makeP5CanvasBase();
+      vectorObjects.clear();
+      vectorObjects.redraw();
+    } 
   }
   function calcRelativePos(){
     let rx = -1;
@@ -879,27 +951,27 @@ document.addEventListener("DOMContentLoaded", () => {
       //translate plot position
       sketch.push(); //save
       sketch.translate(-canvasPos[0], -canvasPos[1]);
-      try{
-        if(Object.keys(modelImages["drilling_depth"]).length>0){
-          if(modelImages["drilling_depth"][holeName+"-"+sectionName]){
-            sketch.image(
-              modelImages["drilling_depth"][holeName+"-"+sectionName],
-              pad[0] * zoom_rate[0],
-              pad[1] * zoom_rate[1],
-              modelImages["drilling_depth"][holeName+"-"+sectionName].width * zoom_rate[0],
-              modelImages["drilling_depth"][holeName+"-"+sectionName].height * zoom_rate[1],
-            );
-
-          }else{
-            console.log("There is no such a image: "+holeName+"-"+sectionName)
-          }
-        }        
-      } catch (error) {
-        console.error(error);
-      }
+      
+      if(Object.keys(modelImages["drilling_depth"]).length>0){
+        try{          
+            if(modelImages["drilling_depth"][holeName+"-"+sectionName]){
+              sketch.image(
+                modelImages["drilling_depth"][holeName+"-"+sectionName],
+                pad[0] * zoom_rate[0],
+                pad[1] * zoom_rate[1],
+                modelImages["drilling_depth"][holeName+"-"+sectionName].width * zoom_rate[0],
+                modelImages["drilling_depth"][holeName+"-"+sectionName].height * zoom_rate[1],
+              );
+            }else{
+              console.log("There is no such a image: "+holeName+"-"+sectionName)
+            }
+        } catch (error) {
+          console.error(error);
+        }
+      }      
 
       //main
-      if(tempCore){
+      if(tempCore !== null){
         const sectionTop    = zoom_rate[1] * pad[1];
         const sectionBottom = zoom_rate[1] * (pad[1]+ modelImages["drilling_depth"][holeName+"-"+sectionName].height);
         const sectionLeft   = zoom_rate[0] * pad[0];
@@ -1035,14 +1107,44 @@ document.addEventListener("DOMContentLoaded", () => {
       resizeScroller();
       sketch.resizeCanvas(scroller.clientWidth, scroller.clientHeight);
     };
-    sketch.keyPressed = () => {
-      if (sketch.key === 's' || sketch.key === 'S') {
-        sketch.saveCanvas("name","jpg")
-      }
-  };
   }
+
+  //---------------------------------------------------------
   let saveBuffer;
+  let OutSizeType = "fix_dpcm";//cm
+  const dpcm = 100;
+  const density = 1;
   const exportSketch = (sketch) => {
+
+    let outSize = [0,0];//less than 20000px
+    let drawSize = [0,0];
+    let mod = 1;
+    let r = 1;
+    if(OutSizeType == "relative"){
+      const coreLength = tempCore.projects[0].holes[0].sections[0].markers[tempCore.projects[0].holes[0].sections[0].markers.length-1].distance - tempCore.projects[0].holes[0].sections[0].markers[0].distance;
+      outSize[0] = parseInt(600 + pad[0] * 2 + modelImages["drilling_depth"][holeName+"-"+sectionName].width * density);
+      outSize[1] = parseInt(coreLength * dpcm  * density + 3000);
+      if(outSize[1]>=20000){
+        mod = 20000/outSize[1];//limit size
+      }
+    }else if(OutSizeType=="fix_outsize"){
+      drawSize[0] = pad[0] * 2 + modelImages["drilling_depth"][holeName+"-"+sectionName].width;
+      drawSize[1] = pad[1] * 2 + modelImages["drilling_depth"][holeName+"-"+sectionName].height;
+      outSize[0]  = pad[0] * 2 + modelImages["drilling_depth"][holeName+"-"+sectionName].width;
+      outSize[1]  = pad[1] * 2 + modelImages["drilling_depth"][holeName+"-"+sectionName].height;
+    }else if(OutSizeType=="fix_dpcm"){
+      const coreLength = tempCore.projects[0].holes[0].sections[0].markers[tempCore.projects[0].holes[0].sections[0].markers.length-1].distance - tempCore.projects[0].holes[0].sections[0].markers[0].distance;
+      r = (pad[1] * 2 + 100 * 100) / (pad[1] * 2+ coreLength * 100);//load size(cm)/actural size(cm)
+      console.log("Load size:"+modelImages["drilling_depth"][holeName+"-"+sectionName].width+","+modelImages["drilling_depth"][holeName+"-"+sectionName].height)
+      console.log("Modified rate: "+ r+"(100/"+coreLength+")")
+
+      drawSize[0] =  pad[0] * 2 + modelImages["drilling_depth"][holeName+"-"+sectionName].width;
+      drawSize[1] =  pad[1] * 2 + modelImages["drilling_depth"][holeName+"-"+sectionName].height;
+      outSize[0]  = (pad[0] * 2 + modelImages["drilling_depth"][holeName+"-"+sectionName].width) * (1/r);
+      outSize[1]  =  pad[1] * 2 + (parseInt(coreLength * dpcm  * density));
+    }
+    
+
     sketch.setup = () => {
       let sketchCanvas = null;
       sketchCanvas = sketch.createCanvas(
@@ -1051,8 +1153,8 @@ document.addEventListener("DOMContentLoaded", () => {
         sketch.P2D
       );
 
-      buffer = sketch.createGraphics(5000,10000,sketch.P2D);
-      buffer.pixelDensity(2);
+      buffer = sketch.createGraphics(drawSize[0], drawSize[1], sketch.P2D);
+      buffer.pixelDensity(density);
       sketch.strokeWeight(2);
       sketch.stroke("#ED225D");
 
@@ -1065,7 +1167,7 @@ document.addEventListener("DOMContentLoaded", () => {
       buffer.background(255)
       //translate plot position
       buffer.push(); //save
-      buffer.translate(-canvasPos[0], -canvasPos[1]);
+      buffer.translate(0, 0);
       
       try{
         if(Object.keys(modelImages["drilling_depth"]).length>0){
@@ -1094,145 +1196,143 @@ document.addEventListener("DOMContentLoaded", () => {
         const sectionRight  = zoom_rate[0] * (pad[0]+ modelImages["drilling_depth"][holeName+"-"+sectionName].width);
         const sectionTopDistance    = tempCore.projects[0].holes[0].sections[0].markers[0].distance;
         const sectionBottomDistance = tempCore.projects[0].holes[0].sections[0].markers[tempCore.projects[0].holes[0].sections[0].markers.length-1].distance;
+        const fontRate = 1.6 * r;
+
         for(let m=0; m<tempCore.projects[0].holes[0].sections[0].markers.length; m++){
           //calc marker position
           const relativeDistance = (tempCore.projects[0].holes[0].sections[0].markers[m].distance-sectionTopDistance)/(sectionBottomDistance-sectionTopDistance);
           const marker_y = sectionTop + (sectionBottom-sectionTop) * relativeDistance;
           const relativeX = tempCore.projects[0].holes[0].sections[0].markers[m].definition_relative_x;
 
+          //show section name
+          buffer.push();
+          buffer.strokeWeight(2);
+          buffer.stroke("Magenta");
+          buffer.line(sectionLeft, sectionTop, sectionRight, sectionTop);
+          
+          buffer.fill("black");
+          buffer.noStroke();
+          buffer.textFont("Arial");
+          buffer.textSize(fontRate*80);
+          //sketch.rotate((-90 / 180) * Math.PI);
+          const holeName = tempCore.projects[0].holes[0].name;
+          const secName  = tempCore.projects[0].holes[0].sections[0].name;
+          buffer.text(
+            holeName+"-"+secName, 
+            pad[0]*0.1,
+            pad[1]*0.5,
+          );
+          buffer.pop();
           //show top/bottom
           if(tempCore.projects[0].holes[0].sections[0].markers[m].name.includes("top")){
             buffer.push();
             buffer.strokeWeight(2);
-            buffer.stroke("Black");
+            buffer.stroke("Magenta");
             buffer.line(sectionLeft, sectionTop, sectionRight, sectionTop);
             
             buffer.fill("black");
             buffer.noStroke();
             buffer.textFont("Arial");
-            buffer.textSize(20);
+            buffer.textSize(fontRate*60);
             //sketch.rotate((-90 / 180) * Math.PI);
             buffer.text(
               "Top", 
-              sectionLeft + (sectionRight - sectionLeft)/2 -20, 
-              sectionTop -10
+              sectionLeft + (sectionRight - sectionLeft)/2 -100, 
+              sectionTop -70
             );
             buffer.pop();
           }
 
 
-
-          saveBuffer = () => {
-            let img = buffer.createImage(2000, 10000);
-
-            img.copy(
-              buffer,
-              0, 0, 1000, 2000,     // ソースの矩形（論理ピクセル）
-              0, 0, 2000, 10000    // デスティネーションの矩形（実際のピクセル）
-            );
-
-            img.save('croppedBuffer.png');
-            // /buffer.save('bufferImage.png');
-          };
-
-
-
           if(tempCore.projects[0].holes[0].sections[0].markers[m].name.includes("bottom")){
-            sketch.push();
-            sketch.strokeWeight(2);
-            sketch.stroke("Black");
-            sketch.line(sectionLeft, sectionBottom, sectionRight, sectionBottom);
+            buffer.push();
+            buffer.strokeWeight(2);
+            buffer.stroke("Black");
+            buffer.line(sectionLeft, sectionBottom, sectionRight, sectionBottom);
 
-            sketch.fill("black");
-            sketch.noStroke();
-            sketch.textFont("Arial");
-            sketch.textSize(20);
-            //sketch.rotate((-90 / 180) * Math.PI);
-            sketch.text(
+            buffer.fill("black");
+            buffer.noStroke();
+            buffer.textFont("Arial");
+            buffer.textSize(fontRate*60);
+            //buffer.rotate((-90 / 180) * Math.PI);
+            buffer.text(
               "Bottom", 
-              sectionLeft + (sectionRight - sectionLeft)/2 -40, 
-              sectionBottom + 20
+              sectionLeft + (sectionRight - sectionLeft)/2 -100, 
+              sectionBottom + 170
             );
-            sketch.pop();
+            buffer.pop();
           }
 
           //show markers
           if(!(tempCore.projects[0].holes[0].sections[0].markers[m].name.includes("top")&&tempCore.projects[0].holes[0].sections[0].markers[m].name.includes("bottom"))){
-            sketch.push();
-            sketch.strokeWeight(2);
-            sketch.stroke("Magenta");
-            sketch.line(
+            buffer.push();
+            buffer.strokeWeight(5);
+            buffer.stroke("Magenta");
+            buffer.line(
               sectionLeft + (sectionRight-sectionLeft)*relativeX, 
               marker_y, 
               sectionRight, 
               marker_y,
             );
-            sketch.pop();
+            buffer.pop();
           }
-          
-          //hittest marker
-          if(objOpts.hittest && ["change_marker_distance","change_marker_name","delete_marker"].includes(objOpts.mode)){
-            if(objOpts.hittest.nearest_marker == tempCore.projects[0].holes[0].sections[0].markers[m].id[3]){
-              if(Math.abs(objOpts.hittest.nearest_distance) <50){
-                sketch.push();
-                sketch.strokeWeight(5);
-                sketch.stroke("Red");
-                sketch.line(
-                  sectionLeft + (sectionRight-sectionLeft)*relativeX, 
-                  marker_y, 
-                  sectionRight, 
-                  marker_y,
-                );
-                sketch.pop();
-              }
-            }
-          }
-
-          //hittest cursol
-          if(objOpts.hittest && objOpts.mode == "add_marker"){
-            sketch.push();
-            sketch.strokeWeight(1);
-            sketch.stroke("Red");
-            sketch.line(
-              sectionLeft + (sectionRight-sectionLeft)*relativeX, 
-              sectionTop + (sectionBottom-sectionTop) * objOpts.hittest.relative_y,
-              sectionRight, 
-              sectionTop + (sectionBottom-sectionTop) * objOpts.hittest.relative_y,
-            );
-            sketch.pop();
-          }
-          
+                    
 
           //show distance
-          sketch.push();
-          sketch.fill("black");
-          sketch.noStroke();
-          sketch.textFont("Arial");
-          sketch.textSize(18);
-          //sketch.rotate((-90 / 180) * Math.PI);
-          sketch.text(
+          buffer.push();
+          buffer.fill("black");
+          buffer.noStroke();
+          buffer.textFont("Arial");
+          buffer.textSize(fontRate*50);
+          //buffer.rotate((-90 / 180) * Math.PI);
+          buffer.text(
             tempCore.projects[0].holes[0].sections[0].markers[m].distance.toFixed(1) + " cm", 
-            sectionRight + 10, 
+            sectionRight + 40, 
             marker_y,
           );
-          sketch.pop();
+          buffer.pop();
 
           //show name
-          sketch.push();
-          sketch.fill("black");
-          sketch.noStroke();
-          sketch.textFont("Arial");
-          sketch.textSize(18);
-          //sketch.rotate((-90 / 180) * Math.PI);
-          sketch.text(
+          buffer.push();
+          buffer.fill("black");
+          buffer.noStroke();
+          buffer.textFont("Arial");
+          buffer.textSize(fontRate*50);
+          //buffer.rotate((-90 / 180) * Math.PI);
+          buffer.text(
             tempCore.projects[0].holes[0].sections[0].markers[m].name, 
-            sectionLeft - sketch.textWidth(tempCore.projects[0].holes[0].sections[0].markers[m].name) -10, 
+            sectionLeft - buffer.textWidth(tempCore.projects[0].holes[0].sections[0].markers[m].name) -40, 
             marker_y,
           );
-          sketch.pop();
-
-
+          buffer.pop();
         }
+
+        //for export
+        saveBuffer = () => {
+          let img = buffer.createImage(drawSize[0], drawSize[1]);//output size
+         
+          console.log("Draw size: "+ parseInt(drawSize[0]) +","+ parseInt(drawSize[1]))
+          console.log("Out size: "+ parseInt(outSize[0]) +","+ parseInt(outSize[1]))
+
+          img.copy(
+            buffer,
+            0, 0, drawSize[0], drawSize[1],     // source size
+            0, 0, outSize[0], outSize[1],    // actural size
+          );
+          sketch.resizeCanvas(outSize[0], outSize[1]); // キャンバスをリサイズ
+          sketch.image(img, 0, 0);                    // トリミング後の画像を描画
+          sketch.saveCanvas('croppedBuffer', 'jpg');
+
+          
+          /*
+          img.copy(
+            buffer,
+            0, 0, drawSize[0], drawSize[1],     // source size
+            0, 0, outSize[0], outSize[1],    // actural size
+          );
+          img.save('croppedBuffer.jpg');
+          */
+        };
       }
       
     }    
