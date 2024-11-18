@@ -31,6 +31,10 @@ const { imPath, sectionData, imHeight, depthScale } = workerData.data;
     let operations = [];
     const d0 = sectionData.markers[0].distance;
     const m0 = sectionData.markers[0][depthScale];
+    let ageCorrection = 1;
+    if(depthScale=="age"){
+      ageCorrection=0.1;
+    }
     for (let i = 0; i < sectionData.markers.length - 1; i++) {
       const id = sectionData.markers[i].id;
       const name = sectionData.markers[i].name;
@@ -41,8 +45,8 @@ const { imPath, sectionData, imHeight, depthScale } = workerData.data;
 
       const fromP0 = (dTop - d0) * pixPerCm;
       const fromP1 = (dBottom - d0) * pixPerCm;
-      const toP0 = (mTop - m0) * pixPerCm;
-      const toP1 = (mBottom - m0) * pixPerCm;
+      const toP0 = (mTop - m0) * pixPerCm  * ageCorrection;
+      const toP1 = (mBottom - m0) * pixPerCm  * ageCorrection;
 
       operations.push({
         id: id,

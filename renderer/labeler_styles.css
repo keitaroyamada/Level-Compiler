@@ -2,7 +2,7 @@ body{
   display: flex;
   flex-direction: row;
   overflow-y: hidden;
-  overflow-x: hidden;
+  overflow-x: hidden;  
 }
 
 html {
@@ -28,17 +28,27 @@ html {
   background-color: transparent;
 }
 
-.base {
+.base0 {
   height: 100%;
-  width: 1;
+  width: 100%;
   overflow-y: hidden;
   overflow-x: hidden;
   position: relative;
   background-color: transparent;
 }
 
+.base {
+  height: 100%;
+  width: 1;
+  overflow-y: hidden;
+  overflow-x: hidden;
+  position: relative;
+  background-color: gray;
+}
+
 #options {
   display: flex;
+  width: 100%;
   flex-direction: row;
 }
 
@@ -110,6 +120,18 @@ html {
   z-index: 10;
 }
 #bt_change_distance img {
+  height: 75%;
+  width: 100%;
+  z-index: 10;
+}
+#bt_change_dd {
+  box-sizing: border-box;
+  width: 40px;
+  height: 40px;
+  border: 1px solid gray;
+  z-index: 10;
+}
+#bt_change_dd img {
   height: 75%;
   width: 100%;
   z-index: 10;

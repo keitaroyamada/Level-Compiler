@@ -9,6 +9,7 @@
 //portable: npx electron-builder --win --x64 --dir
 //npm run build:win
 //npm version prerelease --preid=beta
+//npm version prerelease --preid=alpha
 //npm version patch  ：1.0.0 → 1.0.1
 //npm version minor  ：1.0.0 → 1.1.0
 //npm version major  ：1.0.0 → 2.0.0
@@ -42,6 +43,7 @@ let LCCore = new LevelCompilerCore();
 let LCAge  = new LevelCompilerAge();
 let LCPlot = new LevelCompilerPlot();
 const history = new UndoManager();
+let labelerHistory = new UndoManager();
 let tempCore = null;
 
 //
@@ -224,9 +226,27 @@ function createMainWIndow() {
           ? [
               {
                 label: "Exit",
-                role: "quit",
                 accelerator: "CmdOrCtrl+W",
+                click: (menuItem, browserWindow, event) => {
+                  const options = {
+                    type: "question",
+                    buttons: ["No", "Yes"],
+                    defaultId: 0,
+                    title: "Confirm",
+                    message: "Are you sure you want to exit?",
+                  };
+
+                  const response = dialog.showMessageBoxSync(null, options);
+
+                  if (response === 1) {
+                    app.quit(); 
+                  }
+                },
               },
+
+              
+          
+              
             ]
           : []),
       ],
@@ -269,6 +289,7 @@ function createMainWIndow() {
             });
           },
         },
+        { type: "separator" },
         {
           label: "Labeler",
           click: () => {
@@ -308,7 +329,7 @@ function createMainWIndow() {
             });
           },
         },
-        { type: "separator" },
+        
         {
           label: "Edit correlation",
           accelerator: "CmdOrCtrl+E",
@@ -469,10 +490,11 @@ function createMainWIndow() {
     };
 
     let labeler_icons = {
-      bt_change_distance: path.join(resourcePath, "resources","tool","change_distance.png"),
-      bt_change_name:     path.join(resourcePath, "resources","tool","tag.png"),
-      bt_add_marker:      path.join(resourcePath, "resources","tool","add.png"),
-      bt_delete_marker:   path.join(resourcePath, "resources","tool","delete.png"),
+      bt_change_distance: path.join(resourcePath, "resources","tool","edit_distance.png"),
+      bt_change_dd:       path.join(resourcePath, "resources","tool","edit_dd.png"),
+      bt_change_name:     path.join(resourcePath, "resources","tool","edit_name.png"),
+      bt_add_marker:      path.join(resourcePath, "resources","tool","add_marker.png"),
+      bt_delete_marker:   path.join(resourcePath, "resources","tool","delete_marker.png"),
 
     };
   
@@ -514,6 +536,7 @@ function createMainWIndow() {
     //import modeln
     let results = path.parse(pathData);
     results.fullpath = path.join(results.dir, results.base);
+    results.imagepath = path.join(results.dir, results.name+".jpg");//force to rename for labeler
     return results;
   });
   ipcMain.handle("getFilesInDir", async (_e, dir, name) => {
@@ -522,7 +545,8 @@ function createMainWIndow() {
       //console.log("MAIN: Successfully get fullpath.");
       return results;
     }else{
-      console.log("MAIN: Failed to find fullpath.")
+      console.log("MAIN: Failed to find file of " + name);
+      return null;
     }
   });
   ipcMain.handle("RegisterModelFromCsv", async (_e, model_path) => {
@@ -573,6 +597,87 @@ function createMainWIndow() {
       return
     }catch(err){
       console.log("MAIN: Failed to load LC model.",err);
+    }
+  });
+  ipcMain.handle("addSectionFromLcsection", async (_e,pathData) => {
+    try {
+      //load
+      let sectionData = null;
+      if (pathData.fullpath !== null) {
+        const fileContent = fs.readFileSync(pathData.fullpath, 'utf8');
+        sectionData = JSON.parse(fileContent);
+      }else{
+        return "no_path";
+      }
+
+      //search target section
+      const holeName = pathData.name.split("-")[0];
+      const sectionName = pathData.name.split("-")[1];
+
+      let targetHoleIds = [];
+      for(let p=0;p<LCCore.projects.length;p++){
+        for(let h=0;h<LCCore.projects[p].holes.length;h++){
+          if(LCCore.projects[p].holes[h].name == holeName){
+            targetHoleIds.push(LCCore.projects[p].holes[h].id);
+            for(let s=0; s<LCCore.projects[p].holes[h].sections.length;s++){
+              if(LCCore.projects[p].holes[h].sections[s].name == sectionName){
+                //case duplicate section
+                return "duplicate_section";
+              }
+            }
+          }
+        }  
+      }
+
+      //check duplicate hole
+      if(targetHoleIds.length>1){
+        return "duplicate_hole"
+      }
+
+      //add blank section
+      console.log("MAIN: Add to ["+targetHoleIds[0]+"]");
+      const inData = {
+        name:sectionData.name,
+        distance_top:sectionData.markers[0].distance,
+        distance_bottom:sectionData.markers[sectionData.markers.length-1].distance,
+        dd_top:sectionData.markers[0].drilling_depth,
+        dd_bottom:sectionData.markers[sectionData.markers.length-1].drilling_depth,
+      }
+      const result = LCCore.addSection(targetHoleIds[0], inData);
+
+      //add data
+      for(let p=0;p<LCCore.projects.length;p++){
+        for(let h=0;h<LCCore.projects[p].holes.length;h++){
+          if(LCCore.projects[p].holes[h].id.toString() == targetHoleIds[0].toString()){
+            for(let s=0; s<LCCore.projects[p].holes[h].sections.length;s++){
+              if(LCCore.projects[p].holes[h].sections[s].name == sectionName){
+                //update new section id
+                sectionData.id = LCCore.projects[p].holes[h].sections[s].id;
+                sectionData.markers.forEach(m=>{
+                  let id = LCCore.projects[p].holes[h].sections[s].id;
+                  id[3] = sectionData.reserved_marker_ids.length;
+
+                  m.id = id;
+                  sectionData.reserved_marker_ids.push(id[3]); 
+                })
+
+                LCCore.projects[p].holes[h].sections[s] = sectionData;
+              }            
+            }
+          }
+        }  
+      }
+
+      //return result
+      if(result == true){
+        console.log("MAIN: Add new LC section.");
+        return true
+      }else{
+        return "fail_to_add";
+      }
+    }catch(err){
+      console.log("MAIN: Failed to add LC model.",err);
+      return "fail_to_add"
     }
   });
   
@@ -1004,6 +1109,7 @@ function createMainWIndow() {
   });
   ipcMain.handle("InitiariseTempCore", async (_e) => {
     //import modeln
+    labelerHistory = new UndoManager();
     tempCore = new LevelCompilerCore();
     tempCore.addProject("correlation","temp");
     tempCore.addHole([1,null,null,null],"temp");
@@ -1067,9 +1173,19 @@ function createMainWIndow() {
         console.log("LABELER: "+result)
         return tempCore;
       }
+    }else if(type == "drilling_depth"){
+      //value:distance
+      const result = tempCore.changeDrillingDepth(markerId, parseFloat(value));
+      if(result == true){
+        return tempCore;
+      }else{
+        console.log("LABELER: "+result)
+        return tempCore;
+      }
     }
   });
   ipcMain.handle("LabelerDeleteMarker", (_e, markerId) => {
+    console.log(markerId)
     const result = tempCore.deleteMarker(markerId);
     if(result == true){
       return tempCore;
@@ -1079,6 +1195,80 @@ function createMainWIndow() {
     }
 
   });
+  ipcMain.handle("LabelerSaveData", (_e, data) => {
+    /*
+    let data = {
+        hole_name: holeName,
+        section_name: sectionName,
+        section_data: tempCore.projects[0].holes[0].sections[0],
+        image_labeled:base64Data,
+        image_original:
+      }
+    */
+
+    //make outdata
+    const labeledImage  = Buffer.from(data.image_labeled.split(",")[1], "base64"); //remove header
+    const originalImage = Buffer.from(data.image_original.split(",")[1], "base64"); //remove header
+    const annotationData = JSON.stringify(data.section_data);
+
+    const dataName  = data.hole_name +"-"+ data.section_name;
+
+
+      dialog
+      .showOpenDialog({
+        title: "Please select a folder to save",
+        defaultPath: app.getPath("desktop"),
+        buttonLabel: "Save",
+        properties: ["openDirectory", "createDirectory"],
+      })
+      .then((result) => {
+        if (!result.canceled && result.filePaths[0]) {
+          //save original image
+          fs.writeFileSync(path.join(result.filePaths[0], dataName+".jpg"), originalImage);
+          //save labeled image
+          fs.writeFileSync(path.join(result.filePaths[0], dataName+"_definition.jpg"), labeledImage);
+          //save annotation
+          fs.writeFileSync(path.join(result.filePaths[0], dataName+".lcsection"), annotationData);
+          console.log("MAIN: Save "+dataName+" at "+path.join(result.filePaths[0]))
+          return true
+        }
+      })
+      .catch((err) => {
+        console.log(err);
+        return err;
+      });
+      
+
+  });
+  ipcMain.handle("LabelerLoadSectionModel", (_e, data_path) => {
+    try{
+      if (data_path !== null) {
+        //load section data
+        const fileContent = fs.readFileSync(data_path.fullpath, 'utf8');
+        const sectionData = JSON.parse(fileContent);
+
+        //add to model
+        const name = data_path.name;
+        const holeName = name.split("-")[0];
+        const sectionName = name.split("-")[1];
+        Object.assign(tempCore.projects[0].holes[0].sections[0], sectionData);
+
+        return tempCore;
+      }
+    }catch(err){
+      console.error('Error loading file:', err);
+      return tempCore;
+    }
+
+
+
+    
+
+  });
+  ipcMain.handle("LabelerLoadModel", (_e) => {
+    return tempCore;   
+  });
+
   ipcMain.handle("OpenImporter", async (_e) => {
     if (importerWindow) {
       importerWindow.focus();
@@ -1533,37 +1723,67 @@ function createMainWIndow() {
     }
     
   });
-  ipcMain.handle("sendUndo", async (_e) => { 
-    const result = await history.undo({LCCore:LCCore, LCAge:LCAge, LCPlot:LCPlot});   
-    if(result !== null){
-      //Undo deep copy
-      Object.assign(LCCore, result.LCCore);
-      Object.assign(LCAge, result.LCAge);
-      Object.assign(LCPlot, result.LCPlot);
-      console.log("MAIN: Undo loaded.");
-      return true;
-    }else{
-      return false;
+  ipcMain.handle("sendUndo", async (_e, type) => { 
+    if(type=="main"){
+      const result = await history.undo({LCCore:LCCore, LCAge:LCAge, LCPlot:LCPlot});   
+      if(result !== null){
+        //Undo deep copy
+        Object.assign(LCCore, result.LCCore);
+        Object.assign(LCAge, result.LCAge);
+        Object.assign(LCPlot, result.LCPlot);
+        console.log("MAIN: Undo loaded.");
+        return true;
+      }else{
+        return false;
+      }
+    }else if(type=="labeler"){
+      const result = await labelerHistory.undo({tempCore:tempCore});   
+      if(result !== null){
+        //Undo deep copy
+        Object.assign(tempCore, result.tempCore);
+        console.log("MAIN: Undo loaded.");
+        return true;
+      }else{
+        return false;
+      }
     }
-  });
-  ipcMain.handle("sendRedo", async (_e) => {
-    const result = await history.redo({LCCore:LCCore, LCAge:LCAge, LCPlot:LCPlot});
     
-    if(result !== null){
-      Object.assign(LCCore, result.LCCore);
-      Object.assign(LCAge,  result.LCAge);
-      Object.assign(LCPlot, result.LCPlot);
-      console.log("MAIN: Redo loaded.");
-      return true;
-    }else{
-      return false;
+  });
+  ipcMain.handle("sendRedo", async (_e, type) => {
+    if(type=="main"){
+      const result = await history.redo({LCCore:LCCore, LCAge:LCAge, LCPlot:LCPlot});
+      
+      if(result !== null){
+        Object.assign(LCCore, result.LCCore);
+        Object.assign(LCAge,  result.LCAge);
+        Object.assign(LCPlot, result.LCPlot);
+        console.log("MAIN: Redo loaded.");
+        return true;
+      }else{
+        return false;
+      }
+    }else if(type=="labeler"){
+      const result = await labelerHistory.redo({tempCore:tempCore});   
+      if(result !== null){
+        //Undo deep copy
+        Object.assign(tempCore, result.tempCore);
+        console.log("MAIN: Redo loaded.");
+        return true;
+      }else{
+        return false;
+      }
     }
   });
-  ipcMain.handle("sendSaveState", async (_e) => {
-    history.saveState({LCCore:LCCore, LCAge:LCAge, LCPlot:LCPlot});
-    console.log("MAIN: State saved. Num of history is " + history.undoStack.length);    
-    return true;
-    return;
+  ipcMain.handle("sendSaveState", async (_e, type) => {
+    if(type=="main"){
+      history.saveState({LCCore:LCCore, LCAge:LCAge, LCPlot:LCPlot});
+      console.log("MAIN: State saved. Num of history is " + history.undoStack.length);    
+      return true;
+    }else if(type=="labeler"){
+      labelerHistory.saveState({tempCore:tempCore});
+      console.log("MAIN: State saved. Num of history is " + labelerHistory.undoStack.length);    
+      return true;
+    }
   });
   //------------------------------------------------------------------------------------------------
   //for converter
@@ -2356,7 +2576,7 @@ function round(num, digits) {
 function createAboutWindow() {
   const aboutWindow = new BrowserWindow({
     title: "About Level Compiler",
-    width: 300,
+    width: 500,
     height: 300,
   });
   aboutWindow.setMenu(null);

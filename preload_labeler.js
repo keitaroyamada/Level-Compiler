@@ -20,8 +20,14 @@ contextBridge.exposeInMainWorld("LabelerApi", {
   inputdialog: (args1) => ipcRenderer.invoke("inputdialog", args1),
   getResourcePath: () => ipcRenderer.sendSync("getResourcePath"),
   toggleDevTools: (args1) => ipcRenderer.send('toggle-devtools',args1),
-  
-  
+  saveLabelerData: (args1) => ipcRenderer.invoke("LabelerSaveData", args1),
+  LoadSectionModel: (args1) => ipcRenderer.invoke("LabelerLoadSectionModel", args1),
+
+  sendUndo: (args1) => ipcRenderer.invoke('sendUndo',args1),
+  sendRedo: (args1) => ipcRenderer.invoke('sendRedo',args1),
+  sendSaveState: (args1) => ipcRenderer.invoke('sendSaveState',args1),  
+  loadModel: () => ipcRenderer.invoke("LabelerLoadModel"),
+
   //main -> renderer
   receive: (channel, func) => {
     ipcRenderer.on(channel, (event, ...args) => func(...args));

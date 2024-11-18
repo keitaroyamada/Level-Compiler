@@ -2891,6 +2891,7 @@ class LevelCompilerCore {
     }
   }
   deleteMarker(targetId){
+    this.updateSearchIdx();
     const targetMarkerIdx = this.search_idx_list[targetId.toString()];
     const targetMarkerData = this.getDataByIdx(targetMarkerIdx);
     const targetSectionData = this.getDataByIdx(this.search_idx_list[[targetId[0],targetId[1],targetId[2],null].toString()]);
@@ -3254,6 +3255,12 @@ class LevelCompilerCore {
 
     
   }
+  changeDrillingDepth(markerId, dd){
+    this.updateSearchIdx();
+    const markerIdx = this.search_idx_list[markerId.toString()];
+    this.projects[markerIdx[0]].holes[markerIdx[1]].sections[markerIdx[2]].markers[markerIdx[3]].drilling_depth = parseFloat(dd);
+    return true;
+  }
   addEvent(upperId, lowerId, depositionType, value){
     //depositionType: deposition, erosion, markup
     //value: [deposition, markup]:disturbed, tephra, void
@@ -3460,6 +3467,7 @@ class LevelCompilerCore {
     this.projects[holeIdx[0]].holes[holeIdx[1]].sections.push(newSectionData);
     this.projects[holeIdx[0]].holes[holeIdx[1]].reserved_section_ids.push(newSectionId[2]);
 
+    this.sortModel();
     return true
   }
   deleteHole(holeId){
@@ -3519,6 +3527,7 @@ class LevelCompilerCore {
     //set hole data
     this.projects[projectIdx[0]].holes.push(newHole);
     this.projects[projectIdx[0]].reserved_hole_ids.push(newHole.id[1]);
+    this.sortModel();
 
     return true;
   }
