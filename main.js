@@ -35,6 +35,7 @@ const { Section } = require("./LC_modules/Section.js");
 const { Marker } = require("./LC_modules/Marker.js");
 const { send } = require("process");
 const { Worker } = require('worker_threads');
+const { Tooltip } = require("chart.js");
 
 //properties
 const isMac = process.platform === "darwin";
@@ -52,6 +53,7 @@ let dividerWindow = null;
 let converterWindow = null;
 let importerWindow = null;
 let labelerWindow = null;
+let plotWindow = null;
 let progressBar = null;
 
 function createMainWIndow() {
@@ -120,98 +122,114 @@ function createMainWIndow() {
       label: "File",
       submenu: [
         {
-          label: "Load LC model",
-          //accelerator: "CmdOrCtrl+S",
-          click: async () => {
-            const inData = await loadmodelfile()
-            //console.log(inData)
-            if(inData!==null){
-              Object.assign(LCCore, inData.LCCore);
-              Object.assign(LCAge, inData.LCAge);
-              //Object.assign(LCPlot, inData.LCPlot);
-
-              mainWindow.webContents.send("LoadLCModelMenuClicked");
-            }
-          },
-        },
-        {
-          label: "Save LC model",
-          accelerator: "CmdOrCtrl+S",
-          click: async () => {
+          label:"Load",
+          submenu:[
+            {
+              label: "Load LC model",
+              //accelerator: "CmdOrCtrl+S",
+              click: async () => {
+                const inData = await loadmodelfile()
+                //console.log(inData)
+                if(inData!==null){
+                  Object.assign(LCCore, inData.LCCore);
+                  Object.assign(LCAge, inData.LCAge);
+                  //Object.assign(LCPlot, inData.LCPlot);
+    
+                  mainWindow.webContents.send("LoadLCModelMenuClicked");
+                }
+              },
+            },
+            {
+              label: "Load Correlation Model",
+              accelerator: "CmdOrCtrl+M",
+              click: () => {
+                mainWindow.webContents.send("LoadCorrelationModelMenuClicked");
+              },
+            },
+            {
+              label: "Load Age model",
+              accelerator: "CmdOrCtrl+T",
+              click: () => {
+                mainWindow.webContents.send("LoadAgeModelMenuClicked");
+              },
+            },
+            {
+              label: "Load Core Images",
+              accelerator: "CmdOrCtrl+I",
+              click: () => {
+                mainWindow.webContents.send("LoadCoreImagesMenuClicked");
+              },
+            },
+            {
+              label: "Load Plot Data (under construction)",
+              accelerator: "CmdOrCtrl+P",
+              click: () => {
+                if (converterWindow) {
+                  converterWindow.focus();
+                  return;
+                }
             
-            //remove plot data
-            let outLCPlot = JSON.parse(JSON.stringify(LCPlot));
-            outLCPlot.data_collections = [];
-            outLCPlot.data_selected_id = null;
-            const outData = {LCCore:LCCore, LCAge:LCAge, LCPlotAge:outLCPlot};
-            await putmodelfile(outData);       
-          },
-        },
-        { type: "separator" },
-        {
-          label: "Load Correlation Model",
-          accelerator: "CmdOrCtrl+M",
-          click: () => {
-            mainWindow.webContents.send("LoadCorrelationModelMenuClicked");
-          },
-        },
-        {
-          label: "Load Age model",
-          accelerator: "CmdOrCtrl+T",
-          click: () => {
-            mainWindow.webContents.send("LoadAgeModelMenuClicked");
-          },
-        },
-        { type: "separator" },
-        {
-          label: "Load Core Images",
-          accelerator: "CmdOrCtrl+I",
-          click: () => {
-            mainWindow.webContents.send("LoadCoreImagesMenuClicked");
-          },
-        },
-        {
-          label: "Load Plot Data (under construction)",
-          accelerator: "CmdOrCtrl+P",
-          click: () => {
-            if (converterWindow) {
-              converterWindow.focus();
-              return;
-            }
-        
-            //create finder window
-            converterWindow = new BrowserWindow({
-              title: "Converter",
-              width: 700,
-              height: 800,
-              webPreferences: {preload: path.join(__dirname, "preload_converter.js"),},
-            });
+                //create finder window
+                converterWindow = new BrowserWindow({
+                  title: "Converter",
+                  width: 700,
+                  height: 800,
+                  webPreferences: {preload: path.join(__dirname, "preload_converter.js"),},
+                });
+                
+                //converterWindow.setAlwaysOnTop(true, "normal");
+                converterWindow.on("closed", () => {
+                  converterWindow = null;
+                  mainWindow.webContents.send("ConverterClosed", "");
+                });
+                converterWindow.setMenu(null);
             
-            //converterWindow.setAlwaysOnTop(true, "normal");
-            converterWindow.on("closed", () => {
-              converterWindow = null;
-              mainWindow.webContents.send("ConverterClosed", "");
-            });
-            converterWindow.setMenu(null);
-        
-            converterWindow.loadFile(path.join(__dirname, "./renderer/converter.html"));
-        
-            converterWindow.once("ready-to-show", () => {
-              converterWindow.show();
-              converterWindow.setAlwaysOnTop(true, "normal");
-              //converterWindow.webContents.openDevTools();
-              //converterWindow.setAlwaysOnTop(true, "normal");
-              converterWindow.webContents.send("ConverterMenuClicked", "import");
-            });
-          },
+                converterWindow.loadFile(path.join(__dirname, "./renderer/converter.html"));
+            
+                converterWindow.once("ready-to-show", () => {
+                  converterWindow.show();
+                  converterWindow.setAlwaysOnTop(true, "normal");
+                  //converterWindow.webContents.openDevTools();
+                  //converterWindow.setAlwaysOnTop(true, "normal");
+                  const data = {
+                    output_type:"import",
+                    called_from:"main",
+                    path:null,
+                  }; 
+                  converterWindow.webContents.send("ConverterMenuClicked", data);
+                });
+              },
+            },
+          ],
         },
-        { type: "separator" },
-        
         {
-          label: "Export correlation as csv (under construction)",          
-          click: () => {
-            mainWindow.webContents.send("ExportCorrelationAsCsvMenuClicked");
-          },
+          label:"Save (for Correlator)",
+          submenu:[
+            {
+              label: "Save LC model",
+              accelerator: "CmdOrCtrl+S",
+              click: async () => {
+                
+                //remove plot data
+                let outLCPlot = JSON.parse(JSON.stringify(LCPlot));
+                outLCPlot.data_collections = [];
+                outLCPlot.data_selected_id = null;
+                const outData = {LCCore:LCCore, LCAge:LCAge, LCPlotAge:outLCPlot};
+                await putmodelfile(outData);       
+              },
+            },
+          ],
+        },
+        {
+          label:"Export (for Correlator)",
+          submenu:[
+            {
+              label: "Export model as csv (NOT RECOMMENDED)",
+              click: () => {
+                mainWindow.webContents.send("ExportCorrelationAsCsvMenuClicked");
+              },
+            },
+          ],
         },
         { type: "separator" },
         {
@@ -221,6 +239,7 @@ function createMainWIndow() {
             mainWindow.webContents.send("UnLoadModelsMenuClicked");
           },
         },
+        { type: "separator" },
         // for Windows--------------------
         ...(!isMac
           ? [
@@ -285,13 +304,51 @@ function createMainWIndow() {
               converterWindow.setAlwaysOnTop(true, "normal");
               //converterWindow.webContents.openDevTools();
               //converterWindow.setAlwaysOnTop(true, "normal");
-              converterWindow.webContents.send("ConverterMenuClicked", "export");
+              const data = {
+                output_type:"export",
+                called_from:"main",
+                path:null,
+              }; 
+              converterWindow.webContents.send("ConverterMenuClicked", data);
+            });
+          },
+        },
+        {
+          label: "Plotter",
+          click: () => {
+            if (plotWindow) {
+              plotWindow.focus();
+              return;
+            }
+        
+            //create finder window
+            plotWindow = new BrowserWindow({
+              title: "Converter",
+              width: 900,
+              height: 600,
+              webPreferences: {preload: path.join(__dirname, "preload_plotter.js"),},
+            });
+            
+            //converterWindow.setAlwaysOnTop(true, "normal");
+            plotWindow.on("closed", () => {
+              plotWindow = null;
+              mainWindow.webContents.send("PlotterClosed", "");
+            });
+            plotWindow.setMenu(null);
+        
+            plotWindow.loadFile(path.join(__dirname, "./renderer/plotter.html"));
+        
+            plotWindow.once("ready-to-show", () => {
+              plotWindow.show();
+              // plotWindow.setAlwaysOnTop(true, "normal");
+              plotWindow.webContents.openDevTools();
+              plotWindow.webContents.send("PlotterMenuClicked");
             });
           },
         },
         { type: "separator" },
         {
-          label: "Labeler",
+          label: "Labeler (for Correlator)",
           click: () => {
             if (labelerWindow) {
               labelerWindow.focus();
@@ -329,9 +386,8 @@ function createMainWIndow() {
             });
           },
         },
-        
         {
-          label: "Edit correlation",
+          label: "Edit correlation (for Correlator)",
           accelerator: "CmdOrCtrl+E",
           click: () => {
             mainWindow.webContents.send("EditCorrelation");
@@ -1088,11 +1144,7 @@ function createMainWIndow() {
       console.error("ERROR: Plot data register from LCAge error.", error);
     }
   });
-  ipcMain.handle("RegisterDataPlot", async (_e, data) => {
-    LCPlot.addDataset(data);
 
-    console.log("MAIN: Registered plot data.");
-  });
   ipcMain.handle("ExportCorrelationAsCsvFromRenderer", async (_e, MD) => {
     let exportLCCore = new LevelCompilerCore();
     
@@ -1100,11 +1152,10 @@ function createMainWIndow() {
     Object.assign(exportLCCore, MD);
 
     //make export array
-    let outputArray = exportLCCore.constructLegacyModel();
+    let outputArray = exportLCCore.constructCSVModel();
+    const saveName = "[correlation]"+exportLCCore.projects[0].name+"("+exportLCCore.projects[0].correlation_version+").csv"; 
 
-    putcsvfile(mainWindow, outputArray[0] );
-    
-
+    putcsvfile(mainWindow, saveName, outputArray);
     
   });
   ipcMain.handle("InitiariseTempCore", async (_e) => {
@@ -1268,7 +1319,37 @@ function createMainWIndow() {
   ipcMain.handle("LabelerLoadModel", (_e) => {
     return tempCore;   
   });
+  ipcMain.handle("PlotterGetData", (_e, data) => {
+    if (converterWindow) {
+      converterWindow.focus();
+      return;
+    }
 
+    //create finder window
+    converterWindow = new BrowserWindow({
+      title: "Converter",
+      width: 700,
+      height: 800,
+      webPreferences: {preload: path.join(__dirname, "preload_converter.js"),},
+    });
+    
+    //converterWindow.setAlwaysOnTop(true, "normal");
+    converterWindow.on("closed", () => {
+      converterWindow = null;
+      mainWindow.webContents.send("ConverterClosed", "");
+    });
+    converterWindow.setMenu(null);
+
+    converterWindow.loadFile(path.join(__dirname, "./renderer/converter.html"));
+
+    converterWindow.once("ready-to-show", () => {
+      converterWindow.show();
+      converterWindow.setAlwaysOnTop(true, "normal");
+      //converterWindow.webContents.openDevTools();
+      //converterWindow.setAlwaysOnTop(true, "normal");
+      converterWindow.webContents.send("ConverterMenuClicked", data);
+    });   
+  });
   ipcMain.handle("OpenImporter", async (_e) => {
     if (importerWindow) {
       importerWindow.focus();
@@ -1622,7 +1703,7 @@ function createMainWIndow() {
   });
 
   ipcMain.on("dividerExport", async (_e, data) => {
-    putcsvfile(mainWindow, data);    
+    putcsvfile(mainWindow, null, data);    
     console.log("MAIN: Exported Divided data.");
   });
   ipcMain.handle("OpenFinder", async (_e) => {
@@ -1813,8 +1894,13 @@ function createMainWIndow() {
     return data;
   });
 
-  ipcMain.handle("cvtLoadCsv", async (_e, title, ext) => {
-    const result = await getfile(mainWindow, title, ext);
+  ipcMain.handle("cvtLoadCsv", async (_e, title, ext, path) => {
+    let result = null;
+    if(path==null){
+      result = await getfile(mainWindow, title, ext);
+    }else{
+      result = path;
+    }
 
     if (result !== null) {
       try {
@@ -1836,7 +1922,7 @@ function createMainWIndow() {
   });
   ipcMain.handle("cvtExport", async (_e, data) => {
     //console.log(data);
-    putcsvfile(mainWindow, data);
+    putcsvfile(mainWindow, null, data);
   });
 
   //--------------------------------------------------------------------------------------------------
@@ -1901,7 +1987,16 @@ function createMainWIndow() {
     mainWindow.webContents.send("rendererLog", data);
   });
   ipcMain.handle("sendImportedData", async (_e, data) => {
-    mainWindow.webContents.send("importedData", data);
+    data.name = path.basename(data.path);
+    if(data.send_to == "main"){
+      LCPlot.addDataset(data.name, data.data);
+      mainWindow.webContents.send("importedData", LCPlot);
+    }else if(data.send_to == "plotter"){      
+      LCPlot.addDataset(data.name, data.data);
+      plotWindow.webContents.send("importedData", LCPlot);
+      console.log("MAIN: Plot Data is imported into Plotter.")
+    }
+    
   });
   ipcMain.handle("depthConverter", async (_e, data, type, method) => {
     //data: ["name","depth_data","target_id"] e.g. ["name",[projectName(no use),holeName, sectionName, distance],[null, null, null, null]]
@@ -2479,11 +2574,11 @@ function findFileInDir(dir, fileName) {
   return results;
 }
 //--------------------------------------------------------------------------------------------------
-async function putcsvfile(mainWindow, data) {
+async function putcsvfile(mainWindow, filePath, data) {
   dialog
     .showSaveDialog({
       title: "Please select save path",
-      defaultPath: app.getPath("desktop"),
+      defaultPath: filePath !== null? filePath:app.getPath("desktop"),
       buttonLabel: "Save",
       filters: [{ name: "Csv Files", extensions: ["csv"] }],
     })

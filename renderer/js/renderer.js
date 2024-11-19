@@ -1,7 +1,7 @@
 document.addEventListener("DOMContentLoaded", () => {
  
   //============================================================================================xxxxxxxxxx
-  let developerMode = false;
+  let developerMode = true;
   //base properties
   const scroller = document.getElementById("scroller");
   let canvasBase = document.getElementById("canvasBase");
@@ -235,11 +235,6 @@ document.addEventListener("DOMContentLoaded", () => {
   //hide test event
   document.getElementById("footerLeftText").addEventListener("click", async () => {
     if(developerMode){
-      //initiarise
-      await initiariseCorrelationModel();
-      await initiariseAgeModel();
-      await initiariseCanvas();
-      await initiarisePlot();
 
   }
   });
@@ -700,13 +695,9 @@ document.addEventListener("DOMContentLoaded", () => {
   window.LCapi.receive("importedData", async (data) => {
     console.log("[Renderer]: Imported data recieved.");
     
-    //register into LCPlot
-    window.LCapi.RegisterDataPlot(data);
-
     //load renderer
     await loadPlotData()
     console.log("[Renderer]: Load plot data.");
-    console.log(LCplot);
 
     objOpts.plot.show_dot = true;
     objOpts.plot.show_line = true;
@@ -2234,6 +2225,9 @@ document.addEventListener("DOMContentLoaded", () => {
   //load correlation model
   window.LCapi.receive("ExportCorrelationAsCsvMenuClicked", async () => {
     await window.LCapi.ExportCorrelationAsCsv(LCCore);
+  });
+  window.LCapi.receive("ExportCorrelationAsLFMenuClicked", async () => {
+    await window.LCapi.ExportCorrelationAsLF(LCCore);
   });
   //============================================================================================
   //change canvas mode

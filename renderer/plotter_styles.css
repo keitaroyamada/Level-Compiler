@@ -1,0 +1,66 @@
+html, body{
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  width: 100%;
+  font-family: Arial, sans-serif;
+}
+
+#container{
+  display: flex;
+  height: 100%;
+  flex-direction: row;
+  overflow-y: hidden;
+  overflow-x: hidden;  
+
+}
+
+#menu{
+  display: flex;
+  flex-direction: column;
+  width: 300px;
+  height: 100%;
+  background-color: aliceblue;
+  overflow: visible;
+}
+
+#set_load{
+  display: flex;
+  flex-direction: column;
+}
+#load_list{
+  display: flex;
+  flex-direction: column;
+  margin-left: 20px;
+  width: 200px;
+}
+#plot_list{
+  display: flex;
+  flex-direction: column;
+  margin-top: 0px;
+  margin-left: 20px;
+}
+hr {
+  border: 1px solid #ccc;
+  margin-top: 20px;
+  margin-bottom: 5px;
+  margin-left: 0px;
+  margin-right: 0px;
+}
+#plot_area{
+  width:500px;
+  height:500px;
+  background-color: aquamarine;
+}
+#bt_load{
+  height: 20px;
+  width: 100px;
+  margin-left: 20px;
+  margin-top: 20px;
+}
+#bt_add{
+  height: 20px;
+  width: 100px;
+  margin-left: 20px;
+  margin-top: 30px;
+}

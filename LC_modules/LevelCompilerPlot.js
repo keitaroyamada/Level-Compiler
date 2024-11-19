@@ -88,7 +88,7 @@ class LevelCompilerPlot {
     newDataset.data_min = data_min;
     this.age_collections[targetIdx].datasets.push(newDataset);
   }
-  addDataset(data) {
+  addDataset(collectionName, data) {
     /*name: null,
       project: null,
       hole: null,
@@ -111,6 +111,8 @@ class LevelCompilerPlot {
 
     //add age dataset
     const newCollection = new PlotCollection();
+    newCollection.id = this.data_collections.length+1;
+    newCollection.name = collectionName;
     for(let v=0; v<data[0].data_header.length; v++){
       let newDataset = new PlotDataset();
       let data_max = null;

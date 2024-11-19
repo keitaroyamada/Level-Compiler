@@ -1,11 +1,16 @@
 document.addEventListener("DOMContentLoaded", () => {
   let source_data = null;
+  let source_path = null;
   let n_r = null;
   let n_c = null;
   let output_type = "export";
+  let called_from = "";
   //-------------------------------------------------------------------------------------------
   window.ConverterApi.receive("ConverterMenuClicked", async (data) => {
-    output_type = data;
+    output_type = data.output_type;
+    called_from = data.called_from;
+    source_path = data.path;
+
     console.log("[Converter]: Conterter starting type: " + output_type);
 
     if(output_type == "export"){
@@ -15,8 +20,8 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     //make model chooser
-
     //correlation
+    document.getElementById("cvt_correlation_model").innerHTML = "";
     const correlation_model_list = await window.ConverterApi.cvtGetCorrelationModelList();
     for (let i = 0; i < correlation_model_list.length; i++) {
       const correlationOption = document.createElement("option");
@@ -26,6 +31,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     //age
+    document.getElementById("cvt_age_model").innerHTML = "";
     const age_model_list = await window.ConverterApi.cvtGetAgeModelList();
     for (let i = 0; i < age_model_list.length; i++) {
       const ageOption = document.createElement("option");
@@ -33,48 +39,20 @@ document.addEventListener("DOMContentLoaded", () => {
       ageOption.textContent = age_model_list[i][1]; //name
       document.getElementById("cvt_age_model").appendChild(ageOption);
     }
+
+    //if path exist
+    if(source_path !== null){
+      await loadCsv(source_path )
+    }
   });
   //-------------------------------------------------------------------------------------------
+  //load data
   document.getElementById("cvt_bt_import").addEventListener("click", async (event) => {
       console.log("import");
       source_data = null;
-      let path = "";
-      [source_data, path] = await window.ConverterApi.cvtLoadCsv(
-        "Please select the conversion target data",
-        [
-          {
-            name: "CSV file",
-            extensions: ["csv"],
-          },
-        ]
-      );
-
-      if (source_data !== null) {
-        n_r = source_data.length;
-        n_c = source_data[0].length;
-
-        //Clear all rows within tbody
-        const table = document.getElementById("data_table");
-        const tbody = table.querySelector("tbody");
-        if (tbody) {
-            tbody.innerHTML = "";
-        }
-
-        //show table
-        //const table = document.createElement("table");
-        for (let r = 0; r < n_r; r++) {
-          const tr = table.insertRow();
-          for (let c = 0; c < n_c; c++) {
-            const tc = tr.insertCell();
-            tc.textContent = source_data[r][c];
-          }
-        }
-        //document.getElementById("data_table").appendChild(table);
-        document.getElementById("cvt_source_type").value = "trinity";
-        document.getElementById("cvt_source_type").dispatchEvent(new Event("change"));
-
-        document.getElementById("data_path").textContent = path.match(/[^\\\/]*$/)[0];
-      }
+      let path = null;
+      
+      await loadCsv(path);
     });
 
   //-------------------------------------------------------------------------------------------
@@ -229,6 +207,7 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     });
   //-------------------------------------------------------------------------------------------
+  //convert
   document.getElementById("cvt_bt_convert").addEventListener("click", async (event) => {
       console.log("[Converter]: Converting...");
 
@@ -251,9 +230,19 @@ document.addEventListener("DOMContentLoaded", () => {
         depthMaxIdx = Math.max(...[nameIdx, holeIdx, sectionIdx, distanceIdx]);
         //skip header
         for (let i = 1; i < source_data.length; i++) {
+          const datumName =  source_data[i][nameIdx];//data name
+          const projectName = null;
+          let holeName = source_data[i][holeIdx];
+          if (/^\d+$/.test(holeName.toString()) == true) {
+            //case number
+            holeName = holeName.toString().padStart(2, "0");
+          }
+          const sectionName = source_data[i][sectionIdx];
+          const distance = parseFloat(source_data[i][distanceIdx]);
+
           indataList.push([
-            source_data[i][nameIdx], //data name
-            [null,source_data[i][holeIdx], source_data[i][sectionIdx],source_data[i][distanceIdx]],//position trinity name
+            datumName,
+            [projectName, holeName, sectionName, distance],//position trinity name
             [null,null,null,null],//search range
           ]);
         }
@@ -388,10 +377,22 @@ document.addEventListener("DOMContentLoaded", () => {
 
             output.push(calcedData);
           }
+          
+          const sendData = {
+            name:"",
+            path:source_path,
+            data:output,
+            send_to:called_from,
+            send_from:"Converter",
+          };
+          console.log(sendData)
 
-          await window.ConverterApi.sendImportedData(output);
+          await window.ConverterApi.sendImportedData(sendData);
           console.log("[Converter]: Converted data is imported.");
         }
+
+        //colose window
+        window.close();
 
       } else {
         console.log("Unkown conert type.")
@@ -410,4 +411,45 @@ document.addEventListener("DOMContentLoaded", () => {
       window.ConverterApi.toggleDevTools("converter");
     }
   });
+
+  async function loadCsv(path){
+    [source_data, loadedpath] = await window.ConverterApi.cvtLoadCsv(
+      "Please select the conversion target data",
+      [
+        {
+          name: "CSV file",
+          extensions: ["csv"],
+        },
+      ],
+      path
+    );
+
+    if (source_data !== null) {
+      source_path = loadedpath;
+      n_r = source_data.length;
+      n_c = source_data[0].length;
+
+      //Clear all rows within tbody
+      const table = document.getElementById("data_table");
+      const tbody = table.querySelector("tbody");
+      if (tbody) {
+          tbody.innerHTML = "";
+      }
+
+      //show table
+      //const table = document.createElement("table");
+      for (let r = 0; r < n_r; r++) {
+        const tr = table.insertRow();
+        for (let c = 0; c < n_c; c++) {
+          const tc = tr.insertCell();
+          tc.textContent = source_data[r][c];
+        }
+      }
+      //document.getElementById("data_table").appendChild(table);
+      document.getElementById("cvt_source_type").value = "trinity";
+      document.getElementById("cvt_source_type").dispatchEvent(new Event("change"));
+
+      document.getElementById("data_path").textContent = loadedpath.match(/[^\\\/]*$/)[0];
+    }
+  }
 });

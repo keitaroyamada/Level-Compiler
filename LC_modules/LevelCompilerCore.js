@@ -8,7 +8,7 @@ const { Trinity } = require("./Trinity.js");
 var ss = require("simple-statistics");
 const { Colors } = require("chart.js");
 const { copyFileSync } = require("original-fs");
-const { isObject } = require("chart.js/helpers");
+const { isObject, readUsedSize } = require("chart.js/helpers");
 
 class LevelCompilerCore {
   constructor() {
@@ -997,14 +997,21 @@ class LevelCompilerCore {
       return;
     }
 
-    const results = [];
-
+    let results = [];
+    
     this.projects.forEach((project) => {
-      let cd_counts = 0;
-      let efd_counts = 0;
-      let rank_counts = 0;
-      let max_rank = -1;
-      let age_counts = 0;
+      let result = {
+        id:project.id,
+        name:project.name,
+        type:project.model_type,
+        evaluation:false,
+        cd_error_counts:0,
+        efd_error_counts:0,
+        rank_error_counts:0,
+        age_error_counts:0,
+        max_rank:-1,  
+      };
+  
       project.holes.forEach((hole) => {
         hole.sections.forEach((section) => {
           section.markers.forEach((marker) => {
@@ -1013,29 +1020,29 @@ class LevelCompilerCore {
                 //console.log("ERROR: CD is null. " + this.getMarkerNameFromId(marker.id));
               }
 
-              cd_counts += 1;
+              result.cd_error_counts += 1;
             }
             if (marker.connection_rank == null) {
               if (project.model_type !== "duo") {
                 //console.log("ERROR: Rank is null. " + this.getMarkerNameFromId(marker.id));
               }
-              rank_counts += 1;
+              result.rank_error_counts += 1;
             } else {
-              if (marker.connection_rank > max_rank) {
-                max_rank = marker.connection_rank;
+              if (marker.connection_rank > result.max_rank) {
+                result.max_rank = marker.connection_rank;
               }
             }
             if (marker.event_free_depth == null) {
               if (project.model_type !== "duo") {
                 //console.log("ERROR: EFD is null. " + this.getMarkerNameFromId(marker.id));
               }
-              efd_counts += 1;
+              result.efd_error_counts += 1;
             }
             if (marker.age == null) {
               if (project.model_type !== "duo") {
                 //console.log("ERROR: EFD is null. " + this.getMarkerNameFromId(marker.id));
               }
-              age_counts += 1;
+              result.age_error_counts += 1;
             }
           });
         });
@@ -1046,22 +1053,23 @@ class LevelCompilerCore {
           "]" +
           project.name +
           ": Total interpolation error: CD:" +
-          cd_counts +
+          result.cd_error_counts +
           ", EFD:" +
-          efd_counts +
+          result.efd_error_counts +
           ", Rank:" +
-          rank_counts +
+          result.rank_error_counts +
           ", Max rank:" +
-          max_rank +
+          result.max_rank +
           ", Age:" +
-          age_counts
+          result.age_error_counts
       );
 
-      if (cd_counts == 0 && efd_counts == 0) {
-        results.push(true);
+      if (result.cd_error_counts == 0 && result.efd_error_counts == 0) {
+        result.evaluation = true;
       } else {
-        results.push(false);
+        result.evaluation = false;
       }
+      results.push(result);
     });
 
     return results;
@@ -4035,33 +4043,28 @@ class LevelCompilerCore {
     }
     return idx;
   }
-  constructLegacyModel(){
-    //
-    this.sortModel();
-
-    //update search_idx
-    for(let p=0; p<this.projects.length;p++){
-      const projectData = this.projects[p];
-      this.search_idx_list[projectData.id.toString()] = [p,null,null,null];
-      for(let h=0;h<this.projects[p].holes.length;h++){
-        let holeCompositeDepthSecTop = 0;
-        const holeData = this.projects[p].holes[h];
-        this.search_idx_list[holeData.id.toString()] = [p, h, null, null];
-        for(let s=0;s<this.projects[p].holes[h].sections.length;s++){
-          
-          const sectionData = this.projects[p].holes[h].sections[s];
-          this.search_idx_list[sectionData.id.toString()] = [p, h, s, null];
-          for(let m=0;m<this.projects[p].holes[h].sections[s].markers.length;m++){
-            const markerData = this.projects[p].holes[h].sections[s].markers[m];
-            this.projects[p].holes[h].sections[s].markers[m].hole_composite_depth = holeCompositeDepthSecTop + markerData.distance;
-            this.search_idx_list[markerData.id.toString()] = [p, h, s, m];
-          }
-          holeCompositeDepthSecTop += this.projects[p].holes[h].sections[s].markers[this.projects[p].holes[h].sections[s].markers.length-1].distance;
-        }
+  constructCSVModel(){
+    //NOT RECOMMENDED, becase all descriptions are not saved.
+    //check model
+    const results = this.checkModel();
+    let isError = false;
+    results.forEach(r=>{
+      if(r.evaluation==false){
+        isError = true;
       }
+    })
+
+    if(isError==true){
+      console.log("MAIN: Correlation models have some interpolation errors.");
+      console.log(results);
+      return
     }
 
-    //get id list
+    //initiarise
+    this.sortModel();
+    this.updateSearchIdx();
+
+    //get row id list
     let resultIds = [];
     let visited = new Set();
     
@@ -4071,44 +4074,91 @@ class LevelCompilerCore {
         for(let s=0;s<this.projects[p].holes[h].sections.length;s++){
           for(let m=0;m<this.projects[p].holes[h].sections[s].markers.length;m++){
             const markerData = this.projects[p].holes[h].sections[s].markers[m];
-            if(!visited.has(markerData.id.toString())){
-              //set vigited id 
-              visited.add(markerData.id.toString());
-              
+            if(!visited.has(markerData.id.toString())){              
               //initiarise
               let horizontalMarkers = [];
-              let depth = {};
               let cd = null;
 
               //set cd
-              if(["master","master-transfer","duo-master","duo-master-transfer","interpolate","transfer"].includes(markerData.depth_source[0])){
-                cd = markerData.composite_depth;
-              }else{
-                //if extrapolate
-                let sourceId = markerData.depth_source[1];
-                if(sourceId==null){
-                  sourceId = markerData.depth_source[2];                  
+              //Sometimes extrapolared CD is reversal, so use tempolary very thin CD for extrapolation row. 
+              if(markerData.depth_source[0] == "extrapolate"){
+                //case "extrapolate"
+                if(markerData.depth_source[1] !== null){
+                  //downward extrapolation
+                  let sourceId = markerData.depth_source[1];
+                  //count layers between target and source               
+                  const pathIds = this.searchShortestVerticalPath(markerData.id, sourceId);
+                  let numIds = pathIds.length - 1;
+                  pathIds.forEach((pid, n)=>{
+                    if(visited.has(pid.toString())){
+                      //search nearest calced row
+                      sourceId = pid;
+                      numIds = n;
+                    }
+                  })
+
+                  if(numIds == pathIds.length - 1){
+                    cd = this.getDataByIdx(this.search_idx_list[sourceId.toString()]).composite_depth + 0.01 * (numIds);
+                  }else{
+                    resultIds.forEach(r=>{
+                      r[1].forEach(id=>{
+                        if(id.toString() == sourceId.toString()){
+                          //get previous hole temp CD
+                          cd = r[0] + 0.01 * (numIds);
+                        }
+                      })
+                    })
+                  }
+                }else if(markerData.depth_source[2] !== null){
+                  //upward extrapolation
+                  let sourceId = markerData.depth_source[2];
+                  //count layers between target and source               
+                  const pathIds = this.searchShortestVerticalPath(markerData.id, sourceId);
+                  let numIds = pathIds.length - 1;
+                  pathIds.forEach((pid, n)=>{
+                    if(visited.has(pid.toString())==true){
+                      //search nearest calced row
+                      sourceId = pid;
+                      numIds = n;
+                    }
+                  })
+
+                  if(numIds == pathIds.length - 1){
+                    cd = this.getDataByIdx(this.search_idx_list[sourceId.toString()]).composite_depth - 0.01 * (numIds);
+                  }else{
+                    resultIds.forEach(r=>{
+                      r[1].forEach(id=>{
+                        if(id.toString() == sourceId.toString()){
+                          //get previous hole temp CD
+                          cd = r[0] - 0.01 * (numIds);
+                        }
+                      })
+                    })
+                  }
                 }
-                //count layers between target and source               
-                const pathIds = this.searchShortestVerticalPath(markerData.id, sourceId);
-                cd = this.getDataByIdx(this.search_idx_list[sourceId.toString()]).composite_depth + 0.01 * (pathIds.length-1);
+
                 
+                
+              }else{
+                //case "master","master-transfer","duo-master","duo-master-transfer","interpolate","transfer"
+                cd = markerData.composite_depth;
               }
-             
-              depth[markerData.id] = markerData.hole_composite_depth;
+
+              //set vigited id 
+              visited.add(markerData.id.toString());
+
+              //get row ids
               horizontalMarkers.push(markerData.id);
 
               for(let h=0;h<markerData.h_connection.length;h++){
-                //if(projectData.id[0] == markerData.h_connection[h][0]){
-                  //case same project
-                  visited.add(markerData.h_connection[h].toString());
-                  const holeIdx = this.search_idx_list[markerData.h_connection[h].toString()];
-                  const connectedData = this.getDataByIdx(this.search_idx_list[markerData.h_connection[h].toString()]);
-                  depth[connectedData.id] = connectedData.hole_composite_depth;
-                  horizontalMarkers.push(markerData.h_connection[h]);//[hole idx, marker id]
-                //}
+                //set visited flag
+                visited.add(markerData.h_connection[h].toString());
+                //set row data
+                horizontalMarkers.push(markerData.h_connection[h]);
               }
-              resultIds.push([cd, depth, horizontalMarkers]);
+
+              //add row data
+              resultIds.push([cd, horizontalMarkers]);
             }
           }
         }
@@ -4117,15 +4167,16 @@ class LevelCompilerCore {
 
     //sort by composite depth
     resultIds.sort((a,b)=>{
-      return a[0] < b[0];
+      return a[0] - b[0];
     })
+    
 
     //make output data
     let prevMasterHole = "";
     let output = [];
     for(let i=0;i<resultIds.length;i++){
-      const dds  = resultIds[i][1];
-      const ids  = resultIds[i][2];
+      const cd  = resultIds[i][0];
+      const ids  = resultIds[i][1];
       let rowData = [];
       let zeroMarker = "";
       let masterHole = "";
@@ -4136,8 +4187,8 @@ class LevelCompilerCore {
           let cellsData = [null, null, null, null]; //[name, distance, drilling depth, event]
         
           for(let c=0;c<ids.length;c++){
-            const id      = ids[c];          
-            if(holeData.id.toString() == [id[0],id[1],id[2],null].toString()){
+            const id = ids[c];          
+            if(holeData.id.toString() == [id[0],id[1],null,null].toString()){
               //if same hole, get markerdata            
               const markerData = this.getDataByIdx(this.search_idx_list[id.toString()]);
               //get marker data
@@ -4146,8 +4197,6 @@ class LevelCompilerCore {
               cellsData[2] = markerData.drilling_depth;
               let eventFlag = "";
               for(let e=0;e<markerData.event.length;e++){
-                
-                //============UNDER CONSTRUCTION=======================
                 if(markerData.event[e][0]=="erosion" && markerData.event[e][1]=="upward"){
                   if(eventFlag !==""){eventFlag += "/";}
                   eventFlag += markerData.event[e][0] +"-downward("+markerData.event[e][4]+")";
@@ -4230,15 +4279,11 @@ class LevelCompilerCore {
 
       //add master info
       rowData.unshift(masterHole + zeroMarker);
-      console.log(rowData)
       output.push(rowData);
     }
     
     return output; 
   }
-
- 
-  
  
 }
 
