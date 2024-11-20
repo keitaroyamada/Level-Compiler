@@ -118,7 +118,15 @@ class LevelCompilerPlot {
       let data_max = null;
       let data_min = null;
       newDataset.id        = v + 1;
-      newDataset.name      = data[0].data_header[v];
+      const headerParts = data[0].data_header[v].split(/[\[\]]/);
+      if(headerParts.length ==1){
+        //without unit
+        newDataset.name = data[0].data_header[v];
+      }else{
+        newDataset.name = headerParts[0];
+        newDataset.unit = headerParts[1];
+      }
+      
       newDataset.plot_type = "line"; 
       //collection / dataset(PlotDataset) / single datasiries[data...]
       for (let d = 0; d < data.length; d++) {
@@ -146,7 +154,6 @@ class LevelCompilerPlot {
         newData.data                = parseFloat(dt.data_values[v]);
         newData.source_type         = null; //e.g. marine...
         newData.source_code         = null; //e.g. c1...
-        newData.unit                = null; 
         newData.description         = dt.description;
 
         //add

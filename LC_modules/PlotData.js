@@ -14,7 +14,6 @@ class PlotData {
     this.data = null;
     this.source_type = "general";
     this.source_code = null;
-    this.unit = null;
     this.description = null;
     this.connection_rank = null;
   }

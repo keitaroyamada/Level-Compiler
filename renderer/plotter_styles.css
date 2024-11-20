@@ -1,46 +1,72 @@
 html, body{
-  margin: 0;
-  padding: 0;
+  display: block;
+  overflow: hidden;
+
   height: 100%;
   width: 100%;
+ 
+  margin: 0;
+  padding: 0;
   font-family: Arial, sans-serif;
 }
 
 #container{
-  display: flex;
-  height: 100%;
+  display: flex;  
   flex-direction: row;
-  overflow-y: hidden;
-  overflow-x: hidden;  
 
+  height: 100vh;
+  width: 100vw;
+  overflow: hidden;
 }
 
 #menu{
   display: flex;
   flex-direction: column;
-  width: 300px;
+  flex: 0 0 auto;
+  width: 250px;
   height: 100%;
-  background-color: aliceblue;
-  overflow: visible;
+  background-color: #F5F5F5;
+  overflow: hidden;
 }
 
-#set_load{
+#set_load, #load_list{
   display: flex;
   flex-direction: column;
-}
-#load_list{
-  display: flex;
-  flex-direction: column;
-  margin-left: 20px;
+  margin-left: 10px;
   width: 200px;
+}
+#plot_list_base{
+  display: flex;
+  flex-direction: column;
+  height: 1000px;
+}
+#plot_list_name{
+  margin-left: 20px;
 }
 #plot_list{
   display: flex;
   flex-direction: column;
+  height: 400px;
+  width: 100%;
   margin-top: 0px;
+  margin-left: 0px;
+  overflow-y: scroll;
+  overflow-x: hidden;
+  
+}
+#plot_option_name{
   margin-left: 20px;
 }
+#plot_options{
+  display: flex;
+  flex-direction: column;
+  margin-top: 0px;
+  margin-left: 0px;
+  overflow: hidden;
+  height: 100%;
+}
 hr {
+  width: 100%;
   border: 1px solid #ccc;
   margin-top: 20px;
   margin-bottom: 5px;
@@ -48,19 +74,69 @@ hr {
   margin-right: 0px;
 }
 #plot_area{
-  width:500px;
-  height:500px;
-  background-color: aquamarine;
+  display: flex;
+  flex: 1;
+  overflow: hidden;
 }
-#bt_load{
+
+.bt{
   height: 20px;
   width: 100px;
   margin-left: 20px;
   margin-top: 20px;
+  background-image: linear-gradient(to right, #25aae1, #4481eb, #04befe, #3f86ed);
+  /*box-shadow: 0 4px 15px 0 rgba(49, 196, 190, 0.75);*/
+  border-radius: 8px;
+  pointer-events: auto;
+}
+.bt:hover{
+  background-image: linear-gradient(to right, #25aae1, #40e495, #30dd8a, #2bb673);
+  background-position: 100% 0;
+}
+.bt:focus {
+  background-color:white !important;
+}
+#bt_load{
+
 }
 #bt_add{
-  height: 20px;
-  width: 100px;
+margin-top: 30px;
+}
+#c_collection{
+  border-radius: 8px;
+}
+#scroller {
+  /*Size is displayed size*/
+  display: block;
+  width: 100%;
+  height: 100%;
+  /*border: 1px solid lightblue;*/
+  overflow-y: scroll;
+  overflow-x: scroll;
+  z-index: 1;
+  background-color: transparent;
+}
+
+#canvasBase {
+  /*Size is virtual full size. make blank area for getting scroll.*/
+  overflow: hidden;
+  position: relative;
+
+  width: 10000px;
+  height: 10000px;
+  background-color: transparent;
+}
+
+#p5Canvas {
+  width: 1000px;
+  height: 1000px;
+  z-index: 10;
+  position: absolute;
+  pointer-events: none;
+  background-color: transparent;
+}
+
+#depth_scale{
+  width: 150px;
   margin-left: 20px;
-  margin-top: 30px;
 }

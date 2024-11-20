@@ -8,6 +8,7 @@ class PlotDataset {
     this.data_series = [];
     this.data_max = null;
     this.data_min = null;
+    this.unit = "";
     this.plot_type = "scatter";
   }
 }

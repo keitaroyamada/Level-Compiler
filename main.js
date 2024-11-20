@@ -588,6 +588,14 @@ function createMainWIndow() {
     console.log("MAIN: Project plot data is initiarised.");
     return;
   });
+  ipcMain.handle("InitiarisePlotDataCollection", async (_e) => {
+    //import modeln
+    console.log("MAIN: Initiarise plot data collection");
+    LCPlot.data_collections = [];
+    LCPlot.data_selected_id = null;
+    console.log("MAIN: Project plot data collection is initiarised.");
+    return;
+  });
   ipcMain.handle("getFilePath", async (_e, pathData) => {
     //import modeln
     let results = path.parse(pathData);

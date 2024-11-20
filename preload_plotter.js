@@ -14,7 +14,7 @@ contextBridge.exposeInMainWorld("PlotterApi", {
   toggleDevTools: (args1) => ipcRenderer.send('toggle-devtools',args1),
 
   getPlotData: (args1) => ipcRenderer.invoke("PlotterGetData", args1),
-
+  initiariseLCPlot_data_collection: () => ipcRenderer.invoke("InitiarisePlotDataCollection"),
 
 
   

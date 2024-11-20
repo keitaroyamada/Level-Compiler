@@ -7,6 +7,8 @@
     <title>Level Compiler</title>
     <link rel="stylesheet" href="plotter_styles.css" />
     <script src="js/renderer_plotter.js" defer></script>
+    <script src="js/p5.min.js"></script>
+    <script src="js/p5.svg.js" defer></script>
   </head>
   <body>
     <div id="container">
@@ -14,25 +16,42 @@
       <div id="menu">
 
         <div id="set_load">
-          <button id="bt_load">Load</button>
+          <button class="bt" id="bt_load">Load</button>
           <div id="load_list">
             <p>Tareget collection</p>
             <select id="c_collection"></select>
           </div>
-          <button id="bt_add">Add plot</button>
-          <hr>
+          <button class="bt" id="bt_add">Add plot</button>
         </div>
 
         
         
-        <div id="plot_list">
-          <p>Plot List</p>
+        <div id="plot_list_base">
+          <hr>
+          <p id="plot_list_name">Plot List</p>
+          <div id="plot_list"></div>
+        </div>
+        <div id="plot_options">
+          <hr>
+          <p id="plot_option_name">Plot Options</p>
+          <select id="depth_scale">
+            <option value="drilling_depth">Drilling depth</option>
+            <option value="composite_depth" selected>Composite depth</option> 
+            <option value="event_free_depth">Event Free Depth</option>
+            <option value="age">Age</option>
+          </select>
         </div>
 
       </div>
 
-      <div id="plot_area">   </div>
+      <div id="plot_area">   
+        <div id="scroller">
+          <div id="canvasBase"></div>
+        </div>
+        <div id="p5Canvas"></div> 
+      </div>
 
     </div>
   </body>
+
 </html>
