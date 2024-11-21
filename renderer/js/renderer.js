@@ -759,6 +759,14 @@ document.addEventListener("DOMContentLoaded", () => {
     await loadPlotData();
     updateView();      
   });
+   //============================================================================================
+  window.LCapi.receive("AlertRenderer", async (data) => {
+    //data: status, statusDetails, hasError, statusDetails
+
+    console.error("Error: \n",data);
+    alert(data.statusDetails)
+    //data.errorDetails
+  });
   
   //============================================================================================
   //Edit correlation model
@@ -2551,6 +2559,9 @@ document.addEventListener("DOMContentLoaded", () => {
   window.LCapi.receive("rendererLog", async (data) => {
     console.log(data);
   });
+  window.LCapi.receive("errors", async (data) => {
+    console.log(data);
+  });
   //============================================================================================
   //============================================================================================
   //FInder send event (move to)
@@ -3586,7 +3597,7 @@ document.addEventListener("DOMContentLoaded", () => {
                       }
                     }
                   } else if(objOpts.edit.mode == "add_marker"){
-                    if(objOpts.edit.hittest.hole == hole.id[1] && objOpts.edit.hittest.section == section.id[2]){
+                    if(objOpts.edit.hittest.project == project.id[0] && objOpts.edit.hittest.hole == hole.id[1] && objOpts.edit.hittest.section == section.id[2]){
                       sketch.push();//save
                       sketch.strokeWeight(1);
                       sketch.stroke("Red");
@@ -5087,6 +5098,7 @@ document.addEventListener("DOMContentLoaded", () => {
       while (document.getElementById("hole_list").firstChild) {
         document.getElementById("hole_list").removeChild(document.getElementById("hole_list").firstChild);
       }
+
       //add hole list
       LCCore.projects.forEach((project, p) => {
         const container = document.getElementById("hole_list");

@@ -47,7 +47,7 @@ const history = new UndoManager();
 let labelerHistory = new UndoManager();
 let tempCore = null;
 
-//
+//windows
 let finderWindow = null;
 let dividerWindow = null;
 let converterWindow = null;
@@ -85,6 +85,10 @@ function createMainWIndow() {
       converterWindow.close();
     }
   });
+
+  //initiarise
+  LCCore = initiariseLCCore(mainWindow);
+
   //===================================================================================================================================
   //make Menu
   const lcmenu = [
@@ -131,6 +135,7 @@ function createMainWIndow() {
                 const inData = await loadmodelfile()
                 //console.log(inData)
                 if(inData!==null){
+                  initiari
                   Object.assign(LCCore, inData.LCCore);
                   Object.assign(LCAge, inData.LCAge);
                   //Object.assign(LCPlot, inData.LCPlot);
@@ -325,7 +330,7 @@ function createMainWIndow() {
               return;
             }
         
-            tempCore = new LevelCompilerCore();
+            tempCore = initiariseLCCore(mainWindow);
             tempCore.addProject("correlation","temp");
             tempCore.addHole([1,null,null,null],"temp");
 
@@ -530,14 +535,10 @@ function createMainWIndow() {
   ipcMain.handle("InitiariseCorrelationModel", async (_e) => {
     //import modeln
     console.log("MAIN: Initiarise correlation model");
-    LCCore = new LevelCompilerCore();
-    //LCCore.projects = [];
-    //LCCore.search_idx_list = {};
-    //LCCore.selected_id = null;
-    //LCCore.reserved_project_ids = [0];
+    LCCore = initiariseLCCore(mainWindow);
 
     console.log("MAIN: Project correlation data is initiarised.");
-    return LCCore;
+    return JSON.parse(JSON.stringify(LCCore));
   });
 
   ipcMain.handle("InitiariseAgeModel", async (_e) => {
@@ -718,7 +719,7 @@ function createMainWIndow() {
   ipcMain.handle("LoadModelFromLCCore", async (_e) => {
     //import model
     console.log("MAIN: Load correlation model.");
-    return LCCore;
+    return JSON.parse(JSON.stringify(LCCore));
   });
 
   ipcMain.handle("LoadRasterImage", async (_e, im_path, Resize) => {
@@ -1091,7 +1092,7 @@ function createMainWIndow() {
     console.log("MAIN: Load age model into LCCore. id: " +  LCAge.selected_id + " name:" +  model_name);
     LCCore.checkModel();
 
-    return LCCore;
+    return JSON.parse(JSON.stringify(LCCore));
   });
   ipcMain.handle("RegisterAgePlotFromLCAge", async (_e) => {
     LCPlot.initiariseAgeCollection();
@@ -1124,7 +1125,7 @@ function createMainWIndow() {
   });
 
   ipcMain.handle("ExportCorrelationAsCsvFromRenderer", async (_e, MD) => {
-    let exportLCCore = new LevelCompilerCore();
+    let exportLCCore = initiariseLCCore(mainWindow);
     
     //exportLCCore <- MD
     Object.assign(exportLCCore, MD);
@@ -1139,7 +1140,7 @@ function createMainWIndow() {
   ipcMain.handle("InitiariseTempCore", async (_e) => {
     //import modeln
     labelerHistory = new UndoManager();
-    tempCore = new LevelCompilerCore();
+    tempCore = initiariseLCCore(mainWindow);
     tempCore.addProject("correlation","temp");
     tempCore.addHole([1,null,null,null],"temp");
     console.log("MAIN: Labeler Project data is initiarised.");
@@ -1385,8 +1386,9 @@ function createMainWIndow() {
   ipcMain.handle("CalcCompositeDepth", async (_e) => {
     //import model
     console.log("MAIN: Calc composite depth.");
+   
     LCCore.calcCompositeDepth(LCCore.base_project_id);
-    return LCCore;
+    return JSON.parse(JSON.stringify(LCCore));
   });
 
   ipcMain.handle("CalcEventFreeDepth", async (_e) => {
@@ -1394,7 +1396,7 @@ function createMainWIndow() {
     console.log("MAIN: Calc event free depth");
     LCCore.calcEventFreeDepth(LCCore.base_project_id);
     //LCCore.getModelSummary();
-    return LCCore;
+    return JSON.parse(JSON.stringify(LCCore));
   });
 
   ipcMain.handle("FileChoseDialog", async (_e, title, ext) => {
@@ -2661,7 +2663,20 @@ function createAboutWindow() {
   aboutWindow.setMenu(null);
   aboutWindow.loadFile(path.join(__dirname, "./renderer/about.html"));
 }
-
+function initiariseLCCore(window){
+  let LCCore = new LevelCompilerCore();
+  LCCore.on('error', (err) => {
+    //minor error
+    console.error('LCCore => '+ err.statusDetails);
+    window.webContents.send("AlertRenderer", err);
+  });
+  //alert error
+  LCCore.on('error_alert', (err) => {
+    console.error('LCCore => '+ err.statusDetails);
+    window.webContents.send("AlertRenderer", err);
+  });
+  return LCCore;
+}
 //--------------------------------------------------------------------------------------------------
 app.whenReady().then(() => {
   createMainWIndow();
