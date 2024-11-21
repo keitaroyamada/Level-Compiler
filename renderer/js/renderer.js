@@ -234,6 +234,7 @@ document.addEventListener("DOMContentLoaded", () => {
   //============================================================================================
   //hide test event
   document.getElementById("footerLeftText").addEventListener("click", async () => {
+    console.log(modelImages)
     if(developerMode){
 
   }
@@ -293,9 +294,11 @@ document.addEventListener("DOMContentLoaded", () => {
     })
 
     //check corephoto
+    let isPhotoLoaded = false;
     dataList.forEach((data,i)=>{
       if(data.ext == ""){
         order.push(i);
+        isPhotoLoaded = true;
       }
     })
 
@@ -365,6 +368,13 @@ document.addEventListener("DOMContentLoaded", () => {
 
           //load LCplot
           await loadPlotData();
+
+          //update photo
+          if(isPhotoLoaded == false){
+            if(Object.keys(modelImages.drilling_depth).length>0){
+              modelImages = await loadCoreImages(modelImages, LCCore, objOpts, "age");
+            }
+          }
         }
       }else if(fileParseData.ext == ".lcmodel"){
         console.log("[Renderer]: LCmodel load from drop..");
@@ -551,6 +561,11 @@ document.addEventListener("DOMContentLoaded", () => {
       await loadAge(selected_age_model_id);
       await loadPlotData();
 
+      //update photo
+      if(Object.keys(modelImages.drilling_depth).length>0){
+        modelImages = await loadCoreImages(modelImages, LCCore, objOpts, "age");
+      }
+
       //update plot
       updateView();
     });
@@ -604,7 +619,7 @@ document.addEventListener("DOMContentLoaded", () => {
   window.LCapi.receive("UnLoadModelsMenuClicked", async () => {
     const response = await window.LCapi.Confirm(
       "Confirmation",
-      "Are you sure you want to clear the loaded model?"
+      "Are you sure you want to clear the loaded models?"
     );
     if (response) {
       //ok
@@ -614,6 +629,17 @@ document.addEventListener("DOMContentLoaded", () => {
       await initiariseCanvas();
       await initiarisePlot();
       isLoadedLCModel = false;
+
+      modelImages = {
+        image_dir: [],
+        load_target_ids: [],
+        drilling_depth: {},
+        composite_depth: {},
+        event_free_depth: {},
+        age:{},
+      };
+
+
       console.log("[Renderer]: Unload Models of Correlations, Ages and Canvas.");
       console.log(LCCore)
     } else {
@@ -658,6 +684,11 @@ document.addEventListener("DOMContentLoaded", () => {
     await registerAgePlotFromLCAge();
     await loadPlotData();
 
+    //update photo
+    if(Object.keys(modelImages.drilling_depth).length>0){
+      modelImages = await loadCoreImages(modelImages, LCCore, objOpts, "age");
+    }
+
     //update plot
     updateView();
   });
@@ -693,7 +724,7 @@ document.addEventListener("DOMContentLoaded", () => {
    //============================================================================================
    //import plot data
   window.LCapi.receive("importedData", async (data) => {
-    console.log("[Renderer]: Imported data recieved.");
+    console.log("[Renderer]: Imported data received.");
     
     //load renderer
     await loadPlotData()
@@ -2367,6 +2398,14 @@ document.addEventListener("DOMContentLoaded", () => {
 
       console.log(LCCore);
       console.log(LCplot);
+
+      //update photo
+      modelImages = await updateImageRegistration(modelImages, LCCore);
+      console.log(modelImages)
+      modelImages = await loadCoreImages(modelImages, LCCore, objOpts, "drilling_depth");
+      modelImages = await loadCoreImages(modelImages, LCCore, objOpts, "composite_depth");
+      modelImages = await loadCoreImages(modelImages, LCCore, objOpts, "event_free_depth");
+      modelImages = await loadCoreImages(modelImages, LCCore, objOpts, "age");
 
       //update plot
       updateView();
@@ -6004,6 +6043,36 @@ async function undo(type){
      resolve(result);
   })
 }
+async function updateImageRegistration(modelImages, LCCore){
+  return new Promise(async (resolve, reject) => {
+    modelImages.load_target_ids = [];
+    for(let p of LCCore.projects){
+      for(let h of p.holes){
+        for(let s of h.sections){
+          //check loaded im
+          const im_in_array = modelImages.drilling_depth[h.name+"-"+s.name];
+          //check folder im
+          const im_in_dir = await window.LCapi.getFilesInDir(modelImages.image_dir, h.name+"-"+s.name+".jpg");
+          //add case
+          if(im_in_array==undefined && im_in_dir!==null){
+            modelImages.load_target_ids.push(s.id);//add load list
+          }
+
+          //remove case
+          if(im_in_array!==undefined && im_in_dir==null){
+            delete modelImages.drilling_depth[h.name+"-"+s.name];
+            delete modelImages.composite_depth[h.name+"-"+s.name];
+            delete modelImages.event_free_depth[h.name+"-"+s.name];
+            delete modelImages.age[h.name+"-"+s.name];
+          }
+        }
+      }
+    }
+
+    resolve(modelImages);
+  });
+  
+}
 async function loadCoreImages(modelImages, LCCore, objOpts, depthScale) {
   let txt = "Converting section images to " + depthScale + " scale...";
     if (depthScale == "drilling_depth") {
@@ -6072,7 +6141,7 @@ async function loadCoreImages(modelImages, LCCore, objOpts, depthScale) {
     
     await new Promise((p5resolve) => {
       new p5(async (p) => {
-        const tasks = []; // 各タスクのPromiseを保持
+        const tasks = []; //
     
         for (let t = 0; t < N; t++) {
           const targeIdx = getIdxById(LCCore, modelImages.load_target_ids[t]);

@@ -575,12 +575,12 @@ function createMainWIndow() {
     return results;
   });
   ipcMain.handle("getFilesInDir", async (_e, dir, name) => {
-    const results = findFileInDir(dir, name)
+    const results = findFileInDir(dir, name);
     if(results.length == 1){
       //console.log("MAIN: Successfully get fullpath.");
       return results;
     }else{
-      console.log("MAIN: Failed to find file of " + name);
+      //console.log("MAIN: Failed to find file of " + name);
       return null;
     }
   });
@@ -2668,7 +2668,7 @@ function initiariseLCCore(window){
   LCCore.on('error', (err) => {
     //minor error
     console.error('LCCore => '+ err.statusDetails);
-    window.webContents.send("AlertRenderer", err);
+    //window.webContents.send("AlertRenderer", err);
   });
   //alert error
   LCCore.on('error_alert', (err) => {
