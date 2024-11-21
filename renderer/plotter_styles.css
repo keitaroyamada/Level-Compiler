@@ -38,7 +38,7 @@ html, body{
 #plot_list_base{
   display: flex;
   flex-direction: column;
-  height: 1000px;
+  height: 250px;
 }
 #plot_list_name{
   margin-left: 20px;
@@ -99,8 +99,17 @@ hr {
 #bt_load{
 
 }
+.bt_holder{
+  display: flex;
+  flex-direction: row;
+}
 #bt_add{
 margin-top: 30px;
+width: 80px;
+}
+#bt_remove{
+  margin-top: 30px;
+  width: 80px;
 }
 #c_collection{
   border-radius: 8px;

@@ -1,7 +1,7 @@
 document.addEventListener("DOMContentLoaded", () => {
  
   //============================================================================================xxxxxxxxxx
-  let developerMode = true;
+  let developerMode = false;
   //base properties
   const scroller = document.getElementById("scroller");
   let canvasBase = document.getElementById("canvasBase");
@@ -75,7 +75,7 @@ document.addEventListener("DOMContentLoaded", () => {
   objOpts.canvas.shift_x = 0; //[cm]
   objOpts.canvas.shift_y = 100; //[cm]
   objOpts.canvas.bottom_pad = 100; //[cm]
-  objOpts.canvas.background_colour = 247;//""white
+  objOpts.canvas.background_colour = "#f4f5f7";//"#f7f7f7"//"#f8fbff";//"#fffdfa";//""white
   objOpts.canvas.target_horizon = false;
   objOpts.canvas.is_grid = false;
   objOpts.canvas.grid_width = 0.8;
@@ -3892,41 +3892,7 @@ document.addEventListener("DOMContentLoaded", () => {
       //==========================================================================================
       //==========================================================================================
       //draw data points
-      //get age data(because age data, age series is single)
-      if(LCplot.data_collections.length == 0){
-        return;
-      }
-      const dataSet = LCplot.data_collections[objOpts.plot.collecion_idx].datasets[objOpts.plot.series_idx];
 
-      //get position & plot
-      const dataList = getPlotPosiotion(dataSet, [shift_x, pad_x, xMag], [shift_y, pad_y, yMag], LCCore, objOpts, "data")
-
-      for (let a = 0; a < dataSet.data_series.length; a++) {
-        const posXY = dataList[a];
-        const posX1 = posXY.x0;
-        const posY1 = posXY.y0;
-
-        //plot main
-        if(objOpts.plot.show_dot == true){
-          sketch.fill(objOpts.plot.dot_colour);
-          sketch.noStroke();
-          sketch.ellipse(
-            posXY.x0,
-            posXY.y0,
-            2
-          );
-        }
-        if(objOpts.plot.show_line == true){
-          sketch.strokeWeight(2);
-          sketch.stroke(objOpts.plot.line_colour); 
-          sketch.line(
-            posXY.x0,
-            posXY.y0,
-            posXY.x1,
-            posXY.y1
-          );
-        }
-      }
       //==========================================================================================
 
       sketch.pop(); //restore

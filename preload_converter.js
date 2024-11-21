@@ -1,7 +1,9 @@
 // preload.js
-const { contextBridge, ipcRenderer } = require("electron");
+const { contextBridge, ipcRenderer, webUtils } = require("electron");
 
 contextBridge.exposeInMainWorld("ConverterApi", {
+
+  getFilePath: (args) => ipcRenderer.invoke("getFilePath", webUtils.getPathForFile(args)),
   //rederer <-> main
   cvtGetAgeModelList: () => ipcRenderer.invoke("cvtGetAgeModelList"),
   cvtGetCorrelationModelList: () => ipcRenderer.invoke("cvtGetCorrelationModelList"),

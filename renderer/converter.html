@@ -9,44 +9,47 @@
     <script src="js/renderer_converter.js" defer></script>
   </head>
   <body>
-    <div class="import_row">
-      <div>
-        <button id="cvt_bt_import" title="Import target data">Select csv</button>
+    <div id="container">
+      <div class="import_row">
+        <div>
+          <button class="bt" id="cvt_bt_import" title="Import target data">Select csv</button>
+        </div>
+        <div>
+          <p id="data_path">...</p>
+        </div>
+        <div class="export_row">
+          <button class="bt" id="cvt_bt_convert" title="convert">Convert</button>
+        </div>
       </div>
-      <div>
-        <p id="data_path">...</p>
-      </div>
-    </div>
 
-    <div class="data_id">
-      <div class="correlation_id">
-        <p>Mounted Correlation Model</p>
-        <select id="cvt_correlation_model"></select>
+      <div class="data_id">
+        <div class="correlation_id">
+          <p>Mounted Correlation Model</p>
+          <select id="cvt_correlation_model"></select>
+        </div>
+        <div class="age_id">
+          <p>Mounted Age Model</p>
+          <select id="cvt_age_model"></select>
+        </div>
       </div>
-      <div class="age_id">
-        <p>Mounted Age Model</p>
-        <select id="cvt_age_model"></select>
-      </div>
-    </div>
 
-    <div class="depth">
-      <div>
-        <p>Select source columns</p>
-        <select id="cvt_source_type">
-          <option value="trinity" selected>Trinity depth</option>
-          <option value="composite_depth">Composite depth</option>
-          <option value="event_free_depth">Event free depth</option>
-          <option value="age">Age</option>
-        </select>
+      <div class="depth">
+        <div>
+          <p>Select source columns</p>
+          <select id="cvt_source_type">
+            <option value="trinity" selected>Trinity depth</option>
+            <option value="composite_depth">Composite depth</option>
+            <option value="event_free_depth">Event free depth</option>
+            <option value="age">Age</option>
+          </select>
+        </div>
+        <div id="depth_definition"></div>
       </div>
-      <div id="depth_definition"></div>
-    </div>
-    <div id="cvt_source_chooser"></div>
-    <div id="cvt_data__table">
-      <table id="data_table"></table>
-    </div>
-    <div class="export_row">
-      <button id="cvt_bt_convert" title="convert">Convert</button>
+      <div id="cvt_source_chooser"></div>
+      <div id="cvt_data__table">
+        <table id="data_table"></table>
+      </div>
+      
     </div>
   </body>
 </html>

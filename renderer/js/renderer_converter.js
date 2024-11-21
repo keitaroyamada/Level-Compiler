@@ -5,6 +5,7 @@ document.addEventListener("DOMContentLoaded", () => {
   let n_c = null;
   let output_type = "export";
   let called_from = "";
+  let headrLines = 1;
   //-------------------------------------------------------------------------------------------
   window.ConverterApi.receive("ConverterMenuClicked", async (data) => {
     output_type = data.output_type;
@@ -48,7 +49,7 @@ document.addEventListener("DOMContentLoaded", () => {
   //-------------------------------------------------------------------------------------------
   //load data
   document.getElementById("cvt_bt_import").addEventListener("click", async (event) => {
-      console.log("import");
+      console.log("Load from file chose.");
       source_data = null;
       let path = null;
       
@@ -61,6 +62,7 @@ document.addEventListener("DOMContentLoaded", () => {
       //clear
       const parentElement = document.getElementById("cvt_source_chooser");
 
+      //initiarise
       while (parentElement.firstChild) {
         parentElement.removeChild(parentElement.firstChild);
       }
@@ -73,8 +75,12 @@ document.addEventListener("DOMContentLoaded", () => {
         //-----------------------------------------------------
         if (source_data !== null) {
           const disp = ["Name", "Hole", "Section", "Distance"];
-          const key = ["name", "hole", "sec", "dist"];
-
+          const key = {
+            Name:["name"],
+            Hole:["hole"],
+            Section:["sec"],
+            Distance:["dist","psp","position"],
+          }
           for (let n = 0; n < 4; n++) {
             const div = document.createElement("div");
             const p = document.createElement("p");
@@ -83,13 +89,19 @@ document.addEventListener("DOMContentLoaded", () => {
 
             const selectElement = document.createElement("select");
             selectElement.id = "depth_chooser" + n.toString();
+            selectElement.style.width = "100px";
             for (let i = 0; i < n_c; i++) {
               const option = document.createElement("option");
               option.textContent = source_data[0][i];
               option.value = i;
-              if (source_data[0][i].toLowerCase().includes(key[n])) {
-                option.selected = true;
-              }
+              
+              //check match key
+              key[disp[n]].forEach(k=>{
+                if (source_data[0][i].toLowerCase().includes(k)) {
+                  option.selected = true;
+                }
+              })
+              
               selectElement.appendChild(option);
             }
             div.appendChild(selectElement);
@@ -99,8 +111,11 @@ document.addEventListener("DOMContentLoaded", () => {
       } else if (select == "drilling_depth") {
         //-----------------------------------------------------
         if (source_data !== null) {
-          const disp = ["Name", "Drilling depth"];
-          const key = ["name", "drilling"];
+          const disp = ["Name", "Drilling_depth"];
+          const key = {
+            Name:["name"],
+            Drilling_depth:["drilling","dd"],
+          }
 
           for (let n = 0; n < 2; n++) {
             const div = document.createElement("div");
@@ -110,13 +125,17 @@ document.addEventListener("DOMContentLoaded", () => {
 
             const selectElement = document.createElement("select");
             selectElement.id = "depth_chooser" + n.toString();
+            selectElement.style.width = "100px";
             for (let i = 0; i < n_c; i++) {
               const option = document.createElement("option");
               option.textContent = source_data[0][i];
               option.value = i;
-              if (source_data[0][i].toLowerCase().includes(key[n])) {
-                option.selected = true;
-              }
+              //check match key
+              key[disp[n]].forEach(k=>{
+                if (source_data[0][i].toLowerCase().includes(k)) {
+                  option.selected = true;
+                }
+              })
               selectElement.appendChild(option);
             }
             div.appendChild(selectElement);
@@ -126,8 +145,11 @@ document.addEventListener("DOMContentLoaded", () => {
       } else if (select == "composite_depth") {
         //-----------------------------------------------------
         if (source_data !== null) {
-          const disp = ["Name", "Composite depth"];
-          const key = ["name", "composite"];
+          const disp = ["Name", "Composite_depth"];
+          const key = {
+            Name:["name"],
+            Composite_depth:["composite","cd"],
+          }
 
           for (let n = 0; n < 2; n++) {
             const div = document.createElement("div");
@@ -137,13 +159,17 @@ document.addEventListener("DOMContentLoaded", () => {
 
             const selectElement = document.createElement("select");
             selectElement.id = "depth_chooser" + n.toString();
+            selectElement.style.width = "100px";
             for (let i = 0; i < n_c; i++) {
               const option = document.createElement("option");
               option.textContent = source_data[0][i];
               option.value = i;
-              if (source_data[0][i].toLowerCase().includes(key[n])) {
-                option.selected = true;
-              }
+              //check match key
+              key[disp[n]].forEach(k=>{
+                if (source_data[0][i].toLowerCase().includes(k)) {
+                  option.selected = true;
+                }
+              })
               selectElement.appendChild(option);
             }
             div.appendChild(selectElement);
@@ -153,8 +179,11 @@ document.addEventListener("DOMContentLoaded", () => {
       } else if (select == "event_free_depth") {
         //-----------------------------------------------------
         if (source_data !== null) {
-          const disp = ["Name", "Event free depth"];
-          const key = ["name", "free"];
+          const disp = ["Name", "Event_free_depth"];
+          const key = {
+            Name:["name"],
+            Event_free_depth:["free","efd"],
+          }
 
           for (let n = 0; n < 2; n++) {
             const div = document.createElement("div");
@@ -164,13 +193,17 @@ document.addEventListener("DOMContentLoaded", () => {
 
             const selectElement = document.createElement("select");
             selectElement.id = "depth_chooser" + n.toString();
+            selectElement.style.width = "100px";
             for (let i = 0; i < n_c; i++) {
               const option = document.createElement("option");
               option.textContent = source_data[0][i];
               option.value = i;
-              if (source_data[0][i].toLowerCase().includes(key[n])) {
-                option.selected = true;
-              }
+              //check match key
+              key[disp[n]].forEach(k=>{
+                if (source_data[0][i].toLowerCase().includes(k)) {
+                  option.selected = true;
+                }
+              })
               selectElement.appendChild(option);
             }
             div.appendChild(selectElement);
@@ -181,7 +214,10 @@ document.addEventListener("DOMContentLoaded", () => {
         //-----------------------------------------------------
         if (source_data !== null) {
           const disp = ["Name", "Age"];
-          const key = ["name", "age"];
+          const key = {
+            Name:["name"],
+            Age:["age"],
+          }
 
           for (let n = 0; n < 2; n++) {
             const div = document.createElement("div");
@@ -191,13 +227,17 @@ document.addEventListener("DOMContentLoaded", () => {
 
             const selectElement = document.createElement("select");
             selectElement.id = "depth_chooser" + n.toString();
+            selectElement.style.width = "100px";
             for (let i = 0; i < n_c; i++) {
               const option = document.createElement("option");
               option.textContent = source_data[0][i];
               option.value = i;
-              if (source_data[0][i].toLowerCase().includes(key[n])) {
-                option.selected = true;
-              }
+              //check match key
+              key[disp[n]].forEach(k=>{
+                if (source_data[0][i].toLowerCase().includes(k)) {
+                  option.selected = true;
+                }
+              })
               selectElement.appendChild(option);
             }
             div.appendChild(selectElement);
@@ -229,7 +269,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const distanceIdx = document.getElementById("depth_chooser3").value;
         depthMaxIdx = Math.max(...[nameIdx, holeIdx, sectionIdx, distanceIdx]);
         //skip header
-        for (let i = 1; i < source_data.length; i++) {
+        for (let i = headrLines; i < source_data.length; i++) {
           const datumName =  source_data[i][nameIdx];//data name
           const projectName = null;
           let holeName = source_data[i][holeIdx];
@@ -250,8 +290,8 @@ document.addEventListener("DOMContentLoaded", () => {
         const nameIdx = document.getElementById("depth_chooser0").value;
         const cdIdx = document.getElementById("depth_chooser1").value;
         depthMaxIdx = Math.max(...[nameIdx, cdIdx]);
-        for (let i = 0; i < source_data.length; i++) {
-          indata.push([
+        for (let i = headrLines; i < source_data.length; i++) {
+          indataList.push([
             source_data[i][nameIdx],
             source_data[i][cdIdx],
             [null,null,null,null], 
@@ -261,8 +301,8 @@ document.addEventListener("DOMContentLoaded", () => {
         const nameIdx = document.getElementById("depth_chooser0").value;
         const efdIdx = document.getElementById("depth_chooser1").value;
         depthMaxIdx = Math.max(...[nameIdx, efdIdx]);
-        for (let i = 0; i < source_data.length; i++) {
-          indata.push([
+        for (let i = headrLines; i < source_data.length; i++) {
+          indataList.push([
             source_data[i][nameIdx], 
             source_data[i][efdIdx],
             [null,null,null,null],
@@ -272,8 +312,8 @@ document.addEventListener("DOMContentLoaded", () => {
         const nameIdx = document.getElementById("depth_chooser0").value;
         const ddIdx = document.getElementById("depth_chooser1").value;
         depthMaxIdx = Math.max(...[nameIdx, ddIdx]);
-        for (let i = 0; i < source_data.length; i++) {
-          indata.push([
+        for (let i = headrLines; i < source_data.length; i++) {
+          indataList.push([
             source_data[i][nameIdx], 
             source_data[i][ddIdx],
             [null,null,null,null],
@@ -283,8 +323,8 @@ document.addEventListener("DOMContentLoaded", () => {
         const nameIdx = document.getElementById("depth_chooser0").value;
         const ageIdx = document.getElementById("depth_chooser1").value;
         depthMaxIdx = Math.max(...[nameIdx, ageIdx]);
-        for (let i = 0; i < source_data.length; i++) {
-          indata.push([
+        for (let i = headrLines; i < source_data.length; i++) {
+          indataList.push([
             source_data[i][nameIdx], 
             source_data[i][ageIdx],
             [null,null,null,null],
@@ -411,7 +451,34 @@ document.addEventListener("DOMContentLoaded", () => {
       window.ConverterApi.toggleDevTools("converter");
     }
   });
+  document.getElementById('container').addEventListener("dragover", (e) => {
+    e.preventDefault(e);
+  });
+  document.getElementById('container').addEventListener("drop", async (e) => {
+      e.preventDefault(e);
+      //get file paths
+      let dataList = [];
+      for(const file of e.dataTransfer.files){
+          const fileParseData = await window.ConverterApi.getFilePath(file);
+          if(fileParseData.ext==".csv"){
+              dataList.push(fileParseData);
+          }
+      }
+      if(dataList.length>0){
+          console.log("Load csv files: "+dataList.length);
+      }else{
+          return
+      }
+      
+      //load
+      for(let d=0;d<dataList.length;d++){
+        //initiarise
+        source_data = null;
 
+        await loadCsv(dataList[d].fullpath);
+      }
+
+    });
   async function loadCsv(path){
     [source_data, loadedpath] = await window.ConverterApi.cvtLoadCsv(
       "Please select the conversion target data",
@@ -426,7 +493,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     if (source_data !== null) {
       source_path = loadedpath;
-      n_r = source_data.length;
+      n_r = 10;//source_data.length;
       n_c = source_data[0].length;
 
       //Clear all rows within tbody
@@ -443,10 +510,44 @@ document.addEventListener("DOMContentLoaded", () => {
         for (let c = 0; c < n_c; c++) {
           const tc = tr.insertCell();
           tc.textContent = source_data[r][c];
+          tc.style.padding = "5px"
+          tc.style.border = "1px solid #ccc";
+          if(r==0){
+            //header
+            tc.style.fontWeight = "bold";
+          }
         }
       }
       //document.getElementById("data_table").appendChild(table);
-      document.getElementById("cvt_source_type").value = "trinity";
+
+      //estimate type of depth
+      const key = {
+        trinity:["section","hole","distance"],
+        composite_depth:["cd","composite"],
+        event_free_depth:["free","efd"],
+        age:["age","bp"],
+      };
+
+      let sourceType = "trinity";
+      breakpoint:
+      for (let i = 0; i < n_c; i++) {
+        //check match key
+        
+        for(const k in key){
+          let isContain = false;
+          key[k].forEach(c=>{
+            if (source_data[0][i].toLowerCase().includes(c)) {
+              isContain = true;
+            }
+          })
+          if(isContain==true){
+            sourceType = k.toLocaleLowerCase();
+            break breakpoint;
+          }
+        }
+      }
+      console.log("Estimated Source Type: "+sourceType);
+      document.getElementById("cvt_source_type").value = sourceType;//"trinity";
       document.getElementById("cvt_source_type").dispatchEvent(new Event("change"));
 
       document.getElementById("data_path").textContent = loadedpath.match(/[^\\\/]*$/)[0];

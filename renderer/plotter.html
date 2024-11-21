@@ -16,12 +16,19 @@
       <div id="menu">
 
         <div id="set_load">
-          <button class="bt" id="bt_load">Load</button>
+          <div class="bt_holder">
+            <button class="bt" id="bt_load">Load</button>
+            <button class="bt" id="bt_export">Export</button>
+          </div>
+          
           <div id="load_list">
-            <p>Tareget collection</p>
+            <p>Source collection</p>
             <select id="c_collection"></select>
           </div>
-          <button class="bt" id="bt_add">Add plot</button>
+          <div class="bt_holder">
+            <button class="bt" id="bt_add" title="Add data into plot list.">Add</button>
+            <button class="bt" id="bt_remove" title="Remove Unchecked data from plot list. ">Remove</button>
+          </div>
         </div>
 
         

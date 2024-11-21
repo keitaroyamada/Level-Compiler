@@ -178,6 +178,24 @@ document.addEventListener("DOMContentLoaded", () => {
             updateView();
         }    
     });
+    document.getElementById('bt_remove').addEventListener("click", async (e) => {
+        if(LCPlot !== null ){ 
+            
+            const parentElement = document.getElementById("plot_list");
+            Array.from(parentElement.children).forEach((child) => {
+                const grandChild = child.querySelector("input[type='checkbox']");
+                let isRemove = false;
+                if (grandChild.checked == false) {
+                  isRemove = true;
+                }
+                if(isRemove==true){
+                    child.remove();
+                }
+              });
+            getSelectedData();
+            updateView();
+        }    
+    });
     scroller.addEventListener("scroll",async function (event) {
         ///scroller position
         canvasPos[0] = scroller.scrollLeft;//* xMag;
@@ -187,7 +205,7 @@ document.addEventListener("DOMContentLoaded", () => {
         updateView();
       },
       { passive: false }
-      );
+    );
     document.addEventListener( "wheel",  function (event) {
         const rect = document.getElementById("p5Canvas").getBoundingClientRect(); // Canvas position and size   
         //event.preventDefault();
@@ -239,13 +257,27 @@ document.addEventListener("DOMContentLoaded", () => {
           canvasPos = [x, y];
           updateView();
         }
-      });  
+    });  
+    document.getElementById('bt_export').addEventListener("click", async (e) => {
+        if(LCPlot !== null ){ 
+            isSVG = true;
+            const targetCanvas = new p5(p5Sketch);
+            targetCanvas.save("plot.svg");
+            isSVG = false;
+        }    
+    });
     
     window.PlotterApi.receive("importedData", async (data) => {
         //load LCPlot
         LCPlot = data;
         console.log("[Plotter]: Imported data recieved.");
         console.log(LCPlot)
+
+        //initiarise
+        const parentElement = document.getElementById("c_collection");
+        while (parentElement.firstChild) {
+            parentElement.removeChild(parentElement.firstChild);
+        }
 
         //show
         LCPlot.data_collections.forEach(collection=>{
@@ -298,6 +330,13 @@ document.addEventListener("DOMContentLoaded", () => {
         });
         return results;
     }
+    document.addEventListener("keydown", async (event) => {
+        //dev tool
+        if (event.key === "F12") {
+          window.PlotterApi.toggleDevTools("plotter");
+        }
+    
+      });
     //============================================================================
     function updateView() {
         if (vectorObjects == null) {
@@ -352,9 +391,9 @@ document.addEventListener("DOMContentLoaded", () => {
        
         let ageMod= 1;
         if(depthScale=="age"){
-            ageMod = age_correction * 1.2;
+            ageMod = age_correction;
         }
-        let maxHeight = pad[1] + (ymax - ymin) * ageMod * zoom_rate[1];
+        let maxHeight = pad[1] + (ymax - ymin) * ageMod * zoom_rate[1] * 1.1;
         if(maxHeight == 0){
             maxHeight = 100;
         }
@@ -413,8 +452,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
                 //plot
                 for(let t=0; t< selectedList.length;t++){
-                    const target = selectedList[t];                   
-
+                    const target = selectedList[t];           
+                    
                     //check draw
                     if(target.isDraw == false){
                         continue
@@ -527,9 +566,9 @@ document.addEventListener("DOMContentLoaded", () => {
                         sketch.stroke(target.colour);        
                         for(let i=0; i<x.length-1;i++){
                             sketch.line(
-                                pad[0] + (x[i]   * zoom_rate[0] * mod[0] * target.amplification) + seriesDistance * zoom_rate[2] * target.order,
+                                pad[0] + ((x[i] -xmin)  * zoom_rate[0] * mod[0] * target.amplification) + seriesDistance * zoom_rate[2] * target.order,
                                 pad[1] + (y[i]   * zoom_rate[1]),
-                                pad[0] + (x[i+1] * zoom_rate[0] * mod[0] * target.amplification) + seriesDistance * zoom_rate[2] * target.order,
+                                pad[0] + ((x[i+1] - xmin) * zoom_rate[0] * mod[0] * target.amplification) + seriesDistance * zoom_rate[2] * target.order,
                                 pad[1] + (y[i+1] * zoom_rate[1]),
                             )
                         }
@@ -542,7 +581,7 @@ document.addEventListener("DOMContentLoaded", () => {
                               
                         for(let i=0; i<x.length;i++){
                             sketch.ellipse(
-                                pad[0] + (x[i]   * zoom_rate[0] * mod[0] * target.amplification) + seriesDistance * zoom_rate[2] * target.order,
+                                pad[0] + ((x[i] - xmin) * zoom_rate[0] * mod[0] * target.amplification) + seriesDistance * zoom_rate[2] * target.order,
                                 pad[1] + (y[i]   * zoom_rate[1]),
                                 8
                             );  
@@ -554,16 +593,16 @@ document.addEventListener("DOMContentLoaded", () => {
                         sketch.fill(target.colour);                        
 
                         for(let i=0; i<x.length;i++){
-                            let rectX0 = pad[0] + (0      * zoom_rate[0] * mod[0] * target.amplification) + seriesDistance * zoom_rate[2] * target.order;
-                            let rectX1 = pad[0] + (x[i]   * zoom_rate[0] * mod[0] * target.amplification) + seriesDistance * zoom_rate[2] * target.order;
+                            let rectX0 = pad[0] + ((0-xmin)      * zoom_rate[0] * mod[0] * target.amplification) + seriesDistance * zoom_rate[2] * target.order;
+                            let rectX1 = pad[0] + ((x[i]-xmin)   * zoom_rate[0] * mod[0] * target.amplification) + seriesDistance * zoom_rate[2] * target.order;
                             let rectY  = pad[1] + (y[i]   * zoom_rate[1]);
                             let rectY0 = rectY -2;
                             let rectY1 = rectY +2;
                             if(0>xmax){
-                                rectX0 = pad[0] + (xmax * zoom_rate[0] * mod[0] * target.amplification) + seriesDistance * zoom_rate[2] * target.order;
+                                rectX0 = pad[0] + ((xmax-xmin) * zoom_rate[0] * mod[0] * target.amplification) + seriesDistance * zoom_rate[2] * target.order;
                             }
                             if(0<xmin){
-                                rectX0 = pad[0] + (xmin * zoom_rate[0] * mod[0] * target.amplification) + seriesDistance * zoom_rate[2] * target.order;
+                                rectX0 = pad[0] + ((xmin-xmin) * zoom_rate[0] * mod[0] * target.amplification) + seriesDistance * zoom_rate[2] * target.order;
                             }
                             
                             sketch.rect(
@@ -595,28 +634,30 @@ document.addEventListener("DOMContentLoaded", () => {
                             gridPositions.push(pos);
                         }
 
+                        //x axis--------------------------------------------
                         //baseline
                         sketch.strokeWeight(2);
                         sketch.stroke("Gray");
                         sketch.line(
-                            pad[0] + ((xmin + gridPositions[0])   * zoom_rate[0] * mod[0] * target.amplification) + seriesDistance * zoom_rate[2] * target.order,
+                            pad[0] + ((gridPositions[0] - xmin)   * zoom_rate[0] * mod[0] * target.amplification) + seriesDistance * zoom_rate[2] * target.order,
                             100    + scroller.scrollTop,
-                            pad[0] + ((xmin + gridPositions[gridPositions.length-1]) * zoom_rate[0] * mod[0] * target.amplification) + seriesDistance * zoom_rate[2] * target.order,
+                            pad[0] + ((gridPositions[gridPositions.length-1] - xmin) * zoom_rate[0] * mod[0] * target.amplification) + seriesDistance * zoom_rate[2] * target.order,
                             100    + scroller.scrollTop,
                         )
                         //tick
                         gridPositions.forEach(p=>{
                             sketch.line(
-                               pad[0] + ((xmin + p)  * zoom_rate[0] * mod[0] * target.amplification) + seriesDistance * zoom_rate[2] * target.order,
+                               pad[0] + ((p - xmin)  * zoom_rate[0] * mod[0] * target.amplification) + seriesDistance * zoom_rate[2] * target.order,
                                100    + scroller.scrollTop,
-                               pad[0] + ((xmin + p)  * zoom_rate[0] * mod[0] * target.amplification) + seriesDistance * zoom_rate[2] * target.order,
+                               pad[0] + ((p - xmin)  * zoom_rate[0] * mod[0] * target.amplification) + seriesDistance * zoom_rate[2] * target.order,
                                100    + scroller.scrollTop - 10,
                             )
                         })
                         //tick label
-                        const tickX0 = pad[0] + ((xmin + gridPositions[0])  * zoom_rate[0] * mod[0] * target.amplification) + seriesDistance * zoom_rate[2] * target.order;
-                        const tickX1 = pad[0] + ((xmin + gridPositions[gridPositions.length-1])  * zoom_rate[0] * mod[0] * target.amplification) + seriesDistance * zoom_rate[2] * target.order;
+                        const tickX0 = pad[0] + ((gridPositions[0] - xmin)  * zoom_rate[0] * mod[0] * target.amplification) + seriesDistance * zoom_rate[2] * target.order;
+                        const tickX1 = pad[0] + ((gridPositions[gridPositions.length-1] - xmin)  * zoom_rate[0] * mod[0] * target.amplification) + seriesDistance * zoom_rate[2] * target.order;
                         const tickY0 = 100    + scroller.scrollTop - 15;
+                        sketch.noStroke();
                         sketch.text(
                             Math.round(gridPositions[0]/precision)*precision.toString(),
                             tickX0,
@@ -636,7 +677,7 @@ document.addEventListener("DOMContentLoaded", () => {
                             tickY0 - 20,
                         );
 
-                        //depth grid
+                        //y axis--------------------------------------------
                         const numYGrids = 10;
                         rawInterval = scroller.clientHeight/zoom_rate[1]/100/numYGrids;
                         precision = Math.pow(10, Math.floor(Math.log10(rawInterval)));
@@ -648,6 +689,8 @@ document.addEventListener("DOMContentLoaded", () => {
                         for (let pos = ystart; pos <= yend; pos += precision) {
                             gridYPositions.push(pos);
                         }
+                        sketch.strokeWeight(2);
+                        sketch.stroke("Gray");
                         gridYPositions.forEach(g=>{
                             sketch.line(
                                 pad[0] - 10 + scroller.scrollLeft,
@@ -656,6 +699,7 @@ document.addEventListener("DOMContentLoaded", () => {
                                 pad[1] + g*100 * zoom_rate[1],
                             )
                         })
+                        sketch.noStroke();
                         gridYPositions.forEach(g=>{
                             let val = g;
                             let prec = 1;
@@ -663,6 +707,7 @@ document.addEventListener("DOMContentLoaded", () => {
                                 val = val * 100 * ageMod;
                                 prec = 0;
                             }
+                            
                             sketch.text(
                                 val.toFixed(prec),
                                 pad[0] - 40 + scroller.scrollLeft - sketch.textWidth(val.toFixed(1) + " m"),

@@ -160,46 +160,6 @@ function createMainWIndow() {
                 mainWindow.webContents.send("LoadCoreImagesMenuClicked");
               },
             },
-            {
-              label: "Load Plot Data (under construction)",
-              accelerator: "CmdOrCtrl+P",
-              click: () => {
-                if (converterWindow) {
-                  converterWindow.focus();
-                  return;
-                }
-            
-                //create finder window
-                converterWindow = new BrowserWindow({
-                  title: "Converter",
-                  width: 700,
-                  height: 800,
-                  webPreferences: {preload: path.join(__dirname, "preload_converter.js"),},
-                });
-                
-                //converterWindow.setAlwaysOnTop(true, "normal");
-                converterWindow.on("closed", () => {
-                  converterWindow = null;
-                  mainWindow.webContents.send("ConverterClosed", "");
-                });
-                converterWindow.setMenu(null);
-            
-                converterWindow.loadFile(path.join(__dirname, "./renderer/converter.html"));
-            
-                converterWindow.once("ready-to-show", () => {
-                  converterWindow.show();
-                  converterWindow.setAlwaysOnTop(true, "normal");
-                  //converterWindow.webContents.openDevTools();
-                  //converterWindow.setAlwaysOnTop(true, "normal");
-                  const data = {
-                    output_type:"import",
-                    called_from:"main",
-                    path:null,
-                  }; 
-                  converterWindow.webContents.send("ConverterMenuClicked", data);
-                });
-              },
-            },
           ],
         },
         {
@@ -224,7 +184,7 @@ function createMainWIndow() {
           label:"Export (for Correlator)",
           submenu:[
             {
-              label: "Export model as csv (NOT RECOMMENDED)",
+              label: "Export model as csv",
               click: () => {
                 mainWindow.webContents.send("ExportCorrelationAsCsvMenuClicked");
               },
@@ -277,6 +237,11 @@ function createMainWIndow() {
         {
           label: "Converter",
           click: () => {
+            if (isDev == false){
+              if(LCCore.base_project_id==null){
+                return
+              }
+            }
             if (converterWindow) {
               converterWindow.focus();
               return;
@@ -286,7 +251,7 @@ function createMainWIndow() {
             converterWindow = new BrowserWindow({
               title: "Converter",
               width: 700,
-              height: 800,
+              height: 700,
               webPreferences: {preload: path.join(__dirname, "preload_converter.js"),},
             });
             
@@ -301,7 +266,7 @@ function createMainWIndow() {
         
             converterWindow.once("ready-to-show", () => {
               converterWindow.show();
-              converterWindow.setAlwaysOnTop(true, "normal");
+             // converterWindow.setAlwaysOnTop(true, "normal");
               //converterWindow.webContents.openDevTools();
               //converterWindow.setAlwaysOnTop(true, "normal");
               const data = {
@@ -316,6 +281,11 @@ function createMainWIndow() {
         {
           label: "Plotter",
           click: () => {
+            if (isDev == false){
+              if(LCCore.base_project_id==null){
+                return
+              }
+            }
             if (plotWindow) {
               plotWindow.focus();
               return;
@@ -341,7 +311,7 @@ function createMainWIndow() {
             plotWindow.once("ready-to-show", () => {
               plotWindow.show();
               // plotWindow.setAlwaysOnTop(true, "normal");
-              plotWindow.webContents.openDevTools();
+              //plotWindow.webContents.openDevTools();
               plotWindow.webContents.send("PlotterMenuClicked");
             });
           },
@@ -1808,6 +1778,12 @@ function createMainWIndow() {
         importerWindow.webContents.closeDevTools();
       } else {
         importerWindow.webContents.openDevTools();
+      }
+    }else if(data == "plotter"){
+      if (plotWindow.webContents.isDevToolsOpened()) {
+        plotWindow.webContents.closeDevTools();
+      } else {
+        plotWindow.webContents.openDevTools();
       }
     }
     
