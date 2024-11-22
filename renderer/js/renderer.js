@@ -317,7 +317,11 @@ document.addEventListener("DOMContentLoaded", () => {
     //get
     let numLoadModel = 0;
     await window.LCapi.progressbar("Load models", "Now loading...");
-    await window.LCapi.updateProgressbar(0, order.length, "");
+    let N = order.length;
+    if(isPhotoLoaded=true){
+      N-=1;
+    }
+    await window.LCapi.updateProgressbar(0, N, "");
     for(let i=0;i<order.length;i++){
       const fileParseData = dataList[order[i]];
       if(fileParseData.ext == ""){
@@ -397,7 +401,7 @@ document.addEventListener("DOMContentLoaded", () => {
           updateView(); 
         }
       }
-      await window.LCapi.updateProgressbar(i+1, order.length);
+      await window.LCapi.updateProgressbar(i+1, N);
     }
 
     //update photo
@@ -409,7 +413,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
     //update
     updateView();
-    await window.LCapi.updateProgressbar(1,1, "");
   });
   //============================================================================================
   //open divider
