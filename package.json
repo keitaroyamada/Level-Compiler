@@ -1,7 +1,7 @@
 {
   "name": "levelcompiler",
   "productName": "Level Compiler",
-  "version": "0.0.2-alpha.7",
+  "version": "0.0.2-alpha.8",
   "description": "Calc and show core levels",
   "main": "main.js",
   "scripts": {
