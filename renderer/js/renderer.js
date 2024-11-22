@@ -287,8 +287,10 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     //check age model
+    let isAgeLoaded = false;
     dataList.forEach((data,i)=>{
       if(data.base.includes("[age]")){
+        isAgeLoaded = true;
         order.push(i);
       }
     })
@@ -313,6 +315,9 @@ document.addEventListener("DOMContentLoaded", () => {
     
 
     //get
+    let numLoadModel = 0;
+    await window.LCapi.progressbar("Load models", "Now loading...");
+    await window.LCapi.updateProgressbar(0, order.length, "");
     for(let i=0;i<order.length;i++){
       const fileParseData = dataList[order[i]];
       if(fileParseData.ext == ""){
@@ -339,59 +344,43 @@ document.addEventListener("DOMContentLoaded", () => {
           console.log("[Renderer]: Correlation model file load from drop.");
           //register correlation model
           await registerModel(fileParseData.fullpath);
-  
-          //load model into renderer
-          await loadModel();       
-          if(age_model_list.length >0){
-            await registerAge(fileParseData.fullpath);
 
-            //load age model into LCCore
-            await loadAge(age_model_list[0].id);
-
-            //register age into LCplot
-            await registerAgePlotFromLCAge();
-
-            //load LCplot
-            await loadPlotData();
-          }   
         } else if(fileParseData.base.includes("[age]")){
+          if(numLoadModel==0){
+            await loadModel();
+            numLoadModel++;
+          }
+          
           //case age file
           console.log("[Renderer]: Age model file load from drop.");
           //register age model
           await registerAge(fileParseData.fullpath);
-
-          //load age model into LCCore
-          await loadAge(age_model_list[0].id);
-
-          //register age into LCplot
           await registerAgePlotFromLCAge();
 
-          //load LCplot
-          await loadPlotData();
-
-          //update photo
-          if(isPhotoLoaded == false){
-            if(Object.keys(modelImages.drilling_depth).length>0){
-              modelImages = await loadCoreImages(modelImages, LCCore, objOpts, "age");
-            }
+          if(age_model_list.length >0){
+            await loadAge(age_model_list[0].id);
+            await loadPlotData();//age plot
           }
         }
       }else if(fileParseData.ext == ".lcmodel"){
         console.log("[Renderer]: LCmodel load from drop..");
-        isLoadedLCModel = true;
-        //load into LCCore
+        await initiariseCorrelationModel();
+        await initiariseAgeModel();
+        await initiariseCanvas();
+        await initiarisePlot();
+
+        modelImages = {
+          image_dir: [],
+          load_target_ids: [],
+          drilling_depth: {},
+          composite_depth: {},
+          event_free_depth: {},
+          age:{},
+        };
+    
+        //load into LCCore (load process is in receive("RegisteredLCModel")
         await window.LCapi.loadLCmodel(fileParseData.fullpath);
 
-
-        //load
-        await loadModel();
-        await registerModelFromLCCore()
-        await registerAgeFromLCAge();
-        const selected_age_model_id = document.getElementById("AgeModelSelect").value;
-        await loadAge(selected_age_model_id)
-        await registerAgePlotFromLCAge();
-        await loadPlotData();
-        updateView(); 
       }else if(fileParseData.ext == ".lcsection"){
         console.log("[Renderer]: LCsection load from drop..");
         const result = await window.LCapi.addSectionFromLcsection(fileParseData);
@@ -408,11 +397,19 @@ document.addEventListener("DOMContentLoaded", () => {
           updateView(); 
         }
       }
+      await window.LCapi.updateProgressbar(i+1, order.length);
+    }
+
+    //update photo
+    if(isPhotoLoaded == false && isAgeLoaded == true){
+      if(Object.keys(modelImages.drilling_depth).length>0){
+        modelImages = await loadCoreImages(modelImages, LCCore, objOpts, "age");
+      }
     }
 
     //update
     updateView();
-
+    await window.LCapi.updateProgressbar(1,1, "");
   });
   //============================================================================================
   //open divider
@@ -643,7 +640,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
 
       console.log("[Renderer]: Unload Models of Correlations, Ages and Canvas.");
-      console.log(LCCore)
     } else {
       //no
       return;
@@ -751,6 +747,7 @@ document.addEventListener("DOMContentLoaded", () => {
           extensions: ["csv"],
         },
       ]);
+      console.log(path)
       if (path == null) {
         return;
       }
@@ -759,14 +756,7 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
 
-    path
-
-    //initiarise
-    //await initiariseCorrelationModel();
-    await initiariseAgeModel();
-    await initiariseCanvas();
-    await initiarisePlot();
-
+    console.log(path)
     //mount correlation model
     const isResiter = await registerModel(path);
 
@@ -778,19 +768,31 @@ document.addEventListener("DOMContentLoaded", () => {
       updateView();
     }
   });
+
 //============================================================================================
   //load correlation model
-  window.LCapi.receive("LoadLCModelMenuClicked", async () => {
-    isLoadedLCModel = true;
+  window.LCapi.receive("RegisteredLCModel", async () => {
+    document.body.style.cursor = "wait";
+    isLoadedLCModel = true; //initiarise
+    
     //load
-    await loadModel();
     await registerModelFromLCCore()
     await registerAgeFromLCAge();
-    const selected_age_model_id = document.getElementById("AgeModelSelect").value;
-    await loadAge(selected_age_model_id)
-    await registerAgePlotFromLCAge();
+
+    console.time("Load model") 
+    await loadModel();//make up hole list view
+    console.timeEnd("Load model")
+
+    console.time("Load age")
+    const selected_age_model_id = document.getElementById("AgeModelSelect").value; 
+    await loadAge(selected_age_model_id);//load age data included LCCore
+    console.timeEnd("Load age")
+
+    await registerAgePlotFromLCAge(); 
     await loadPlotData();
-    updateView();      
+
+    updateView();    
+    document.body.style.cursor = "default";
   });
    //============================================================================================
   window.LCapi.receive("AlertRenderer", async (data) => {
@@ -2367,6 +2369,8 @@ document.addEventListener("DOMContentLoaded", () => {
   //============================================================================================
   //reload
   document.getElementById("bt_reload").addEventListener("click", async (event) => {
+
+    //修正：LCモデルでの画像の読みこみ
       if (correlation_model_list.length == 0 || isLoadedLCModel==true) {
         return;
       }
@@ -2403,7 +2407,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
       //update photo
       modelImages = await updateImageRegistration(modelImages, LCCore);
-      console.log(modelImages)
       modelImages = await loadCoreImages(modelImages, LCCore, objOpts, "drilling_depth");
       modelImages = await loadCoreImages(modelImages, LCCore, objOpts, "composite_depth");
       modelImages = await loadCoreImages(modelImages, LCCore, objOpts, "event_free_depth");
@@ -5116,7 +5119,7 @@ document.addEventListener("DOMContentLoaded", () => {
   async function registerModelFromLCCore() {
   
     //mount model into LCCore
-    const results = await window.LCapi.RegisterModelFromLCCore();
+    const results = await window.LCapi.RegisterModelFromLCCore(); //[]
 
     if (results == null && results.length==0) {
       console.error("[Renderer]: Failed to resister correlation model.")
@@ -5264,6 +5267,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
   async function registerAgeFromLCAge() {
+    
     //initiarise dropdown
     const parentElement = document.getElementById("AgeModelSelect");
     while (parentElement.firstChild) {

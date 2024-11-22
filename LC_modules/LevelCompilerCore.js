@@ -57,12 +57,21 @@ class LevelCompilerCore extends EventEmitter{
     this.state.errorDetails = errorMessage;
     this.emit('error_alert', this.state);
   }
+  setUpdateDepth() {
+    //set update event for LCAge, LCPlot
+    this.state.status = 'update_depth';
+    this.state.statusDetails = null;
+    this.state.hasError = false; 
+    this.state.errorDetails = null;
+    this.emit('update_depth');
+  }
   getState() {
     return this.state;
   }
 
   //methods
   loadModelFromCsv(model_path) {
+    console.time("        Load csv");
     this.setStatus("running", "Start loadModelFromCsv");
 
     //initiarise
@@ -116,7 +125,7 @@ class LevelCompilerCore extends EventEmitter{
           }else{
             this.setErrorAlert("","E003: Skipped load the model. Multiple correlation model is not supported. Please use Duo model.");
             console.log("LCCore: E003: Skipped load the model. Multiple correlation model is not supported. Please use Duo model.");
-            return;
+            return null;
           }          
         } else if (match[1].toLowerCase().includes("duo")) {
           model_info.name = match[2];
@@ -128,14 +137,14 @@ class LevelCompilerCore extends EventEmitter{
         } else if (match[1] == "" || match[1] == undefined) {
           this.setErrorAlert("","E004: The identifier is not correct. Please use 'correlation' or 'duo'.");
           console.log("LCCore: E004: The identifier is not correct. Please use 'correlation' or 'duo'.");
-          return;
+          return null;
         } else {
           this.setErrorAlert("","E005: The identifier is not correct. Please use 'correlation' or 'duo'.");
           console.log("LCCore: E005: The identifier is not correct. Please use 'correlation' or 'duo'.");
-          return;
+          return null;
         }
       } else {
-        return;
+        return null;
       }
     } else {
       this.setError("","E051: The is no project data.");
@@ -164,7 +173,7 @@ class LevelCompilerCore extends EventEmitter{
     if (holeList.length == 0) {
       this.setErrorAlert("","E006: There are no holes.")
       console.log("LCCore: E006: There are no holes.");
-      return;
+      return null;
     }
 
     //add each hole
@@ -414,7 +423,7 @@ class LevelCompilerCore extends EventEmitter{
                 if(correlated_marker_id == null){
                   this.setErrorAlert("","E052: Correlation model contains error in cell (" +marker_r+", "+k+ ")");
                   console.error("E052: LCCore: Correlation model contains error in cell (" +marker_r+", "+k+ ")");
-                  return 
+                  return null
                 }
 
                 if (correlated_marker_id.join("-") !== this.projects[projectIdx[0]].holes[h].sections[s].markers[m].id.join("-")) {
@@ -522,9 +531,14 @@ class LevelCompilerCore extends EventEmitter{
 
     console.log("LCCore: Model loaded from csv.");
     this.setStatus("completed","Model loaded from csv.")
+
+    console.timeEnd("        Load csv")
+
     return true;
+
   }
   connectDuoModel() {
+    console.time("        Connect duo")
     this.setStatus("running","Start connectDuoModel")
     //if no connected markers in the master project, create a new marker.
     let isAllowAddMarker = true;
@@ -613,8 +627,10 @@ class LevelCompilerCore extends EventEmitter{
       }
     }
     this.setStatus("completed","Connected duo model.")
+    console.timeEnd("        Connect duo")
   }
   calcCompositeDepth() {
+    console.time("        Calc CD")
     this.setStatus("running","start calcCompositeDepth");
     this.initiariseCDEFD();
     //"all(not recommended)": All mode contains some problems in 2nd order interpolation and matchs between extrapolations.
@@ -628,8 +644,10 @@ class LevelCompilerCore extends EventEmitter{
     
     console.log("LCCore: Calced composite depth.");
     this.setStatus("completed","Calced composite depth.")
+    console.timeEnd("        Calc CD")
   }
   calcEventFreeDepth() {
+    console.time("        Calc EFD")
     this.setStatus("running","start calcEventFreeDepth");
     const calcRange = "project";
        
@@ -640,7 +658,9 @@ class LevelCompilerCore extends EventEmitter{
     }
 
     console.log("LCCore: Calced event free depth.");
+    this.setUpdateDepth();
     this.setStatus("completed","Calced Event Free Depth.")
+    console.timeEnd("        Calc EFD")
   }
   calcDFSDepth(calcRange, calcType){
     this.setStatus("running","start calcDFSDpeth")
@@ -667,6 +687,7 @@ class LevelCompilerCore extends EventEmitter{
 
     //find zero point of each project
     const zeroPoints = this.findZeroPointId();
+
     //calc master section
     let masterDfsList = [];
     for (let p=0; p<this.projects.length; p++){
@@ -762,6 +783,7 @@ class LevelCompilerCore extends EventEmitter{
       }
     }
 
+    console.time("    interpolate")
     //apply 1st order interpolation -> extrapolation 
     let NoCDmarkers = this.applyMarkerPolation(calcRange, calcType);
     if (NoCDmarkers.length !== 0){
@@ -769,7 +791,8 @@ class LevelCompilerCore extends EventEmitter{
       console.log("LCCore: E016: "+NoCDmarkers.length+" markers without " + calcType);
       //console.log(NoCDmarkers);
     }
-          
+    console.timeEnd("    interpolate")
+
     //calc & submit project top/bottom
     if (calcType=="composite_depth"){
       for(let p=0;p<this.projects.length;p++){
@@ -1064,7 +1087,7 @@ class LevelCompilerCore extends EventEmitter{
     console.log("==================================");
     this.setStatus("completed","Checked model summary");
   }
-  checkModel() {
+  checkModel(...args) {
     this.setStatus("running","start checkModel");
     if (this.projects.length == 0) {
       this.setError("","E018: There is no project data.")
@@ -1122,6 +1145,7 @@ class LevelCompilerCore extends EventEmitter{
           });
         });
       });
+
       this.setStatus(
         "info",
         "LCCore: [" +
@@ -1139,23 +1163,26 @@ class LevelCompilerCore extends EventEmitter{
           ", Age:" +
           result.age_error_counts
         )
-      console.log(
-          "LCCore: [" +
-          project.model_type +
-          "]" +
-          project.name +
-          ": Total interpolation error: CD:" +
-          result.cd_error_counts +
-          ", EFD:" +
-          result.efd_error_counts +
-          ", Rank:" +
-          result.rank_error_counts +
-          ", Max rank:" +
-          result.max_rank +
-          ", Age:" +
-          result.age_error_counts
-      );
-
+        if(args[0]==true){
+          console.log(
+              "LCCore: [" +
+              project.model_type +
+              "]" +
+              project.name +
+              ": Total interpolation error: CD:" +
+              result.cd_error_counts +
+              ", EFD:" +
+              result.efd_error_counts +
+              ", Rank:" +
+              result.rank_error_counts +
+              ", Max rank:" +
+              result.max_rank +
+              ", Age:" +
+              result.age_error_counts
+          );
+    
+        }
+      
       if (result.cd_error_counts == 0 && result.efd_error_counts == 0) {
         result.evaluation = true;
       } else {
@@ -1425,6 +1452,7 @@ class LevelCompilerCore extends EventEmitter{
     this.setStatus("completed","initiarised");
   }
   calcMarkerAges(LCAge) {
+    LCAge.updateAgeDepth(this);
     this.setStatus("running","start calcMarkerAges");
     if (this.projects.length == 0) {
       this.setError("E021: There is no correlation model.")
@@ -1447,8 +1475,7 @@ class LevelCompilerCore extends EventEmitter{
           ) {
             const marker = this.projects[p].holes[h].sections[s].markers[m];
             if (marker.event_free_depth !== null) {
-              const age = LCAge.getAgeFromEFD(marker.event_free_depth,"linear"); //{age: { type: null, mid: null, upper: null, lower: null }, age_idx:null};
-
+              const age = LCAge.getAgeFromEFD(marker.event_free_depth, "linear"); //{age: { type: null, mid: null, upper: null, lower: null }, age_idx:null};
               this.projects[p].holes[h].sections[s].markers[m].age = age.age.mid;
             }
           }
@@ -2544,16 +2571,18 @@ class LevelCompilerCore extends EventEmitter{
       let extrapolationList = polationList.filter(item => item[0] == "extrapolation");
       skippedList = polationList.filter(item => item[0] == "floating");
       this.polation(interpolationList, calcRange, calcType);
-
+      
+      
       //apply extrapolation  
       polationList = this.getPolationList(p, calcType);
       interpolationList = polationList.filter(item => item[0] == "interpolation");
       extrapolationList = polationList.filter(item => item[0] == "extrapolation");
       skippedList = polationList.filter(item => item[0] == "floating");
       this.polation(extrapolationList, calcRange, calcType);
-      
+
       //apply 2nd interpolation    
       polationList = this.getPolationList(p, calcType);
+      
       interpolationList = polationList.filter(item => item[0] == "interpolation");
       extrapolationList = polationList.filter(item => item[0] == "extrapolation");
       skippedList = polationList.filter(item => item[0] == "floating");
@@ -2564,7 +2593,7 @@ class LevelCompilerCore extends EventEmitter{
       interpolationList = polationList.filter(item => item[0] == "interpolation");
       extrapolationList = polationList.filter(item => item[0] == "extrapolation");
       skippedList = polationList.filter(item => item[0] == "floating");
-      
+
       if(interpolationList.length!==0){
         this.setErrorAlert("","E033: The 3rd order interpolation exist. The 3rd order interpolation is not suportted."+interpolationList)
         console.log("LCCore: E033: The 3rd order interpolation exist. The 3rd order interpolation is not suportted.", interpolationList);
@@ -2734,12 +2763,12 @@ class LevelCompilerCore extends EventEmitter{
     for (let i=0; i<connectedIds.length; i++){
       let connectedId = connectedIds[i];
       let connectedMarkerData = this.getDataByIdx(this.search_idx_list[connectedId.toString()]);
-
       if (connectedMarkerData[calcType] !== null){
         //check target is null?, calc distance by CD because of simplify
         distances.push(this.calcMarkerDistance(connectedMarkerData, startMarkerData, "composite_depth"));
         distanceIds.push(connectedMarkerData.id);
       }
+
     }
     
 
@@ -2752,14 +2781,18 @@ class LevelCompilerCore extends EventEmitter{
     let zeroIdx = -1;
     for (let i=0; i<distances.length; i++){
       //lower case
-      if(distances[i] > 0 && Math.abs(distances[i]) < Math.abs(lowerDistance)){
-        lowerDistance = distances[i];
-        lowerIdx = i;
+      if(distances[i] > 0){
+        if(Math.abs(distances[i]) < Math.abs(lowerDistance)){
+          lowerDistance = distances[i];
+          lowerIdx = i;
+        }        
       }
       //upper case
-      if(distances[i] < 0 && Math.abs(distances[i]) < Math.abs(upperDistance)){
-        upperDistance = distances[i];
-        upperIdx = i;
+      if(distances[i] < 0 ){
+        if(Math.abs(distances[i]) < Math.abs(upperDistance)){
+          upperDistance = distances[i];
+          upperIdx = i;
+        }        
       }
       //case interpolated marker distance is as same as upper/lower marker
       if(distances[i] == 0 ){

@@ -192,11 +192,13 @@ class LevelCompilerAge {
     }
     this.AgeModels.forEach((model) => {
       let name = model.name;
+      let num_total_ages = 0;
       let num_error_ages = 0;
       let num_error_ages_u = 0;
       let num_error_ages_l = 0;
       let num_error_efds = 0;
       model.ages.forEach((ageData) => {
+        num_total_ages ++;
         if (isNaN(ageData.event_free_depth) || ageData.event_free_depth == null || ageData.event_free_depth == undefined) {
           num_error_efds += 1;
           //console.log(ageData);
@@ -212,7 +214,7 @@ class LevelCompilerAge {
         }
       });
 
-      console.log("LCAge: [" + name + "] Total Age Model Error: EFD:" + num_error_efds + ", Age: [" +  num_error_ages + "," +  num_error_ages_u +  "," + num_error_ages_l + "]" );
+      console.log("LCAge: [" + name + "(N="+num_total_ages+")] Total Age Model Error: EFD:" + num_error_efds + ", Age: [" +  num_error_ages + "," +  num_error_ages_u +  "," + num_error_ages_l + "]" );
     });
   }
   addAge(ageData) {
@@ -233,6 +235,43 @@ class LevelCompilerAge {
 
     //add
     this.AgeModels[targetAgeModelIdx].ages.push(ageData);
+  }
+  updateAgeDepth(LCCore){
+    
+    if(this.AgeModels.length==0){
+      return;
+    }
+    for(let m=0; m<this.AgeModels.length; m++){
+      for(let a=0;a<this.AgeModels[m].ages.length;a++){
+        const ageData = this.AgeModels[m].ages[a];
+        if(ageData.original_depth_type == "trinity"){
+
+          const result = LCCore.getDepthFromTrinity([1,null,null,null], [ageData.trinityData],"event_free_depth");
+          const [sectionId, efd, rank] = result[0];
+          if (sectionId == null) {
+            console.log("Could not determine the position of " + ageData.trinityData.name);
+            continue;
+          } else {
+            ageData.event_free_depth = efd;
+            ageData.section_id = sectionId;
+          }
+        }else if(ageData.original_depth_type == "composite_depth"){
+          const efdval = LCCore.getEFDfromCD(ageData.composite_depth);
+          if (efdval !== NaN) {
+            ageData.event_free_depth = efdval;
+          } else {
+            console.log("Comsposite depth is out of model definition. :" + csv_data[r][0]);
+          }
+        }else if(ageData.original_depth_type == "event_free_depth"){
+
+        }else{
+          console.log("LCAge: Unsuspected depth type depetected")
+        }    
+      }
+    }
+
+    console.log("--LCAge: Update depth.")
+    //this.checkAges();
   }
   removeAge(targetAgeDataId) {
     const targetAgeModelId = this.selected_id;
@@ -378,6 +417,7 @@ class LevelCompilerAge {
     }
   }
   getEFDFromAge(age, method) {
+
     let output = {efd: {type: null, mid: null, upper: null, lower: null}, age_idx:null};
     const targetAgeModelId = this.selected_id;
     //get access index
