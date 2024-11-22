@@ -1144,7 +1144,7 @@ function createMainWIndow() {
     tempCore.addProject("correlation","temp");
     tempCore.addHole([1,null,null,null],"temp");
     console.log("MAIN: Labeler Project data is initiarised.");
-    return tempCore;
+    return JSON.parse(JSON.stringify(tempCore));
   });
   
   ipcMain.handle("LabelerAddSectionData", async (_e, holeName, sectionName) => {
@@ -1166,7 +1166,7 @@ function createMainWIndow() {
     inData.dd_bottom = 100;
     tempCore.addSection([1,1,null,null], inData);
 
-    return tempCore;
+    return JSON.parse(JSON.stringify(tempCore));
   });
   ipcMain.handle("LabelerAddMarkerData", async (_e, name, depth, relative_x) => {
     //add marker
@@ -1180,7 +1180,7 @@ function createMainWIndow() {
     }
     tempCore.sortModel();
 
-    return tempCore;
+    return JSON.parse(JSON.stringify(tempCore));
   });
   ipcMain.handle("LabelerChangeMarker", (_e, markerId, type, value) => {
     //
@@ -1190,27 +1190,27 @@ function createMainWIndow() {
       //value:distance
       const result = tempCore.changeDistance(markerId, parseFloat(value));
       if(result == true){
-        return tempCore;
+        return JSON.parse(JSON.stringify(tempCore));
       }else{
         console.log("LABELER: "+result)
-        return tempCore;
+        return JSON.parse(JSON.stringify(tempCore));
       }
     }else if(type=="name"){
       const result = tempCore.changeName(markerId, value)
       if(result == true){
-        return tempCore;
+        return JSON.parse(JSON.stringify(tempCore));
       }else{
         console.log("LABELER: "+result)
-        return tempCore;
+        return JSON.parse(JSON.stringify(tempCore));
       }
     }else if(type == "drilling_depth"){
       //value:distance
       const result = tempCore.changeDrillingDepth(markerId, parseFloat(value));
       if(result == true){
-        return tempCore;
+        return JSON.parse(JSON.stringify(tempCore));
       }else{
         console.log("LABELER: "+result)
-        return tempCore;
+        return JSON.parse(JSON.stringify(tempCore));
       }
     }
   });
@@ -1218,10 +1218,10 @@ function createMainWIndow() {
     console.log(markerId)
     const result = tempCore.deleteMarker(markerId);
     if(result == true){
-      return tempCore;
+      return JSON.parse(JSON.stringify(tempCore));
     }else{
       console.log("LABELER: "+result)
-      return tempCore;
+      return JSON.parse(JSON.stringify(tempCore));
     }
 
   });
@@ -1283,11 +1283,11 @@ function createMainWIndow() {
         const sectionName = name.split("-")[1];
         Object.assign(tempCore.projects[0].holes[0].sections[0], sectionData);
 
-        return tempCore;
+        return JSON.parse(JSON.stringify(tempCore));
       }
     }catch(err){
       console.error('Error loading file:', err);
-      return tempCore;
+      return JSON.parse(JSON.stringify(tempCore));
     }
 
 
@@ -1296,7 +1296,7 @@ function createMainWIndow() {
 
   });
   ipcMain.handle("LabelerLoadModel", (_e) => {
-    return tempCore;   
+    return JSON.parse(JSON.stringify(tempCore));
   });
   ipcMain.handle("PlotterGetData", (_e, data) => {
     if (converterWindow) {

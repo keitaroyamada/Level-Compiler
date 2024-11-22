@@ -601,6 +601,7 @@ document.addEventListener("DOMContentLoaded", () => {
           if (!measureObject.isMeasure) {
             measureObject.isMeasure = true;
             measureObject.showMeasureResults = true;
+            document.body.style.cursor = "crosshair"; 
             
             measureObject.measureCanvas = new p5(measureSketch);
             document.getElementById("bt_measure").style.backgroundColor = "#ccc";
@@ -609,6 +610,7 @@ document.addEventListener("DOMContentLoaded", () => {
             measureObject.isMeasure = false;
             measureObject.showMeasureResults = false;
             measureObject.measureCanvas = null;
+            document.body.style.cursor = "default"; 
             document.getElementById("bt_measure").style.backgroundColor = "#f0f0f0";
           }
         }
@@ -4836,6 +4838,7 @@ document.addEventListener("DOMContentLoaded", () => {
         console.log("[Measure]: End to " + endPoint);
         if(measureObject.showMeasureResults){
           measureResults();
+          document.body.style.cursor = "default"; 
         }
         
       } else if (clickCount > 0) {
