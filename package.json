@@ -24,9 +24,11 @@
   "build": {
     "appId": "your.app.id",
     "win": {
+      "target": "msi",
       "icon": "./icon/levelcompiler.png"
     },
     "mac": {
+      "target": "dmg",
       "icon": "./icon/levelcompiler.png"
     },
     "linux": {
