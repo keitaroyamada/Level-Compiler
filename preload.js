@@ -83,6 +83,8 @@ contextBridge.exposeInMainWorld("LCapi", {
   loadLCmodel:(args1) => ipcRenderer.invoke("loadLCmodel",args1),
   addSectionFromLcsection:(args1) => ipcRenderer.invoke("addSectionFromLcsection",args1),
   changeEditMode:(args1) => ipcRenderer.invoke("changeEditMode",args1),
+  sendSettings:(args1,args2) => ipcRenderer.invoke("sendSettings",args1,args2),
+
   
   
   sendUndo: (args1) => ipcRenderer.invoke('sendUndo',args1),

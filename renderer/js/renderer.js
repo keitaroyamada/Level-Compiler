@@ -50,20 +50,20 @@ document.addEventListener("DOMContentLoaded", () => {
   //--------------------------------------------------------------------------------------------
   //plot properties
   let objOpts = {
-    interface:[],
-    canvas: [],
-    project:[],
-    hole: [],
-    section: [],
-    marker: [],
-    event: [],
-    connection: [],
-    age: [],
-    pen: [],
-    edit:[],
-    plot:[],
-    edit:[],
-    image:[],
+    interface:{},
+    canvas: {},
+    project:{},
+    hole: {},
+    section: {},
+    marker: {},
+    event: {},
+    connection: {},
+    age: {},
+    pen: {},
+    edit:{},
+    plot:{},
+    edit:{},
+    image:{},
   };
   objOpts.canvas.depth_scale = "composite_depth";
   objOpts.canvas.zoom_level = [4, 3]; //[x, y](1pix/2cm)
@@ -2704,6 +2704,52 @@ document.addEventListener("DOMContentLoaded", () => {
   window.LCapi.receive("errors", async (data) => {
     console.log(data);
   });
+  window.LCapi.receive("SettingsMenuClicked", async () => {
+
+    const canvas = objOpts.canvas;
+    const project = objOpts.project;
+    const hole = objOpts.hole;
+    const section = objOpts.section;
+    const marker = objOpts.marker;
+    const event = objOpts.event;
+    const connection = objOpts.connection;
+    const age = objOpts.age;
+    const pen = objOpts.pen;
+    const plot = objOpts.plot; 
+
+    const settings = {
+      canvas,
+      project,
+      hole,
+      section,
+      marker,
+      event,
+      connection,
+      age,
+      pen,
+      plot,  
+    };
+      
+   await window.LCapi.sendSettings(settings, "settings");
+
+  });
+  
+  window.LCapi.receive("SettingsData", async (data) => {
+    console.log(data)
+    objOpts.canvas = data.canvas;
+    objOpts.project = data.project;
+    objOpts.hole = data.hole;
+    objOpts.section = data.section;
+    objOpts.marker = data.marker;
+    objOpts.event = data.event;
+    objOpts.connection = data.connection;
+    objOpts.age = data.age;
+    objOpts.pen = data.pen;
+    objOpts.plot = data.plot; 
+    console.log("[RENDERER]: Setting is updated.")
+    updateView();
+  });
+  
   //============================================================================================
   //============================================================================================
   //FInder send event (move to)

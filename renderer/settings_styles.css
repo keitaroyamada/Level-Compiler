@@ -1,0 +1,36 @@
+body {
+  font-family: Arial, sans-serif;
+  margin: 20px;
+}
+
+h1 {
+  color: #333;
+}
+
+details {
+  margin-left: 20px;
+}
+
+details summary {
+  cursor: pointer;
+  font-weight: bold;
+}
+
+label {
+  margin-right: 10px;
+  font-weight: bold;
+}
+
+input[type="text"],
+input[type="number"] {
+  padding: 5px;
+  margin-bottom: 10px;
+  border: 1px solid #ccc;
+  border-radius: 3px;
+  width: 200px;
+}
+
+input[type="checkbox"] {
+  transform: scale(1.2);
+  margin-right: 5px;
+}

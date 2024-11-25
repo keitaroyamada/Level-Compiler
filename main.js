@@ -58,6 +58,7 @@ let dividerWindow = null;
 let converterWindow = null;
 let importerWindow = null;
 let labelerWindow = null;
+let settingsWindow = null;
 let plotWindow = null;
 let progressBar = null;
 
@@ -2135,6 +2136,16 @@ function createMainWIndow() {
     menuRebuild(mainWindow);
     
   });
+  ipcMain.handle("sendSettings", (_e,data, to) => {
+    console.log(to)
+    if(to=="settings"){
+      settingsWindow.webContents.send("SettingsData", data);
+    }else if(to=="renderer"){
+      mainWindow.webContents.send("SettingsData", data);
+    }
+    
+    
+  });
   //--------------------------------------------------------------------------------------------------
   function initiariseLCCore(){
     LCCore = new LevelCompilerCore();
@@ -2295,6 +2306,45 @@ function buildMainMenu(mainWindow){
           },
         },
         { type: "separator" },
+        {
+          label: "Preferences",
+          click: () => {
+            if (settingsWindow) {
+              settingsWindow.focus();
+              return;
+            }
+        
+            //create finder window
+            settingsWindow = new BrowserWindow({
+              title: "Settings",
+              width: 700,
+              height: 700,
+              webPreferences: {preload: path.join(__dirname, "preload_settings.js"),},
+            });
+            
+            //converterWindow.setAlwaysOnTop(true, "normal");
+            settingsWindow.on("closed", () => {
+              settingsWindow = null;
+              mainWindow.webContents.send("SettingsClosed", "");
+            });
+            settingsWindow.setMenu(null);
+        
+            settingsWindow.loadFile(path.join(__dirname, "./renderer/settings.html"));
+        
+            settingsWindow.once("ready-to-show", () => {
+              settingsWindow.show();
+             // converterWindow.setAlwaysOnTop(true, "normal");
+             //settingsWindow.webContents.openDevTools();
+              //converterWindow.setAlwaysOnTop(true, "normal");
+              const data = {
+                output_type:"export",
+                called_from:"main",
+                path:null,
+              }; 
+              mainWindow.webContents.send("SettingsMenuClicked", data);
+            });
+          },
+        },
         // for Windows--------------------
         ...(!isMac
           ? [
@@ -2316,11 +2366,7 @@ function buildMainMenu(mainWindow){
                     app.quit(); 
                   }
                 },
-              },
-
-              
-          
-              
+              },              
             ]
           : []),
       ],
