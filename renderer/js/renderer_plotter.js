@@ -704,7 +704,7 @@ document.addEventListener("DOMContentLoaded", () => {
                             let val = g;
                             let prec = 1;
                             if(depthScale=="age"){
-                                val = val * 100 * ageMod;
+                                val = val  * 100 * 1/ageMod;
                                 prec = 0;
                             }
                             

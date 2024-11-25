@@ -2,7 +2,7 @@
   "name": "levelcompiler",
   "productName": "Level Compiler",
   "version": "0.0.2-alpha.9",
-  "description": "Calc and show core levels",
+  "description": "Stratigraphic Correlation Viewer and Compiler",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
@@ -18,12 +18,18 @@
     "csv-stringify": "^6.5.1",
     "electron-progressbar": "^2.2.1",
     "electron-prompt": "^1.7.0",
+    "electron-updater": "^6.3.9",
     "jszip": "^3.10.1",
     "sharp": "^0.33.5",
     "simple-statistics": "^7.8.7"
   },
   "build": {
-    "appId": "your.app.id",
+    "appId": "io.github.keitaroyamada.Level-Compiler",
+    "publish": {
+      "provider": "github",
+      "owner": "keitaroyamada",
+      "repo": "Level-Compiler"
+    },
     "win": {
       "target": "msi",
       "icon": "./icon/levelcompiler.png"

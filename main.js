@@ -23,8 +23,10 @@ const { stringify } = require("csv-stringify/sync");
 const ProgressBar = require("electron-progressbar");
 const prompt = require("electron-prompt");
 const JSZip = require('jszip');
+const https = require('https');
+const { autoUpdater} = require('electron-updater');
 
-const { app, BrowserWindow, Menu, ipcMain, dialog } = require("electron");
+const { app, BrowserWindow, Menu, ipcMain, dialog, shell } = require("electron");
 const { LevelCompilerCore } = require("./LC_modules/LevelCompilerCore.js");
 const { Project } = require("./LC_modules/Project.js");
 const { lcfnc } = require("./LC_modules/lcfnc.js");
@@ -41,12 +43,14 @@ const { Tooltip } = require("chart.js");
 //properties
 const isMac = process.platform === "darwin";
 const isDev = false;//process.env.NODE_ENV !== "development"; //const isDev = false;
+let isEditMode = false;
 let LCCore = new LevelCompilerCore();
 let LCAge  = new LevelCompilerAge();;
 let LCPlot = new LevelCompilerPlot();
 const history = new UndoManager();
 let labelerHistory = new UndoManager();
 let tempCore = null; //for labeler
+let globalPath = {saveModelPath:null};
 
 //windows
 let finderWindow = null;
@@ -90,362 +94,9 @@ function createMainWIndow() {
   //initiarise
   LCCore = initiariseLCCore();
   
-  //===================================================================================================================================
-  //make Menu
-  const lcmenu = [
-    // for Mac ---------------------------------------------------------------------------------------
-    ...(isMac
-      ? [
-          {
-            label: app.name,
-            submenu: [
-              { label: "About", click: createAboutWindow },
-              { type: "separator" },
-              { role: "hide" },
-              { role: "hideOthers" },
-              { role: "unhide" },
-              { type: "separator" },
-              {
-                label: "Developer tool",
-                click: () => {
-                  if (mainWindow.webContents.isDevToolsOpened()) {
-                    mainWindow.webContents.closeDevTools();
-                  } else {
-                    mainWindow.webContents.openDevTools();
-                  }
-                  //mainWindow.webContents.openDevTools();
-                },
-              },
-              { type: "separator" },
-              { role: "quit" },
-            ],
-          },
-        ]
-      : []),
-    // for common -----------------------------------------------------------------------------------
-    {
-      label: "File",
-      submenu: [
-        {
-          label:"Load",
-          submenu:[
-            {
-              label: "Load LC model",
-              //accelerator: "CmdOrCtrl+S",
-              click: async () => {
-                const inData = await loadmodelfile();
-                if(inData!==null){
-                  console.log(inData)
-                  //initiarise
-                    LCCore = initiariseLCCore();
-                    LCAge  = new LevelCompilerAge();
-                    
-                    //register
-                    assignObject(LCCore, inData.LCCore);
-                    assignObject(LCAge, inData.LCAge);
-                }
-                mainWindow.webContents.send("RegisteredLCModel");
-              },
-            },
-            { type: "separator" },
-            {
-              label: "Load Correlation Model",
-              accelerator: "CmdOrCtrl+M",
-              click: () => {
-                mainWindow.webContents.send("LoadCorrelationModelMenuClicked");
-              },
-            },
-            {
-              label: "Load Age model",
-              accelerator: "CmdOrCtrl+T",
-              click: () => {
-                mainWindow.webContents.send("LoadAgeModelMenuClicked");
-              },
-            },
-            {
-              label: "Load Core Images",
-              accelerator: "CmdOrCtrl+I",
-              click: () => {
-                mainWindow.webContents.send("LoadCoreImagesMenuClicked");
-              },
-            },
-          ],
-        },
-        {
-          label:"Save (for Correlator)",
-          submenu:[
-            {
-              label: "Save LC model",
-              accelerator: "CmdOrCtrl+S",
-              click: async () => {
-                
-                //remove plot data
-                let out_LCPlot = JSON.parse(JSON.stringify(LCPlot));
-                out_LCPlot.data_collections = [];
-                out_LCPlot.data_selected_id = null;
-
-
-                const outData = {LCCore:LCCore, LCAge:LCAge, LCPlotAge:out_LCPlot};
-                await putmodelfile(outData);
-              },
-            },
-          ],
-        },
-        {
-          label:"Export (for Correlator)",
-          submenu:[
-            {
-              label: "Export model as csv",
-              click: () => {
-                mainWindow.webContents.send("ExportCorrelationAsCsvMenuClicked");
-              },
-            },
-          ],
-        },
-        { type: "separator" },
-        {
-          label: "Unload all models",
-          accelerator: "CmdOrCtrl+U",
-          click: () => {
-            mainWindow.webContents.send("UnLoadModelsMenuClicked");
-          },
-        },
-        { type: "separator" },
-        // for Windows--------------------
-        ...(!isMac
-          ? [
-              {
-                label: "Exit",
-                accelerator: "CmdOrCtrl+W",
-                click: (menuItem, browserWindow, event) => {
-                  const options = {
-                    type: "question",
-                    buttons: ["No", "Yes"],
-                    defaultId: 0,
-                    title: "Confirm",
-                    message: "Are you sure you want to exit?",
-                  };
-
-                  const response = dialog.showMessageBoxSync(null, options);
-
-                  if (response === 1) {
-                    app.quit(); 
-                  }
-                },
-              },
-
-              
-          
-              
-            ]
-          : []),
-      ],
-    },
-
-    {
-      label: "Tools",
-      submenu: [
-        {
-          label: "Converter",
-          click: () => {
-            if (isDev == false){
-              if(LCCore.base_project_id==null){
-                return
-              }
-            }
-            if (converterWindow) {
-              converterWindow.focus();
-              return;
-            }
-        
-            //create finder window
-            converterWindow = new BrowserWindow({
-              title: "Converter",
-              width: 700,
-              height: 700,
-              webPreferences: {preload: path.join(__dirname, "preload_converter.js"),},
-            });
-            
-            //converterWindow.setAlwaysOnTop(true, "normal");
-            converterWindow.on("closed", () => {
-              converterWindow = null;
-              mainWindow.webContents.send("ConverterClosed", "");
-            });
-            converterWindow.setMenu(null);
-        
-            converterWindow.loadFile(path.join(__dirname, "./renderer/converter.html"));
-        
-            converterWindow.once("ready-to-show", () => {
-              converterWindow.show();
-             // converterWindow.setAlwaysOnTop(true, "normal");
-              //converterWindow.webContents.openDevTools();
-              //converterWindow.setAlwaysOnTop(true, "normal");
-              const data = {
-                output_type:"export",
-                called_from:"main",
-                path:null,
-              }; 
-              converterWindow.webContents.send("ConverterMenuClicked", data);
-            });
-          },
-        },
-        {
-          label: "Plotter",
-          click: () => {
-            if (isDev == false){
-              if(LCCore.base_project_id==null){
-                return
-              }
-            }
-            if (plotWindow) {
-              plotWindow.focus();
-              return;
-            }
-        
-            //create finder window
-            plotWindow = new BrowserWindow({
-              title: "Converter",
-              width: 900,
-              height: 600,
-              webPreferences: {preload: path.join(__dirname, "preload_plotter.js"),},
-            });
-            
-            //converterWindow.setAlwaysOnTop(true, "normal");
-            plotWindow.on("closed", () => {
-              plotWindow = null;
-              mainWindow.webContents.send("PlotterClosed", "");
-            });
-            plotWindow.setMenu(null);
-        
-            plotWindow.loadFile(path.join(__dirname, "./renderer/plotter.html"));
-        
-            plotWindow.once("ready-to-show", () => {
-              plotWindow.show();
-              // plotWindow.setAlwaysOnTop(true, "normal");
-              //plotWindow.webContents.openDevTools();
-              plotWindow.webContents.send("PlotterMenuClicked");
-            });
-          },
-        },
-        { type: "separator" },
-        {
-          label: "Labeler (for Correlator)",
-          click: () => {
-            if (labelerWindow) {
-              labelerWindow.focus();
-              return;
-            }
-        
-            tempCore = initiariseLCCore();
-            tempCore.addProject("correlation","temp");
-            tempCore.addHole([1,null,null,null],"temp");
-
-            //create finder window
-            labelerWindow = new BrowserWindow({
-              title: "labeler",
-              width: 800,
-              height: 800,
-              webPreferences: {preload: path.join(__dirname, "preload_labeler.js"),},
-            });
-            
-            //converterWindow.setAlwaysOnTop(true, "normal");
-            labelerWindow.on("closed", () => {
-              labelerWindow = null;
-              tempCore = null;
-              mainWindow.webContents.send("LabelerClosed", "");
-            });
-            labelerWindow.setMenu(null);
-        
-            labelerWindow.loadFile(path.join(__dirname, "./renderer/labeler.html"));
-        
-            labelerWindow.once("ready-to-show", () => {
-              labelerWindow.show();
-              //labelerWindow.setAlwaysOnTop(true, "normal");
-              //labelerWindow.webContents.openDevTools();
-              //converterWindow.setAlwaysOnTop(true, "normal");
-              labelerWindow.webContents.send("LabelerMenuClicked", "export");
-            });
-          },
-        },
-        {
-          label: "Edit correlation (for Correlator)",
-          accelerator: "CmdOrCtrl+E",
-          click: () => {
-            mainWindow.webContents.send("EditCorrelation");
-          },
-        },
-        { type: "separator" },
-        {
-          label: "Developer tool",
-          click: () => {
-            if (mainWindow.webContents.isDevToolsOpened()) {
-              mainWindow.webContents.closeDevTools();
-            } else {
-              mainWindow.webContents.openDevTools();
-            }
-            //mainWindow.webContents.openDevTools();
-          },
-        },
-      ],
-    },
-    /*
-    {
-      label: "Mode",
-      submenu: [
-        {
-          label: "Vector mode",
-          type: "checkbox",
-          checked: true,
-          click: () => {
-            lcmenu.forEach((m1) => {
-              if (m1.label == "Mode") {
-                m1.submenu[0].checked = false;
-                m1.submenu[1].checked = true;
-                menuRebuild();
-              }
-            });
-            mainWindow.webContents.send("CanvasModeChanged", "vector");
-          },
-        },
-        {
-          label: "Raster mode",
-          type: "checkbox",
-          checked: false,
-          click: () => {
-            lcmenu.forEach((m1) => {
-              if (m1.label == "Mode") {
-                m1.submenu[0].checked = true;
-                m1.submenu[1].checked = false;
-                menuRebuild();
-              }
-            });
-            mainWindow.webContents.send("CanvasModeChanged", "raster");
-          },
-        },
-      ],
-    },
-    */
-    // for windows ----------------------------------------------------------------------------------
-    ...(!isMac
-      ? [
-          {
-            label: "Help",
-            submenu: [
-              { label: "About", click: createAboutWindow },
-            ],
-          },
-        ]
-      : []),
-    // others
-  ];
-
   //Implement menu
-  menuRebuild();
+  menuRebuild(mainWindow);
   //===================================================================================================================================
-  function menuRebuild() {
-    let mainMenu = Menu.buildFromTemplate(lcmenu);
-    Menu.setApplicationMenu(mainMenu);
-  }
   //===================================================================================================================================
   //IPC from renderer
   ipcMain.handle("test", async (_e, _arg1, _arg2) => {
@@ -461,7 +112,7 @@ function createMainWIndow() {
     }else{
       //dev env
       resourcePath = path.join(__dirname);
-
+      
     }
     
     let plot_icons = {
@@ -781,6 +432,9 @@ function createMainWIndow() {
   ipcMain.handle("updateProgressbar", async (_e, n, N) => {
     progressBar = await updateProgress(progressBar, n, N);
   });
+  ipcMain.handle("clearProgressbar", async (_e, n, N) => {
+      progressBar = null;    
+  });
   ipcMain.handle("makeModelImage", async (_e, imPath, sectionData, imHeight, depthScale) => {
     try {
       const result = await startMakeModelImageWorker({ imPath, sectionData, imHeight, depthScale });
@@ -838,6 +492,66 @@ function createMainWIndow() {
       let template;
       if(type == "editContextMenu"){
         template = [
+          {
+            label:"Connection",
+            submenu:[
+              { 
+                label: 'Set master', 
+                click: () => {
+                  console.log('MAIN: Edit master'); 
+                  resolve("addMaster");                      
+                } 
+              },
+              { 
+                label: 'Remove master', 
+                click: () => {
+                  console.log('MAIN: Edit master'); 
+                  resolve("deleteMaster");                      
+                } 
+              },
+              { type: 'separator' },
+              { 
+                label: 'Connect markers', 
+                click: () => {
+                  console.log('MAIN: Connect markers'); 
+                  resolve("connect"); 
+                 
+                } 
+              },
+              { 
+                label: 'Disconnect markers', 
+                click: () => { 
+                  console.log('MAIN: Disconnect markers'); 
+                  resolve("disconnect"); 
+                } 
+              },
+              { type: 'separator' },
+              { 
+                label: 'Add event', 
+                click: () => {
+                  console.log('MAIN: Add event'); 
+                  resolve("addEvent");                      
+                } 
+              },
+              { 
+                label: 'Delete event', 
+                click: () => {
+                  console.log('MAIN: Delete event'); 
+                  resolve("deleteEvent");                      
+                } 
+              },
+              { type: 'separator' },
+              { 
+                label: 'Set Zero Horizon', 
+                click: () => {
+                  console.log('MAIN: Edit zero point'); 
+                  resolve("setZeroPoint");                      
+                } 
+              },
+              
+            ]
+          },
+          { type: 'separator' },
           {
             label:"Project",
             submenu:[
@@ -968,63 +682,13 @@ function createMainWIndow() {
               },
             ]
           }, 
+          { type: 'separator' },
           {
-            label:"Connection",
-            submenu:[
-              { 
-                label: 'Connect markers', 
-                click: () => {
-                  console.log('MAIN: Connect markers'); 
-                  resolve("connect"); 
-                 
-                } 
-              },
-              { 
-                label: 'Disconnect markers', 
-                click: () => { 
-                  console.log('MAIN: Disconnect markers'); 
-                  resolve("disconnect"); 
-                } 
-              },
-              { type: 'separator' },
-              { 
-                label: 'Add event', 
-                click: () => {
-                  console.log('MAIN: Add event'); 
-                  resolve("addEvent");                      
-                } 
-              },
-              { 
-                label: 'Delete event', 
-                click: () => {
-                  console.log('MAIN: Delete event'); 
-                  resolve("deleteEvent");                      
-                } 
-              },
-              { type: 'separator' },
-              { 
-                label: 'Set Zero Horizon', 
-                click: () => {
-                  console.log('MAIN: Edit zero point'); 
-                  resolve("setZeroPoint");                      
-                } 
-              },
-              { 
-                label: 'Add master flag', 
-                accelerator: "CmdOrCtrl+q",
-                click: () => {
-                  console.log('MAIN: Edit master'); 
-                  resolve("addMaster");                      
-                } 
-              },
-              { 
-                label: 'Remove master flag', 
-                click: () => {
-                  console.log('MAIN: Edit master'); 
-                  resolve("deleteMaster");                      
-                } 
-              },
-            ]
+            label: 'Load high-resolution image', 
+            click: () => {
+              console.log('MAIN: Load high-resolution image'); 
+              resolve("loadHighResolutionImage");                      
+            } 
           },
           {
             label:"Cancel",
@@ -1034,6 +698,24 @@ function createMainWIndow() {
           },
         ];
         
+      }else if(type=="normalContextMenu"){
+        //template = [  ] 
+        return
+      }else if(type=="sectionContextMenu"){
+        template = [
+          {
+            label:"Image",
+            submenu:[
+              { 
+                label: 'Load high-resolution image', 
+                click: () => {
+                  console.log('MAIN: Load high-resolution image'); 
+                  resolve("loadHighResolutionImage");                      
+                } 
+              },
+            ]
+          }
+        ] 
       }
        
       const menu = Menu.buildFromTemplate(template);
@@ -2447,6 +2129,12 @@ function createMainWIndow() {
       return result
     }
   });
+  ipcMain.handle("changeEditMode", (_e,mode) => {
+    
+    isEditMode = mode;
+    menuRebuild(mainWindow);
+    
+  });
   //--------------------------------------------------------------------------------------------------
   function initiariseLCCore(){
     LCCore = new LevelCompilerCore();
@@ -2467,6 +2155,8 @@ function createMainWIndow() {
     LCCore.on('update_depth', () => {
       LCAge.updateAgeDepth(LCCore);
       LCCore.calcMarkerAges(LCAge);
+      LCPlot.calcAgeCollectionPosition(LCCore, LCAge);
+      LCPlot.calcDataCollectionPosition(LCCore,LCAge);
     });  
 
     return LCCore;
@@ -2476,6 +2166,335 @@ function createMainWIndow() {
 //===================================================================================================================================
 
 //--------------------------------------------------------------------------------------------------
+function buildMainMenu(mainWindow){
+  return [
+    // for Mac ---------------------------------------------------------------------------------------
+    ...(isMac
+      ? [
+          {
+            label: app.name,
+            submenu: [
+              { label: "About", click: createAboutWindow },
+              { type: "separator" },
+              { role: "hide" },
+              { role: "hideOthers" },
+              { role: "unhide" },
+              { type: "separator" },
+              {
+                label: "Developer tool",
+                click: () => {
+                  if (mainWindow.webContents.isDevToolsOpened()) {
+                    mainWindow.webContents.closeDevTools();
+                  } else {
+                    mainWindow.webContents.openDevTools();
+                  }
+                  //mainWindow.webContents.openDevTools();
+                },
+              },
+              { type: "separator" },
+              { role: "quit" },
+            ],
+          },
+        ]
+      : []),
+    // for common -----------------------------------------------------------------------------------
+    {
+      label: "File",
+      submenu: [
+        {
+          label:"Load",
+          submenu:[
+            {
+              label: "Load LC model",
+              //accelerator: "CmdOrCtrl+S",
+              click: async () => {
+                const inData = await loadmodelfile();
+                if(inData!==null){
+                  console.log(inData)
+                  //initiarise
+                    LCCore = initiariseLCCore();
+                    LCAge  = new LevelCompilerAge();
+                    
+                    //register
+                    assignObject(LCCore, inData.LCCore);
+                    assignObject(LCAge, inData.LCAge);
+                }
+                mainWindow.webContents.send("RegisteredLCModel");
+              },
+            },
+            { type: "separator" },
+            {
+              label: "Load Correlation Model",
+              accelerator: "CmdOrCtrl+M",
+              click: () => {
+                mainWindow.webContents.send("LoadCorrelationModelMenuClicked");
+              },
+            },
+            {
+              label: "Load Age model",
+              accelerator: "CmdOrCtrl+T",
+              click: () => {
+                mainWindow.webContents.send("LoadAgeModelMenuClicked");
+              },
+            },
+            {
+              label: "Load Core Images",
+              accelerator: "CmdOrCtrl+I",
+              click: () => {
+                mainWindow.webContents.send("LoadCoreImagesMenuClicked");
+              },
+            },
+          ],
+        },
+        {
+          label:"Save",
+          visible:isEditMode,
+          submenu:[
+            {
+              label: "Save LC model",
+              accelerator: "CmdOrCtrl+S",
+              click: async () => {
+                
+                //remove plot data
+                let out_LCPlot = JSON.parse(JSON.stringify(LCPlot));
+                out_LCPlot.data_collections = [];
+                out_LCPlot.data_selected_id = null;
+
+                const outData = {LCCore:LCCore, LCAge:LCAge, LCPlotAge:out_LCPlot};
+
+                if(globalPath.saveModelPath == null){
+                  //save as new file
+                  globalPath.saveModelPath = await putmodelfile(outData, null);
+                }else{
+                  //save orverwrite
+                  globalPath.saveModelPath = await putmodelfile(outData, globalPath.saveModelPath);
+                }
+                
+              },
+            },
+          ],
+        },
+        {
+          label:"Export",
+          visible:isEditMode,
+          submenu:[
+            {
+              label: "Export model as csv",
+              click: () => {
+                mainWindow.webContents.send("ExportCorrelationAsCsvMenuClicked");
+              },
+            },
+          ],
+        },
+        { type: "separator" },
+        {
+          label: "Unload all models",
+          accelerator: "CmdOrCtrl+U",
+          click: () => {
+            mainWindow.webContents.send("UnLoadModelsMenuClicked");
+          },
+        },
+        { type: "separator" },
+        // for Windows--------------------
+        ...(!isMac
+          ? [
+              {
+                label: "Exit",
+                accelerator: "CmdOrCtrl+W",
+                click: (menuItem, browserWindow, event) => {
+                  const options = {
+                    type: "question",
+                    buttons: ["No", "Yes"],
+                    defaultId: 0,
+                    title: "Confirm",
+                    message: "Are you sure you want to exit?",
+                  };
+
+                  const response = dialog.showMessageBoxSync(null, options);
+
+                  if (response === 1) {
+                    app.quit(); 
+                  }
+                },
+              },
+
+              
+          
+              
+            ]
+          : []),
+      ],
+    },
+    {
+      label:"Edit",
+      submenu:[
+        {
+          label: "Edit mode",
+          accelerator: "CmdOrCtrl+E",
+          click: () =>{
+            mainWindow.webContents.send("EditCorrelation");
+          },
+        },
+        {
+          label: "Labeler",
+          click: () => {
+            if (labelerWindow) {
+              labelerWindow.focus();
+              return;
+            }
+        
+            tempCore = initiariseLCCore();
+            tempCore.addProject("correlation","temp");
+            tempCore.addHole([1,null,null,null],"temp");
+
+            //create finder window
+            labelerWindow = new BrowserWindow({
+              title: "labeler",
+              width: 800,
+              height: 800,
+              webPreferences: {preload: path.join(__dirname, "preload_labeler.js"),},
+            });
+            
+            //converterWindow.setAlwaysOnTop(true, "normal");
+            labelerWindow.on("closed", () => {
+              labelerWindow = null;
+              tempCore = null;
+              mainWindow.webContents.send("LabelerClosed", "");
+            });
+            labelerWindow.setMenu(null);
+        
+            labelerWindow.loadFile(path.join(__dirname, "./renderer/labeler.html"));
+        
+            labelerWindow.once("ready-to-show", () => {
+              labelerWindow.show();
+              //labelerWindow.setAlwaysOnTop(true, "normal");
+              //labelerWindow.webContents.openDevTools();
+              //converterWindow.setAlwaysOnTop(true, "normal");
+              labelerWindow.webContents.send("LabelerMenuClicked", "export");
+            });
+          },
+        },
+      ],
+    },
+    {
+      label: "Tools",
+      submenu: [
+        {
+          label: "Converter",
+          click: () => {
+            if (isDev == false){
+              if(LCCore.base_project_id==null){
+                return
+              }
+            }
+            if (converterWindow) {
+              converterWindow.focus();
+              return;
+            }
+        
+            //create finder window
+            converterWindow = new BrowserWindow({
+              title: "Converter",
+              width: 700,
+              height: 700,
+              webPreferences: {preload: path.join(__dirname, "preload_converter.js"),},
+            });
+            
+            //converterWindow.setAlwaysOnTop(true, "normal");
+            converterWindow.on("closed", () => {
+              converterWindow = null;
+              mainWindow.webContents.send("ConverterClosed", "");
+            });
+            converterWindow.setMenu(null);
+        
+            converterWindow.loadFile(path.join(__dirname, "./renderer/converter.html"));
+        
+            converterWindow.once("ready-to-show", () => {
+              converterWindow.show();
+             // converterWindow.setAlwaysOnTop(true, "normal");
+              //converterWindow.webContents.openDevTools();
+              //converterWindow.setAlwaysOnTop(true, "normal");
+              const data = {
+                output_type:"export",
+                called_from:"main",
+                path:null,
+              }; 
+              converterWindow.webContents.send("ConverterMenuClicked", data);
+            });
+          },
+        },
+        {
+          label: "Plotter",
+          click: () => {
+            if (isDev == false){
+              if(LCCore.base_project_id==null){
+                return
+              }
+            }
+            if (plotWindow) {
+              plotWindow.focus();
+              return;
+            }
+        
+            //create finder window
+            plotWindow = new BrowserWindow({
+              title: "Converter",
+              width: 900,
+              height: 600,
+              webPreferences: {preload: path.join(__dirname, "preload_plotter.js"),},
+            });
+            
+            //converterWindow.setAlwaysOnTop(true, "normal");
+            plotWindow.on("closed", () => {
+              plotWindow = null;
+              mainWindow.webContents.send("PlotterClosed", "");
+            });
+            plotWindow.setMenu(null);
+        
+            plotWindow.loadFile(path.join(__dirname, "./renderer/plotter.html"));
+        
+            plotWindow.once("ready-to-show", () => {
+              plotWindow.show();
+              // plotWindow.setAlwaysOnTop(true, "normal");
+              //plotWindow.webContents.openDevTools();
+              plotWindow.webContents.send("PlotterMenuClicked");
+            });
+          },
+        },
+        { type: "separator" },
+        {
+          label: "Developer tool",
+          click: () => {
+            if (mainWindow.webContents.isDevToolsOpened()) {
+              mainWindow.webContents.closeDevTools();
+            } else {
+              mainWindow.webContents.openDevTools();
+            }
+            //mainWindow.webContents.openDevTools();
+          },
+        },
+      ],
+    },
+    // for windows ----------------------------------------------------------------------------------
+    ...(!isMac
+      ? [
+          {
+            label: "Help",
+            submenu: [
+              { label: "About", click: createAboutWindow },
+              { label: "Check update", click: async()=>{await checkUpdate()}},
+            ],
+          },
+        ]
+      : []),
+    // others
+  ];
+}
+function menuRebuild(mainWindow) {
+  const lcmenu = buildMainMenu(mainWindow);
+  let mainMenu = Menu.buildFromTemplate(lcmenu);
+  Menu.setApplicationMenu(mainMenu);
+}
 let activeThreads = 0;
 function startMakeModelImageWorker(data) {
   return new Promise((resolve, reject) => {
@@ -2611,33 +2630,44 @@ async function putcsvfile(mainWindow, filePath, data) {
     });
 }
 //--------------------------------------------------------------------------------------------------
-async function putmodelfile(data) {
+async function putmodelfile(data, path) {
   try{
-    const file = await dialog.showSaveDialog({
-      title: "Please select save path",
-      defaultPath: app.getPath("desktop"),
-      buttonLabel: "Save",
-      filters: [{ name: "Level Compiler model", extensions: ["lcmodel"] }],
-    })
-  
-    if (!file.canceled && file.filePath) {
-      const isComp = true;
-      if(isComp == true){
+    //get save path
+    let filePath = null;
+    if(path == null){
+      const file = await dialog.showSaveDialog({
+        title: "Please select save path",
+        defaultPath: app.getPath("desktop"),
+        buttonLabel: "Save",
+        filters: [{ name: "Level Compiler model", extensions: ["lcmodel"] }],
+      })
+      if (!file.canceled && file.filePath) {
+        filePath = file.filePath;
+      }
+    }else{
+      filePath = path;
+    }
+
+    //save main
+    if(filePath !== null){
+      const saveAsZip = true;
+      if(saveAsZip == true){
         const zip = new JSZip();
           zip.file('lcmodel.json', JSON.stringify(data), { compression: 'DEFLATE' });
           const zipContent = await zip.generateAsync({ type: 'nodebuffer' });
 
-          fs.writeFileSync(file.filePath, zipContent);
+          fs.writeFileSync(filePath, zipContent);
 
           console.log('MAIN: LC model is saved.');
 
       }else{
         //convert array --> csv
         const saveData = JSON.stringify(data);
-        fs.writeFileSync(file.filePath,saveData);
+        fs.writeFileSync(filePath,saveData);
       }
-    }
+    }   
     
+    return filePath;
   }catch(err) {
       console.log(err);
   };
@@ -2723,6 +2753,8 @@ function round(num, digits) {
 //--------------------------------------------------------------------------------------------------
 //create about window
 function createAboutWindow() {
+
+  // make window
   const aboutWindow = new BrowserWindow({
     title: "About Level Compiler",
     width: 500,
@@ -2739,9 +2771,57 @@ function assignObject (obj,data){
     }
   });
 }
+async function checkUpdate(){
+  //check update in the github
+  autoUpdater.allowPrerelease = true;
+  autoUpdater.autoDownload = false;
+  autoUpdater.forceDevUpdateConfig = false; 
+  autoUpdater.on('update-available', (info) => {
+    dialog.showMessageBox({
+      type: 'info',
+      title: 'Update Available',
+      message: `A new version (${info.version}) is available. Would you like to get the new version?`,
+      buttons: ['Get', 'Cancel']
+    }).then((result) => {
+      if (result.response === 0) {
+        shell.openExternal('https://github.com/keitaroyamada/Level-Compiler/releases');
+      } else {
+        console.log('User canceled.');
+      }
+    }).catch((err) => {
+      console.error('Error displaying message box:', err);
+    });
+
+  });
+
+  autoUpdater.on('update-not-available', () => {
+    /*
+    dialog.showMessageBox({
+      type: 'info',
+      title: 'No Updates',
+      message: 'You are using the latest version.',
+    });
+    */
+  });
+
+  autoUpdater.on('error', (err) => {
+    /*
+    dialog.showMessageBox({
+      type: 'error',
+      title: 'Update Error',
+      message: `An error occurred: ${err.message}`,
+    });
+    */
+  });
+
+  autoUpdater.checkForUpdates();
+}
 //--------------------------------------------------------------------------------------------------
 app.whenReady().then(() => {
+  //check update
+  checkUpdate();
 
+  //create main window
   createMainWIndow();
 
   app.on("activate", (I) => {

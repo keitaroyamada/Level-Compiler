@@ -53,6 +53,7 @@ contextBridge.exposeInMainWorld("LCapi", {
   LoadRasterImage: (args1, args2) =>  ipcRenderer.invoke("LoadRasterImage", args1, args2),
   progressbar: (args1, args2) => ipcRenderer.invoke("progressbar", args1, args2),
   updateProgressbar: (args1, args2) => ipcRenderer.invoke("updateProgressbar", args1, args2),
+  clearProgressbar: () => ipcRenderer.invoke("clearProgressbar"),
   askdialog: (args1, args2) => ipcRenderer.invoke("askdialog", args1, args2),
   inputdialog: (args1) => ipcRenderer.invoke("inputdialog", args1),
   makeModelImage: (args1, args2, args3, args4) =>  ipcRenderer.invoke("makeModelImage", args1, args2, args3, args4),
@@ -81,6 +82,7 @@ contextBridge.exposeInMainWorld("LCapi", {
   DeleteEvent: (args1,args2,args3) => ipcRenderer.invoke("DeleteEvent", args1,args2,args3),
   loadLCmodel:(args1) => ipcRenderer.invoke("loadLCmodel",args1),
   addSectionFromLcsection:(args1) => ipcRenderer.invoke("addSectionFromLcsection",args1),
+  changeEditMode:(args1) => ipcRenderer.invoke("changeEditMode",args1),
   
   
   sendUndo: (args1) => ipcRenderer.invoke('sendUndo',args1),
