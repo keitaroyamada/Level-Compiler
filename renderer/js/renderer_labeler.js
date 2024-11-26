@@ -1454,7 +1454,7 @@ document.addEventListener("DOMContentLoaded", () => {
       if (sketch.key === 's' || sketch.key === 'S') {
         //buffer.saveCanvas("name","jpg")
       }
-  };
+    };
   }
 //-------------------------------------------------------------------------------------------
 });

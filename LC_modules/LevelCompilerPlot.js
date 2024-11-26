@@ -309,21 +309,19 @@ class LevelCompilerPlot {
             this.data_collections[c].datasets[d].data_series[s].age = age.mid;
           } else if (calcType == "event_free_depth") {
             //calc
-            const efd = this.age_collections[c].datasets[d].data_series[s].event_free_depth;
-            const cd  = LCCore.getCDfromEFD(targetProjectId, efd); //paseudo
-            const age = LCAge.getAgefromEFD(efd);
+            const cd  = LCCore.getCDfromEFD(targetProjectId, data.event_free_depth); //paseudo
+            const age = LCAge.getAgefromEFD(data.event_free_depth);
 
             //add
             this.data_collections[c].datasets[d].data_series[s].composite_depth = cd;
             this.data_collections[c].datasets[d].data_series[s].age = age.mid;
           } else if (calcType == "age") {
             //calc
-            const age = this.age_collections[c].datasets[d].data_series[s].age;
-            const efd = LCAge.getEFDFromAge(age, "linear");
-            const cd = LCCore.getCDfromEFD(targetProjectId, efd.mid); //paseudo
-
+            const efd = LCAge.getEFDFromAge(data.age, "linear");
+            
+            const cd  = LCCore.getCDfromEFD(efd.efd.mid); //paseudo
             //add
-            this.data_collections[c].datasets[d].data_series[s].event_free_depth = efd.mid;
+            this.data_collections[c].datasets[d].data_series[s].event_free_depth = efd.efd.mid;
             this.data_collections[c].datasets[d].data_series[s].composite_depth = cd;
           } else {
             continue;

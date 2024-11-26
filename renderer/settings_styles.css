@@ -17,7 +17,7 @@ details summary {
 }
 
 label {
-  margin-right: 10px;
+  margin-right: 20px;
   font-weight: bold;
 }
 
@@ -33,4 +33,8 @@ input[type="number"] {
 input[type="checkbox"] {
   transform: scale(1.2);
   margin-right: 5px;
+}
+
+#menu_button{
+  margin-bottom: 20px;
 }

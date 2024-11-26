@@ -57,6 +57,7 @@ document.addEventListener("DOMContentLoaded", () => {
     });
     document.getElementById('plot_list').addEventListener("change", async (e) => {
         updateView();
+        sendToRenderer("update");
     });
     document.getElementById('bt_add').addEventListener("click", async (e) => {
         if(LCPlot !== null ){ 
@@ -154,7 +155,8 @@ document.addEventListener("DOMContentLoaded", () => {
             plotTypeDropdown.id = numSeries;
             plotTypeDropdown.title = "Plot type";
 
-            const plotType = ["line", "scatter","bar"];
+            //const plotType = ["line", "scatter","bar"];
+            const plotType = ["line", "scatter"];
             plotType.forEach(p=>{
                 const opt = document.createElement("option");
                 opt.value = p;
@@ -176,6 +178,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
             getSelectedData();
             updateView();
+            sendToRenderer("new")
         }    
     });
     document.getElementById('bt_remove').addEventListener("click", async (e) => {
@@ -309,6 +312,8 @@ document.addEventListener("DOMContentLoaded", () => {
             const plotColour = child.querySelector("input[type='text']");
             const amplification = child.querySelector("input[type='number']");
             const plotTypeDropdown = child.querySelector("select:nth-of-type(3)");
+            const noLabel = child.querySelector("label:nth-of-type(1)");
+            const splitLabel = child.querySelector("label:nth-of-type(2)");
           
             const checkboxValue = checkbox ? checkbox.checked : null;
             const numeratorId   = numeratorDropdown ? numeratorDropdown.value : null;
@@ -317,6 +322,16 @@ document.addEventListener("DOMContentLoaded", () => {
             const colourValue   = plotColour ? plotColour.value : "gray";
             const amplificationValue = amplification ? amplification.value : null;
             const plotType = plotTypeDropdown ? plotTypeDropdown.value : "line";
+
+            //set colour value
+            numeratorDropdown.style.color = colourValue;
+            denominatorDropdown.style.color = colourValue;
+            noLabel.style.color = colourValue;
+            splitLabel.style.color = colourValue;
+            parentCollection.style.color = colourValue;
+            plotTypeDropdown.style.color = colourValue;
+            amplification.style.color = colourValue;
+            plotColour.style.color = colourValue;
 
             result.isDraw = checkboxValue;
             result.collectionId = parseInt(collectionId);
@@ -747,6 +762,10 @@ document.addEventListener("DOMContentLoaded", () => {
         sketch.windowResized = () => {
             sketch.resizeCanvas(scroller.clientWidth, scroller.clientHeight);
         };
+    }
+    function sendToRenderer(type){
+        let selectedList = getSelectedData();
+        window.PlotterApi.sendPlotOptions({data:selectedList, emitType:type}, "renderer");
     }
     //============================================================================
       

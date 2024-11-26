@@ -6,6 +6,7 @@ window.addEventListener("DOMContentLoaded", () => {
           const details = document.createElement("details");
           const summary = document.createElement("summary");
           summary.textContent = key;
+          summary.style.fontSize = "25px";
           details.appendChild(summary);
           createMenu(value, details);
           container.appendChild(details);
@@ -50,6 +51,8 @@ window.addEventListener("DOMContentLoaded", () => {
         input = document.createElement("input");
         input.type = "checkbox";
         input.checked = value;
+        input.style.marginTop = "15px";
+        input.style.marginBottom = "15px";
       } else {
         throw new Error("Unsupported type data detected.", value);
       }
@@ -68,6 +71,7 @@ window.addEventListener("DOMContentLoaded", () => {
       }
     }
   
+    
     //----------------------------------------------------------------
     window.SettingsApi.receive("SettingsData", async (data) => {
 
@@ -78,6 +82,23 @@ window.addEventListener("DOMContentLoaded", () => {
         createMenu(settings, container);
         }
         
+    });
+
+    document.getElementById("default").addEventListener("click", async (event) => {
+      const response = await window.SettingsApi.askdialog(
+        "Initiarise settings",
+        "All settings will be reset. Do you want to restore them to their default values?"
+      );
+
+      if (response.response) {
+        window.SettingsApi.sendSettings(null,"renderer")
+      }
+      
+    });
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "F12") {
+        window.SettingsApi.toggleDevTools("settings");
+      }
     });
 });
   

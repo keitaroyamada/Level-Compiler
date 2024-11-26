@@ -322,6 +322,7 @@ document.addEventListener("DOMContentLoaded", () => {
       } else if (sourceType == "age") {
         const nameIdx = document.getElementById("depth_chooser0").value;
         const ageIdx = document.getElementById("depth_chooser1").value;
+
         depthMaxIdx = Math.max(...[nameIdx, ageIdx]);
         for (let i = headrLines; i < source_data.length; i++) {
           indataList.push([

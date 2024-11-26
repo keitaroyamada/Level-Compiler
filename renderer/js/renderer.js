@@ -10,7 +10,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   //model
   let LCCore = null;
-  let LCplot = null;
+  let LCPlot = null;
 
   //model source path
   let correlation_model_list = []; //for reload
@@ -49,163 +49,166 @@ document.addEventListener("DOMContentLoaded", () => {
 
   //--------------------------------------------------------------------------------------------
   //plot properties
-  let objOpts = {
-    interface:{},
-    canvas: {},
-    project:{},
-    hole: {},
-    section: {},
-    marker: {},
-    event: {},
-    connection: {},
-    age: {},
-    pen: {},
-    edit:{},
-    plot:{},
-    edit:{},
-    image:{},
-  };
-  objOpts.canvas.depth_scale = "composite_depth";
-  objOpts.canvas.zoom_level = [4, 3]; //[x, y](1pix/2cm)
-  objOpts.canvas.age_zoom_correction = [1/10, 100];//[zoom level, pad level]
-  objOpts.canvas.dpir = 1; //window.devicePixelRatio || 1;
-  objOpts.canvas.mouse_over_colour = "red";
-  objOpts.canvas.pad_x = 200; //[px]
-  objOpts.canvas.pad_y = 100; //[px]
-  objOpts.canvas.shift_x = 0; //[cm]
-  objOpts.canvas.shift_y = 100; //[cm]
-  objOpts.canvas.bottom_pad = 100; //[cm]
-  objOpts.canvas.background_colour = "#f4f5f7";//"#f7f7f7"//"#f8fbff";//"#fffdfa";//""white
-  objOpts.canvas.target_horizon = false;
-  objOpts.canvas.is_grid = false;
-  objOpts.canvas.grid_width = 0.8;
-  objOpts.canvas.grid_colour = "gray";
-  objOpts.canvas.is_target = false;//mouse target
-  objOpts.canvas.is_event = true;
-  objOpts.canvas.is_connection = true;
-  objOpts.canvas.draw_core_photo = false;
-  objOpts.canvas.finder_y = 0;
+  let objOpts = setupSettings();
+  function setupSettings(){
+    let objOpts = {
+      interface:{},
+      canvas: {},
+      project:{},
+      hole: {},
+      section: {},
+      marker: {},
+      event: {},
+      connection: {},
+      age: {},
+      pen: {},
+      edit:{},
+      plot:{},
+      edit:{},
+      image:{},
+    };
+    objOpts.canvas.depth_scale = "composite_depth";
+    objOpts.canvas.zoom_level = [4, 3]; //[x, y](1pix/2cm)
+    objOpts.canvas.age_zoom_correction = [1/10, 100];//[zoom level, pad level]
+    objOpts.canvas.dpir = 1; //window.devicePixelRatio || 1;
+    objOpts.canvas.mouse_over_colour = "red";
+    objOpts.canvas.pad_x = 200; //[px]
+    objOpts.canvas.pad_y = 100; //[px]
+    objOpts.canvas.shift_x = 0; //[cm]
+    objOpts.canvas.shift_y = 100; //[cm]
+    objOpts.canvas.bottom_pad = 100; //[cm]
+    objOpts.canvas.background_colour = "#f4f5f7";//"#f7f7f7"//"#f8fbff";//"#fffdfa";//""white
+    objOpts.canvas.target_horizon = false;
+    objOpts.canvas.is_grid = false;
+    objOpts.canvas.grid_width = 0.8;
+    objOpts.canvas.grid_colour = "gray";
+    objOpts.canvas.is_target = false;//mouse target
+    objOpts.canvas.is_event = true;
+    objOpts.canvas.is_connection = true;
+    objOpts.canvas.draw_core_photo = false;
+    objOpts.canvas.finder_y = 0;
+  
+    objOpts.project.interval = 0;
+    objOpts.project.font = "Arial";
+    objOpts.project.font_size = 25;
+    objOpts.project.font_colour = "black";
+  
+    objOpts.hole.distance = 20;
+    objOpts.hole.width = 20;
+    objOpts.hole.line_colour = "lightgreen";
+    objOpts.hole.line_width = 2;
+    objOpts.hole.font = "Arial";
+    objOpts.hole.font_size = 20;
+    objOpts.hole.font_colour = "black";
+  
+    objOpts.section.line_colour = "gray";
+    objOpts.section.face_colour = "lightgray";
+    objOpts.section.line_width = 4;
+    objOpts.section.width = 20;
+    objOpts.section.font = "Arial";
+    objOpts.section.font_size = 20;
+    objOpts.section.font_colour = "black";
+  
+    objOpts.marker.line_colour = "gray";
+    objOpts.marker.line_width = 1;
+    objOpts.marker.width = 20;
+    objOpts.marker.is_rank = false;
+    objOpts.marker.rank_colours = [
+      "blue",
+      "green",
+      "lightgreen",
+      "orange",
+      "red",
+    ];
+    objOpts.marker.ignore_zoom_level = 0.4;
+    objOpts.marker.font = "Arial";
+    objOpts.marker.font_size = 12;
+    objOpts.marker.font_colour = "black";
+    objOpts.marker.show_labels = true;
+  
+    objOpts.event.line_colour = "red";
+    objOpts.event.face_colour = {
+      general: "Gold",
+      erosion: "Teal",
+      tephra: "Crimson",
+      void: "Purple",
+      disturbed: "SlateGray",
+      earthquake: "green",
+    };
+    objOpts.event.line_width = 1;
+    objOpts.event.line_colour = "Gray"; //rate
+    objOpts.event.folded_width  = 0.1;//rate
+    objOpts.event.face_height = 0.98;//rate
+  
+    objOpts.connection.line_colour = "Gray";
+    objOpts.connection.line_width = 1.5;
+    objOpts.connection.indexWidth = objOpts.hole.distance * 0.7; //20;
+    objOpts.connection.emphasize_non_horizontal = true;
+    objOpts.connection.show_remote_connections = true;
+    objOpts.connection.emphasize_remote_connections = true;
+  
+    objOpts.plot.isVisible = false;
+    objOpts.plot.collecion_idx = 0;
+    objOpts.plot.series_idx = 0;
+    objOpts.plot.selected_options = null;
+  
+    objOpts.edit.editable = false;
+    objOpts.edit.contextmenu_enable = false;
+    objOpts.edit.hittest = null;
+    objOpts.edit.mode = null;
+    objOpts.edit.sensibility = 2;
+    objOpts.edit.marker_from = null;
+    objOpts.edit.marker_to = null;
+    objOpts.edit.handleClick = null;
+    objOpts.edit.handleMove = null;
+    objOpts.edit.passwards = "admin";
+  
+    objOpts.pen.colour = "Red";
+    objOpts.image.dpcm = 40;
+  
+    objOpts.age.incon_size = 20;
+    objOpts.age.alt_radius = 3;
+     
+    objOpts.age.incon_list = {
+      terrestrial: [
+        "",//"./resources/plot/terrestrial.png",
+        "Green",
+      ],
+      marine: [
+        "",//"./resources/plot/marine.png",
+        "Blue",
+      ],
+      tephra: [
+        "",//"./resources/plot/tephra.png",
+        "Red",
+      ],
+      climate: [
+        "",//"./resources/plot/climate.png",
+        "Yellow",
+      ],
+      orbital: [
+        "",//"./resources/plot/orbital.png",
+        "Orange",
+      ],
+      general: [
+        "",//"./resources/plot/general.png",
+        "Gray",
+      ],
+      historical: [
+        "",//"./resources/plot/historical.png",
+        "Black"
+      ],
+      interpolation: [
+        "",//"./resources/plot/interpolation.png",
+        "Gray"
+      ]
+    };
+    let resourcePaths = window.LCapi.getResourcePath();
+    objOpts.age.incon_list = resourcePaths.plot;
+    objOpts.interface.icon_list = resourcePaths.tool;
 
-  objOpts.project.interval = 0;
-  objOpts.project.font = "Arial";
-  objOpts.project.font_size = 25;
-  objOpts.project.font_colour = "black";
-
-  objOpts.hole.distance = 20;
-  objOpts.hole.width = 20;
-  objOpts.hole.line_colour = "lightgreen";
-  objOpts.hole.line_width = 2;
-  objOpts.hole.font = "Arial";
-  objOpts.hole.font_size = 20;
-  objOpts.hole.font_colour = "black";
-
-  objOpts.section.line_colour = "gray";
-  objOpts.section.face_colour = "lightgray";
-  objOpts.section.line_width = 4;
-  objOpts.section.width = 20;
-  objOpts.section.font = "Arial";
-  objOpts.section.font_size = 20;
-  objOpts.section.font_colour = "black";
-
-  objOpts.marker.line_colour = "gray";
-  objOpts.marker.line_width = 1;
-  objOpts.marker.width = 20;
-  objOpts.marker.is_rank = false;
-  objOpts.marker.rank_colours = [
-    "blue",
-    "green",
-    "lightgreen",
-    "orange",
-    "red",
-  ];
-  objOpts.marker.ignore_zoom_level = 0.4;
-  objOpts.marker.font = "Arial";
-  objOpts.marker.font_size = 12;
-  objOpts.marker.font_colour = "black";
-  objOpts.marker.show_labels = true;
-
-  objOpts.event.line_colour = "red";
-  objOpts.event.face_colour = {
-    general: "Gold",
-    erosion: "Teal",
-    tephra: "Crimson",
-    void: "Purple",
-    disturbed: "SlateGray",
-    earthquake: "green",
-  };
-  objOpts.event.line_width = 1;
-  objOpts.event.line_colour = "Gray"; //rate
-  objOpts.event.folded_width  = 0.1;//rate
-  objOpts.event.face_height = 0.98;//rate
-
-  objOpts.connection.line_colour = "Gray";
-  objOpts.connection.line_width = 1.5;
-  objOpts.connection.indexWidth = objOpts.hole.distance * 0.7; //20;
-  objOpts.connection.emphasize_non_horizontal = true;
-  objOpts.connection.show_remote_connections = true;
-  objOpts.connection.emphasize_remote_connections = false;
-
-  objOpts.plot.dot_colour = "Black";
-  objOpts.plot.line_colour = "Red";
-  objOpts.plot.show_dot = false;
-  objOpts.plot.show_line = false;
-  objOpts.plot.collecion_idx = 0;
-  objOpts.plot.series_idx = 0;
-
-  objOpts.edit.editable = false;
-  objOpts.edit.contextmenu_enable = false;
-  objOpts.edit.hittest = null;
-  objOpts.edit.mode = null;
-  objOpts.edit.sensibility = 2;
-  objOpts.edit.marker_from = null;
-  objOpts.edit.marker_to = null;
-  objOpts.edit.handleClick = null;
-  objOpts.edit.handleMove = null;
-  objOpts.edit.passwards = "admin";
-
-  objOpts.pen.colour = "Red";
-  objOpts.image.dpcm = 40;
-
-  objOpts.age.incon_size = 20;
-  objOpts.age.alt_radius = 3;
-   
-  objOpts.age.incon_list = {
-    terrestrial: [
-      "",//"./resources/plot/terrestrial.png",
-      "Green",
-    ],
-    marine: [
-      "",//"./resources/plot/marine.png",
-      "Blue",
-    ],
-    tephra: [
-      "",//"./resources/plot/tephra.png",
-      "Red",
-    ],
-    climate: [
-      "",//"./resources/plot/climate.png",
-      "Yellow",
-    ],
-    orbital: [
-      "",//"./resources/plot/orbital.png",
-      "Orange",
-    ],
-    general: [
-      "",//"./resources/plot/general.png",
-      "Gray",
-    ],
-    historical: [
-      "",//"./resources/plot/historical.png",
-      "Black"
-    ],
-    interpolation: [
-      "",//"./resources/plot/interpolation.png",
-      "Gray"
-    ]
-  };
-  let resourcePaths = window.LCapi.getResourcePath();
-  objOpts.age.incon_list = resourcePaths.plot;
-  objOpts.interface.icon_list = resourcePaths.tool;
+    return objOpts;
+  }
   //============================================================================================
   //resources
   //get plot image data
@@ -315,6 +318,23 @@ document.addEventListener("DOMContentLoaded", () => {
           order.push(i);
         }
       })
+    }
+
+    //check jpg
+    let numIm = 0;
+    dataList.forEach((data,i)=>{
+      if(data.ext == ".jpg"){
+        //order.push(i);
+        numIm ++;
+      }
+      if(data.ext == ".tif"){
+        //order.push(i);
+        numIm ++;
+      }
+    })
+    console.log(dataList)
+    if(numIm>0){
+      alert("Image files must be specified by their parent folder with name of 'holeName-sectionName'.")
     }
     
 
@@ -839,7 +859,18 @@ document.addEventListener("DOMContentLoaded", () => {
     alert(data.statusDetails)
     //data.errorDetails
   });
-  
+  //============================================================================================
+  window.LCapi.receive("PlotDataOptions", async (data) => {
+    console.log("[Renderer]: Plot options are received.",data)
+    if(data.emitType=="new"){
+      await loadPlotData();
+    }
+
+    objOpts.plot.selected_options = data.data;
+    objOpts.plot.isVisible = true;
+    document.getElementById("bt_chart").style.backgroundColor = "#ccc";
+    updateView();
+  });
   //============================================================================================
   //Edit correlation model
   document.addEventListener('contextmenu', handleNormalContextmenu);
@@ -886,11 +917,17 @@ document.addEventListener("DOMContentLoaded", () => {
   async function handleNormalContextmenu(event) {
     event.preventDefault();
     let clickResult = null;
-    if(objOpts.edit.hittest.section!==null){
-      clickResult = await window.LCapi.showContextMenu("sectionContextMenu");
+    if(objOpts.edit.hittest.hole!==null){
+      if(objOpts.edit.hittest.section!==null){
+        clickResult = await window.LCapi.showContextMenu("sectionContextMenu");
+      }else{
+        clickResult = await window.LCapi.showContextMenu("holeContextMenu");
+      }
     }else{
       clickResult = await window.LCapi.showContextMenu("normalContextMenu");  
     }
+
+    
 
     if(clickResult=="loadHighResolutionImage"){
       const curDPCM = JSON.parse(JSON.stringify(objOpts.image.dpcm));
@@ -904,6 +941,42 @@ document.addEventListener("DOMContentLoaded", () => {
       modelImages = await loadCoreImages(modelImages, LCCore, objOpts, "age");
       updateView();
       objOpts.image.dpcm = curDPCM;
+    }else if(clickResult.includes("holeMoveTo")){
+      const minHoleOrder = Math.min(...LCCore.projects.flatMap(p => p.holes.map(h => h.order)));
+      const maxHoleOrder = Math.max(...LCCore.projects.flatMap(p => p.holes.map(h => h.order)));
+      LCCore.projects.forEach(p=>{
+        if(p.id[0]==objOpts.edit.hittest.project){
+          p.holes.forEach(h=>{
+            if(h.id[1]==objOpts.edit.hittest.hole){
+              const currentOrder = h.order;
+              let newOrder = null;
+              if(clickResult.includes("Right")){
+                newOrder = currentOrder+1;
+              }else if(clickResult.includes("Left")){
+                newOrder = currentOrder-1;
+              }
+              
+              if(newOrder>maxHoleOrder){
+                newOrder = maxHoleOrder;
+              }
+              if(newOrder<minHoleOrder){
+                newOrder = minHoleOrder;
+              }
+
+              p.holes.forEach(h2=>{
+                if(h2.order == newOrder){
+                  h2.order = currentOrder;
+                  h.order = newOrder;
+                }
+              })
+              
+            }
+          })
+        }
+      })
+      updateView();
+    }else if(clickResult=="holeMoveToLeft"){
+
     }
     
   }
@@ -1204,6 +1277,40 @@ document.addEventListener("DOMContentLoaded", () => {
       modelImages = await loadCoreImages(modelImages, LCCore, objOpts, "age");
       updateView();
       objOpts.image.dpcm = curDPCM;
+    }else if(clickResult.includes("holeMoveTo")){
+      const minHoleOrder = Math.min(...LCCore.projects.flatMap(p => p.holes.map(h => h.order)));
+      const maxHoleOrder = Math.max(...LCCore.projects.flatMap(p => p.holes.map(h => h.order)));
+      LCCore.projects.forEach(p=>{
+        if(p.id[0]==objOpts.edit.hittest.project){
+          p.holes.forEach(h=>{
+            if(h.id[1]==objOpts.edit.hittest.hole){
+              const currentOrder = h.order;
+              let newOrder = null;
+              if(clickResult.includes("Right")){
+                newOrder = currentOrder+1;
+              }else if(clickResult.includes("Left")){
+                newOrder = currentOrder-1;
+              }
+              
+              if(newOrder>maxHoleOrder){
+                newOrder = maxHoleOrder;
+              }
+              if(newOrder<minHoleOrder){
+                newOrder = minHoleOrder;
+              }
+
+              p.holes.forEach(h2=>{
+                if(h2.order == newOrder){
+                  h2.order = currentOrder;
+                  h.order = newOrder;
+                }
+              })
+              
+            }
+          })
+        }
+      })
+      updateView();
     }else{
       objOpts.edit.contextmenu_enable = true;
       objOpts.edit.hittest = null;
@@ -2364,14 +2471,12 @@ document.addEventListener("DOMContentLoaded", () => {
   //============================================================================================
   document.getElementById("bt_chart").addEventListener("click", async () => {
     if (LCCore) {
-      if (!objOpts.plot.show_dot || !objOpts.plot.show_line) {
-        objOpts.plot.show_dot = true;
-        objOpts.plot.show_line = true;
+      if (!objOpts.plot.isVisible ) {
+        objOpts.plot.isVisible = true;
         document.getElementById("bt_chart").style.backgroundColor = "#ccc";
         updateView();
       } else {
-        objOpts.plot.show_dot = false;
-        objOpts.plot.show_line = false;
+        objOpts.plot.isVisible = false;
         document.getElementById("bt_chart").style.backgroundColor = "#f0f0f0";
         updateView();
       }
@@ -2477,7 +2582,7 @@ document.addEventListener("DOMContentLoaded", () => {
       await loadPlotData();
 
       console.log(LCCore);
-      console.log(LCplot);
+      console.log(LCPlot);
 
       //update photo
       modelImages = await updateImageRegistration(modelImages, LCCore);
@@ -2735,18 +2840,23 @@ document.addEventListener("DOMContentLoaded", () => {
   });
   
   window.LCapi.receive("SettingsData", async (data) => {
-    console.log(data)
-    objOpts.canvas = data.canvas;
-    objOpts.project = data.project;
-    objOpts.hole = data.hole;
-    objOpts.section = data.section;
-    objOpts.marker = data.marker;
-    objOpts.event = data.event;
-    objOpts.connection = data.connection;
-    objOpts.age = data.age;
-    objOpts.pen = data.pen;
-    objOpts.plot = data.plot; 
-    console.log("[RENDERER]: Setting is updated.")
+    if(data == null){
+      //set default
+      objOpts = setupSettings();
+    }else{
+      Object.assign(objOpts.canvas, data.canvas);
+      Object.assign(objOpts.project, data.project);
+      Object.assign(objOpts.hole, data.hole);
+      Object.assign(objOpts.section, data.section);
+      Object.assign(objOpts.marker, data.marker);
+      Object.assign(objOpts.event, data.event);
+      Object.assign(objOpts.connection, data.connection);
+      Object.assign(objOpts.age, data.age);
+      Object.assign(objOpts.pen, data.pen);
+      Object.assign(objOpts.plot, data.plot); 
+    }
+    
+    console.log("[RENDERER]: Setting is updated.",data)
     updateView();
   });
   
@@ -4032,69 +4142,313 @@ document.addEventListener("DOMContentLoaded", () => {
 
       //==========================================================================================
       //draw age points
-      if (LCplot == null || LCplot.age_collections.length == 0) {
-        return;
-      }
+      if (LCPlot !== null && LCPlot.age_collections.length > 0) {
+        let age_plot_idx = null;
+        LCPlot.age_collections.forEach((a, idx) => {
+          if (a.id == LCPlot.age_selected_id) {
+            age_plot_idx = idx;
+          }
+        });
 
-      //
-      let age_plot_idx = null;
-      LCplot.age_collections.forEach((a, idx) => {
-        if (a.id == LCplot.age_selected_id) {
-          age_plot_idx = idx;
-        }
-      });
+        //get age data(because age data, age series is single)
+        const ageSet = LCPlot.age_collections[age_plot_idx].datasets[0];
 
-      //get age data(because age data, age series is single)
-      const ageSet = LCplot.age_collections[age_plot_idx].datasets[0];
+        //get position & plot
+        const result = getPlotPosiotion(ageSet, 1,null, [shift_x, pad_x, xMag], [shift_y, pad_y, yMag], LCCore, objOpts, "age")
+        const posList = result.output;
 
-      //get position & plot
-      const posList = getPlotPosiotion(ageSet, [shift_x, pad_x, xMag], [shift_y, pad_y, yMag], LCCore, objOpts, "age")
-
-      const view_rect = {
-        x: scroller.scrollLeft,
-        y: scroller.scrollTop,
-        width: offScreenCanvas.width,
-        height: offScreenCanvas.height,
-      };
-
-      
-      for (let a = 0; a < ageSet.data_series.length; a++) {       
-        const posXY = posList[a];
-        const posX = posXY.x0;
-        const posY = posXY.y0;
-        //check inside
-        const age_rect = {
-          x: posX,
-          y: posY,
-          width: objOpts.age.incon_size,
-          height: objOpts.age.incon_size,
+        const view_rect = {
+          x: scroller.scrollLeft,
+          y: scroller.scrollTop,
+          width: offScreenCanvas.width,
+          height: offScreenCanvas.height,
         };
-        if (!isInside(view_rect, age_rect, 500)) {
-          continue;
-        }
 
-        //plot main
-        if (ageSet.data_series[a].source_type == "") {
-          sketch.image(
-            ageVectorPlotIcons["none"],
-            posX,
-            posY,
-            objOpts.age.incon_size,
-            objOpts.age.incon_size
-          );
-        } else {
-          sketch.image(
-            ageVectorPlotIcons[ageSet.data_series[a].source_type],
-            posX,
-            posY,
-            objOpts.age.incon_size,
-            objOpts.age.incon_size
-          );
+        
+        for (let a = 0; a < ageSet.data_series.length; a++) {       
+          const posXY = posList[a];
+          const posX = posXY.x0;
+          const posY = posXY.y0;
+          //check inside
+          const age_rect = {
+            x: posX,
+            y: posY,
+            width: objOpts.age.incon_size,
+            height: objOpts.age.incon_size,
+          };
+          if (!isInside(view_rect, age_rect, 500)) {
+            continue;
+          }
+
+          //plot main
+          if (ageSet.data_series[a].source_type == "") {
+            sketch.image(
+              ageVectorPlotIcons["none"],
+              posX,
+              posY,
+              objOpts.age.incon_size,
+              objOpts.age.incon_size
+            );
+          } else {
+            sketch.image(
+              ageVectorPlotIcons[ageSet.data_series[a].source_type],
+              posX,
+              posY,
+              objOpts.age.incon_size,
+              objOpts.age.incon_size
+            );
+          }
         }
       }
+      
       //==========================================================================================
       //==========================================================================================
       //draw data points
+      if(objOpts.plot.isVisible == true){
+        if(objOpts.plot.selected_options !== null){
+          sketch.push();
+
+          const view_rect = {
+            x: scroller.scrollLeft,
+            y: scroller.scrollTop,
+            width: offScreenCanvas.width,
+            height: offScreenCanvas.height,
+          };
+
+          const selectedList = objOpts.plot.selected_options;
+          for(let t=0; t< selectedList.length;t++){
+            const target = selectedList[t];           
+            
+            //check draw
+            if(target.isDraw == false){
+                continue
+            }
+  
+            //main
+            //get idx
+            let colIdx = null;
+            LCPlot.data_collections.forEach((c,i)=>{
+                if(c.id == target.collectionId){
+                    colIdx = i;
+                }
+            })
+            if(colIdx==null){
+                continue
+            }
+  
+            //get data
+            let nIdx = null;
+            let dIdx = null;
+            LCPlot.data_collections[colIdx].datasets.forEach((d,i)=>{
+                if(d.id == target.numeratorId){
+                    nIdx = i;
+                }
+                if(d.id == target.denominatorId){
+                    dIdx = i;
+                }
+            })
+            
+            if(nIdx==null && dIdx==null){
+                continue
+            }
+                        
+            let numeratorName = "";
+            let denominatorName = "";
+            let numeratorUnit = "";
+            let denominatorUnit = "";
+            let x0 = [];
+            let y0 = [];
+            let xoffset = objOpts.section.width;
+            let dataset_max_pos = NaN;
+            let dataset_min_pos = NaN;
+            let dataset_max = NaN;
+            let dataset_min = NaN;
+            let depth_source = null;
+            if(nIdx!==null && dIdx!==null){
+              //get position & plot
+              const numeratorData   = LCPlot.data_collections[colIdx].datasets[nIdx];
+              const denominatorData = LCPlot.data_collections[colIdx].datasets[dIdx];
+              depth_source = numeratorData.original_depth_type;
+
+              const resultPos   = getPlotPosiotion(numeratorData, denominatorData ,target.amplification, [shift_x+xoffset, pad_x, xMag], [shift_y, pad_y, yMag], LCCore, objOpts, "")
+              const numdenoList = resultPos.output;
+              dataset_max_pos = resultPos.max;
+              dataset_min_pos = resultPos.min;
+              dataset_max = resultPos.max_original;
+              dataset_min = resultPos.min_original;
+              //({x0:posX0, x1:posX1, y0:posY0, y1:posY1});
+              //normarise by values
+              numeratorName = numeratorData.name;
+              denominatorName = " / "+denominatorData.name;
+              denominatorUnit = " / "+denominatorData.unit;
+              for(let i=0;i<numdenoList .length;i++){
+                  const y = numdenoList[i].y0;
+                  const x = numdenoList[i].x0 !== null ? numdenoList[i].x0 : NaN;
+                  
+                  x0.push(x);
+                  y0.push(y);                            
+              }            
+            }else{
+              if(nIdx!==null){
+                //get position & plot
+                const numeratorData   = LCPlot.data_collections[colIdx].datasets[nIdx];
+                depth_source = numeratorData.original_depth_type;
+                const resultPos = getPlotPosiotion(numeratorData, 1, target.amplification,[shift_x+xoffset, pad_x, xMag], [shift_y, pad_y, yMag], LCCore, objOpts, "")
+                const numeratorList = resultPos.output;
+                dataset_max_pos = resultPos.max;
+                dataset_min_pos = resultPos.min;
+                dataset_max = resultPos.max_original;
+                dataset_min = resultPos.min_original;
+                //({x0:posX0, x1:posX1, y0:posY0, y1:posY1});
+                  //without normarisation
+                  numeratorName = numeratorData.name;
+                  numeratorUnit = numeratorData.unit;
+                  for(let i=0;i<numeratorList.length;i++){
+                      const y = numeratorList[i].y0;
+                      const x = numeratorList[i].x0!==null ? numeratorList[i].x0 : NaN;
+                      x0.push(x);
+                      y0.push(y);                            
+                  }
+              }else if(dIdx!==null){
+                //get position & plot
+                const denominatorData = LCPlot.data_collections[colIdx].datasets[dIdx];
+                depth_source = denominatorData.original_depth_type;
+                const resultPos = getPlotPosiotion(1,denominatorData,target.amplification,[shift_x+xoffset, pad_x, xMag], [shift_y, pad_y, yMag], LCCore, objOpts, "")
+                const denominatorList = resultPos.output;
+                dataset_max_pos = resultPos.max;
+                dataset_min_pos = resultPos.min;
+                dataset_max = resultPos.max_original;
+                dataset_min = resultPos.min_original;
+                //({x0:posX0, x1:posX1, y0:posY0, y1:posY1});
+                  //without normarisation
+                  numeratorName = "1";
+                  numeratorUnit = "1";
+                  denominatorName = " / "+denominatorData.name;
+                  denominatorUnit = " / "+denominatorData.unit;
+                  for(let i=0;i<denominatorList.length;i++){
+                      const y = denominatorList[i].y0;
+                      const x = denominatorList[i].x0!==null ? denominatorList[i].x0 : NaN;
+                      x0.push(x);
+                      y0.push(y);                            
+                  }
+              }
+            }
+
+
+            if(x0.length==0){
+              continue
+            }
+
+
+            
+            //draw plot
+            if(target.plotType =="line"){
+              sketch.strokeWeight(1);
+              sketch.stroke(target.colour);     
+              const x0_plot = shift_x * xMag + pad_x + objOpts.section.width * xMag + 5;
+              for(let i=0; i<x0.length-1;i++){
+                const data_rect = {
+                  x: x0[i],
+                  y: y0[i],
+                  width: x0[i+1]-x0[i],
+                  height: y0[i+1]-y0[i],
+                };
+                if (!isInside(view_rect, data_rect, 500)) {
+                  continue;
+                }                
+                  sketch.line(
+                      x0[i],
+                      y0[i],
+                      x0[i+1],
+                      y0[i+1],
+                  )
+              }
+            }else if(target.plotType == "scatter"){
+              sketch.push();
+              sketch.noStroke();
+              sketch.fill(target.colour);
+                    
+              for(let i=0; i<x0.length;i++){
+                  sketch.ellipse(
+                      x0[i],
+                      y0[i],
+                      8
+                  );  
+              }          
+              sketch.pop();              
+            }else if(target.plotType == "bar"){
+              sketch.push();
+              sketch.noStroke();
+              sketch.fill(target.colour);   
+              
+              for(let i=0; i<x0.length;i++){
+                  let rectX0 = 0 - xmin;
+                  let rectX1 = x0[i] - xmin;
+                  let rectY  = y0[i];
+                  let rectY0 = rectY -2;
+                  let rectY1 = rectY +2;
+                  if(0>xmax){
+                      rectX0 = xmax-xmin;
+                  }
+                  if(0<xmin){
+                      rectX0 = 0;
+                  }
+                  
+                  sketch.rect(
+                      rectX0,
+                      rectY0,
+                      rectX1 - rectX0,
+                      rectY1 - rectY0,
+                  );  
+              }          
+              sketch.pop(); 
+            }
+          
+            //x scale
+            if(["age","composite","free"].includes(depth_source)){
+              sketch.line(
+                dataset_min_pos,
+                100    + scroller.scrollTop,
+                dataset_max_pos,
+                100    + scroller.scrollTop,
+              )
+              sketch.textSize(10);
+              sketch.text(
+                autoRound(dataset_min).toString(),
+                dataset_min_pos,
+                80    + scroller.scrollTop,
+              )
+              sketch.text(
+                autoRound(dataset_max).toString(),
+                dataset_max_pos,
+                80    + scroller.scrollTop,
+              )
+              const unit = "["+numeratorUnit+denominatorUnit+"]";
+              const title = numeratorName+denominatorName;
+              sketch.text(
+                title,
+                (dataset_min_pos + dataset_max_pos)/2 - sketch.textSize(title),
+                80    + scroller.scrollTop,
+              )
+            }
+            
+            
+  
+            
+          }
+          sketch.pop();
+        }
+      }
+      
+
+      /*
+      objOpts.plot.colour_dot = "gray";
+      objOpts.plot.colour_line = "gray";
+      objOpts.plot.colour_bar = "gray";
+      objOpts.plot.collecion_idx = 0;
+      objOpts.plot.series_idx = 0;
+      objOpts.plot.selected_options = null;
+      */
 
       //==========================================================================================
 
@@ -4107,6 +4461,23 @@ document.addEventListener("DOMContentLoaded", () => {
   };
 
   //============================================================================================
+  function autoRound(num, { precision = 2, decimalPlaces = null, significantFigures = null } = {}) {
+    if (!isFinite(num)) return num;
+  
+    if (significantFigures !== null) {
+      const factor = Math.pow(10, significantFigures - Math.ceil(Math.log10(Math.abs(num))));
+      return Math.round(num * factor) / factor;
+    }
+  
+    if (decimalPlaces !== null) {
+      const factor = Math.pow(10, decimalPlaces);
+      return Math.round(num * factor) / factor;
+    }
+  
+    const decimalPlacesForAuto = Math.max(0, Math.floor(-Math.log10(Math.abs(num)) + precision));
+    const factor = Math.pow(10, decimalPlacesForAuto);
+    return Math.round(num * factor) / factor;
+  }
   //make raster view with using update plot
   function makeRasterObjects(isDrawObject) {
     //get hole length
@@ -4751,21 +5122,21 @@ document.addEventListener("DOMContentLoaded", () => {
 
     //==========================================================================================
     //draw age points
-    if (LCplot == null || LCplot.age_collections.length == 0) {
+    if (LCPlot == null || LCPlot.age_collections.length == 0) {
       return;
     }
 
     //
     let age_plot_idx = null;
-    LCplot.age_collections.forEach((a, idx) => {
-      if (a.id == LCplot.age_selected_id) {
+    LCPlot.age_collections.forEach((a, idx) => {
+      if (a.id == LCPlot.age_selected_id) {
         age_plot_idx = idx;
       }
     });
 
     //get age data(because age data, age series is single)
     const ageSeries =
-      LCplot.age_collections[age_plot_idx].datasets[0].data_series;
+      LCPlot.age_collections[age_plot_idx].datasets[0].data_series;
 
     //plot
     for (let a = 0; a < ageSeries.length; a++) {
@@ -5502,7 +5873,7 @@ document.addEventListener("DOMContentLoaded", () => {
     //LC plot age_collection id is as same as LCAge id
     const results = await window.LCapi.LoadPlotFromLCPlot();
     if (results) {
-      LCplot = results;
+      LCPlot = results;
       const num_age_collections = results.age_collections.length;
       const num_data_collections= results.data_collections.length;
       console.log("[Renderer]: Plot Data have been loaded into the renderer.");
@@ -5544,7 +5915,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     //data initiarise
     await window.LCapi.InitiarisePlot();
-    LCplot = null;
+    LCPlot = null;
   }
   async function initiariseCanvas() {
     //canvas initiarise
@@ -6557,23 +6928,63 @@ function getClickedItemIdx(mouseX, mouseY, LCCore, objOpts){
   
   return results;
 }
-function getPlotPosiotion(dataSet, xMod, yMod, LCCore, objOpts, type){
-  const dataSeries = dataSet.data_series;
+function getPlotPosiotion(dataSet1,dataSet2, ampRate, xMod, yMod, LCCore, objOpts, type){
   const shift_x = xMod[0];
   const pad_x   = xMod[1]
   const xMag    = xMod[2];
   const shift_y = yMod[0];
   const pad_y   = yMod[1];
   const yMag    = yMod[2];
-  const dataRange = dataSet.data_max - dataSet.data_min;
-  const dataAmpRate = objOpts.hole.width / dataRange;
+  let dataSeries = [];
+  if(dataSet2 == 1){
+    dataSeries = dataSet1.data_series;
+  }else if(dataSet1 == 1){
+    dataSeries = JSON.parse(JSON.stringify(dataSet2.data_series));
+    dataSet2.data_series.forEach((d,i)=>{
+      dataSeries[i].data = 1/d.data;
+    })
+  }else{
+    dataSeries = JSON.parse(JSON.stringify(dataSet2.data_series));
+    dataSet2.data_series.forEach((d,i)=>{
+      dataSeries[i].data = dataSet1.data_series[i].data/d.data;
+    })
+  }
+
+  const minResult = dataSeries.reduce(
+    (min, current, index) => {
+      if (!isNaN(current.data) && (min.value === null || current.data < min.value)) {
+        return { value: current.data, index: index };
+      }
+      return min;
+    },
+    { value: null, index: null }
+  );
+
+  const maxResult = dataSeries.reduce(
+    (max, current, index) => {
+      if (!isNaN(current.data) && (max.value === null || current.data > max.value)) {
+        return { value: current.data, index: index };
+      }
+      return max;
+    },
+    { value: null, index: null }
+  );
+
+  //Math.min(...dataSeries.map(item=>item.data).filter(data => !isNaN(data))); 
+  const dataset_min = minResult.value;
+  const dataset_max = maxResult.value;
+
+  let dataRange = (dataset_max - dataset_min);
+  if(ampRate !== null){
+    dataRange = dataRange / ampRate;
+  }
+  const dataAmpRate = objOpts.hole.width / 2 / dataRange;
 
   let output = [];
+  //cacl each data position
   for (let a = 0; a < dataSeries.length; a++) {
     let posX0 = NaN;
     let posY0 = NaN;
-    let posX1 = NaN;
-    let posY1 = NaN;
 
     //get hole
     let hole = null;
@@ -6607,7 +7018,7 @@ function getPlotPosiotion(dataSet, xMod, yMod, LCCore, objOpts, type){
 
       if (isSkip || hole == null) {
         //if disabel hole
-        output.push({x0:posX0, x1:posX1, y0:posY0, y1:posY1});
+        output.push({x0:posX0, y0:posY0});
         continue;
       }
      
@@ -6620,24 +7031,14 @@ function getPlotPosiotion(dataSet, xMod, yMod, LCCore, objOpts, type){
         }
       } else{
         if(dataSeries[a].data !== null){
-          posX0 = ((objOpts.hole.distance + objOpts.hole.width) * (num_hole.enable -1 ) + dataSeries[a].data * dataAmpRate + shift_x) * xMag + pad_x;
+          posX0 = ((objOpts.hole.distance + objOpts.hole.width) * (num_hole.enable -1 ) + (dataSeries[a].data - dataset_min) * dataAmpRate + shift_x) * xMag + pad_x;
         }
         if(dataSeries[a][objOpts.canvas.depth_scale] !== null){
           posY0 = (dataSeries[a][objOpts.canvas.depth_scale] + shift_y) * yMag + pad_y;
         }
       }
-      
 
-      if(type !== "age" && a !== dataSeries.length -1 && dataSeries[a].data !== NaN){
-        if(dataSeries[a+1].data !== null){
-          posX1 = ((objOpts.hole.distance + objOpts.hole.width) * (num_hole.enable -1 ) + dataSeries[a+1].data * dataAmpRate + shift_x) * xMag + pad_x;
-        }
-        if(dataSeries[a+1][objOpts.canvas.depth_scale] !== null){
-          posY1 = (dataSeries[a+1][objOpts.canvas.depth_scale] + shift_y) * yMag + pad_y;
-        }
-      }
-      
-      output.push({x0:posX0, x1:posX1, y0:posY0, y1:posY1});
+      output.push({x0:posX0, y0:posY0});
       //------------------------------------------------
     } else {
       //plot 0
@@ -6646,18 +7047,15 @@ function getPlotPosiotion(dataSet, xMod, yMod, LCCore, objOpts, type){
         posX0 = age_shift_x + shift_x * xMag + pad_x - objOpts.age.incon_size * 1.2;
         posY0 = (dataSeries[a][objOpts.canvas.depth_scale] + shift_y) * yMag + pad_y - objOpts.age.incon_size / 2;
       }else{
-        posX0 = shift_x * xMag + pad_x;
+        posX0 = ((objOpts.hole.distance + objOpts.hole.width) * (-2) + (dataSeries[a].data - dataset_min) * dataAmpRate + shift_x) * xMag + pad_x + objOpts.hole.width * xMag;
         posY0 = (dataSeries[a][objOpts.canvas.depth_scale] + shift_y) * yMag + pad_y;
       }
 
-      if(type !== "age" && a !== dataSeries.length -1 && dataSeries[a].data !== NaN){
-        posX1 = ((objOpts.hole.distance + objOpts.hole.width) * (num_hole.enable -1 ) + dataSeries[a+1].data * dataAmpRate + shift_x) * xMag + pad_x + objOpts.hole.width * xMag;
-        posY1 = (dataSeries[a+1][objOpts.canvas.depth_scale] + shift_y) * yMag + pad_y;
-      }
-      
-      output.push({x0:posX0, x1:posX1, y0:posY0, y1:posY1});
+      output.push({x0:posX0, y0:posY0});
     }
   }
-  return output;
+  
+  
+  return {output,min_original:dataset_min,max_original:dataset_max,min:output[minResult.index].x0,max:output[maxResult.index].x0};
 }
 //============================================================================================

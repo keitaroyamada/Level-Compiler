@@ -43,18 +43,22 @@
   width: 450;
   display: flex;
   flex-direction: column;
+  visibility: hidden;
 }
 .correlation_id select {
   width: 200px;
+  visibility: hidden;
 }
 .age_id {
   padding-left: 30px;
   width: 450;
   display: flex;
   flex-direction: column;
+  visibility: hidden;
 }
 .age_id select {
   width: 200px;
+  visibility: hidden;
 }
 
 .depth {

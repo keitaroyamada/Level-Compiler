@@ -90,11 +90,23 @@ function createMainWIndow() {
     if (converterWindow && !converterWindow.isDestroyed()) {
       converterWindow.close();
     }
+    if (importerWindow && !importerWindow.isDestroyed()) {
+      importerWindow.close();
+    }
+    if (labelerWindow && !labelerWindow.isDestroyed()) {
+      labelerWindow.close();
+    }
+    if (settingsWindow && !settingsWindow.isDestroyed()) {
+      settingsWindow.close();
+    }
+    if (plotWindow && !plotWindow.isDestroyed()) {
+      plotWindow.close();
+    }
   });
 
   //initiarise
   LCCore = initiariseLCCore();
-  
+    
   //Implement menu
   menuRebuild(mainWindow);
   //===================================================================================================================================
@@ -607,6 +619,18 @@ function createMainWIndow() {
                  
                 } 
               },
+              { 
+                label: 'Move to right', 
+                click: () => {
+                  resolve("holeMoveToRight");                      
+                } 
+              },
+              { 
+                label: 'Move to left', 
+                click: () => {
+                  resolve("holeMoveToLeft");                      
+                } 
+              },
               { type: 'separator' },
               { 
                 label: 'Delete Hole', 
@@ -705,6 +729,23 @@ function createMainWIndow() {
       }else if(type=="sectionContextMenu"){
         template = [
           {
+            label:"Hole",
+            submenu:[
+              { 
+                label: 'Move to right', 
+                click: () => {
+                  resolve("holeMoveToRight");                      
+                } 
+              },
+              { 
+                label: 'Move to left', 
+                click: () => {
+                  resolve("holeMoveToLeft");                      
+                } 
+              },
+            ]
+          },
+          {
             label:"Image",
             submenu:[
               { 
@@ -712,6 +753,26 @@ function createMainWIndow() {
                 click: () => {
                   console.log('MAIN: Load high-resolution image'); 
                   resolve("loadHighResolutionImage");                      
+                } 
+              },
+            ]
+          }
+        ] 
+      }else if(type=="holeContextMenu"){
+        template = [
+          {
+            label:"Hole",
+            submenu:[
+              { 
+                label: 'Move to right', 
+                click: () => {
+                  resolve("holeMoveToRight");                      
+                } 
+              },
+              { 
+                label: 'Move to left', 
+                click: () => {
+                  resolve("holeMoveToLeft");                      
                 } 
               },
             ]
@@ -812,6 +873,7 @@ function createMainWIndow() {
           LCPlot.age_selected_id, //new made lotdata id
           LCAge.AgeModels[age_idx]
         );
+        LCPlot.calcAgeCollectionPosition(LCCore, LCAge);
         console.log("MAIN: Registered age plot data from " + LCAge.AgeModels[age_idx].name);
       }
     } catch (error) {
@@ -1061,8 +1123,8 @@ function createMainWIndow() {
 
   ipcMain.handle("LoadPlotFromLCPlot", async (_e) => {
     //calc latest age and depth
-    LCPlot.calcAgeCollectionPosition(LCCore, LCAge);
-    LCPlot.calcDataCollectionPosition(LCCore, LCAge);
+    //LCPlot.calcAgeCollectionPosition(LCCore, LCAge);
+    //LCPlot.calcDataCollectionPosition(LCCore, LCAge);
 
     //LC plot age_collection id is as same as LCAge id
     LCPlot.age_selected_id = LCAge.selected_id;
@@ -1477,6 +1539,12 @@ function createMainWIndow() {
         plotWindow.webContents.closeDevTools();
       } else {
         plotWindow.webContents.openDevTools();
+      }
+    }else if(data == "settings"){
+      if (settingsWindow.webContents.isDevToolsOpened()) {
+        settingsWindow.webContents.closeDevTools();
+      } else {
+        settingsWindow.webContents.openDevTools();
       }
     }
     
@@ -2137,14 +2205,17 @@ function createMainWIndow() {
     
   });
   ipcMain.handle("sendSettings", (_e,data, to) => {
-    console.log(to)
     if(to=="settings"){
       settingsWindow.webContents.send("SettingsData", data);
     }else if(to=="renderer"){
       mainWindow.webContents.send("SettingsData", data);
-    }
-    
-    
+      setSettings(data);
+    }    
+  });
+  ipcMain.handle("sendPlotOptions", (_e,data, to) => {
+    if(to=="renderer"){
+      mainWindow.webContents.send("PlotDataOptions", data);
+    }    
   });
   //--------------------------------------------------------------------------------------------------
   function initiariseLCCore(){
@@ -2173,6 +2244,12 @@ function createMainWIndow() {
     return LCCore;
   }
   //--------------------------------------------------------------------------------------------------
+  mainWindow.webContents.once("did-finish-load", () => {
+    const LCSettingData = getSettings();
+    if (LCSettingData !== null) {
+      mainWindow.webContents.send("SettingsData", LCSettingData);
+    }
+  });
 }
 //===================================================================================================================================
 
@@ -2265,22 +2342,22 @@ function buildMainMenu(mainWindow){
               label: "Save LC model",
               accelerator: "CmdOrCtrl+S",
               click: async () => {
-                
-                //remove plot data
-                let out_LCPlot = JSON.parse(JSON.stringify(LCPlot));
-                out_LCPlot.data_collections = [];
-                out_LCPlot.data_selected_id = null;
+                if(isEditMode){
+                  //remove plot data
+                  let out_LCPlot = JSON.parse(JSON.stringify(LCPlot));
+                  out_LCPlot.data_collections = [];
+                  out_LCPlot.data_selected_id = null;
 
-                const outData = {LCCore:LCCore, LCAge:LCAge, LCPlotAge:out_LCPlot};
+                  const outData = {LCCore:LCCore, LCAge:LCAge, LCPlotAge:out_LCPlot};
 
-                if(globalPath.saveModelPath == null){
-                  //save as new file
-                  globalPath.saveModelPath = await putmodelfile(outData, null);
-                }else{
-                  //save orverwrite
-                  globalPath.saveModelPath = await putmodelfile(outData, globalPath.saveModelPath);
-                }
-                
+                  if(globalPath.saveModelPath == null){
+                    //save as new file
+                    globalPath.saveModelPath = await putmodelfile(outData, null);
+                  }else{
+                    //save orverwrite
+                    globalPath.saveModelPath = await putmodelfile(outData, globalPath.saveModelPath);
+                  }
+                }                
               },
             },
           ],
@@ -2485,7 +2562,7 @@ function buildMainMenu(mainWindow){
             //create finder window
             plotWindow = new BrowserWindow({
               title: "Converter",
-              width: 900,
+              width: 280,//full: 900
               height: 600,
               webPreferences: {preload: path.join(__dirname, "preload_plotter.js"),},
             });
@@ -2699,7 +2776,7 @@ async function putmodelfile(data, path) {
       const saveAsZip = true;
       if(saveAsZip == true){
         const zip = new JSZip();
-          zip.file('lcmodel.json', JSON.stringify(data), { compression: 'DEFLATE' });
+          zip.file('lcmodel.json', JSON.stringify(data, null, 2), { compression: 'DEFLATE' });
           const zipContent = await zip.generateAsync({ type: 'nodebuffer' });
 
           fs.writeFileSync(filePath, zipContent);
@@ -2863,6 +2940,28 @@ async function checkUpdate(){
   autoUpdater.checkForUpdates();
 }
 //--------------------------------------------------------------------------------------------------
+function getSettings(){
+  let LCSettingData = null;
+  const settingPath = path.join(app.getPath('userData'), "lcsettings.json");
+  if(fs.existsSync(settingPath)){
+    const settingsData = fs.readFileSync(settingPath, 'utf-8');
+    LCSettingData = JSON.parse(settingsData);   
+    console.log("MAIN: Restore settings")
+  }else{
+    console.log("MAIN: There is no setting data.")
+  }
+  return LCSettingData;
+}
+function setSettings(data){
+  const settingPath = path.join(app.getPath('userData'), "lcsettings.json");
+  try {
+    fs.writeFileSync(settingPath, JSON.stringify(data, null, 2), 'utf-8');
+    console.log('MAIN: Settings are saved.');
+  } catch (error) {
+    console.error('MAIN: Failed to save settings.', error);
+  }
+}
+//--------------------------------------------------------------------------------------------------
 app.whenReady().then(() => {
   //check update
   checkUpdate();
@@ -2875,7 +2974,10 @@ app.whenReady().then(() => {
       createMainWIndow();
     }
   });
+
 });
+
+
 //================================================================================================
 //subfunc
 //-------------------------------------------------------------------------------------------------
