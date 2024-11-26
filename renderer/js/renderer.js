@@ -1311,6 +1311,24 @@ document.addEventListener("DOMContentLoaded", () => {
         }
       })
       updateView();
+    }else if(clickResult == "cancel"){
+      console.log("[Renderer]: Edit cancelled.")
+      objOpts.edit.editable = true;
+      objOpts.edit.contextmenu_enable = true;
+      objOpts.edit.hittest = null;
+      objOpts.edit.marker_from = null;
+      objOpts.edit.marker_to = null;
+      objOpts.edit.mode = "";
+      document.body.style.cursor = "default";
+      if(objOpts.edit.handleClick !== null){
+        document.removeEventListener('click', objOpts.edit.handleClick);
+        objOpts.edit.handleClick = null;
+      }
+      if(objOpts.edit.handleMove !== null){
+        document.removeEventListener('mousemove', objOpts.edit.handleMove);
+        objOpts.edit.handleMove = null;
+      }
+      updateView();
     }else{
       objOpts.edit.contextmenu_enable = true;
       objOpts.edit.hittest = null;
