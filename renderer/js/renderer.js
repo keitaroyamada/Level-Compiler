@@ -1430,46 +1430,43 @@ document.addEventListener("DOMContentLoaded", () => {
     const ht = JSON.parse(JSON.stringify(getClickedItemIdx(mouseX, mouseY, LCCore, objOpts)));
     objOpts.edit.hittest = ht;
     updateView();
-    //console.log(ht.hole+"-"+ht.section+"-"+ht.upper_marker+"/"+ht.lower_marker)
-  
-    //context menu
-    if(ht.section !== null){
-      //on the section
-      if(objOpts.edit.mode == "add_marker"){
-        if(objOpts.edit.handleClick == null || objOpts.edit.handleClick !== handleMarkerAddClick){
-          //console.log(ht.hole+"-"+ht.section+"-"+ht.nearest_marker)
-          objOpts.edit.handleClick = handleMarkerAddClick;
-          document.addEventListener('click', objOpts.edit.handleClick);
-        }else{
-          document.removeEventListener('click', objOpts.edit.handleClick);
-          objOpts.edit.handleClick = null;
-        }
-      }else if(objOpts.edit.mode == "delete_marker"){
-        if (Math.abs(ht.nearest_distance) < objOpts.edit.sensibility) {
-          objOpts.edit.handleClick = handleMarkerDeleteClick;
-          document.addEventListener('click', objOpts.edit.handleClick);
-        }else if(objOpts.edit.handleClick !== null){
-          document.removeEventListener('click', objOpts.edit.handleClick);
-          objOpts.edit.handleClick = null;
-        }
-      }else if(["change_marker_name","change_marker_distance", "set_zero_point", "enable_master","disable_master"].includes(objOpts.edit.mode)){
-        if (Math.abs(ht.nearest_distance) < objOpts.edit.sensibility) {
-          objOpts.edit.handleClick = handleMarkerChangeClick;
-          document.addEventListener('click', objOpts.edit.handleClick);
-        }else if(objOpts.edit.handleClick !== null){
-          document.removeEventListener('click', objOpts.edit.handleClick);
-          objOpts.edit.handleClick = null;
-        }
-      }else if(["add_event","delete_event"].includes(objOpts.edit.mode)){
-        if(objOpts.edit.handleClick == null){
-          objOpts.edit.handleClick = handleEventAddClick;
-          document.addEventListener('click', objOpts.edit.handleClick);
-        }else{
-          document.removeEventListener('click', objOpts.edit.handleClick);
-          objOpts.edit.handleClick = null;
-        }
+    
+    //on the sectionif(ht.section !== null){}
+    if(objOpts.edit.mode == "add_marker"){
+      if(ht.section !== null){
+        //console.log(ht.hole+"-"+ht.section+"-"+ht.nearest_marker)
+        objOpts.edit.handleClick = handleMarkerAddClick;
+        document.addEventListener('click', objOpts.edit.handleClick);
+      }else{
+        document.removeEventListener('click', objOpts.edit.handleClick);
+        objOpts.edit.handleClick = null;
       }
-    } 
+    }else if(objOpts.edit.mode == "delete_marker"){
+      if (ht.section !== null && Math.abs(ht.nearest_distance) < objOpts.edit.sensibility) {
+        objOpts.edit.handleClick = handleMarkerDeleteClick;
+        document.addEventListener('click', objOpts.edit.handleClick);
+      }else if(objOpts.edit.handleClick !== null){
+        document.removeEventListener('click', objOpts.edit.handleClick);
+        objOpts.edit.handleClick = null;
+      }
+    }else if(["change_marker_name","change_marker_distance", "set_zero_point", "enable_master","disable_master"].includes(objOpts.edit.mode)){
+      if (ht.section !== null && Math.abs(ht.nearest_distance) < objOpts.edit.sensibility) {
+        objOpts.edit.handleClick = handleMarkerChangeClick;
+        document.addEventListener('click', objOpts.edit.handleClick);
+      }else if(objOpts.edit.handleClick !== null){
+        document.removeEventListener('click', objOpts.edit.handleClick);
+        objOpts.edit.handleClick = null;
+      }
+    }else if(["add_event","delete_event"].includes(objOpts.edit.mode)){
+      if(ht.section !== null && objOpts.edit.handleClick == null){
+        objOpts.edit.handleClick = handleEventAddClick;
+        document.addEventListener('click', objOpts.edit.handleClick);
+      }else{
+        document.removeEventListener('click', objOpts.edit.handleClick);
+        objOpts.edit.handleClick = null;
+      }
+    }
+    
   }
   //2 Marker click--------------------------------------------
   async function handleMarkerChangeClick(event) {

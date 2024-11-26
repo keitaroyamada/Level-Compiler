@@ -424,39 +424,37 @@ document.addEventListener("DOMContentLoaded", () => {
     updateView();
   
     //context menu
-    if(ht.section !== null){
-      //on the section
-      if(objOpts.mode == "add_marker"){
-        if(objOpts.handleClick == null || objOpts.handleClick !== handleMarkerAddClick){
-          objOpts.handleClick = handleMarkerAddClick;
-          document.addEventListener('click', objOpts.handleClick);
-        }else{
-          document.removeEventListener('click', objOpts.handleClick);
-          objOpts.handleClick = null;
-        }
-      }else if(objOpts.mode == "delete_marker"){
-        if (Math.abs(ht.nearest_distance) < objOpts.sensibility) {
-          objOpts.handleClick = handleMarkerDeleteClick;
-          document.addEventListener('click', objOpts.handleClick);
-        }else if(objOpts.handleClick !== null){
-          document.removeEventListener('click', objOpts.handleClick);
-          objOpts.handleClick = null;
-        }
-      }else if(["change_marker_name","change_marker_distance", "set_zero_point", "enable_master","disable_master","change_marker_dd"].includes(objOpts.mode)){
-        if (Math.abs(ht.nearest_distance) < objOpts.sensibility) {
-          objOpts.handleClick = handleMarkerChangeClick;
-          document.addEventListener('click', objOpts.handleClick);
-        }
-      }else if(["add_event","delete_event"].includes(objOpts.mode)){
-        if(objOpts.edit.handleClick == null){
-          objOpts.edit.handleClick = handleEventAddClick;
-          document.addEventListener('click', objOpts.edit.handleClick);
-        }else{
-          document.removeEventListener('click', objOpts.edit.handleClick);
-          objOpts.edit.handleClick = null;
-        }
+    //on the section
+    if(objOpts.mode == "add_marker"){
+      if(ht.section !== null){
+        objOpts.handleClick = handleMarkerAddClick;
+        document.addEventListener('click', objOpts.handleClick);
+      }else{
+        document.removeEventListener('click', objOpts.handleClick);
+        objOpts.handleClick = null;
       }
-    } 
+    }else if(objOpts.mode == "delete_marker"){
+      if (ht.section !== null && Math.abs(ht.nearest_distance) < objOpts.sensibility) {
+        objOpts.handleClick = handleMarkerDeleteClick;
+        document.addEventListener('click', objOpts.handleClick);
+      }else if(objOpts.handleClick !== null){
+        document.removeEventListener('click', objOpts.handleClick);
+        objOpts.handleClick = null;
+      }
+    }else if(["change_marker_name","change_marker_distance", "set_zero_point", "enable_master","disable_master","change_marker_dd"].includes(objOpts.mode)){
+      if (ht.section !== null && Math.abs(ht.nearest_distance) < objOpts.sensibility) {
+        objOpts.handleClick = handleMarkerChangeClick;
+        document.addEventListener('click', objOpts.handleClick);
+      }
+    }else if(["add_event","delete_event"].includes(objOpts.mode)){
+      if(ht.section !== null && objOpts.edit.handleClick == null){
+        objOpts.edit.handleClick = handleEventAddClick;
+        document.addEventListener('click', objOpts.edit.handleClick);
+      }else{
+        document.removeEventListener('click', objOpts.edit.handleClick);
+        objOpts.edit.handleClick = null;
+      }
+    }
   }
   //2 Marker Change Name & Change distance--------------------------------------------
   async function handleMarkerChangeClick(event) {
