@@ -3085,6 +3085,7 @@ class LevelCompilerCore extends EventEmitter{
         let newhconnected = hconnected.filter(item => item.toString() !== c.toString());
         this.projects[ci[0]].holes[ci[1]].sections[ci[2]].markers[ci[3]].h_connection = newhconnected;
       });
+      return true
     } else {
       this.setErrorAlert("","E040: Fail to connect markers because direction is not correct.")
       console.log("E040: Fail to connect markers because direction is not correct.");
@@ -3154,18 +3155,18 @@ class LevelCompilerCore extends EventEmitter{
       //disconnect
       if (connectionIdxFrom !== null && connectionIdxTo !== null) {
         this.projects[fromIdx[0]].holes[fromIdx[1]].sections[fromIdx[2]].markers[fromIdx[3]].h_connection.splice(connectionIdxFrom, 1);
-        this.projects[toIdx[0]].holes[fromIdx[1]].sections[toIdx[2]].markers[toIdx[3]].h_connection.splice(connectionIdxTo, 1);
-        /*
+        this.projects[toIdx[0]].holes[toIdx[1]].sections[toIdx[2]].markers[toIdx[3]].h_connection.splice(connectionIdxTo, 1);
         console.log(
           "Disconnected between " +
             this.getMarkerNameFromId(fromId) +
             " and " +
             this.getMarkerNameFromId(toId)
         );
-        */
+        return true
       } else {
         this.setError("","E042: Fail to disconnect markers because there is no connection between ." + this.getMarkerNameFromId(fromId) + " and " + this.getMarkerNameFromId(toId))
         console.log("E042: Fail to disconnect markers because there is no connection between ." + this.getMarkerNameFromId(fromId) + " and " + this.getMarkerNameFromId(toId));
+        return false
       }
     }
     this.setStatus("completed","");

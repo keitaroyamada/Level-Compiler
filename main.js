@@ -2006,10 +2006,21 @@ function createMainWIndow() {
     return results;
   });
   ipcMain.handle("connectMarkers", (_e, fromId, toId, direction) => {
-    LCCore.connectMarkers(fromId, toId, direction);
+    const res = LCCore.connectMarkers(fromId, toId, direction);
+    if(res == true){
+      return true
+    }else{
+      return false
+    }    
   });
-  ipcMain.handle("disconnectMarkers", (_e, fromId, toId,direction) => {
-    LCCore.disconnectMarkers(fromId, toId, direction);
+  ipcMain.handle("disconnectMarkers", (_e, fromId, toId, direction) => {
+    const res = LCCore.disconnectMarkers(fromId, toId, direction);
+    if(res==true){
+      return true
+    }else{
+      return false
+    }
+    
   });
   ipcMain.handle("deleteMarker", (_e, targetId) => {
     LCCore.deleteMarker(targetId);

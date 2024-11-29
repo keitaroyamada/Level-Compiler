@@ -1394,18 +1394,24 @@ document.addEventListener("DOMContentLoaded", () => {
           const fromId = [objOpts.edit.marker_from.project, objOpts.edit.marker_from.hole, objOpts.edit.marker_from.section, objOpts.edit.marker_from.nearest_marker];
           const toId   = [objOpts.edit.marker_to.project,   objOpts.edit.marker_to.hole,   objOpts.edit.marker_to.section,   objOpts.edit.marker_to.nearest_marker];
           
-          console.log("[Editor]: Connected markers between " + fromId +" to " + toId);
+          console.log("[Editor]: Connected markers between " + fromId +" and " + toId);
 
           await undo("save");//undo
-          await window.LCapi.connectMarkers(fromId, toId, "horizontal");
-          await loadModel();
+          const result = await window.LCapi.connectMarkers(fromId, toId, "horizontal");
+          if(result==true){
+            await loadModel();
 
-          const affectedSections = getConnectedSectionIds([fromId, toId]);
-          modelImages.load_target_ids = affectedSections;
-          modelImages = await loadCoreImages(modelImages, LCCore, objOpts, "composite_depth");
-          modelImages = await loadCoreImages(modelImages, LCCore, objOpts, "event_free_depth");
-          
-          updateView();
+            const affectedSections = getConnectedSectionIds([fromId, toId]);
+            if(affectedSections.length>0){
+              modelImages.load_target_ids = affectedSections;
+              modelImages = await loadCoreImages(modelImages, LCCore, objOpts, "composite_depth");
+              modelImages = await loadCoreImages(modelImages, LCCore, objOpts, "event_free_depth");
+              modelImages = await loadCoreImages(modelImages, LCCore, objOpts, "age");
+            }
+            
+            updateView();
+          }
+         
         }
       } else if(objOpts.edit.mode == "disconnect_marker"){
         const response = await window.LCapi.askdialog(
@@ -1416,18 +1422,26 @@ document.addEventListener("DOMContentLoaded", () => {
           const fromId = [objOpts.edit.marker_from.project, objOpts.edit.marker_from.hole, objOpts.edit.marker_from.section, objOpts.edit.marker_from.nearest_marker];
           const toId   = [objOpts.edit.marker_to.project,   objOpts.edit.marker_to.hole,   objOpts.edit.marker_to.section,   objOpts.edit.marker_to.nearest_marker];
 
-          console.log("[Editor]: Disconnected markers between " + fromId +" to " + toId);
+          console.log("[Editor]: Disconnected markers between " + fromId +" and " + toId);
 
           await undo("save");//undo
-          await window.LCapi.disconnectMarkers(fromId, toId, "horizontal");
-          await loadModel();
+          const result = await window.LCapi.disconnectMarkers(fromId, toId, "horizontal");
+          if(result == true){
+            await loadModel();
 
-          const affectedSections = getConnectedSectionIds([fromId, toId]);
-          modelImages.load_target_ids = affectedSections;
-          modelImages = await loadCoreImages(modelImages, LCCore, objOpts, "composite_depth");
-          modelImages = await loadCoreImages(modelImages, LCCore, objOpts, "event_free_depth");
-
-          updateView();
+            const affectedSections = getConnectedSectionIds([fromId, toId]);
+            if(affectedSections.length>0){
+              modelImages.load_target_ids = affectedSections;
+              modelImages = await loadCoreImages(modelImages, LCCore, objOpts, "composite_depth");
+              modelImages = await loadCoreImages(modelImages, LCCore, objOpts, "event_free_depth");
+              modelImages = await loadCoreImages(modelImages, LCCore, objOpts, "age");
+            }
+  
+            updateView();
+          }else{
+            console.log("Fail")
+          }
+          
         }
       }
 
@@ -1895,9 +1909,12 @@ document.addEventListener("DOMContentLoaded", () => {
             await loadAge(document.getElementById("AgeModelSelect").value);
             await loadPlotData();
             const affectedSections = getConnectedSectionIds([upperId, lowerId]);
-            modelImages.load_target_ids = affectedSections;
-            modelImages = await loadCoreImages(modelImages, LCCore, objOpts, "composite_depth");
-            modelImages = await loadCoreImages(modelImages, LCCore, objOpts, "event_free_depth");
+            if(affectedSections.length>0){
+              modelImages.load_target_ids = affectedSections;
+              modelImages = await loadCoreImages(modelImages, LCCore, objOpts, "composite_depth");
+              modelImages = await loadCoreImages(modelImages, LCCore, objOpts, "event_free_depth");
+              modelImages = await loadCoreImages(modelImages, LCCore, objOpts, "age");
+            }
             updateView();
             console.log("[Renderer]: Add a new event.]");
           }else if(result == "occupied"){
@@ -1921,9 +1938,12 @@ document.addEventListener("DOMContentLoaded", () => {
           await loadAge(document.getElementById("AgeModelSelect").value);
           await loadPlotData();
           const affectedSections = getConnectedSectionIds([upperId, lowerId]);
-          modelImages.load_target_ids = affectedSections;
-          modelImages = await loadCoreImages(modelImages, LCCore, objOpts, "composite_depth");
-          modelImages = await loadCoreImages(modelImages, LCCore, objOpts, "event_free_depth");
+          if(affectedSections.length>0){
+            modelImages.load_target_ids = affectedSections;
+            modelImages = await loadCoreImages(modelImages, LCCore, objOpts, "composite_depth");
+            modelImages = await loadCoreImages(modelImages, LCCore, objOpts, "event_free_depth");
+            modelImages = await loadCoreImages(modelImages, LCCore, objOpts, "age");
+          }
           updateView();
           console.log("[Renderer]: Delete event")
         }
@@ -2565,11 +2585,33 @@ document.addEventListener("DOMContentLoaded", () => {
   //============================================================================================
   //reload
   document.getElementById("bt_reload").addEventListener("click", async (event) => {
-      if (correlation_model_list.length == 0 || isLoadedLCModel==true) {
+      if (correlation_model_list.length == 0) {
         return;
       }
 
-      const temp_correlation_model_list = correlation_model_list;
+      if(isLoadedLCModel==true){
+        //load from main
+        console.log("[Renderer]: LCmodel load from drop..");
+        await initiariseCorrelationModel();
+        await initiariseAgeModel();
+        await initiariseCanvas();
+        await initiarisePlot();
+
+        modelImages = {
+          image_dir: [],
+          load_target_ids: [],
+          drilling_depth: {},
+          composite_depth: {},
+          event_free_depth: {},
+          age:{},
+        };
+    
+        //load into LCCore (load process is in receive("RegisteredLCModel")
+        await window.LCapi.loadLCmodel(fileParseData.fullpath);
+
+      }else{
+        //load from csv
+        const temp_correlation_model_list = correlation_model_list;
       const temp_age_model_list = age_model_list;
       const selected_age_model_id = document.getElementById("AgeModelSelect").value;
 
@@ -2578,6 +2620,14 @@ document.addEventListener("DOMContentLoaded", () => {
       await initiariseAgeModel();
       await initiariseCanvas();
       await initiarisePlot();
+      modelImages = {
+        image_dir: [],
+        load_target_ids: [],
+        drilling_depth: {},
+        composite_depth: {},
+        event_free_depth: {},
+        age:{},
+      };
       console.log("list" + temp_age_model_list);
 
       //reload correlation model
@@ -2610,6 +2660,8 @@ document.addEventListener("DOMContentLoaded", () => {
       updateView();
 
       console.log("Model reloaded.");
+      }
+      
     });
   //============================================================================================
   //zoomout
