@@ -6,10 +6,7 @@ const { Hole } = require("./Hole.js");
 const { Section } = require("./Section.js");
 const { Marker } = require("./Marker.js");
 const { Trinity } = require("./Trinity.js");
-var ss = require("simple-statistics");
-const { Colors } = require("chart.js");
 const { copyFileSync } = require("original-fs");
-const { isObject, readUsedSize, setsEqual } = require("chart.js/helpers");
 const { setegid } = require("process");
 const { Console } = require("console");
 
@@ -1326,7 +1323,7 @@ class LevelCompilerCore extends EventEmitter{
       const d3d1 = d3 - d1;
       const interpolatedEFD = this.linearInterp(D1, D3, d2d1, d3d1);
 
-      const new_rank = ss.max([D1_rank, D3_rank]);
+      const new_rank = Math.max([D1_rank, D3_rank]);
       output.push([sectionId, interpolatedEFD, new_rank]);
     }
     this.setStatus("completed","");

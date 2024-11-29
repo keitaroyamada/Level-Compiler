@@ -17,7 +17,7 @@
 const path = require("path");
 const fs = require("fs");
 const sharp = require("sharp");
-const { mode } = require("simple-statistics");
+//const { mode } = require("simple-statistics");
 const { parse } = require("csv-parse/sync");
 const { stringify } = require("csv-stringify/sync");
 const ProgressBar = require("electron-progressbar");
@@ -38,7 +38,6 @@ const { Section } = require("./LC_modules/Section.js");
 const { Marker } = require("./LC_modules/Marker.js");
 const { send } = require("process");
 const { Worker } = require('worker_threads');
-const { Tooltip } = require("chart.js");
 
 //properties
 const isMac = process.platform === "darwin";
@@ -2217,6 +2216,12 @@ function createMainWIndow() {
       mainWindow.webContents.send("PlotDataOptions", data);
     }    
   });
+  ipcMain.handle("openExtarnalLink", (_e,url) => {
+    if(url){
+      shell.openExternal(url);
+    }
+  });
+  
   //--------------------------------------------------------------------------------------------------
   function initiariseLCCore(){
     LCCore = new LevelCompilerCore();
@@ -2876,15 +2881,22 @@ function round(num, digits) {
 //--------------------------------------------------------------------------------------------------
 //create about window
 function createAboutWindow() {
-
   // make window
   const aboutWindow = new BrowserWindow({
     title: "About Level Compiler",
     width: 500,
     height: 300,
+    webPreferences: {preload: path.join(__dirname, "preload_about.js"),},
   });
   aboutWindow.setMenu(null);
   aboutWindow.loadFile(path.join(__dirname, "./renderer/about.html"));
+
+  aboutWindow.once("ready-to-show", () => {
+    aboutWindow.show();
+   // converterWindow.setAlwaysOnTop(true, "normal");
+   //aboutWindow.webContents.openDevTools();
+    //converterWindow.setAlwaysOnTop(true, "normal");
+  });
 }
 function assignObject (obj,data){
   //assign without event listener

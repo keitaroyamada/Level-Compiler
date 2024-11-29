@@ -7,8 +7,6 @@ const { Marker } = require("./Marker.js");
 const { Event } = require("./Event.js");
 const { Age } = require("./Age.js");
 const { AgeSet } = require("./AgeSet.js");
-var ss = require("simple-statistics");
-const { layouts } = require("chart.js");
 
 class LevelCompilerAge {
   //private properties

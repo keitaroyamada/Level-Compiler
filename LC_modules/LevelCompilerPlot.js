@@ -9,8 +9,6 @@ const { PlotCollection } = require("./PlotCollection.js");
 const { PlotDataset } = require("./PlotDataset.js");
 const { PlotData } = require("./PlotData.js");
 
-var ss = require("simple-statistics");
-
 class LevelCompilerPlot {
   constructor() {
     this.age_collections = []; //dataRepository > dataCollection > dataset > data  [LCplot.age_collections[age_plot_idx].datasets[0].data_series;]
