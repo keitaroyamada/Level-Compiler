@@ -3005,6 +3005,7 @@ class LevelCompilerCore extends EventEmitter{
             this.getMarkerNameFromId(toId)
         );
         */
+       return true
       } else {
         this.setError(
           "",
@@ -3021,6 +3022,7 @@ class LevelCompilerCore extends EventEmitter{
             this.getMarkerNameFromId(toId)
         );
         */
+          return false;
       }
     } else if (direction == "horizontal") {
       let connectionIdxFrom = null;
@@ -3131,9 +3133,11 @@ class LevelCompilerCore extends EventEmitter{
             this.getMarkerNameFromId(toId)
         );
         */
+       return true
       } else {
         this.setError("","E041: Fail to disconnect markers because there is no connection between " + this.getMarkerNameFromId(fromId) + " and " + this.getMarkerNameFromId(toId))
         console.log("E041: Fail to disconnect markers because there is no connection between " + this.getMarkerNameFromId(fromId) + " and " + this.getMarkerNameFromId(toId));
+        return false
       }
     } else if (direction == "horizontal") {
       let connectionIdxFrom = null;

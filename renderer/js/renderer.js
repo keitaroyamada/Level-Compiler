@@ -986,7 +986,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const clickResult = await window.LCapi.showContextMenu("editContextMenu");
 
-    if(clickResult == "connect"){
+    if(clickResult == "connectMarkers"){
       objOpts.edit.contextmenu_enable = false;
       objOpts.edit.hittest = null;
       objOpts.edit.marker_from = null;
@@ -996,12 +996,31 @@ document.addEventListener("DOMContentLoaded", () => {
       objOpts.edit.handleClick = null;
       document.addEventListener("mousemove", objOpts.edit.handleMove);
       console.log(objOpts.edit);
-    } else if(clickResult == "disconnect"){
+    } else if(clickResult == "disconnectMarkers"){
       objOpts.edit.contextmenu_enable = false;
       objOpts.edit.hittest = null;
       objOpts.edit.marker_from = null;
       objOpts.edit.marker_to = null;
       objOpts.edit.mode = "disconnect_marker";
+      objOpts.edit.handleMove = handleConnectMouseMove;
+      objOpts.edit.handleClick = null;
+      document.addEventListener("mousemove", objOpts.edit.handleMove);
+    }else if(clickResult == "connectSections"){
+      objOpts.edit.contextmenu_enable = false;
+      objOpts.edit.hittest = null;
+      objOpts.edit.marker_from = null;
+      objOpts.edit.marker_to = null;
+      objOpts.edit.mode = "connect_section";
+      objOpts.edit.handleMove = handleConnectMouseMove;
+      objOpts.edit.handleClick = null;
+      document.addEventListener("mousemove", objOpts.edit.handleMove);
+      console.log(objOpts.edit);
+    } else if(clickResult == "disconnectSections"){
+      objOpts.edit.contextmenu_enable = false;
+      objOpts.edit.hittest = null;
+      objOpts.edit.marker_from = null;
+      objOpts.edit.marker_to = null;
+      objOpts.edit.mode = "disconnect_section";
       objOpts.edit.handleMove = handleConnectMouseMove;
       objOpts.edit.handleClick = null;
       document.addEventListener("mousemove", objOpts.edit.handleMove);
@@ -1374,13 +1393,31 @@ document.addEventListener("DOMContentLoaded", () => {
 
     //if clicked same hole
     if(objOpts.edit.marker_from == null && ht.nearest_marker !== null){
-      objOpts.edit.marker_from = ht;
+      if(objOpts.edit.mode == "connect_marker" || objOpts.edit.mode == "disconnect_marker"){
+        objOpts.edit.marker_from = ht;
+      }else if(objOpts.edit.mode == "connect_section" || objOpts.edit.mode == "disconnect_section"){
+        //case piston core
+        if(ht.name.includes("top") || ht.name.includes("bottom")){
+          objOpts.edit.marker_from = ht;
+        }
+      }
     }
 
     if(objOpts.edit.marker_to == null && ht.nearest_marker !== null){
-      if(!(objOpts.edit.marker_from.project == ht.project && objOpts.edit.marker_from.hole == ht.hole)){
-        objOpts.edit.marker_to = ht;
-      }  
+      if(objOpts.edit.mode == "connect_marker" || objOpts.edit.mode == "disconnect_marker"){
+        if(!(objOpts.edit.marker_from.project == ht.project && objOpts.edit.marker_from.hole == ht.hole)){
+          objOpts.edit.marker_to = ht;
+        }  
+      }else if(objOpts.edit.mode == "connect_section" || objOpts.edit.mode == "disconnect_section"){
+        //case piston core
+        if(objOpts.edit.marker_from.project == ht.project && objOpts.edit.marker_from.hole ==ht.hole && objOpts.edit.marker_from.section !== ht.section){
+          if((objOpts.edit.marker_from.name.includes("top") && ht.name.includes("bottom")) || (objOpts.edit.marker_from.name.includes("bottom") && ht.name.includes("top"))){
+            objOpts.edit.marker_to = ht;
+          }
+        }
+        
+      }
+      
     }    
     
     if (objOpts.edit.marker_from !== null && objOpts.edit.marker_to !== null) {
@@ -1398,6 +1435,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
           await undo("save");//undo
           const result = await window.LCapi.connectMarkers(fromId, toId, "horizontal");
+          
+          
           if(result==true){
             await loadModel();
 
@@ -1426,6 +1465,72 @@ document.addEventListener("DOMContentLoaded", () => {
 
           await undo("save");//undo
           const result = await window.LCapi.disconnectMarkers(fromId, toId, "horizontal");
+          if(result == true){
+            await loadModel();
+
+            const affectedSections = getConnectedSectionIds([fromId, toId]);
+            if(affectedSections.length>0){
+              modelImages.load_target_ids = affectedSections;
+              modelImages = await loadCoreImages(modelImages, LCCore, objOpts, "composite_depth");
+              modelImages = await loadCoreImages(modelImages, LCCore, objOpts, "event_free_depth");
+              modelImages = await loadCoreImages(modelImages, LCCore, objOpts, "age");
+            }
+  
+            updateView();
+          }else{
+            console.log("Fail")
+          }
+          
+        }
+      } else if(objOpts.edit.mode == "connect_section"){
+        const response = await window.LCapi.askdialog(
+          "Connect markers",
+          "Do you want to CONNECT between selected sections?"
+        );
+        if (response.response) {
+          const fromId = [objOpts.edit.marker_from.project, objOpts.edit.marker_from.hole, objOpts.edit.marker_from.section, objOpts.edit.marker_from.nearest_marker];
+          const toId   = [objOpts.edit.marker_to.project,   objOpts.edit.marker_to.hole,   objOpts.edit.marker_to.section,   objOpts.edit.marker_to.nearest_marker];
+          
+          console.log("[Editor]: Connected markers between " + fromId +" and " + toId);
+
+          await undo("save");//undo
+          let result = null;
+          if(fromId[0] == toId[0] && fromId[1] == toId[1] && fromId[2] !== toId[2]){
+            //case connect vertival
+            result = await window.LCapi.connectMarkers(fromId, toId, "vertical");
+          }
+          console.log(result)
+          
+          if(result==true){
+            await loadModel();
+            const affectedSections = getConnectedSectionIds([fromId, toId]);
+            if(affectedSections.length>0){
+              modelImages.load_target_ids = affectedSections;
+              modelImages = await loadCoreImages(modelImages, LCCore, objOpts, "composite_depth");
+              modelImages = await loadCoreImages(modelImages, LCCore, objOpts, "event_free_depth");
+              modelImages = await loadCoreImages(modelImages, LCCore, objOpts, "age");
+            }
+            
+            updateView();
+          }
+         
+        }
+      } else if(objOpts.edit.mode == "disconnect_section"){
+        const response = await window.LCapi.askdialog(
+          "Connect markers",
+          "Do you want to DISCONNECT between selected sections?"
+        );
+        if (response.response) {
+          const fromId = [objOpts.edit.marker_from.project, objOpts.edit.marker_from.hole, objOpts.edit.marker_from.section, objOpts.edit.marker_from.nearest_marker];
+          const toId   = [objOpts.edit.marker_to.project,   objOpts.edit.marker_to.hole,   objOpts.edit.marker_to.section,   objOpts.edit.marker_to.nearest_marker];
+
+          console.log("[Editor]: Disconnected markers between " + fromId +" and " + toId);
+
+          await undo("save");//undo
+          if(fromId[0] == toId[0] && fromId[1] == toId[1] && fromId[2] !== toId[2]){
+            //case connect vertival
+            result = await window.LCapi.disconnectMarkers(fromId, toId, "vertical");
+          }
           if(result == true){
             await loadModel();
 
@@ -3984,12 +4089,19 @@ document.addEventListener("DOMContentLoaded", () => {
               if(objOpts.edit.editable){
                 //live hittest
                 if(objOpts.edit.hittest !== null){
-                  if(["connect_marker", "disconnect_marker", "delete_marker","change_marker_name","change_marker_distance","set_zero_point","enable_master","disable_master"].includes(objOpts.edit.mode)){
+                  if(["connect_marker", "disconnect_marker","connect_section", "disconnect_section", "delete_marker","change_marker_name","change_marker_distance","set_zero_point","enable_master","disable_master"].includes(objOpts.edit.mode)){
                     const hitId = [objOpts.edit.hittest.project, objOpts.edit.hittest.hole, objOpts.edit.hittest.section, objOpts.edit.hittest.nearest_marker];
                     if(Math.abs(objOpts.edit.hittest.nearest_distance) < objOpts.edit.sensibility){
                       if(hitId.toString() == marker.id.toString()){
-                        sketch.strokeWeight(3);
-                        sketch.stroke("Red");
+                        if(["disconnect_marker","connect_section"].includes(objOpts.edit.mode)){
+                          if(marker.name.includes("top") || marker.name.includes("bottom")){
+                            sketch.strokeWeight(3);
+                            sketch.stroke("Red");
+                          }
+                        }else{
+                          sketch.strokeWeight(3);
+                          sketch.stroke("Red");
+                        }
                       }
                     }
                   } else if(objOpts.edit.mode == "add_marker"){
@@ -4008,7 +4120,7 @@ document.addEventListener("DOMContentLoaded", () => {
                   }
                 } 
 
-                if(objOpts.edit.marker_from !== null && ["connect_marker", "disconnect_marker", "delete_marker"].includes(objOpts.edit.mode)){
+                if(objOpts.edit.marker_from !== null && ["connect_marker", "disconnect_marker", "connect_section", "disconnect_section", "delete_marker"].includes(objOpts.edit.mode)){
                   const hitId = [objOpts.edit.marker_from.project, objOpts.edit.marker_from.hole, objOpts.edit.marker_from.section, objOpts.edit.marker_from.nearest_marker];
                   if(hitId.toString() == marker.id.toString()){
                     sketch.strokeWeight(3);
@@ -6917,6 +7029,7 @@ function getClickedItemIdx(mouseX, mouseY, LCCore, objOpts){
     nearest_distance:null,
     upper_marker:null,
     lower_marker:null,
+    name:null,
   };
   
   breakpoint:
@@ -6940,6 +7053,7 @@ function getClickedItemIdx(mouseX, mouseY, LCCore, objOpts){
     const project_x1 = project_x0 + project_w;
     if(x >= project_x0 && x <= project_x1){
       results.project = LCCore.projects[p].id[0];
+      results.name = LCCore.projects[p].name;
     }
 
     for(let h=0; h<LCCore.projects[p].holes.length; h++){     
@@ -6951,6 +7065,7 @@ function getClickedItemIdx(mouseX, mouseY, LCCore, objOpts){
       if(x >= hole_x0 && x <= hole_x1){
         results.hole    = LCCore.projects[p].holes[h].id[1];
         results.relative_x = (x-hole_x0)/(hole_x1-hole_x0);
+        results.name = LCCore.projects[p].holes[h].name;
         for(let s=0; s<LCCore.projects[p].holes[h].sections.length; s++){
           const sec_y0 = LCCore.projects[p].holes[h].sections[s].markers[0][objOpts.canvas.depth_scale];//cd/efd
           const sec_y1 = LCCore.projects[p].holes[h].sections[s].markers.slice(-1)[0][objOpts.canvas.depth_scale];//cd/efd
@@ -6960,6 +7075,7 @@ function getClickedItemIdx(mouseX, mouseY, LCCore, objOpts){
           if(y >= sec_y0 && y <= sec_y1){
             results.section = LCCore.projects[p].holes[h].sections[s].id[2];
             results.relative_y = (y-sec_y0)/(sec_y1-sec_y0);
+            results.name = LCCore.projects[p].holes[h].sections[s].name;
 
             let upperIdx = null;
             let lowerIdx = null;
@@ -7010,8 +7126,12 @@ function getClickedItemIdx(mouseX, mouseY, LCCore, objOpts){
 
             results.nearest_distance = markerDistance;
             results.nearest_marker   = LCCore.projects[p].holes[h].sections[s].markers[nearestIdx].id[3];   
+            results.name             = LCCore.projects[p].holes[h].sections[s].markers[nearestIdx].name;
             results.upper_marker     = LCCore.projects[p].holes[h].sections[s].markers[upperIdx].id[3];
-            results.lower_marker    = LCCore.projects[p].holes[h].sections[s].markers[lowerIdx].id[3];
+            if(lowerIdx !== null){
+              results.lower_marker     = LCCore.projects[p].holes[h].sections[s].markers[lowerIdx].id[3];
+            }            
+
             break breakpoint;
           }     
         }  

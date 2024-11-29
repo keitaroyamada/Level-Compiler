@@ -526,7 +526,7 @@ function createMainWIndow() {
                 label: 'Connect markers', 
                 click: () => {
                   console.log('MAIN: Connect markers'); 
-                  resolve("connect"); 
+                  resolve("connectMarkers"); 
                  
                 } 
               },
@@ -534,7 +534,23 @@ function createMainWIndow() {
                 label: 'Disconnect markers', 
                 click: () => { 
                   console.log('MAIN: Disconnect markers'); 
-                  resolve("disconnect"); 
+                  resolve("disconnectMarkers"); 
+                } 
+              },
+              { type: 'separator' },
+              { 
+                label: 'Connect sections', 
+                click: () => {
+                  console.log('MAIN: Connect sections'); 
+                  resolve("connectSections"); 
+                 
+                } 
+              },
+              { 
+                label: 'Disconnect sections', 
+                click: () => { 
+                  console.log('MAIN: Disconnect sections'); 
+                  resolve("disconnectSections"); 
                 } 
               },
               { type: 'separator' },
@@ -2007,6 +2023,7 @@ function createMainWIndow() {
   });
   ipcMain.handle("connectMarkers", (_e, fromId, toId, direction) => {
     const res = LCCore.connectMarkers(fromId, toId, direction);
+    console.log(res)
     if(res == true){
       return true
     }else{
@@ -2310,6 +2327,7 @@ function buildMainMenu(mainWindow){
           submenu:[
             {
               label: "Load LC model",
+              accelerator: "CmdOrCtrl+M",
               //accelerator: "CmdOrCtrl+S",
               click: async () => {
                 const inData = await loadmodelfile();
@@ -2325,37 +2343,38 @@ function buildMainMenu(mainWindow){
                 }
                 mainWindow.webContents.send("RegisteredLCModel");
               },
-            },
-            { type: "separator" },
+            },            
+          ],
+        },
+        {
+          label:"Import",
+          submenu:[
             {
-              label: "Load Correlation Model",
-              accelerator: "CmdOrCtrl+M",
+              label: "Load Correlation Model",              
               click: () => {
                 mainWindow.webContents.send("LoadCorrelationModelMenuClicked");
               },
             },
             {
               label: "Load Age model",
-              accelerator: "CmdOrCtrl+T",
               click: () => {
                 mainWindow.webContents.send("LoadAgeModelMenuClicked");
               },
             },
             {
               label: "Load Core Images",
-              accelerator: "CmdOrCtrl+I",
               click: () => {
                 mainWindow.webContents.send("LoadCoreImagesMenuClicked");
               },
             },
-          ],
+          ]
         },
         {
           label:"Save",
           visible:isEditMode,
           submenu:[
             {
-              label: "Save LC model",
+              label: "Save",
               accelerator: "CmdOrCtrl+S",
               click: async () => {
                 if(isEditMode){
@@ -2376,6 +2395,23 @@ function buildMainMenu(mainWindow){
                 }                
               },
             },
+            {
+              label:"Save As...",
+              click: async () => {
+                if(isEditMode){
+                  //remove plot data
+                  let out_LCPlot = JSON.parse(JSON.stringify(LCPlot));
+                  out_LCPlot.data_collections = [];
+                  out_LCPlot.data_selected_id = null;
+
+                  const outData = {LCCore:LCCore, LCAge:LCAge, LCPlotAge:out_LCPlot};
+
+                  //save as new file
+                  globalPath.saveModelPath = await putmodelfile(outData, null);
+                  
+                }                
+              },              
+            }
           ],
         },
         {
