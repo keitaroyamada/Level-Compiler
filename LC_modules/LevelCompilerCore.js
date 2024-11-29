@@ -3351,12 +3351,12 @@ class LevelCompilerCore extends EventEmitter{
     //remove previous zero point in the same prohject
     this.updateSearchIdx();
     const idx = this.search_idx_list[markerId.toString()];
+    //initiarise zerpoint
     //breakpoint:
     for(let h of this.projects[idx[0]].holes){
       for(let s of h.sections){
         for(let m of s.markers){
           if(m.isZeroPoint !== false){
-            this.setErrorAlert("","")
             m.isZeroPoint = false;
             //break breakpoint;
           }

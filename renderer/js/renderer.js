@@ -1476,7 +1476,7 @@ document.addEventListener("DOMContentLoaded", () => {
         objOpts.edit.handleClick = null;
       }
     }else if(["add_event","delete_event"].includes(objOpts.edit.mode)){
-      if(ht.section !== null && objOpts.edit.handleClick == null){
+      if(ht.section !== null){
         objOpts.edit.handleClick = handleEventAddClick;
         document.addEventListener('click', objOpts.edit.handleClick);
       }else{
@@ -2858,6 +2858,33 @@ document.addEventListener("DOMContentLoaded", () => {
     if(data == null){
       //set default
       objOpts = setupSettings();
+
+      //back to settings menu
+      const canvas = objOpts.canvas;
+      const project = objOpts.project;
+      const hole = objOpts.hole;
+      const section = objOpts.section;
+      const marker = objOpts.marker;
+      const event = objOpts.event;
+      const connection = objOpts.connection;
+      const age = objOpts.age;
+      const pen = objOpts.pen;
+      const plot = objOpts.plot; 
+
+      const settings = {
+        canvas,
+        project,
+        hole,
+        section,
+        marker,
+        event,
+        connection,
+        age,
+        pen,
+        plot,  
+      };
+        
+    await window.LCapi.sendSettings(settings, "settings");
     }else{
       Object.assign(objOpts.canvas, data.canvas);
       Object.assign(objOpts.project, data.project);
@@ -5554,7 +5581,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
       sketch.background(0, 0, 0, 0);
       sketch.strokeWeight(2);
-      sketch.stroke("red");
+      sketch.stroke(objOpts.pen.colour);
       sketch.noLoop();
       sketchCanvas.parent("p5penCanvas");
     };
