@@ -8,7 +8,7 @@ class UndoManager {
     saveState(state) {
         // stack with deep copy
         this.undoStack.push(JSON.parse(JSON.stringify(state)));
-        //initiarise redo
+        //Initialise redo
         this.redoStack = [];
     }
 

@@ -1,6 +1,6 @@
 
 document.addEventListener("DOMContentLoaded", () => {
-    initiariseLCPlotDataCollection();
+    initialiseLCPlotDataCollection();
     const scroller = document.getElementById("scroller");
     
     let LCPlot = null;
@@ -276,7 +276,7 @@ document.addEventListener("DOMContentLoaded", () => {
         console.log("[Plotter]: Imported data recieved.");
         console.log(LCPlot)
 
-        //initiarise
+        //initialise
         const parentElement = document.getElementById("c_collection");
         while (parentElement.firstChild) {
             parentElement.removeChild(parentElement.firstChild);
@@ -366,8 +366,8 @@ document.addEventListener("DOMContentLoaded", () => {
           vectorObjects.redraw();
         } 
     }
-    async function initiariseLCPlotDataCollection(){
-        await window.PlotterApi.initiariseLCPlot_data_collection();
+    async function initialiseLCPlotDataCollection(){
+        await window.PlotterApi.initialiseLCPlot_data_collection();
     }
     function makeP5CanvasBase() {        //case base is too small
         let ymin = 0;

@@ -5,7 +5,7 @@ document.addEventListener("DOMContentLoaded", () => {
   let interpolatedData = null;
 
   //-------------------------------------------------------------------------------------------
-  //initiarise
+  //initialise
   window.DividerApi.receive("DividerToolClicked", async (data) => {
     await getList();
     await updateHoleList();
@@ -155,7 +155,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const markerList = sectionList[selectedHole][selectedSection][5];
 
     //apply data into table
-    //initiarise table
+    //initialise table
     for (var i = rows.length - 1; i >= 0; i--) {
       table.deleteRow(i);
     }
@@ -350,7 +350,7 @@ document.getElementById("target_lower").addEventListener("click", () => {
 });
   //-------------------------------------------------------------------------------------------
 document.getElementById("calcButton").addEventListener("click", () => {
-  //initiarise
+  //initialise
   interpolatedData = null
 
   //get data
@@ -420,7 +420,7 @@ document.getElementById("calcButton").addEventListener("click", () => {
 
 });
 document.getElementById("exportButton").addEventListener("click", () => {
-  //initiarise
+  //initialise
   if(interpolatedData !== null){
     let output = [[
       "Name", "Project","Hole", "Section","Actural distance upper (cm)","Actural distance lower (cm)",

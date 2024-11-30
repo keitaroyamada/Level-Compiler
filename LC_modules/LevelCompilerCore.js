@@ -18,7 +18,7 @@ class LevelCompilerCore extends EventEmitter{
     this.base_project_id = null;
     this.reserved_project_ids = [0];
     this.state = {
-      status: 'initiarise',
+      status: 'Initialise',
       statusDetails: null,      
       hasError: false,    
       errorDetails: null,  
@@ -32,7 +32,7 @@ class LevelCompilerCore extends EventEmitter{
     });
   }
   
-  //status type: ["initiarise","running","completed","error","error_important"]
+  //status type: ["Initialise","running","completed","error","error_important"]
   setStatus(newStatus, statusDetails) {
     this.state.status = newStatus;
     this.state.statusDetails = statusDetails;
@@ -71,7 +71,7 @@ class LevelCompilerCore extends EventEmitter{
     console.time("        Load csv");
     this.setStatus("running", "Start loadModelFromCsv");
 
-    //initiarise
+    //Initialise
     const projectData = new Project();
 
     //load model
@@ -629,7 +629,7 @@ class LevelCompilerCore extends EventEmitter{
   calcCompositeDepth() {
     console.time("        Calc CD")
     this.setStatus("running","start calcCompositeDepth");
-    this.initiariseCDEFD();
+    this.InitialiseCDEFD();
     //"all(not recommended)": All mode contains some problems in 2nd order interpolation and matchs between extrapolations.
     const calcRange = "project";
     
@@ -668,7 +668,7 @@ class LevelCompilerCore extends EventEmitter{
       return;
     }
 
-    //initiarise
+    //Initialise
     this.sortModelByOrder();
     this.projects.forEach(project=>{
       project.holes.forEach(hole=>{
@@ -1197,7 +1197,7 @@ class LevelCompilerCore extends EventEmitter{
     let output = [];
     
     for (let t = 0; t < trinityList.length; t++) {
-      //initiarize
+      //Initialize
       let upperIdxs = [];
       let lowerIdxs = [];
 
@@ -1331,7 +1331,7 @@ class LevelCompilerCore extends EventEmitter{
   }
   getEFDfromCD(targetCD) {
     this.setStatus("running","start getEFDfromCD");
-    //initiarise   
+    //Initialise   
     let upperData = {
       id: null,
       nearest_data: { event_free_depth: null, composite_depth: null },
@@ -1385,7 +1385,7 @@ class LevelCompilerCore extends EventEmitter{
   getCDfromEFD(targetEFD) {
     this.setStatus("running","start getCDfromEFD");
     //this method is return paseudo result because multiple CDs are match.
-    //initiarise
+    //Initialise
     let upperData = {
       id: null,
       nearest_data: { event_free_depth: null, composite_depth: null },
@@ -1433,20 +1433,20 @@ class LevelCompilerCore extends EventEmitter{
     this.setStatus("completed","");
     return interpolatedEFD;
   }
-  initiariseCDEFD(){
-    this.setStatus("running","start initiariseCDEFD");
+  InitialiseCDEFD(){
+    this.setStatus("running","start InitialiseCDEFD");
     for(let p=0; p<this.projects.length;p++){
       for(let h=0;h<this.projects[p].holes.length;h++){
         for(let s=0;s<this.projects[p].holes[h].sections.length;s++){
           for(let m=0;m<this.projects[p].holes[h].sections[s].markers.length;m++){
-            //initiarise
+            //Initialise
             this.projects[p].holes[h].sections[s].markers[m].composite_depth = null;
             this.projects[p].holes[h].sections[s].markers[m].event_free_depth = null;
           }
         }
       }
     }
-    this.setStatus("completed","initiarised");
+    this.setStatus("completed","Initialised");
   }
   calcMarkerAges(LCAge) {
     LCAge.updateAgeDepth(this);
@@ -2341,7 +2341,7 @@ class LevelCompilerCore extends EventEmitter{
     let queue = [];
     let previous = {};
     
-    //initiarize
+    //Initialize
     queue.push(startId);
     visitedId.add(startId.toString());
     previous[startId.toString()] = null;
@@ -3356,7 +3356,7 @@ class LevelCompilerCore extends EventEmitter{
     //remove previous zero point in the same prohject
     this.updateSearchIdx();
     const idx = this.search_idx_list[markerId.toString()];
-    //initiarise zerpoint
+    //Initialise zerpoint
     //breakpoint:
     for(let h of this.projects[idx[0]].holes){
       for(let s of h.sections){
@@ -3739,7 +3739,7 @@ class LevelCompilerCore extends EventEmitter{
             //remove deleted v_connection
             this.projects[p].holes[h].sections[s].markers[m].v_connection
               = this.projects[p].holes[h].sections[s].markers[m].v_connection.filter(vc=>!deleteList.has(vc.toString()));
-            //initiarise
+            //Initialise
             this.projects[p].holes[h].sections[s].markers[m].composite_depth = null;
             this.projects[p].holes[h].sections[s].markers[m].event_free_depth = null;
           }
@@ -3820,7 +3820,7 @@ class LevelCompilerCore extends EventEmitter{
             //remove deleted v_connection
             this.projects[p].holes[h].sections[s].markers[m].v_connection
               = this.projects[p].holes[h].sections[s].markers[m].v_connection.filter(vc=>!deleteList.has(vc.toString()));
-            //initiarise
+            //Initialise
             this.projects[p].holes[h].sections[s].markers[m].composite_depth = null;
             this.projects[p].holes[h].sections[s].markers[m].event_free_depth = null;
           }
@@ -3934,7 +3934,7 @@ class LevelCompilerCore extends EventEmitter{
             //remove deleted v_connection
             this.projects[p].holes[h].sections[s].markers[m].v_connection
               = this.projects[p].holes[h].sections[s].markers[m].v_connection.filter(vc=>!deleteList.has(vc.toString()));
-            //initiarise
+            //Initialise
             this.projects[p].holes[h].sections[s].markers[m].composite_depth = null;
             this.projects[p].holes[h].sections[s].markers[m].event_free_depth = null;
           }
@@ -4416,7 +4416,7 @@ class LevelCompilerCore extends EventEmitter{
       return
     }
 
-    //initiarise
+    //Initialise
     this.sortModel();
     this.updateSearchIdx();
 
@@ -4431,7 +4431,7 @@ class LevelCompilerCore extends EventEmitter{
           for(let m=0;m<this.projects[p].holes[h].sections[s].markers.length;m++){
             const markerData = this.projects[p].holes[h].sections[s].markers[m];
             if(!visited.has(markerData.id.toString())){              
-              //initiarise
+              //Initialise
               let horizontalMarkers = [];
               let cd = null;
 

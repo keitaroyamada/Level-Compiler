@@ -86,7 +86,7 @@ window.addEventListener("DOMContentLoaded", () => {
 
     document.getElementById("default").addEventListener("click", async (event) => {
       const response = await window.SettingsApi.askdialog(
-        "Initiarise settings",
+        "Initialise settings",
         "All settings will be reset. Do you want to restore them to their default values?"
       );
 

@@ -62,7 +62,7 @@ document.addEventListener("DOMContentLoaded", () => {
       //clear
       const parentElement = document.getElementById("cvt_source_chooser");
 
-      //initiarise
+      //initialise
       while (parentElement.firstChild) {
         parentElement.removeChild(parentElement.firstChild);
       }
@@ -473,7 +473,7 @@ document.addEventListener("DOMContentLoaded", () => {
       
       //load
       for(let d=0;d<dataList.length;d++){
-        //initiarise
+        //initialise
         source_data = null;
 
         await loadCsv(dataList[d].fullpath);

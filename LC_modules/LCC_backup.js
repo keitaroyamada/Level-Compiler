@@ -105,7 +105,7 @@
     }
 
     //--------------------------------------------------------
-    //initiarise
+    //Initialise
     //this.sortModel();
 
     //check correlation
@@ -306,7 +306,7 @@
       this.projectData.holes.push(holeData);
     }
     //--------------------------------------------------------
-    //initiarise
+    //Initialise
     //this.sortModel();
 
     //check correlation
@@ -458,7 +458,7 @@
     if (this.model_data == null) {
       return;
     }
-    //initiarise
+    //Initialise
     this.sortModel();
 
     //find zero point
@@ -506,7 +506,7 @@
     if (this.model_data == null) {
       return;
     }
-    //initiarise
+    //Initialise
     this.sortModel();
 
     //find zero point

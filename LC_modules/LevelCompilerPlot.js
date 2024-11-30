@@ -21,11 +21,11 @@ class LevelCompilerPlot {
   //from new csv
 
   //methods
-  initiariseAgeCollection(){
+  initialiseAgeCollection(){
     this.age_collections = [];
     this.age_selected_id = null;
   }
-  initiariseDataCollection(){
+  initialiseDataCollection(){
     this.data_collections = [];
     this.data_selected_id = null;
   }

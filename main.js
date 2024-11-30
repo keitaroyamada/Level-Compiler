@@ -103,8 +103,8 @@ function createMainWIndow() {
     }
   });
 
-  //initiarise
-  LCCore = initiariseLCCore();
+  //initialise
+  LCCore = initialiseLCCore();
     
   //Implement menu
   menuRebuild(mainWindow);
@@ -201,40 +201,40 @@ function createMainWIndow() {
     _e.returnValue = {plot:plot_icons, tool:tool_icons, finder:finder_icons, labeler:labeler_icons};
   });
   //============================================================================================
-  ipcMain.handle("InitiariseCorrelationModel", async (_e) => {
+  ipcMain.handle("InitialiseCorrelationModel", async (_e) => {
     //import modeln
-    console.log("MAIN: Initiarise correlation model");
-    LCCore = initiariseLCCore();
+    console.log("MAIN: Initialise correlation model");
+    LCCore = initialiseLCCore();
 
-    console.log("MAIN: Project correlation data is initiarised.");
+    console.log("MAIN: Project correlation data is initialised.");
     return JSON.parse(JSON.stringify(LCCore));
   });
 
-  ipcMain.handle("InitiariseAgeModel", async (_e) => {
+  ipcMain.handle("InitialiseAgeModel", async (_e) => {
     //import modeln
-    console.log("MAIN: Initiarise age model");
+    console.log("MAIN: Initialise age model");
     LCAge = new LevelCompilerAge();
     //LCAge.AgeModels = [];
     //LCAge.selected_id = null;
-    console.log("MAIN: Project age data is initiarised.");
+    console.log("MAIN: Project age data is initialised.");
     return;
   });
-  ipcMain.handle("InitiarisePlot", async (_e) => {
+  ipcMain.handle("InitialisePlot", async (_e) => {
     //import modeln
-    console.log("MAIN: Initiarise plot data");
+    console.log("MAIN: Initialise plot data");
     LCPlot.age_collections = [];
     LCPlot.data_collections = [];
     LCPlot.age_selected_id = null;
     LCPlot.data_selected_id = null;
-    console.log("MAIN: Project plot data is initiarised.");
+    console.log("MAIN: Project plot data is initialised.");
     return;
   });
-  ipcMain.handle("InitiarisePlotDataCollection", async (_e) => {
+  ipcMain.handle("InitialisePlotDataCollection", async (_e) => {
     //import modeln
-    console.log("MAIN: Initiarise plot data collection");
+    console.log("MAIN: Initialise plot data collection");
     LCPlot.data_collections = [];
     LCPlot.data_selected_id = null;
-    console.log("MAIN: Project plot data collection is initiarised.");
+    console.log("MAIN: Project plot data collection is initialised.");
     return;
   });
   ipcMain.handle("getFilePath", async (_e, pathData) => {
@@ -296,8 +296,8 @@ function createMainWIndow() {
     try {
       const inData = await loadmodelfile(filepath)
       if(inData!==null){
-         //initiarise
-         LCCore = initiariseLCCore(mainWindow);
+         //initialise
+         LCCore = initialiseLCCore(mainWindow);
          LCAge  = new LevelCompilerAge(); 
 
         //register
@@ -866,7 +866,7 @@ function createMainWIndow() {
     return JSON.parse(JSON.stringify(LCCore));
   });
   ipcMain.handle("RegisterAgePlotFromLCAge", async (_e) => {
-    LCPlot.initiariseAgeCollection();
+    LCPlot.initialiseAgeCollection();
     try {      
       //register all LCAge models
       for (let i = 0; i < LCAge.AgeModels.length; i++) {
@@ -897,7 +897,7 @@ function createMainWIndow() {
   });
 
   ipcMain.handle("ExportCorrelationAsCsvFromRenderer", async (_e, MD) => {
-    let exportLCCore = initiariseLCCore();
+    let exportLCCore = initialiseLCCore();
     
     //exportLCCore <- MD
     assignObject(exportLCCore, MD);
@@ -909,13 +909,13 @@ function createMainWIndow() {
     putcsvfile(mainWindow, saveName, outputArray);
     
   });
-  ipcMain.handle("InitiariseTempCore", async (_e) => {
+  ipcMain.handle("InitialiseTempCore", async (_e) => {
     //import modeln
     labelerHistory = new UndoManager();
-    tempCore = initiariseLCCore();
+    tempCore = initialiseLCCore();
     tempCore.addProject("correlation","temp");
     tempCore.addHole([1,null,null,null],"temp");
-    console.log("MAIN: Labeler Project data is initiarised.");
+    console.log("MAIN: Labeler Project data is initialised.");
     return JSON.parse(JSON.stringify(tempCore));
   });
   
@@ -1266,7 +1266,7 @@ function createMainWIndow() {
       //D2    d2
       //D3    d4
       
-      //initiarise
+      //initialise
       //each row data
       const targetRowData = targetData[t];
       //results contains sampling point of upper/lower info
@@ -2251,7 +2251,7 @@ function createMainWIndow() {
   });
   
   //--------------------------------------------------------------------------------------------------
-  function initiariseLCCore(){
+  function initialiseLCCore(){
     LCCore = new LevelCompilerCore();
 
     //minor error
@@ -2333,8 +2333,8 @@ function buildMainMenu(mainWindow){
                 const inData = await loadmodelfile();
                 if(inData!==null){
                   console.log(inData)
-                  //initiarise
-                    LCCore = initiariseLCCore();
+                  //initialise
+                    LCCore = initialiseLCCore();
                     LCAge  = new LevelCompilerAge();
                     
                     //register
@@ -2518,7 +2518,7 @@ function buildMainMenu(mainWindow){
               return;
             }
         
-            tempCore = initiariseLCCore();
+            tempCore = initialiseLCCore();
             tempCore.addProject("correlation","temp");
             tempCore.addHole([1,null,null,null],"temp");
 

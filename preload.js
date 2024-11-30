@@ -10,10 +10,10 @@ contextBridge.exposeInMainWorld("LCapi", {
   Test: (args1, args2) => ipcRenderer.invoke("test", args1, args2),
   //lcfnc: () => ipcRenderer.invoke("lcfnc"),
 
-  //initiarise
-  InitiariseCorrelationModel: () => ipcRenderer.invoke("InitiariseCorrelationModel"),
-  InitiariseAgeModel: () => ipcRenderer.invoke("InitiariseAgeModel"),
-  InitiarisePlot: () => ipcRenderer.invoke("InitiarisePlot"),
+  //initialise
+  InitialiseCorrelationModel: () => ipcRenderer.invoke("InitialiseCorrelationModel"),
+  InitialiseAgeModel: () => ipcRenderer.invoke("InitialiseAgeModel"),
+  InitialisePlot: () => ipcRenderer.invoke("InitialisePlot"),
 
   //register and load models
   RegisterModelFromCsv: (args) => ipcRenderer.invoke("RegisterModelFromCsv", args),

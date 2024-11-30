@@ -9,7 +9,7 @@ document.addEventListener("DOMContentLoaded", () => {
   let canvasPos = [0, 0]; //canvas scroller position
   let pad = [0,0];
   let tempCore = null;
-  //initiarise
+  //initialise
   let vectorObjects = null; //p5 instance data
   let isSVG = false;
   let isDev = false;
@@ -48,8 +48,8 @@ document.addEventListener("DOMContentLoaded", () => {
       
     }
     
-    //initiarise
-    initiarise();
+    //initialise
+    initialise();
     resizeScroller();
 
     //get list
@@ -207,7 +207,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if(!tempCore){
       return
     }
-    //initiarise
+    //initialise
     objOpts.hittest = null;
     objOpts.marker_from = null;
     objOpts.marker_to = null;
@@ -249,7 +249,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if(!tempCore){
       return
     }
-    //initiarise
+    //initialise
     objOpts.hittest = null;
     objOpts.marker_from = null;
     objOpts.marker_to = null;
@@ -291,7 +291,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if(!tempCore){
       return
     }
-    //initiarise
+    //initialise
     objOpts.hittest = null;
     objOpts.marker_from = null;
     objOpts.marker_to = null;
@@ -333,7 +333,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if(!tempCore){
       return
     }
-    //initiarise
+    //initialise
     objOpts.hittest = null;
     objOpts.marker_from = null;
     objOpts.marker_to = null;
@@ -375,7 +375,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if(!tempCore){
       return
     }
-    //initiarise
+    //initialise
     objOpts.hittest = null;
     objOpts.marker_from = null;
     objOpts.marker_to = null;
@@ -572,7 +572,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const ht = JSON.parse(JSON.stringify(getClickedItemIdx(mouseX, mouseY, tempCore, zoom_rate, pad)));
     console.log("[Labeler]: Add Marker clicked at " + ht.distance +" cm.")
 
-    //initiarise
+    //initialise
     objOpts.marker_from = ht;
     objOpts.marker_to = 999999;//dummy
 
@@ -604,7 +604,7 @@ document.addEventListener("DOMContentLoaded", () => {
     
   }
   document.getElementById("exportButton").addEventListener("click", async (event) => {
-    //initiarise
+    //initialise
     objOpts.hittest = null;
     objOpts.marker_from = null;
     objOpts.marker_to = null;
@@ -692,8 +692,8 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 //-------------------------------------------------------------------------------------------
-  async function initiarise(){
-    await window.LabelerApi.InitiariseTempCore();
+  async function initialise(){
+    await window.LabelerApi.InitialiseTempCore();
 
     original_image_height = 10000;
     zoom_rate = [0.3, 0.3];
@@ -702,7 +702,7 @@ document.addEventListener("DOMContentLoaded", () => {
     canvasPos = [0, 0]; //canvas scroller position
     pad = [1200,500];
     tempCore = null;
-    //initiarise
+    //initialise
     //vectorObjects = null; //p5 instance data
     isSVG = false;
     holeName = "";
@@ -744,7 +744,7 @@ document.addEventListener("DOMContentLoaded", () => {
   }
   async function loadCoreImage(modelImages, pathData) {
     return new Promise(async (resolve, reject) => {
-      //initiarise
+      //initialise
       let results = modelImages;
 
       await new Promise((p5resolve) => {
@@ -805,7 +805,7 @@ document.addEventListener("DOMContentLoaded", () => {
   }
   async function loadSectionModel(modelImages, pathData) {
     return new Promise(async (resolve, reject) => {
-      //initiarise
+      //initialise
       let results = modelImages;
       results = await window.LabelerApi.LoadSectionModel(pathData);//load original size
       

@@ -14,6 +14,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   //model source path
   let correlation_model_list = []; //for reload
+  let lcmodel_path = null;
   let age_model_list = []; //for reload
 
   //p5(vector) canvas
@@ -214,7 +215,7 @@ document.addEventListener("DOMContentLoaded", () => {
   //get plot image data
   let ageVectorPlotIcons = {};
   let modelImages = {
-    image_dir: [],
+    image_dir: "",
     load_target_ids: [],
     image_resolution: {},
     drilling_depth: {},
@@ -396,14 +397,15 @@ document.addEventListener("DOMContentLoaded", () => {
         }
       }else if(fileParseData.ext == ".lcmodel"){
         console.log("[Renderer]: LCmodel load from drop..");
-        await initiariseCorrelationModel();
-        await initiariseAgeModel();
-        await initiariseCanvas();
-        await initiarisePlot();
+        await initialiseCorrelationModel();
+        await initialiseAgeModel();
+        await initialiseCanvas();
+        await initialisePlot();
 
         modelImages = {
-          image_dir: [],
+          image_dir: "",
           load_target_ids: [],
+          image_resolution: {},
           drilling_depth: {},
           composite_depth: {},
           event_free_depth: {},
@@ -411,7 +413,8 @@ document.addEventListener("DOMContentLoaded", () => {
         };
     
         //load into LCCore (load process is in receive("RegisteredLCModel")
-        await window.LCapi.loadLCmodel(fileParseData.fullpath);
+        lcmodel_path = fileParseData.fullpath;
+        await window.LCapi.loadLCmodel(lcmodel_path );
 
       }else if(fileParseData.ext == ".lcsection"){
         console.log("[Renderer]: LCsection load from drop..");
@@ -676,15 +679,15 @@ document.addEventListener("DOMContentLoaded", () => {
     );
     if (response) {
       //ok
-      //initiarise
-      await initiariseCorrelationModel();
-      await initiariseAgeModel();
-      await initiariseCanvas();
-      await initiarisePlot();
+      //initialise
+      await initialiseCorrelationModel();
+      await initialiseAgeModel();
+      await initialiseCanvas();
+      await initialisePlot();
       isLoadedLCModel = false;
 
       modelImages = {
-        image_dir: [],
+        image_dir: "",
         load_target_ids: [],
         drilling_depth: {},
         composite_depth: {},
@@ -826,9 +829,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
 //============================================================================================
   //load correlation model
-  window.LCapi.receive("RegisteredLCModel", async () => {
+  window.LCapi.receive("RegisteredLCModel", async (filepath) => {
     document.body.style.cursor = "wait";
-    isLoadedLCModel = true; //initiarise
+    isLoadedLCModel = true; //initialise
     
     //load
     await registerModelFromLCCore()
@@ -1384,7 +1387,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const ht = JSON.parse(JSON.stringify(getClickedItemIdx(mouseX, mouseY, LCCore, objOpts)));
     event.preventDefault();
 
-    //initiarise
+    //initialise
     if(objOpts.edit.marker_from !== null && objOpts.edit.marker_to !== null){
       objOpts.edit.marker_from = null;
       objOpts.edit.marker_to = null;
@@ -1613,7 +1616,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const ht = JSON.parse(JSON.stringify(getClickedItemIdx(mouseX, mouseY, LCCore, objOpts)));
     event.preventDefault();
 
-    //initiarise
+    //initialise
     if(objOpts.edit.marker_from !== null ){
       objOpts.edit.marker_from = null;
       objOpts.edit.marker_to = 999999;//dummy
@@ -1830,7 +1833,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const ht = JSON.parse(JSON.stringify(getClickedItemIdx(mouseX, mouseY, LCCore, objOpts)));
     event.preventDefault();
 
-    //initiarise
+    //initialise
     if(objOpts.edit.marker_from !== null ){
       objOpts.edit.marker_from = null;
       objOpts.edit.marker_to = 999999;//dummy
@@ -1879,7 +1882,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const mouseY = event.clientY - rect.top;
     const ht = JSON.parse(JSON.stringify(getClickedItemIdx(mouseX, mouseY, LCCore, objOpts)));
 
-    //initiarise
+    //initialise
     objOpts.edit.marker_from = ht;
     objOpts.edit.marker_to = 999999;//dummy
 
@@ -2694,77 +2697,64 @@ document.addEventListener("DOMContentLoaded", () => {
         return;
       }
 
+      console.log("[Renderer]: LC model includes: ", isLoadedLCModel);
       if(isLoadedLCModel==true){
+        console.log(correlation_model_list)
         //load from main
-        console.log("[Renderer]: LCmodel load from drop..");
-        await initiariseCorrelationModel();
-        await initiariseAgeModel();
-        await initiariseCanvas();
-        await initiarisePlot();
-
-        modelImages = {
-          image_dir: [],
-          load_target_ids: [],
-          drilling_depth: {},
-          composite_depth: {},
-          event_free_depth: {},
-          age:{},
-        };
+        const tempModelPath = lcmodel_path;
+        await initialiseCorrelationModel();
+        await initialiseAgeModel();
+        await initialiseCanvas();
+        await initialisePlot();
     
         //load into LCCore (load process is in receive("RegisteredLCModel")
-        await window.LCapi.loadLCmodel(fileParseData.fullpath);
-
+        await window.LCapi.loadLCmodel(tempModelPath);
+        //修正：csvは読み込まれない→registerをmainで
       }else{
         //load from csv
         const temp_correlation_model_list = correlation_model_list;
-      const temp_age_model_list = age_model_list;
-      const selected_age_model_id = document.getElementById("AgeModelSelect").value;
+        const temp_age_model_list = age_model_list;
+        const selected_age_model_id = document.getElementById("AgeModelSelect").value;
+        const image_dir = modelImages.image_dir;
 
-      //initiarise
-      await initiariseCorrelationModel();
-      await initiariseAgeModel();
-      await initiariseCanvas();
-      await initiarisePlot();
-      modelImages = {
-        image_dir: [],
-        load_target_ids: [],
-        drilling_depth: {},
-        composite_depth: {},
-        event_free_depth: {},
-        age:{},
-      };
-      console.log("list" + temp_age_model_list);
+        //initialise
+        await initialiseCorrelationModel();
+        await initialiseAgeModel();
+        await initialiseCanvas();
+        await initialisePlot();
+        console.log("list" + temp_age_model_list);
 
-      //reload correlation model
-      for (let i = 0; i < temp_correlation_model_list.length; i++) {
-        await registerModel(temp_correlation_model_list[i].path);
-      }
-      await loadModel();
+        //reload correlation model
+        for (let i = 0; i < temp_correlation_model_list.length; i++) {
+          await registerModel(temp_correlation_model_list[i].path);
+        }
+        await loadModel();
 
-      //reload age model
-      for (let i = 0; i < temp_age_model_list.length; i++) {
-        await registerAge(temp_age_model_list[i].path);
-      }
-      await loadAge(selected_age_model_id);
+        //reload age model
+        for (let i = 0; i < temp_age_model_list.length; i++) {
+          await registerAge(temp_age_model_list[i].path);
+        }
+        await loadAge(selected_age_model_id);
 
-      //reload plot data
-      await registerAgePlotFromLCAge();
-      await loadPlotData();
+        //reload plot data
+        await registerAgePlotFromLCAge();
+        await loadPlotData();
 
-      console.log(LCCore);
-      console.log(LCPlot);
+        console.log(LCCore);
+        console.log(LCPlot);
 
-      //update photo
-      modelImages = await updateImageRegistration(modelImages, LCCore);
-      modelImages = await loadCoreImages(modelImages, LCCore, objOpts, "drilling_depth");
-      modelImages = await loadCoreImages(modelImages, LCCore, objOpts, "composite_depth");
-      modelImages = await loadCoreImages(modelImages, LCCore, objOpts, "event_free_depth");
-      modelImages = await loadCoreImages(modelImages, LCCore, objOpts, "age");
+        //update photo
+        modelImages.image_dir = image_dir;
+        modelImages = await updateImageRegistration(modelImages, LCCore);
+        modelImages = await loadCoreImages(modelImages, LCCore, objOpts, "drilling_depth");
+        modelImages = await loadCoreImages(modelImages, LCCore, objOpts, "composite_depth");
+        modelImages = await loadCoreImages(modelImages, LCCore, objOpts, "event_free_depth");
+        modelImages = await loadCoreImages(modelImages, LCCore, objOpts, "age");
 
-      //update plot
-      updateView();
+        //update plot
+        updateView();
 
-      console.log("Model reloaded.");
+        console.log("Model reloaded.");
       }
       
     });
@@ -3488,7 +3478,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const shift_x = objOpts.canvas.shift_x;
     const shift_y = objOpts.canvas.shift_y;
 
-    //initiarise off screan canvas
+    //initialise off screan canvas
     let num_total_holes = 0;
     LCCore.projects.forEach((project) => {
       if (project.enable) {
@@ -3674,7 +3664,7 @@ document.addEventListener("DOMContentLoaded", () => {
       }
       //-----------------------------------------------------------------------------------------
 
-      //initiarise
+      //initialise
       //draw finder target line
       if(finderEnable){        
         //get pos
@@ -4483,7 +4473,7 @@ document.addEventListener("DOMContentLoaded", () => {
               dataset_max = resultPos.max_original;
               dataset_min = resultPos.min_original;
               //({x0:posX0, x1:posX1, y0:posY0, y1:posY1});
-              //normarise by values
+              //normalise by values
               numeratorName = numeratorData.name;
               denominatorName = " / "+denominatorData.name;
               denominatorUnit = " / "+denominatorData.unit;
@@ -4506,7 +4496,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 dataset_max = resultPos.max_original;
                 dataset_min = resultPos.min_original;
                 //({x0:posX0, x1:posX1, y0:posY0, y1:posY1});
-                  //without normarisation
+                  //without normalisation
                   numeratorName = numeratorData.name;
                   numeratorUnit = numeratorData.unit;
                   for(let i=0;i<numeratorList.length;i++){
@@ -4526,7 +4516,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 dataset_max = resultPos.max_original;
                 dataset_min = resultPos.min_original;
                 //({x0:posX0, x1:posX1, y0:posY0, y1:posY1});
-                  //without normarisation
+                  //without normalisation
                   numeratorName = "1";
                   numeratorUnit = "1";
                   denominatorName = " / "+denominatorData.name;
@@ -4733,7 +4723,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const shift_x = objOpts.canvas.shift_x;
     const shift_y = objOpts.canvas.shift_y;
 
-    //initiarise canvas base
+    //initialise canvas base
     let num_total_holes = 0;
     LCCore.projects.forEach((project) => {
       if (project.enable) {
@@ -4775,7 +4765,7 @@ document.addEventListener("DOMContentLoaded", () => {
     //console.log(      "Viertual size" + offScreenCanvas.height + "x" + offScreenCanvas.width    );
 
     offScreenCtx = offScreenCanvas.getContext("2d");
-    offScreenCtx.clearRect(0, 0, offScreenCanvasWidth, offScreenCanvasHeight); //initiarise
+    offScreenCtx.clearRect(0, 0, offScreenCanvasWidth, offScreenCanvasHeight); //initialise
 
     //change scroller size from canvas base(make full size canvas area)
     canvasBase.style.width = canvasBaseWidth.toString() + "px"; //offsetWidth
@@ -5453,7 +5443,7 @@ document.addEventListener("DOMContentLoaded", () => {
   }
   //--------------------------------------------------------------------------------------------
   function updateRaster(drawPosition) {
-    //initiarise
+    //initialise
     const [x, y] = drawPosition;
     const viewWidth = scroller.clientWidth;
     const viewHeight = scroller.clientHeight;
@@ -5864,7 +5854,7 @@ document.addEventListener("DOMContentLoaded", () => {
     LCCore = await window.LCapi.LoadModelFromLCCore();
 
     if (LCCore) {
-      //initiarise hole list
+      //initialise hole list
       while (document.getElementById("hole_list").firstChild) {
         document.getElementById("hole_list").removeChild(document.getElementById("hole_list").firstChild);
       }
@@ -5993,7 +5983,7 @@ document.addEventListener("DOMContentLoaded", () => {
   }
   async function registerAgeFromLCAge() {
     
-    //initiarise dropdown
+    //initialise dropdown
     const parentElement = document.getElementById("AgeModelSelect");
     while (parentElement.firstChild) {
       parentElement.removeChild(parentElement.firstChild);
@@ -6092,39 +6082,40 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  async function initiariseCorrelationModel() {
-    //canvas initiarise
+  async function initialiseCorrelationModel() {
+    //canvas initialise
     const parentElement = document.getElementById("hole_list");
     while (parentElement.firstChild) {
       parentElement.removeChild(parentElement.firstChild);
     }
 
-    //data initiarise
+    //data initialise
     LCCore = null;
-    await window.LCapi.InitiariseCorrelationModel();
+    await window.LCapi.InitialiseCorrelationModel();
     correlation_model_list = [];
+    lcmodel_path = null;
   }
 
-  async function initiariseAgeModel() {
-    //canvas initiarise(remove all children)
+  async function initialiseAgeModel() {
+    //canvas initialise(remove all children)
     const parentElement = document.getElementById("AgeModelSelect");
     while (parentElement.firstChild) {
       parentElement.removeChild(parentElement.firstChild);
     }
 
-    //data initiarise
-    await window.LCapi.InitiariseAgeModel();
+    //data initialise
+    await window.LCapi.InitialiseAgeModel();
     age_model_list = [];
   }
-  async function initiarisePlot() {
-    //canvas initiarise(remove all children)
+  async function initialisePlot() {
+    //canvas initialise(remove all children)
 
-    //data initiarise
-    await window.LCapi.InitiarisePlot();
+    //data initialise
+    await window.LCapi.InitialisePlot();
     LCPlot = null;
   }
-  async function initiariseCanvas() {
-    //canvas initiarise
+  async function initialiseCanvas() {
+    //canvas initialise
     const parentElement = document.getElementById("hole_list");
     while (parentElement.firstChild) {
       parentElement.removeChild(parentElement.firstChild);
@@ -6132,7 +6123,7 @@ document.addEventListener("DOMContentLoaded", () => {
     
     //plot update
     if (isDrawVector) {
-      //canvas initiarise
+      //canvas initialise
       const parentElement1 = document.getElementById("p5Canvas"); //vector plot
       while (parentElement1.firstChild) {
         parentElement1.removeChild(parentElement1.firstChild);
@@ -6147,7 +6138,7 @@ document.addEventListener("DOMContentLoaded", () => {
       document.getElementById("p5penCanvas").style.display = "none";
     } else {
       //clear canvas data
-      offScreenCtx.clearRect(0, 0, scroller.clientWidth, scroller.clientHeight); //initiarise
+      offScreenCtx.clearRect(0, 0, scroller.clientWidth, scroller.clientHeight); //initialise
       //plot update
       updateRaster([0, 0]);
     }
@@ -6629,7 +6620,7 @@ function calcCanvasBaseSize(LCCore, objOpts) {
   const shift_x = objOpts.canvas.shift_x;
   const shift_y = objOpts.canvas.shift_y;
 
-  //initiarise off screan canvas
+  //initialise off screan canvas
   let num_total_holes = 0;
   LCCore.projects.forEach((project) => {
     if (project.enable) {
@@ -6784,21 +6775,31 @@ async function updateImageRegistration(modelImages, LCCore){
           //check loaded im
           const im_in_array = modelImages.drilling_depth[h.name+"-"+s.name];
           //check folder im
-          const im_in_dir = await window.LCapi.getFilesInDir(modelImages.image_dir, h.name+"-"+s.name+".jpg");
-          //add case
-          if(im_in_array==undefined && im_in_dir!==null){
-            modelImages.load_target_ids.push(s.id);//add load list
-          }
+          //console.log(modelImages.image_dir, h.name+"-"+s.name+".jpg")
+          if(modelImages.image_dir !== ""){
+            const im_in_dir = await window.LCapi.getFilesInDir(modelImages.image_dir, h.name+"-"+s.name+".jpg");
+            if(im_in_array==undefined){
+              if(im_in_dir!==null){
+                //add case
+                modelImages.load_target_ids.push(s.id);//add load list
+              }
+            }else{
+              if(im_in_dir==null){
+                //remove case
+                delete modelImages.drilling_depth[h.name+"-"+s.name];
+                delete modelImages.composite_depth[h.name+"-"+s.name];
+                delete modelImages.event_free_depth[h.name+"-"+s.name];
+                delete modelImages.age[h.name+"-"+s.name];
+              }
+            }
 
-          //remove case
-          if(im_in_array!==undefined && im_in_dir==null){
-            delete modelImages.drilling_depth[h.name+"-"+s.name];
-            delete modelImages.composite_depth[h.name+"-"+s.name];
-            delete modelImages.event_free_depth[h.name+"-"+s.name];
-            delete modelImages.age[h.name+"-"+s.name];
           }
         }
       }
+    }
+
+    if(modelImages.load_target_ids.length == 0){
+      modelImages.load_target_ids = null;
     }
 
     resolve(modelImages);
@@ -6814,7 +6815,7 @@ async function loadCoreImages(modelImages, LCCore, objOpts, depthScale) {
     await window.LCapi.progressbar("Load images"+depthScale, txt);
 
   return new Promise(async (resolve, reject) => {
-    //initiarise
+    //initialise
     let results = modelImages;
     
 
@@ -6843,19 +6844,23 @@ async function loadCoreImages(modelImages, LCCore, objOpts, depthScale) {
 
     //get target image list
     let N = 0;
-    if(modelImages.load_target_ids.length == 0){
-      //case all
-      LCCore.projects.forEach((p) => {
-        p.holes.forEach((h) => {
-          h.sections.forEach((s) => {
-            N += 1;
-            modelImages.load_target_ids.push(s.id);
+    if(modelImages.load_target_ids !== null){
+      if(modelImages.load_target_ids.length == 0){
+        //case all
+        console.log("[Renderer]: Load all images]")
+        LCCore.projects.forEach((p) => {
+          p.holes.forEach((h) => {
+            h.sections.forEach((s) => {
+              N += 1;
+              modelImages.load_target_ids.push(s.id);
+            });
           });
         });
-      });
-    } else {
-      //case target
-      N = modelImages.load_target_ids.length;
+      } else {
+        //case target
+        console.log("[Renderer]: Load selected images]")
+        N = modelImages.load_target_ids.length;
+      }
     }
     
     if(N==0){
@@ -6888,7 +6893,7 @@ async function loadCoreImages(modelImages, LCCore, objOpts, depthScale) {
           const hole = project.holes[targeIdx[1]];
           const section = hole.sections[targeIdx[2]];
           const im_name = hole.name + "-" + section.name;
-          const im_path = await window.LCapi.getFilesInDir(modelImages.image_dir, im_name+".jpg");
+          const im_path = await window.LCapi.getFilesInDir(modelImages.image_dir,   im_name+".jpg");
           if(im_path == null){
             continue;
           }

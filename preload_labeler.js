@@ -6,7 +6,7 @@ contextBridge.exposeInMainWorld("LabelerApi", {
   //renderer name: (main name)
   getFilePath: (args) => ipcRenderer.invoke("getFilePath", webUtils.getPathForFile(args)),
 
-  InitiariseTempCore: () => ipcRenderer.invoke("InitiariseTempCore"),
+  InitialiseTempCore: () => ipcRenderer.invoke("InitialiseTempCore"),
 
   terminalLog: (args1) => ipcRenderer.invoke("terminalLog", args1),
   rendererLog: (args1) => ipcRenderer.invoke("rendererLog", args1),
