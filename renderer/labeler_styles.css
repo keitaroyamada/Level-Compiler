@@ -3,6 +3,9 @@ body{
   flex-direction: row;
   overflow-y: hidden;
   overflow-x: hidden;  
+  height: 100%;
+  width: 100%;
+  margin: 0px;
 }
 
 html {
@@ -19,7 +22,8 @@ html {
 
 .container {
   display: flex;
-  direction: row;
+  direction: column;
+  flex-grow: 1;
   height: 100%;
   width: 100%;
   overflow-y: hidden;
@@ -28,30 +32,63 @@ html {
   background-color: transparent;
 }
 
-.base0 {
-  height: 100%;
+#base0 {
+  display: flex;
+  flex-direction: column;
+  height: calc(100% - 30px);
   width: 100%;
   overflow-y: hidden;
   overflow-x: hidden;
-  position: relative;
   background-color: transparent;
 }
-
-.base {
+#options {
+  display: flex;
+  flex-direction: row;
+  height: 50px;
+  width: 100%;
+}
+#base1 {
   height: 100%;
-  width: 1;
+  width: 100%;
   overflow-y: hidden;
   overflow-x: hidden;
   position: relative;
   background-color: gray;
 }
 
-#options {
-  display: flex;
+#scroller {
+  /*Size is displayed size*/
   width: 100%;
-  flex-direction: row;
+  height: 100%;
+  /*border: 1px solid lightblue;*/
+  overflow-y: scroll;
+  overflow-x: scroll;
+  display: block;
+  z-index: 1;
+  background-color: transparent;
+  position: relative;
 }
 
+#canvasBase {
+  /*Size is virtual full size. make blank area for getting scroll.*/
+  overflow: hidden;
+  position: relative;
+
+  width: 100px;
+  height: 100px;
+  background-color: transparent;
+}
+
+#p5Canvas {
+  width: 500px;
+  height: 500px;
+  top: 0px;
+  left: 0px;
+  z-index: 0;
+  position: absolute;
+  pointer-events: none;
+  background-color: transparent;
+}
 #importButton {
   width: 100px;
   height: 20px;
@@ -65,42 +102,12 @@ html {
   margin-top: 10px;
   margin-left: 20px;
 }
-
-
-#scroller {
-  /*Size is displayed size*/
-  top: 0px;
-  width: 100%;
-  height: 500px;
-  /*border: 1px solid lightblue;*/
-  overflow-y: scroll;
-  overflow-x: scroll;
-  display: block;
-  z-index: 1;
-  background-color: transparent;
+#resetButton {
+  width: 100px;
+  height: 20px;
+  margin-top: 10px;
+  margin-left: 20px;
 }
-
-#canvasBase {
-  /*Size is virtual full size. make blank area for getting scroll.*/
-  overflow: hidden;
-  position: relative;
-
-  width: 2000px;
-  height: 2000px;
-  background-color: transparent;
-}
-
-#p5Canvas {
-  width: 1000px;
-  height: 1000px;
-  top: 0px;
-  left: 0px;
-  z-index: 0;
-  position: absolute;
-  pointer-events: none;
-  background-color: transparent;
-}
-
 #toolbar {
   width: 100%;
   height: 40px;

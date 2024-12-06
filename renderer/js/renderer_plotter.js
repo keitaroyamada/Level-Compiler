@@ -134,8 +134,8 @@ document.addEventListener("DOMContentLoaded", () => {
             const plotColour = document.createElement("input");
             plotColour.type = "text";
             plotColour.id = numSeries;
-            plotColour.placeholder = "gray";
-            plotColour.value = "gray";
+            plotColour.placeholder = "red";
+            plotColour.value = "red";
             plotColour.style.width = "40px";
             plotColour.style.marginLeft= "40px";
             plotColour.title = "Plot colour";
@@ -156,7 +156,7 @@ document.addEventListener("DOMContentLoaded", () => {
             plotTypeDropdown.title = "Plot type";
 
             //const plotType = ["line", "scatter","bar"];
-            const plotType = ["line", "scatter"];
+            const plotType = ["line", "scatter","bar"];
             plotType.forEach(p=>{
                 const opt = document.createElement("option");
                 opt.value = p;
@@ -200,10 +200,14 @@ document.addEventListener("DOMContentLoaded", () => {
         }    
     });
     scroller.addEventListener("scroll",async function (event) {
+        const rect = document.getElementById("p5Canvas").getBoundingClientRect()
         ///scroller position
         canvasPos[0] = scroller.scrollLeft;//* xMag;
         canvasPos[1] = scroller.scrollTop;//* yMag;
-    
+
+        const absoluteX = scroller.scrollLeft + rect.width / 2 - rect.left;
+        const absoluteY = scroller.scrollTop + rect.height / 2 - rect.top;
+
         //update plot
         updateView();
       },
@@ -218,7 +222,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
         if (event.shiftKey) {
             zoom_rate[2] += 0.01 * deltaY;
-            updateView();
+
         }
 
         if (event.altKey) {      
@@ -238,29 +242,25 @@ document.addEventListener("DOMContentLoaded", () => {
           }
     
           //mouse position
-          const relative_scroll_pos_x = scroller.scrollLeft / scroller.scrollWidth;
-          const relative_scroll_pos_y = scroller.scrollTop / scroller.scrollHeight;
-    
+          const relativeX = (scroller.scrollLeft + rect.width / 2 - rect.left) / canvasBaseSize[0];
+          const relativeY = (scroller.scrollTop + rect.height / 2 - rect.top) / canvasBaseSize[1];
+          console.log(canvasBaseSize)
+
           //calc new canvas size
-          //makeRasterObjects(false); //make only base canvas
           makeP5CanvasBase();
-          const canvasBase_height = parseInt(canvasBase.style.height.match(/\d+/)[0], 10);
-          const canvasBase_width  = parseInt(canvasBase.style.width.match(/\d+/)[0], 10);
-    
-          //get new scroll pos
-          const new_scroll_pos_x = canvasBase_width * relative_scroll_pos_x;
-          const new_scroll_pos_y = canvasBase_height * relative_scroll_pos_y;
-    
-          let x = new_scroll_pos_x;
-          let y = new_scroll_pos_y;
-    
-          scroller.scrollTo(x, y); //move scroll position
-    
-          //update data
-          canvasPos = [x, y];
-          updateView();
+          const canvasBaseHeight = parseInt(canvasBase.style.height.match(/\d+/)[0], 10);
+          const canvasBaseWidth  = parseInt(canvasBase.style.width.match(/\d+/)[0], 10);
+
+          const newScrollLeft = relativeX * canvasBaseWidth - rect.width / 2 + rect.left;
+          const newScrollTop  = relativeY * canvasBaseHeight - rect.height / 2 + rect.top;
+
+          scroller.scrollTo(newScrollLeft, newScrollTop); //move scroll position
+          
         }
-    });  
+
+        updateView();
+    },
+    { passive: false });  
     document.getElementById('bt_export').addEventListener("click", async (e) => {
         if(LCPlot !== null ){ 
             isSVG = true;
@@ -768,5 +768,6 @@ document.addEventListener("DOMContentLoaded", () => {
         window.PlotterApi.sendPlotOptions({data:selectedList, emitType:type}, "renderer");
     }
     //============================================================================
-      
+
 });
+

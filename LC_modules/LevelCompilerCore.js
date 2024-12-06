@@ -658,6 +658,7 @@ class LevelCompilerCore extends EventEmitter{
     this.setUpdateDepth();
     this.setStatus("completed","Calced Event Free Depth.")
     console.timeEnd("        Calc EFD")
+    this.checkReliability();
   }
   calcDFSDepth(calcRange, calcType){
     this.setStatus("running","start calcDFSDpeth")
@@ -1308,7 +1309,7 @@ class LevelCompilerCore extends EventEmitter{
       const d3      = this.projects[lowerIdxs[0][0]].holes[lowerIdxs[0][1]].sections[lowerIdxs[0][2]].markers[lowerIdxs[0][3]].distance;
       const D1_rank = this.projects[upperIdxs[0][0]].holes[upperIdxs[0][1]].sections[upperIdxs[0][2]].markers[upperIdxs[0][3]].connection_rank;
       const D3_rank = this.projects[lowerIdxs[0][0]].holes[lowerIdxs[0][1]].sections[lowerIdxs[0][2]].markers[lowerIdxs[0][3]].connection_rank;
-      
+
       if (D1 == null || D3 == null) {
         this.setError("","E020: "+ calcType + " of value is empty.");
         //console.log("ERROR: " + calcType + " of value is empty.");
@@ -1323,7 +1324,7 @@ class LevelCompilerCore extends EventEmitter{
       const d3d1 = d3 - d1;
       const interpolatedEFD = this.linearInterp(D1, D3, d2d1, d3d1);
 
-      const new_rank = Math.max([D1_rank, D3_rank]);
+      const new_rank = Math.max(...[D1_rank, D3_rank]);
       output.push([sectionId, interpolatedEFD, new_rank]);
     }
     this.setStatus("completed","");
@@ -1348,19 +1349,21 @@ class LevelCompilerCore extends EventEmitter{
       project.holes.forEach((hole) => {
         hole.sections.forEach((section) => {
           section.markers.forEach((marker) => {
-            const temp = marker.composite_depth - targetCD;
-            if (temp <= 0 && upperData.cumulate_distance < temp) {
-              //console.log(this.getMarkerNameFromId(marker.id));
-              upperData.id = marker.id;
-              upperData.nearest_data.composite_depth = marker.composite_depth;
-              upperData.nearest_data.event_free_depth = marker.event_free_depth;
-              upperData.cumulate_distance = temp;
-            }
-            if (temp >= 0 && lowerData.cumulate_distance > temp) {
-              lowerData.id = marker.id;
-              lowerData.nearest_data.composite_depth = marker.composite_depth;
-              lowerData.nearest_data.event_free_depth = marker.event_free_depth;
-              lowerData.cumulate_distance = temp;
+            if(marker.depth_source[0] =="master"){
+              const temp = marker.composite_depth - targetCD;
+              if (temp <= 0 && upperData.cumulate_distance < temp) {
+                //console.log(this.getMarkerNameFromId(marker.id));
+                upperData.id = marker.id;
+                upperData.nearest_data.composite_depth = marker.composite_depth;
+                upperData.nearest_data.event_free_depth = marker.event_free_depth;
+                upperData.cumulate_distance = temp;
+              }
+              if (temp >= 0 && lowerData.cumulate_distance > temp) {
+                lowerData.id = marker.id;
+                lowerData.nearest_data.composite_depth = marker.composite_depth;
+                lowerData.nearest_data.event_free_depth = marker.event_free_depth;
+                lowerData.cumulate_distance = temp;
+              }
             }
           });
         });
@@ -2048,7 +2051,6 @@ class LevelCompilerCore extends EventEmitter{
                   newMarkerData.distance = newDistance;
                   newMarkerData.name = name;
                   newMarkerData.drilling_depth = event_border_drilling_depth;
-                  newMarkerData.reliability += 1;
                   newMarkerData.event = [];
                   if (event[1] == "upward") {
                     newMarkerData.name = "";
@@ -2166,6 +2168,25 @@ class LevelCompilerCore extends EventEmitter{
       }
     }
     this.setStatus("completed","");
+  }
+  checkReliability(){
+    //console.time("reliability")
+    this.projects.forEach(project=>{
+      project.holes.forEach(hole=>{
+        hole.sections.forEach(section=>{
+          section.markers.forEach(marker=>{
+            const calcedEFD = this.getEFDfromCD(marker.composite_depth);
+            if(Math.abs(marker.event_free_depth - calcedEFD) > 0.1){
+              marker.unreliability = 1;
+              //console.log(hole.name+"-"+section.name+": "+Math.abs(marker.event_free_depth - calcedEFD))
+            }else{
+              marker.unreliability = 0;
+            }
+          })
+        })
+      })
+    })
+    //console.timeEnd("reliability")
   }
   getMarkerNameFromId(id) {
     this.setStatus("running","start getMarkerNameFromId");
@@ -3796,6 +3817,37 @@ class LevelCompilerCore extends EventEmitter{
     this.setStatus("completed","");
     return true
   }
+  addSectionModel(holeId, sectionModel){
+    this.setStatus("running","start addSectionFromModel");
+    try{
+      let targetId;
+      if(holeId){
+        targetId = holeId;
+      }
+      if(!targetId){
+        return
+      }
+  
+      //search location
+      const idx = this.search_idx_list[holeId.toString()];
+      const holeData = this.projects[idx[0]].holes[idx[1]];
+  
+      //make sectiondata
+      let sectionData = sectionModel;
+      const newId = Math.max(holeData.reserved_hole_ids)+1;
+      sectionData.id = [holeData.id[0], holeData.id[1], newId, null];
+  
+      holeData.reserved_section_ids.push(newId);
+      holeData.sections.push(sectionData);
+      this.updateSearchIdx();
+      this.setStatus("completed","");
+      return true
+    }catch(err){
+      console.log(err)
+      this.setErrorAlert("","E066: Failed to add section from lcsection model.")
+      return false
+    }   
+  }
   deleteHole(holeId){
     this.setStatus("running","start deleteHole");
     this.updateSearchIdx();
@@ -4207,7 +4259,6 @@ class LevelCompilerCore extends EventEmitter{
         currentIdx = this.search_idx_list[currentId];
 
         visitedId.add(currentId.toString());
-
         this.projects[currentIdx[0]].holes[currentIdx[1]].sections[currentIdx[2]].markers[currentIdx[3]].v_connection.forEach((v) => {
           if (!visitedId.has(v.toString())) {
             stack.push(v);

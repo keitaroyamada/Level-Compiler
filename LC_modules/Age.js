@@ -13,6 +13,7 @@ class Age {
     this.age_raw = null;
 
     this.original_depth_type = null;
+    this.data_type = "age";
     this.trinityData = new Trinity();
     this.section_id = [null, null, null, null];
     this.composite_depth = null;
@@ -25,6 +26,9 @@ class Age {
     this.note = "";
 
     this.order = null;
+
+    this.enable = true;
+    this.reliable = true;
   }
 }
 

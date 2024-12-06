@@ -2,9 +2,8 @@ document.addEventListener("DOMContentLoaded", () => {
   //-------------------------------------------------------------------------------------------
   const scroller = document.getElementById("scroller");
   let canvasBase = document.getElementById("canvasBase");
-  let original_image_height = 10000;
+  let original_image_height = 0;
   let zoom_rate = [0.3, 0.3];
-  let relative_pos = [0, 0];
   let mousePos = [0,0];
   let canvasPos = [0, 0]; //canvas scroller position
   let pad = [0,0];
@@ -15,17 +14,15 @@ document.addEventListener("DOMContentLoaded", () => {
   let isDev = false;
   let holeName = "";
   let sectionName = "";
-  let rect = null;
-  loadToolIcons();
-  resizeScroller();
-  
+  let rect = null;  
   let modelImages = {
-    image_dir: [],
     load_target_ids: [],
+    image_resolution: {},
     drilling_depth: {},
     composite_depth: {},
     event_free_depth: {},
     age:{},
+    operations:[],
   };
   let objOpts = {
     tool_on: false,
@@ -36,76 +33,204 @@ document.addEventListener("DOMContentLoaded", () => {
     handleMove: null,
     handleClick: null,
     sensibility:20,
+    dpcm:150,
   };
   //-------------------------------------------------------------------------------------------
+  window.LabelerApi.receive("LabelerMenuClicked", async () => {
+    loadToolIcons();
+    const res = await initialise();
+    if(res){
+      console.log("Initialised models: ",tempCore);
+      console.log("Initialised images; ", modelImages);
+    }
+  });
+  document.getElementById("resetButton").addEventListener("click", async (event) => {
+    //initialise
+    objOpts.hittest = null;
+    objOpts.marker_from = null;
+    objOpts.marker_to = null;
+    objOpts.mode = null;
+    if(objOpts.handleMove!==null){
+      document.removeEventListener('mousemove', objOpts.handleMove);
+      objOpts.handleMove = null;
+    }
+    if(objOpts.handleClick !== null){
+      document.removeEventListener('click', objOpts.handleClick);
+      objOpts.handleClick = null;
+    }
+    document.getElementById("bt_change_distance").style.backgroundColor = "#f0f0f0";
+    document.getElementById("bt_change_name").style.backgroundColor = "#f0f0f0";
+    document.getElementById("bt_add_marker").style.backgroundColor = "#f0f0f0";
+    document.getElementById("bt_delete_marker").style.backgroundColor = "#f0f0f0";
+
+    const response = await window.LabelerApi.askdialog(
+      "Initialise Canvas",
+      "Do you want to Remove all data?"
+    );
+    if (response.response) {
+      loadToolIcons();
+      const res = await initialise();
+      if(res){
+        console.log("Initialised models: ",tempCore);
+        console.log("Initialised images; ", modelImages);
+      }
+    }   
+  });
+  async function initialise(){
+    tempCore = await window.LabelerApi.InitialiseTempCore();
+
+    zoom_rate = [0.3, 0.3];
+    relative_pos = [0, 0];
+    mousePos = [0,0];
+    canvasPos = [0, 0]; //canvas scroller position
+    pad = [1200,500];
+
+    //initialise
+    if(vectorObjects!==null){
+      vectorObjects.remove(); //p5 instance data
+      vectorObjects = null;
+    }
+    
+    isSVG = false;
+    holeName = "";
+    sectionName = "";
+    rect = null;
+    modelImages = {
+      load_target_ids: [],
+      image_resolution: {},
+      drilling_depth: {},
+      composite_depth: {},
+      event_free_depth: {},
+      age:{},
+      operations:[],
+    };
+    objOpts = {
+      tool_on: false,
+      hittest: null,
+      marker_from: null,
+      marker_to: null,
+      mode: null,
+      handleMove: null,
+      handleClick: null,
+      sensibility:20,
+      dpcm:150,
+    };
+
+    original_image_height = objOpts.dpcm * (100 - 0);
+    return true
+  }
+  
+  //-------------------------------------------------------------------------------------------
   document.getElementById("scroller").addEventListener("dragover", (e) => {
-    e.preventDefault(e);
+    e.preventDefault();
   });
   
   document.getElementById("scroller").addEventListener("drop", async (e) => {
-    e.preventDefault(e);
-    if(tempCore !== null){
-      
+    e.preventDefault();
+    if(Object.keys(modelImages.drilling_depth).length!==0){
+      alert("The target image is already registered. To replace it with a new image, please press the 'Initialise' button first.");
+      return
     }
-    
-    //initialise
-    initialise();
-    resizeScroller();
 
     //get list
     let dataList = [];
     for(const file of e.dataTransfer.files){
-      const fileParseData = await window.LabelerApi.getFilePath(file);
-      dataList.push(fileParseData);
+      dataList.push({type:file.name.split(".").pop(), name:file.name, path:file});
     }
+
     //check
     let orderLC = [];
     let orderImage = [];
 
     //check lcmodel
     dataList.forEach((data,i)=>{
-      if(data.ext == ".lcsection"){
+      if(data.type == "lcsection"){
         orderLC.push(i);
       }
     })
     //check image
     dataList.forEach((data,i)=>{
-      if(data.ext == ".jpg"){
+      if(data.type == "jpg"){
         orderImage.push(i);
       }
     })
 
+
     //load
+    let droppedData;
     if(orderLC.length > 0){
-      //chekc image exist
-      modelImages = await loadCoreImage(modelImages, dataList[orderLC[0]]);
-      if(modelImages["drilling_depth"][dataList[orderLC[0]].name] !== undefined){
-        //if same name imaeg exist
-        holeName = dataList[orderLC[0]].name.split("-")[0];
-        sectionName = dataList[orderLC[0]].name.split("-")[1];
-  
+      //load from model
+      droppedData = dataList[orderLC[0]];
+      const baseName = dataList[orderLC[0]].name.split(/[.]+/)[0];
+      
+      holeName = baseName.split(/[-]+/)[0];
+      sectionName = baseName.split(/[-]+/)[1];
+
+      const isImExist = await window.LabelerApi.isExistFile(droppedData.path, baseName+".jpg");
+
+      //const isImExist = await window.LabelerApi.CheckImagesInDir(h.name+"-"+s.name+".jpg");
+      if(isImExist){
+        //if same name imaeg exist          
         tempCore = await addSectionData(holeName, sectionName);
-        tempCore = await loadSectionModel(modelImages, dataList[0]);
-        console.log("Annotation data: \n",tempCore);
+        tempCore = await loadSectionModel(droppedData.path, droppedData.name);
+        
+        console.log("Load annotation data: \n",tempCore);
+        //register&load image
+        const res = await window.LabelerApi.RegisterCoreImage(droppedData.path, "labeler");
+        if(res==true){
+          //load images
+          console.log("loading")
+          modelImages = await loadCoreImages(modelImages, tempCore, objOpts, ["drilling_depth"]);
+          console.log("Created model Info: \n",modelImages);
+        }else{
+          alert("Failed to load image. The image name and the model name need to match.")
+          return
+        }
       }else{
         alert("There is no image corresponding LC model. The image name and the model name need to match.");
-      }      
+        return
+      }     
     }else{
-      //no annotaions
+      //load from image
       if(orderImage.length > 0){
-        //load first image   
-    
-        modelImages = await loadCoreImage(modelImages, dataList[orderImage[0]]); 
-        console.log("Created model Info: \n",modelImages);
+        //chekc image exist, read only first image
+        droppedData = dataList[orderImage[0]];
+        const baseName = droppedData.name.split(/[.]+/)[0];
+        holeName = baseName.split(/[-]+/)[0];
+        sectionName = baseName.split(/[-]+/)[1];
 
         tempCore = await addSectionData(holeName, sectionName);
-        console.log("Annotation data: \n",tempCore);
+        console.log("Create new annotation data: \n",tempCore);
 
-        if(Object.keys(modelImages.drilling_depth).length>0){
-          //console.log("[Labeler]: Section image loaded: "+holeName+"-"+sectionName);
+        //register&load image
+        const res = await window.LabelerApi.RegisterCoreImage(droppedData.path, "labeler");
+
+        if(res==true){
+          //load images
+          modelImages = await loadCoreImages(modelImages, tempCore, objOpts, ["drilling_depth"]);
+          console.log("Created model Info: \n",modelImages);
+
+          //check model exist
+          const isExist = await window.LabelerApi.isExistFile(droppedData.path, baseName+".lcsection");
+          if(isExist){
+            tempCore = await window.LabelerApi.InitialiseTempCore();
+            tempCore = await addSectionData(holeName, sectionName);
+            tempCore = await loadSectionModel(droppedData.path, droppedData.name);
+            console.log("Load annotation data: \n",tempCore);
+
+          }
+
+        }else{
+          alert("Failed to load a image.")
+          return
         }
       }
     }
+
+    
+  
+    
+
 
 
     //show image
@@ -136,8 +261,8 @@ document.addEventListener("DOMContentLoaded", () => {
       }
 
       //mouse position
-      const relative_scroll_pos_x = scroller.scrollLeft / scroller.scrollWidth;
-      const relative_scroll_pos_y = scroller.scrollTop / scroller.scrollHeight;
+      const relative_scroll_pos_x = (scroller.scrollLeft - pad[0]) / scroller.scrollWidth;
+      const relative_scroll_pos_y = (scroller.scrollTop  - pad[1]) / scroller.scrollHeight;
 
       //calc new canvas size
       //makeRasterObjects(false); //make only base canvas
@@ -146,8 +271,8 @@ document.addEventListener("DOMContentLoaded", () => {
       const canvasBase_width  = parseInt(canvasBase.style.width.match(/\d+/)[0], 10);
 
       //get new scroll pos
-      const new_scroll_pos_x = canvasBase_width * relative_scroll_pos_x;
-      const new_scroll_pos_y = canvasBase_height * relative_scroll_pos_y;
+      const new_scroll_pos_x = canvasBase_width * relative_scroll_pos_x  + pad[0];
+      const new_scroll_pos_y = canvasBase_height * relative_scroll_pos_y + pad[1];
 
       let x = new_scroll_pos_x;
       let y = new_scroll_pos_y;
@@ -170,6 +295,7 @@ document.addEventListener("DOMContentLoaded", () => {
   { passive: false }
   );
   document.addEventListener("mousemove", async function (event) {
+    if(!tempCore){return}
     rect = document.getElementById("p5Canvas").getBoundingClientRect();
 
     //positin in view
@@ -691,123 +817,173 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     }
   });
-//-------------------------------------------------------------------------------------------
-  async function initialise(){
-    await window.LabelerApi.InitialiseTempCore();
-
-    original_image_height = 10000;
-    zoom_rate = [0.3, 0.3];
-    relative_pos = [0, 0];
-    mousePos = [0,0];
-    canvasPos = [0, 0]; //canvas scroller position
-    pad = [1200,500];
-    tempCore = null;
-    //initialise
-    //vectorObjects = null; //p5 instance data
-    isSVG = false;
-    holeName = "";
-    sectionName = "";
-    rect = null;
-    modelImages = {
-      image_dir: [],
-      load_target_ids: [],
-      drilling_depth: {},
-      composite_depth: {},
-      event_free_depth: {},
-      age:{},
-    };
-    objOpts = {
-      tool_on: false,
-      hittest: null,
-      marker_from: null,
-      marker_to: null,
-      mode: null,
-      handleMove: null,
-      handleClick: null,
-      sensibility:20,
-    };
-    return
-  }
+  //-------------------------------------------------------------------------------------------
+  
 
   function wait(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
   }
   function loadToolIcons() {
-    let resourcePaths = window.LabelerApi.getResourcePath();
-    for (let key in resourcePaths.labeler) {
+    let resourceData = window.LabelerApi.GetResources();
+    for (let key in resourceData.labeler) {
       let path = null;
       try {
-        path =  resourcePaths.labeler[key];
-        document.getElementById(key).querySelector("img").src = path;
+        document.getElementById(key).querySelector("img").src = resourceData.labeler[key];
       }catch{}
     }
   }
-  async function loadCoreImage(modelImages, pathData) {
+  async function loadCoreImages(modelImages, LCCore, objOpts, operations) {
+
     return new Promise(async (resolve, reject) => {
-      //initialise
-      let results = modelImages;
-
-      await new Promise((p5resolve) => {
-        new p5(async (p) => {
-          const tasks = []; 
-          const N = 1;
-          for (let t = 0; t < N; t++) {
-      
-            const im_name = pathData.name;
-            let im_path = pathData.fullpath;
-            if(!im_path.includes(".jpg")){
-              im_path = pathData.imagepath;
+      try{
+        //initialise
+        let results = modelImages;
+  
+        //check
+        if (LCCore == null) {
+          console.log("There is no LCCore.");
+          resolve(results);
+          return;
+        }
+        
+        if (operations.includes("composite_depth") || operations.includes("event_free_depth") || operations.includes("age")) {
+          if(!operations.includes("drilling_depth")){
+            if (Object.keys(modelImages.drilling_depth).length == 0) {
+              console.log("[Renderer]: There is no original image.");
+              resolve(results);
+              return;
             }
+          }
+        
+        }
+  
+        //get target image list
+        let N = 0;
+        if(modelImages.load_target_ids !== null){
+          if(modelImages.load_target_ids.length == 0){
+            //case all
+            LCCore.projects.forEach((p) => {
+              p.holes.forEach((h) => {
+                h.sections.forEach((s) => {
+                  modelImages.load_target_ids.push(s.id);
+                });
+              });
+            });
+          }else{
+            //case target
+          }
+          
+          N = modelImages.load_target_ids.length;
+        }else{
+          N=0;
+          modelImages.load_target_ids=[];
+        }
+        
+        if(N==0){
+          console.log("[Renderer]: There is no update image.")
+          resolve(results);
+          return;
+        }
+  
+        //main Progress   
+        await new Promise(async(p5resolve,reject) => {
+          try{
+            //load image
+            const imageBuffers = await new Promise(async(resolve, reject)=>{
+              const imBufferDict = await window.LabelerApi.LoadCoreImage({
+                targetIds:modelImages.load_target_ids,
+                operations:operations,
+                dpcm:objOpts.dpcm,
+              },"labeler");
+              resolve(imBufferDict)
+            }) 
+            results = await assignCoreImages(results, imageBuffers, objOpts);
+            results.load_target_ids = [];
+            p5resolve();
+          }catch(err){
+            reject();
+          }
+          
+        });
+        
+        resolve(results);
+      }catch(err){
+        reject(err);
+      }
+    });
+  
+  }
 
-            //check name
-            const split_name = im_name.split("-");
-            if(split_name.length !==2){
-              alert("Incorrectly named image dropped. Please rename it as 'Hole Name'- 'Section Name' first.");
-              return 
-            }
-            holeName = split_name[0];
-            sectionName = split_name[1];
-      
-            const task = (async () => {
-              try {
-                let imageBase64;
-                imageBase64 = await window.LabelerApi.LoadRasterImage(im_path, original_image_height);//load original size
-      
-                if (imageBase64 !== undefined) {
-                  results["drilling_depth"][im_name] = await p.loadImage(
-                    "data:image/png;base64," + imageBase64,
+  async function assignCoreImages(coreImages, imageBuffers, objOpts) {
+    let results = coreImages;
+    let suc = 0; 
+    let N = 0;
+    for(const depthTyep in imageBuffers){
+      N += Object.keys(imageBuffers[depthTyep]).length;
+    }
+  
+    await new Promise((resolve, reject) => {
+      new p5(async (p) => {
+        try {
+          let n = 0;
+          if(imageBuffers==null){
+            console.log("[Renderer]: Failed to assign images because there are no loaded images.");
+            reject();
+          }
+  
+          const promises = [];
+  
+          for (const depthScale of Object.keys(imageBuffers)) {
+            for (const imName in imageBuffers[depthScale]) {
+              const promise = new Promise(async (resolveImage) => {
+                try {
+                  let blob = new Blob([imageBuffers[depthScale][imName]], { type: 'image/jpeg' });
+                  let url = URL.createObjectURL(blob);
+                  results[depthScale][imName] = await p.loadImage(
+                    url,
                     async () => {
+                      console.log("[Renderer]: Assign image of " + imName +" in "+depthScale);
+                      suc+=1;
+                      resolveImage();
                     },
                     async () => {
-                      console.log("[Labeler]: Fail to load image of " + im_name);
+                      console.log("[Renderer]: Failed to assign image of " + imName +" in "+depthScale);
+                      resolveImage();
                     }
                   );
-                  console.log("Loaded image Info: \n", results["drilling_depth"][im_name])
-                } else {
-                  results["drilling_depth"][im_name] = undefined;
+                  results.image_resolution[imName] = objOpts.dpcm;
+                } catch (err) {
+                  console.log(err);
+                  results[depthScale][imName] = undefined;
+                  resolveImage();
                 }
-              } catch (error) {
-                console.error(error);
-                results["drilling_depth"][im_name] = undefined;
-              }
-            })();
-      
-            tasks.push(task);
+  
+                n+=1;
+              });
+              promises.push(promise);            
+            }
           }
-      
-          await Promise.all(tasks); 
-          p5resolve();
-        });
+          
+          await Promise.all(promises);
+          
+          resolve(results);
+        } catch (err) {
+          reject(err);
+        }
       });
-
-      resolve(results);
     });
-  }
-  async function loadSectionModel(modelImages, pathData) {
+  
+    console.log("[Renderer]: Load " + suc + " images / " + N + " models.");
+    return results;
+  }  
+  async function loadSectionModel(pathData, modelName) {
     return new Promise(async (resolve, reject) => {
       //initialise
-      let results = modelImages;
-      results = await window.LabelerApi.LoadSectionModel(pathData);//load original size
+      let results;
+      const res = await window.LabelerApi.LoadSectionModel(pathData, modelName);//load original size
+      if(res!==false){
+        results = res;
+      }
       
       resolve(results);
     });
@@ -819,7 +995,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const scrollerHeight = window.innerHeight - toolbarHeight - optionsHeight - footerHeight/2;
     //const scrollerWidth  = window.innerWidth;
     
-    document.getElementById('scroller').style.height = `${scrollerHeight}px`;
+    //document.getElementById('scroller').style.height = `${scrollerHeight}px`;
     //document.getElementById('scroller').style.width  = `${scrollerWidth}px`;
   }
   function makeP5CanvasBase() {
@@ -840,12 +1016,10 @@ document.addEventListener("DOMContentLoaded", () => {
   function updateView() {
     if (vectorObjects == null) {
       vectorObjects = new p5(p5Sketch);
-      resizeScroller();
       document.getElementById("p5Canvas").style.display = "block";
       makeP5CanvasBase();
       vectorObjects.redraw();
     }else{
-      resizeScroller();
       document.getElementById("p5Canvas").style.display = "block";
       makeP5CanvasBase();
       vectorObjects.clear();
@@ -853,6 +1027,9 @@ document.addEventListener("DOMContentLoaded", () => {
     } 
   }
   function calcRelativePos(){
+    if(!tempCore){
+      return null
+    }
     let rx = -1;
     let ry = -1;
     if(Object.keys(modelImages.drilling_depth).length>0){
@@ -871,6 +1048,7 @@ document.addEventListener("DOMContentLoaded", () => {
   async function addSectionData(holeName, sectionName){
     return new Promise(async (resolve, reject) => {
       tempCore = await window.LabelerApi.addSectionData(holeName, sectionName);
+
       resolve(tempCore)
     });
   }
@@ -1009,6 +1187,18 @@ document.addEventListener("DOMContentLoaded", () => {
 
     //draw data=============================================================================================
     sketch.draw = () => {
+      if(Object.keys(modelImages.drilling_depth).length==0){
+        let centerX = window.innerWidth / 2;
+        let centerY = window.innerHeight / 2;
+        sketch.push();
+        sketch.fill("lightgray");
+        sketch.noStroke();
+        sketch.textFont("Arial");
+        sketch.textSize(40);
+        sketch.text("Drop section image here.",centerX - sketch.textWidth("Drop section image here.")/2, centerY)
+        sketch.pop();
+        return
+      }
       //sketch.background("Black");
       let imgLoaded = false;
       //translate plot position
@@ -1028,7 +1218,7 @@ document.addEventListener("DOMContentLoaded", () => {
       let sectionTopDistance    = null;
       let sectionBottomDistance = null;
       
-      if(tempCore !== null ){
+      if(tempCore !== null && modelImages["drilling_depth"][holeName+"-"+sectionName] !== undefined){
         coreLength = tempCore.projects[0].holes[0].sections[0].markers[tempCore.projects[0].holes[0].sections[0].markers.length-1].distance - tempCore.projects[0].holes[0].sections[0].markers[0].distance;
         dpcm = original_image_height / coreLength;
 
@@ -1208,7 +1398,6 @@ document.addEventListener("DOMContentLoaded", () => {
     }    
     //draw data=============================================================================================
     sketch.windowResized = () => {
-      resizeScroller();
       sketch.resizeCanvas(scroller.clientWidth, scroller.clientHeight);
     };
   }
@@ -1445,7 +1634,6 @@ document.addEventListener("DOMContentLoaded", () => {
     }    
     //draw data=============================================================================================
     sketch.windowResized = () => {
-      resizeScroller();
       sketch.resizeCanvas(scroller.clientWidth, scroller.clientHeight);
     };
     sketch.keyPressed = () => {
@@ -1454,5 +1642,5 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     };
   }
-//-------------------------------------------------------------------------------------------
+  //-------------------------------------------------------------------------------------------
 });

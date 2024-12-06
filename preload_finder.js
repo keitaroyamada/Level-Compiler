@@ -13,7 +13,7 @@ contextBridge.exposeInMainWorld("FinderApi", {
   MoveToHorizon: (args1) => ipcRenderer.invoke("MoveToHorizon", args1),
   terminalLog: (args1) => ipcRenderer.invoke("terminalLog", args1),
   rendererLog: (args1) => ipcRenderer.invoke("rendererLog", args1),
-  getResourcePath: () => ipcRenderer.sendSync("getResourcePath"),
+  GetResources: () => ipcRenderer.sendSync("GetResources"),
   toggleDevTools: (args1) => ipcRenderer.send('toggle-devtools',args1),
 
   //main -> renderer

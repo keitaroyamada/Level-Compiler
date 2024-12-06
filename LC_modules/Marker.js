@@ -11,10 +11,10 @@ class Marker {
     this.age = null;
     this.h_connection = [];
     this.v_connection = [];
-    this.connection_rank = null;
+    this.connection_rank = null; //Level of inter/extrapolation
+    this.unreliability = null;  //Level of Reliability of Composite Depth when comparing to EFD
     this.isMaster = false;
     this.isZeroPoint = false; //if NOT zerpoint,"false", if START point, "value"(e.g. 8.4)
-    this.reliability = 1;  //legacy, use calculation for CD and EFD. Core with smaller value is used preferenticall.
     this.order = null;
     this.enable = true;
     this.depth_source = ["", null, null];

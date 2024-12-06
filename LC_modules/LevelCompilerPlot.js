@@ -36,7 +36,6 @@ class LevelCompilerPlot {
     this.age_collections.push(newCollection);
     this.age_selected_id = age_id;
   }
-
   addAgesetFromLCAgeModel(age_collectionId, LCAgeModel) {
     //get collection idx
     let targetIdx = null;
@@ -69,6 +68,8 @@ class LevelCompilerPlot {
       newData.source_code         = LCAgeModel.ages[a].source_code;
       newData.unit                = LCAgeModel.ages[a].unit;
       newData.description         = LCAgeModel.ages[a].note;
+      newData.enable              = LCAgeModel.ages[a].enable;
+      newData.reliable            = LCAgeModel.ages[a].reliable;
 
       //add
 
@@ -328,6 +329,15 @@ class LevelCompilerPlot {
       }
     }
   }
+  sortDataBy(target){
+    this.data_collections.forEach(dataCollection=>{
+      dataCollection.datasets.forEach(dataset=>{
+        dataset.data_series.sort((a,b)=>a[target] - b[target]);
+      })
+    })
+    console.log("LCPlot: Plot Data is sorted by "+target);
+  }
+ 
 }
 
 module.exports = { LevelCompilerPlot };

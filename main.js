@@ -16,6 +16,7 @@
 
 const path = require("path");
 const fs = require("fs");
+const os = require("os");
 const sharp = require("sharp");
 //const { mode } = require("simple-statistics");
 const { parse } = require("csv-parse/sync");
@@ -36,20 +37,28 @@ const { UndoManager } = require("./LC_modules/UndoManager.js");
 const { Trinity } = require("./LC_modules/Trinity.js");
 const { Section } = require("./LC_modules/Section.js");
 const { Marker } = require("./LC_modules/Marker.js");
-const { send } = require("process");
+const { send, availableMemory } = require("process");
 const { Worker } = require('worker_threads');
+const { isString } = require("util");
+const { resolve } = require("dns");
+const { rejects } = require("assert");
 
-//properties
+//mode properties
 const isMac = process.platform === "darwin";
 const isDev = false;//process.env.NODE_ENV !== "development"; //const isDev = false;
 let isEditMode = false;
+
+//main properties
 let LCCore = new LevelCompilerCore();
 let LCAge  = new LevelCompilerAge();;
 let LCPlot = new LevelCompilerPlot();
 const history = new UndoManager();
 let labelerHistory = new UndoManager();
 let tempCore = null; //for labeler
-let globalPath = {saveModelPath:null};
+let globalPath = {
+  saveModelPath:null,
+  dataPaths:[], //{type:[lcmodel, csvmodel, csvage, csvplot], path:""}
+};
 
 //windows
 let finderWindow = null;
@@ -107,15 +116,485 @@ function createMainWIndow() {
   LCCore = initialiseLCCore();
     
   //Implement menu
-  menuRebuild(mainWindow);
+  menuRebuild();
   //===================================================================================================================================
   //===================================================================================================================================
   //IPC from renderer
-  ipcMain.handle("test", async (_e, _arg1, _arg2) => {
-    console.log("test handle called");
-    console.log(_arg1 + _arg2);
+  
+  //============================================================================================
+  //Initialise and load model data
+  ipcMain.handle("InitialiseCorrelationModel", async (_e) => {
+    //initialise
+    LCCore = initialiseLCCore();
+
+    console.log("MAIN: Project correlation data is initialised.");
+    return JSON.parse(JSON.stringify(LCCore));
   });
-  ipcMain.on('getResourcePath', (_e) => {
+  ipcMain.handle("InitialiseAgeModel", async (_e) => {
+    //initialise
+    LCAge = new LevelCompilerAge();
+    LCCore.calcMarkerAges(LCAge);
+    console.log("MAIN: Project age data is initialised.");
+    return;
+  });
+  ipcMain.handle("InitialisePlotAgeCollection", async (_e) => {
+    //import modeln
+    LCPlot.age_collections = [];
+    LCPlot.age_selected_id = null;
+    console.log("MAIN: Project age plot data is initialised.");
+    return;
+  });
+  ipcMain.handle("InitialisePlotDataCollection", async (_e) => {
+    //import modeln
+    LCPlot.data_collections = [];
+    LCPlot.data_selected_id = null;
+    console.log("MAIN: Project plot data collection is initialised.");
+    return;
+  });
+  ipcMain.handle("InitialisePaths", async (_e) => {
+    //import modeln
+    initialiseGlobalPath();
+    console.log("MAIN: Paths are initialised.");
+    return;
+  });
+  //============================================================================================
+  //register and load model data
+  ipcMain.handle("RegisterModelFromCsv", async (_e, model_path) => {
+    //get file path
+    let results = path.parse(model_path);
+    const fullpath = path.join(results.dir, results.base);
+    
+    const result = registerModelFromCsv(fullpath);
+    return result
+  });
+  ipcMain.handle("RegistertAgeFromCsv", async (_e, age_path) => {
+    try {
+      //get file path
+      let results = path.parse(age_path);
+      const fullpath = path.join(results.dir, results.base);      
+      
+      //register
+      const res = registerAgeFromCsv(fullpath);
+
+      if(res==true){
+        //apply latest age model to the depth model
+        let model_name = null;
+        LCAge.AgeModels.forEach((model) => {
+          if (model.id == LCAge.selected_id) {
+            model_name = model.name;
+          }
+        });
+
+        return { id: LCAge.selected_id, name: model_name};
+      }
+    } catch (error) {
+      console.error("MAINE: Age model register error.");
+      console.log(error);
+      return null;
+    }
+  });
+  ipcMain.handle("RegisterLCmodel", async (_e, model_path) => {
+    try {
+      //get file path
+      let results = path.parse(model_path);
+      const fullpath = path.join(results.dir, results.base);
+
+      const registeredAgeList = await registerLCModel(fullpath);
+
+      return  registeredAgeList;
+    }catch(err){
+      console.log("MAIN: Failed to load LC model.",err);
+      return false
+    }
+  });
+  ipcMain.handle("LoadModelFromLCCore", async (_e) => {
+    //import model
+    console.log("MAIN: Load correlation model.");
+    return JSON.parse(JSON.stringify(LCCore));
+  });
+  ipcMain.handle("LoadAgeFromLCAge", async (_e, age_id) => {
+    //apply latest age model to the depth model
+    let model_name = null;
+
+    //set new id
+    LCAge.selected_id = age_id;
+
+    //get model name
+    LCAge.AgeModels.forEach((model) => {
+      if (model.id == LCAge.selected_id) {
+        model_name = model.name;
+      }
+    });
+
+    if (model_name == null) {
+      return null;
+    }
+
+    //load ages into LCCore
+    LCCore.calcMarkerAges(LCAge);
+    //LCAge.checkAges();
+    if(LCAge.unreliable_ids.length>0){
+      let txt = "Age model contains inverted chronological order.";
+      if(LCAge.use_unreliable_data==true){
+        txt +=" The Ages were forcibly calculated including inverted data.";
+      }else{
+        txt +=" The ages were calculated excluding inverted data.";        
+      }
+      const err = {
+        status: 'Infomation',
+        statusDetails: txt,      
+        hasError: false,    
+        errorDetails: null, 
+      }
+      mainWindow.webContents.send("AlertRenderer", err);
+    }
+
+    console.log("MAIN: Load age model into LCCore. id: " +  LCAge.selected_id + " name:" +  model_name);
+
+    return JSON.parse(JSON.stringify(LCCore));
+  });
+  ipcMain.handle("MirrorAgeList", async (_e) => {
+    let registeredAgeList = []; 
+    for (let i = 0; i < LCAge.AgeModels.length; i++) {
+      //make new collection
+      const model_name = LCAge.AgeModels[i].name;
+      const model_id = LCAge.AgeModels[i].id;
+      registeredAgeList.push({ id: model_id, name: model_name});
+    }
+    console.log("MAIN: Mirrored age list");
+    
+    return registeredAgeList;
+    
+  });
+  ipcMain.handle("Reregister", async (_e) => {    
+    const tempPath = JSON.parse(JSON.stringify(globalPath));
+    initialiseGlobalPath();
+
+    //re register LCModel
+    let targetList = tempPath.dataPaths.filter(item=>item.type=="lcmodel");
+    for(const data of targetList){
+      const fullpath = data.path;
+      if(fullpath !== undefined){
+        await registerLCModel(fullpath);
+      }
+    }
+
+    //re register CSV model
+    targetList = tempPath.dataPaths.filter(item=>item.type=="csvmodel");
+    for(const data of targetList){
+      const fullpath = data.path;
+      if(fullpath !== undefined){
+        const result = registerModelFromCsv(fullpath);
+      }
+    }
+
+    //calc
+    LCCore.calcCompositeDepth();
+    LCCore.calcEventFreeDepth();
+
+    //re register CsvAge
+    targetList = tempPath.dataPaths.filter(item=>item.type=="csvage");
+    for(const data of targetList){
+      const fullpath = data.path;
+      console.log(fullpath)
+      if(fullpath !== undefined){
+        const result = registerAgeFromCsv(fullpath);
+      }
+    }
+
+    //re register Images
+    targetList = tempPath.dataPaths.filter(item=>item.type=="core_images");
+    for(const data of targetList){
+      const fullpath = data.path;
+      console.log(fullpath)
+      if(fullpath !== undefined){
+        registerCoreImage(fullpath,"core_images",null);
+      }
+    }
+
+    console.log("MAIN: Reload all model data.")
+    return ;
+  });
+  
+  //============================================================================================
+  //file process
+  ipcMain.handle("getFilePath", async (_e, pathData) => {
+    //import modeln
+    let results = path.parse(pathData);
+    console.log(results)
+    results.fullpath = path.join(results.dir, results.base);
+    results.imagepath = path.join(results.dir, results.name+".jpg");//force to rename for labeler
+    return results;
+  });
+  ipcMain.handle("CheckImagesInDir", async (_e, name) => {
+    let targetList = globalPath.dataPaths.filter(item=>item.type=="core_images");
+    let result = false;
+    for(const target of targetList){
+      const res = findFileInDir(target.path, name, "check");
+      if(res[0]==true){
+        result = true;
+        break;
+      }
+    }
+    return result;
+  });
+  ipcMain.handle("FileChoseDialog", async (_e, title, ext) => {
+    const result = await getfile(mainWindow, title, ext);
+    
+    return result;
+  });
+  ipcMain.handle("FolderChoseDialog", async (_e, title) => {
+    const result = await getDirectory(mainWindow, title);
+    return result;
+  });
+
+ //============================================================================================
+ //image process
+  ipcMain.handle('RegisterCoreImage', (_e, dir_handle, type) => {
+    try{
+      //get file path
+      const pathData = path.parse(dir_handle);
+      if(pathData.dir==""){
+        console.log("MAIN: Failed to register core images.")
+        return false
+      }
+
+      let dirPath = null; 
+      if(pathData.ext==""){
+        //case folder
+        dirPath = path.join(pathData.dir, pathData.name);
+        //register path
+        registerCoreImage(dirPath, type, null);
+      }else if(pathData.ext==".jpg"){
+        dirPath = pathData.dir;
+        //register path
+        registerCoreImage(dirPath, type, pathData.base);
+      }else if(pathData.ext==".lcsection"){
+        //lcsection from labeler
+        dirPath = pathData.dir;
+        //register path
+        registerCoreImage(dirPath, type, null);
+      }else{
+        return false
+      }
+      
+      return true      
+    }catch(err){
+      return false
+    } 
+  });
+  ipcMain.handle("LoadCoreImage", async (_e, loadOptions, type) => {
+    //type: "core_images", "labeler"
+    const coreImages = await loadCoreImages(loadOptions, type);
+    return coreImages;
+  });
+  async function loadCoreImages(loadOptions, type){
+    //console.log("   Load core image called")
+    let releasedWorkers = 0;
+    let numTotalTasks = 0;
+    try {
+      if(loadOptions.targetIds.length==0){
+        return null
+      }
+
+      //initialise
+      
+      let coreImages = {
+        load_target_ids: [],
+        operations:[],
+        image_resolution: {},
+        drilling_depth: {},
+        composite_depth: {},
+        event_free_depth: {},
+        age:{},
+      };
+
+      //get registered image folder path
+      let targetList = globalPath.dataPaths.filter(item=>item.type==type);
+
+      if(targetList.length < 1){
+        return null
+      }
+      console.log("MAIN: Load images: N = "+loadOptions.targetIds.length+"; Operations: "+loadOptions.operations);
+
+      //make tasks
+      const NUM_WORKERS = Math.min(Math.round(os.cpus().length/2,0), loadOptions.targetIds.length);
+      const tasks = []; // Task queue
+      const idleWorkers = []; // Idle worker list
+
+      for(const target of targetList){
+        for(const id of loadOptions.targetIds){
+          let idx = null;
+          let targetHoleData = null;
+          let targetSectionData = null;
+          if(type=="core_images"){
+            idx = LCCore.search_idx_list[id.toString()];
+            targetHoleData = LCCore.projects[idx[0]].holes[idx[1]];
+            targetSectionData = targetHoleData.sections[idx[2]];
+          }else if(type=="labeler"){
+            targetHoleData = tempCore.projects[0].holes[0];
+            targetSectionData = targetHoleData.sections[0];
+          }
+          
+          let imBaseName = targetHoleData.name +"-"+targetSectionData.name;
+         
+
+          //get image path
+          let fullpath;
+          if(imBaseName.includes(".jpg")){
+            fullpath = findFileInDir(target.path, imBaseName, "get");
+          }else{
+            fullpath = findFileInDir(target.path, imBaseName+".jpg", "get");
+          }
+
+          if(fullpath.length==0){
+            continue
+          }
+  
+          //calc new image size
+          let new_height = Math.round(loadOptions.dpcm * (targetSectionData.markers[targetSectionData.markers.length - 1].distance - targetSectionData.markers[0].distance), 0);
+          if(new_height > loadOptions.dpcm * 120){
+            new_height = loadOptions.dpcm * 120;
+          }
+          //calc resize        
+          const new_size = { height: new_height, width: 1 };
+  
+          tasks.push({
+            type:"continue",
+            imageName:imBaseName,
+            imagePath:fullpath[0],
+            imageSize:new_size,
+            operations:loadOptions.operations,
+            sectionData:targetSectionData,
+          })  
+        }
+      }      
+
+      if(tasks.length==0){
+        console.log("MAIN: Failed to get tasks", targetList, loadOptions);
+        return null
+      }
+      //submit
+      //make worker
+      numTotalTasks =tasks.length;
+      progressBar = progressDialog(mainWindow, "Load modeled section images", "Now converting...");
+      progressBar = await updateProgress(progressBar, 0, numTotalTasks);
+      const workers = await initialiseWorkerPool(NUM_WORKERS, tasks, idleWorkers, coreImages);
+
+      while (tasks.length > 0 && idleWorkers.length > 0) {
+        processNextTask(tasks, idleWorkers);
+      }
+
+      // Wait for all workers to finish
+      await new Promise((resolve, reject) => {
+        workers.forEach((worker) => {
+          worker.on("exit", (code) => {
+            //count num releases
+            releasedWorkers +=1;
+
+            //console.log(releasedWorkers,NUM_WORKERS)
+            if(releasedWorkers==NUM_WORKERS){
+              console.log("MAIN: All workers have been successfully closed and resources are released.");
+              resolve();
+            }else{
+              processNextTask([{type:"exit"}], idleWorkers); // next close task
+            }
+          });
+        });
+      });
+
+      if(progressBar!==null){
+        progressBar = await updateProgress(progressBar, numTotalTasks, numTotalTasks);
+        progressBar = null;
+      }
+      return coreImages;
+    }catch(err){
+      return null;
+    }
+      //-----------------------------------------------------------
+      
+      async function initialiseWorkerPool(numWorkers, tasks, idleWorkers, taskResults) {
+        const workers = [];  
+        let n = 0;
+        for (let i = 0; i < numWorkers; i++) {
+          const worker = new Worker(path.join(__dirname, './LC_modules/makeModelImageWorker.js'));
+          workers.push(worker);
+          idleWorkers.push(worker);
+      
+          // when completed//errored
+          worker.on("message", async(result) => {
+            //console.log("MAIN: Worker finished task.");
+            n +=1;
+            progressBar = await updateProgress(progressBar, n, numTotalTasks);
+            // if get result
+            mergeMissingKeys(taskResults, result);
+      
+            if (tasks.length > 0) {
+              idleWorkers.push(worker); // reuse worker
+              processNextTask(tasks, idleWorkers); // next task
+            } else{
+              // all tasks are finished
+              //console.log("MAIN: Exit worker1 (idle workers: "+idleWorkers.length+")")
+              if(idleWorkers.length == 0){
+                idleWorkers.push(worker); // reuse worker
+                processNextTask([{type:"exit"}], idleWorkers);
+              }else{
+                releasedWorkers +=1;
+                processNextTask([{type:"exit"}], idleWorkers);
+              }                        
+            }
+          });
+      
+          //if error
+          worker.on("error", async(err) => {
+            n+=1;
+            progressBar = await updateProgress(progressBar, n, numTotalTasks);
+            console.error("Worker error:", err);
+            idleWorkers.push(worker);
+            if (tasks.length > 0) {
+              idleWorkers.push(worker); // reuse worker
+              processNextTask(tasks, idleWorkers); // next task
+            } else{
+              // all tasks are finished
+              //console.log("MAIN: Exit worker2 (idle workers: "+idleWorkers.length+")")  
+              if(idleWorkers.length == 0){
+                idleWorkers.push(worker); // reuse worker
+                processNextTask([{type:"exit"}], idleWorkers);
+              }else{
+                releasedWorkers +=1;
+                processNextTask([{type:"exit"}], idleWorkers);
+              }                       
+            }
+          });
+    
+        }
+        return workers;
+      }
+      function processNextTask(tasks, idleWorkers) {    
+        if ((tasks.length > 0 && idleWorkers.length > 0)) {
+          const worker = idleWorkers.pop();
+          const task = tasks.shift();
+          if (worker && task) {
+            if(task.type=='continue'){
+              //console.log(`MAIN: Assigning task to worker: ${task.imageName}`);
+            }        
+            worker.postMessage(task);
+          }
+        }
+      }
+      function mergeMissingKeys(objA, objB) {
+        for (const key in objB) {
+          if (!objA.hasOwnProperty(key)) {
+            if(!objA[key]){
+              objA[key] = objB[key];
+            }
+          } else if (typeof objB[key] === 'object' && typeof objA[key] === 'object') {
+            mergeMissingKeys(objA[key], objB[key]);
+          }
+        }
+      }
+  };
+  ipcMain.on('GetResources', (_e) => {
     
     let resourcePath;
     if(app.isPackaged){
@@ -124,45 +603,34 @@ function createMainWIndow() {
     }else{
       //dev env
       resourcePath = path.join(__dirname);
-      
     }
     
-    let plot_icons = {
-      terrestrial: [
-        path.join(resourcePath, "resources","plot","terrestrial.png"),
-        "Green",
-      ],
-      marine: [
-        path.join(resourcePath, "resources","plot","marine.png"),
-        "Blue",
-      ],
-      tephra: [
-        path.join(resourcePath, "resources","plot","tephra.png"),
-        "Red",
-      ],
-      climate: [
-        path.join(resourcePath, "resources","plot","climate.png"),
-        "Yellow",
-      ],
-      orbital: [
-        path.join(resourcePath, "resources","plot","orbital.png"),
-        "Orange",
-      ],
-      general: [
-        path.join(resourcePath, "resources","plot","general.png"),
-        "Gray",
-      ],
-      historical: [
-        path.join(resourcePath, "resources","plot","historical.png"),
-        "Black"
-      ],
-      interpolation: [
-        path.join(resourcePath, "resources","plot","interpolation.png"),
-        "Gray"
-      ]
+    //set path
+    let plot_paths = {
+      terrestrial: path.join(resourcePath, "resources","plot","terrestrial.png"),
+      terrestrial_unreliable: path.join(resourcePath, "resources","plot","terrestrial_unreliable.png"),
+      terrestrial_disable: path.join(resourcePath, "resources","plot","terrestrial_disable.png"),
+      marine: path.join(resourcePath, "resources","plot","marine.png"),
+      marine_unreliable: path.join(resourcePath, "resources","plot","marine_unreliable.png"),
+      marine_disable: path.join(resourcePath, "resources","plot","marine_disable.png"),
+      tephra: path.join(resourcePath, "resources","plot","tephra.png"),
+      tephra_unreliable: path.join(resourcePath, "resources","plot","tephra_unreliable.png"),
+      tephra_disable: path.join(resourcePath, "resources","plot","tephra_disable.png"),
+      orbital: path.join(resourcePath, "resources","plot","orbital.png"),
+      orbital_unreliable: path.join(resourcePath, "resources","plot","orbital_unreliable.png"),
+      orbital_disable: path.join(resourcePath, "resources","plot","orbital_disable.png"),
+      general: path.join(resourcePath, "resources","plot","general.png"),
+      general_unreliable: path.join(resourcePath, "resources","plot","general_unreliable.png"),
+      general_disable: path.join(resourcePath, "resources","plot","general_disable.png"),
+      historical: path.join(resourcePath, "resources","plot","historical.png"),
+      historical_unreliable: path.join(resourcePath, "resources","plot","historical_unreliable.png"),
+      historical_disable: path.join(resourcePath, "resources","plot","historical_disable.png"),
+      interpolation: path.join(resourcePath, "resources","plot","interpolation.png"),
+      interpolation_unreliable: path.join(resourcePath, "resources","plot","interpolation_unreliable.png"),
+      interpolation_disable: path.join(resourcePath, "resources","plot","interpolation_disable.png"),
     };
 
-    let tool_icons ={
+    let tool_paths ={
       bt_reload:      path.join(resourcePath, "resources","tool","reload.png"),
       bt_finder:      path.join(resourcePath, "resources","tool","finder.png"),
       bt_zoomin:      path.join(resourcePath, "resources","tool","zoomin.png"),
@@ -182,14 +650,14 @@ function createMainWIndow() {
       bt_show_labels: path.join(resourcePath, "resources","tool","label.png"),
     };
     
-    let finder_icons ={
+    let finder_paths ={
       fixed:  path.join(resourcePath, "resources","tool","fixed.png"),
       linked: path.join(resourcePath, "resources","tool","linked.png"),
       fix:    path.join(resourcePath, "resources","tool","fix.png"),
       link:   path.join(resourcePath, "resources","tool","link.png"),
     };
 
-    let labeler_icons = {
+    let labeler_paths = {
       bt_change_distance: path.join(resourcePath, "resources","tool","edit_distance.png"),
       bt_change_dd:       path.join(resourcePath, "resources","tool","edit_dd.png"),
       bt_change_name:     path.join(resourcePath, "resources","tool","edit_name.png"),
@@ -198,128 +666,69 @@ function createMainWIndow() {
 
     };
   
+    //make fuction
+    const loadIcon = ((paths)=>{
+      let icons = {};
+      for(const key in paths){
+        try{
+        const imBuffer = fs.readFileSync(paths[key]).toString("base64");
+        const imData = `data:image/png;base64,${imBuffer}`;
+        icons[key] = imData;
+        }catch(err){
+          console.log("MAIN: Failed to load icon: "+key);
+        }
+      }
+      return icons;
+    })
+
+    //load images
+    let plot_icons   = loadIcon(plot_paths);
+    let tool_icons   = loadIcon(tool_paths);
+    let finder_icons = loadIcon(finder_paths);
+    let labeler_icons= loadIcon(labeler_paths);
+
+    
     _e.returnValue = {plot:plot_icons, tool:tool_icons, finder:finder_icons, labeler:labeler_icons};
   });
-  //============================================================================================
-  ipcMain.handle("InitialiseCorrelationModel", async (_e) => {
-    //import modeln
-    console.log("MAIN: Initialise correlation model");
-    LCCore = initialiseLCCore();
-
-    console.log("MAIN: Project correlation data is initialised.");
-    return JSON.parse(JSON.stringify(LCCore));
-  });
-
-  ipcMain.handle("InitialiseAgeModel", async (_e) => {
-    //import modeln
-    console.log("MAIN: Initialise age model");
-    LCAge = new LevelCompilerAge();
-    //LCAge.AgeModels = [];
-    //LCAge.selected_id = null;
-    console.log("MAIN: Project age data is initialised.");
-    return;
-  });
-  ipcMain.handle("InitialisePlot", async (_e) => {
-    //import modeln
-    console.log("MAIN: Initialise plot data");
-    LCPlot.age_collections = [];
-    LCPlot.data_collections = [];
-    LCPlot.age_selected_id = null;
-    LCPlot.data_selected_id = null;
-    console.log("MAIN: Project plot data is initialised.");
-    return;
-  });
-  ipcMain.handle("InitialisePlotDataCollection", async (_e) => {
-    //import modeln
-    console.log("MAIN: Initialise plot data collection");
-    LCPlot.data_collections = [];
-    LCPlot.data_selected_id = null;
-    console.log("MAIN: Project plot data collection is initialised.");
-    return;
-  });
-  ipcMain.handle("getFilePath", async (_e, pathData) => {
-    //import modeln
-    let results = path.parse(pathData);
-    results.fullpath = path.join(results.dir, results.base);
-    results.imagepath = path.join(results.dir, results.name+".jpg");//force to rename for labeler
-    return results;
-  });
-  ipcMain.handle("getFilesInDir", async (_e, dir, name) => {
-    const results = findFileInDir(dir, name);
-    if(results.length == 1){
-      //console.log("MAIN: Successfully get fullpath.");
-      return results;
-    }else{
-      //console.log("MAIN: Failed to find file of " + name);
-      return null;
-    }
-  });
-  ipcMain.handle("RegisterModelFromCsv", async (_e, model_path) => {
-    try {
-      //register model
-      const isLoad = LCCore.loadModelFromCsv(model_path);
-      if(isLoad == true){
-        console.log('MAIN: Registered correlation model from "' + model_path + '"' );
-        return {
-          id: LCCore.projects[LCCore.projects.length - 1].id,
-          name: LCCore.projects[LCCore.projects.length - 1].name,
-          path: model_path,
-        };
+  ipcMain.handle("isExistFile",(_e, dirHandle, fileName)=>{
+    try{
+      //get file path
+      const pathData = path.parse(dirHandle);
+      let dirPath = null; 
+      if(pathData.ext==""){
+        //case folder
+        dirPath = path.join(pathData.dir, pathData.name);
       }else{
-        return null;
-      }
-      
-    } catch (error) {
-      console.log(error);
-      console.error("MAIN: Correlation model register error.");
-      return null;
-    }
-  });
-  ipcMain.handle("RegisterModelFromLCCore", async (_e) => {
-    try {
-      //register model
-      let outData =[];
-
-      for(let p=0; p<LCCore.projects.length;p++){
-        outData.push({id:JSON.parse(JSON.stringify(LCCore.projects[p].id)), name:LCCore.projects[p].name, path:null});
+        dirPath = pathData.dir;
+        //register path
       }
 
-      return outData;
-      
-    } catch (error) {
-      console.log(error);
-      console.error("MAIN: Correlation model register error.");
-      return null;
-    }
-  });
-  ipcMain.handle("loadLCmodel", async (_e,filepath) => {
-    try {
-      const inData = await loadmodelfile(filepath)
-      if(inData!==null){
-         //initialise
-         LCCore = initialiseLCCore(mainWindow);
-         LCAge  = new LevelCompilerAge(); 
-
-        //register
-        assignObject(LCCore, inData.LCCore);
-        assignObject(LCAge, inData.LCAge);
+      //check
+      const fullpath = path.join(dirPath, fileName);
+      if(fs.existsSync(fullpath)){
+        return true
+      }else{
+        return false
       }
-      mainWindow.webContents.send("RegisteredLCModel");
-      return
     }catch(err){
-      console.log("MAIN: Failed to load LC model.",err);
-      return
-    }
+      return false
+    } 
   });
-  ipcMain.handle("addSectionFromLcsection", async (_e,pathData) => {
+  
+ //============================================================================================
+  ipcMain.handle("addSectionFromLcsection", async (_e,pathHandle) => {
     try {
+      //get file path
+      let pathData = path.parse(pathHandle);
+      pathData.fullpath = path.join(pathData.dir, pathData.base);
+
       //load
       let sectionData = null;
       if (pathData.fullpath !== null) {
         const fileContent = fs.readFileSync(pathData.fullpath, 'utf8');
         sectionData = JSON.parse(fileContent);
       }else{
-        return "no_path";
+        return "There is no such a file.";
       }
 
       //search target section
@@ -334,7 +743,7 @@ function createMainWIndow() {
             for(let s=0; s<LCCore.projects[p].holes[h].sections.length;s++){
               if(LCCore.projects[p].holes[h].sections[s].name == sectionName){
                 //case duplicate section
-                return "duplicate_section";
+                return "Duplicate section exist.";
               }
             }
           }
@@ -343,46 +752,17 @@ function createMainWIndow() {
 
       //check duplicate hole
       if(targetHoleIds.length>1){
-        return "duplicate_hole"
+        return "Duplicate hole exist."
+      }else if(targetHoleIds.length==0){
+        return "There is no hole with a matching name."
       }
 
       //add blank section
-      console.log("MAIN: Add to ["+targetHoleIds[0]+"]");
-      const inData = {
-        name:sectionData.name,
-        distance_top:sectionData.markers[0].distance,
-        distance_bottom:sectionData.markers[sectionData.markers.length-1].distance,
-        dd_top:sectionData.markers[0].drilling_depth,
-        dd_bottom:sectionData.markers[sectionData.markers.length-1].drilling_depth,
-      }
-      const result = LCCore.addSection(targetHoleIds[0], inData);
-
-      //add data
-      for(let p=0;p<LCCore.projects.length;p++){
-        for(let h=0;h<LCCore.projects[p].holes.length;h++){
-          if(LCCore.projects[p].holes[h].id.toString() == targetHoleIds[0].toString()){
-            for(let s=0; s<LCCore.projects[p].holes[h].sections.length;s++){
-              if(LCCore.projects[p].holes[h].sections[s].name == sectionName){
-                //update new section id
-                sectionData.id = LCCore.projects[p].holes[h].sections[s].id;
-                sectionData.markers.forEach(m=>{
-                  let id = LCCore.projects[p].holes[h].sections[s].id;
-                  id[3] = sectionData.reserved_marker_ids.length;
-
-                  m.id = id;
-                  sectionData.reserved_marker_ids.push(id[3]); 
-                })
-
-                LCCore.projects[p].holes[h].sections[s] = sectionData;
-              }            
-            }
-          }
-        }  
-      }
+      const result = LCCore.addSectionModel(targetHoleIds[0], sectionData);
 
       //return result
       if(result == true){
-        console.log("MAIN: Add new LC section.");
+        console.log("MAIN: Add new section from lcsection.");
         return true
       }else{
         return "fail_to_add";
@@ -393,46 +773,9 @@ function createMainWIndow() {
     }
   });
   
-  ipcMain.handle("LoadModelFromLCCore", async (_e) => {
-    //import model
-    console.log("MAIN: Load correlation model.");
-    return JSON.parse(JSON.stringify(LCCore));
-  });
 
-  ipcMain.handle("LoadRasterImage", async (_e, im_path, Resize) => {
-    try {
-      //path.join(__dirname.replace(/\\/g, "/"), im_path)
-      const imageBuffer = fs.readFileSync(im_path);
-      //console.log(im_path)
-      if (Resize !== 0) {
-        const metadata = await sharp(imageBuffer).metadata();
-        const new_size = { height: Resize, width: 1 };
 
-        if (metadata.height > new_size.height) {
-          const resizedBuffer = await sharp(imageBuffer)
-            .resize({ height: new_size.height })
-            .toBuffer();
 
-          //console.log("resized");
-          return resizedBuffer.toString("base64");
-        } else {
-          //console.log("original");
-          const resizedBuffer = await sharp(imageBuffer)
-            .resize({ height: new_size.height })
-            .toBuffer();
-          return resizedBuffer.toString("base64");
-        }
-      } else {
-        return imageBuffer.toString("base64");
-      }
-    } catch (error) {
-      if (error.code === "ENOENT") {
-        //case there is no such a file.
-      } else {
-        throw error;
-      }
-    }
-  });
 
   ipcMain.handle("progressbar", async (_e, tit, txt) => {
     progressBar = null;
@@ -447,20 +790,7 @@ function createMainWIndow() {
   ipcMain.handle("clearProgressbar", async (_e, n, N) => {
       progressBar = null;    
   });
-  ipcMain.handle("makeModelImage", async (_e, imPath, sectionData, imHeight, depthScale) => {
-    try {
-      const result = await startMakeModelImageWorker({ imPath, sectionData, imHeight, depthScale });
-      return result;
-    } catch (error) {
-      if (error.code === "ENOENT") {
-        //（Error NO ENTry）case there is no such a file.
-      } else {
-        throw error;
-      }
-    }
-    
-
-  });
+  
 
   ipcMain.handle("askdialog", (_e, tit, txt) => {
     const options = {
@@ -799,102 +1129,7 @@ function createMainWIndow() {
       menu.popup(BrowserWindow.fromWebContents(event.sender));
     });
   });
-  ipcMain.handle("RegistertAgeFromCsv", async (_e, age_path) => {
-    try {
-      //import model
-      LCAge.loadAgeFromCsv(LCCore, age_path);
-      LCAge.selected_id; //latest version is automatucally selected in loadAgeFromCsv
-
-      //apply latest age model to the depth model
-      let model_name = null;
-      LCAge.AgeModels.forEach((model) => {
-        if (model.id == LCAge.selected_id) {
-          model_name = model.name;
-        }
-      });
-
-
-      console.log("MAIN: Registered age model from " + age_path);
-      return { id: LCAge.selected_id, name: model_name, path: age_path };
-    } catch (error) {
-      console.error("MAINE: Age model register error.");
-      console.log(error);
-      return null;
-    }
-  });
-  ipcMain.handle("RegisterAgeFromLCAge", async (_e) => {
-    if(LCAge !== null){
-      //apply latest age model to the depth model
-      let outData = [];
-
-      for(let model of LCAge.AgeModels){
-
-        outData.push({ id: model.id, name: model.name, path: null });
-
-      }
-
-      console.log("MAIN: Registered age model from LCAge");
-      return outData;
-    }else{
-      return null;
-    }
-  });
-  ipcMain.handle("LoadAgeFromLCAge", async (_e, age_id) => {
-    //apply latest age model to the depth model
-    let model_name = null;
-
-    //set new id
-    LCAge.selected_id = age_id;
-
-    //get model name
-    LCAge.AgeModels.forEach((model) => {
-      if (model.id == LCAge.selected_id) {
-        model_name = model.name;
-      }
-    });
-
-    if (model_name == null) {
-      return null;
-    }
-
-    //load ages into LCCore
-    LCCore.calcMarkerAges(LCAge);
-    LCAge.checkAges();
-
-    console.log("MAIN: Load age model into LCCore. id: " +  LCAge.selected_id + " name:" +  model_name);
-
-    return JSON.parse(JSON.stringify(LCCore));
-  });
-  ipcMain.handle("RegisterAgePlotFromLCAge", async (_e) => {
-    LCPlot.initialiseAgeCollection();
-    try {      
-      //register all LCAge models
-      for (let i = 0; i < LCAge.AgeModels.length; i++) {
-        //make new collection
-        const model_name = LCAge.AgeModels[i].name;
-        const model_id = LCAge.AgeModels[i].id;
-        LCPlot.addNewAgeCollection(model_name, model_id);
-
-        //get idx
-        let age_idx = null;
-        LCAge.AgeModels.forEach((a, idx) => {
-          if (a.id == model_id) {
-            age_idx = idx;
-          }
-        });
-
-        //register dage data from LCAge
-        LCPlot.addAgesetFromLCAgeModel(
-          LCPlot.age_selected_id, //new made lotdata id
-          LCAge.AgeModels[age_idx]
-        );
-        LCPlot.calcAgeCollectionPosition(LCCore, LCAge);
-        console.log("MAIN: Registered age plot data from " + LCAge.AgeModels[age_idx].name);
-      }
-    } catch (error) {
-      console.error("ERROR: Plot data register from LCAge error.", error);
-    }
-  });
+  
 
   ipcMain.handle("ExportCorrelationAsCsvFromRenderer", async (_e, MD) => {
     let exportLCCore = initialiseLCCore();
@@ -915,6 +1150,9 @@ function createMainWIndow() {
     tempCore = initialiseLCCore();
     tempCore.addProject("correlation","temp");
     tempCore.addHole([1,null,null,null],"temp");
+
+    globalPath.dataPaths = globalPath.dataPaths.filter(data => data.type !== "labeler");
+
     console.log("MAIN: Labeler Project data is initialised.");
     return JSON.parse(JSON.stringify(tempCore));
   });
@@ -1011,7 +1249,7 @@ function createMainWIndow() {
     //make outdata
     const labeledImage  = Buffer.from(data.image_labeled.split(",")[1], "base64"); //remove header
     const originalImage = Buffer.from(data.image_original.split(",")[1], "base64"); //remove header
-    const annotationData = JSON.stringify(data.section_data);
+    const annotationData = JSON.stringify(data.section_data,null,2);
 
     const dataName  = data.hole_name +"-"+ data.section_name;
 
@@ -1042,25 +1280,49 @@ function createMainWIndow() {
       
 
   });
-  ipcMain.handle("LabelerLoadSectionModel", (_e, data_path) => {
+  ipcMain.handle("LabelerLoadSectionModel", (_e, dirHandle, fileName) => {
     try{
-      if (data_path !== null) {
+      //get file path
+      const pathData = path.parse(dirHandle);
+      let fullpath = null;
+      if(pathData.ext==""){
+        //case folder
+        const dirPath = path.join(pathData.dir, pathData.name);
+        fullpath = path.join(dirPath, fileName);
+      }else if(pathData.ext==".jpg"){
+        const dirPath = pathData.dir;
+        const baseName = fileName.split(".")[0];
+        fullpath = path.join(dirPath, baseName+".lcsection");
+        //register path
+      }else{
+        const dirPath = pathData.dir;
+        fullpath = path.join(dirPath, fileName);
+        //register path
+      }
+
+      //check
+      if(fs.existsSync(fullpath)){
         //load section data
-        const fileContent = fs.readFileSync(data_path.fullpath, 'utf8');
+        console.log(fullpath)
+        const fileContent = fs.readFileSync(fullpath, 'utf8');
         const sectionData = JSON.parse(fileContent);
 
-        //add to model
-        const name = data_path.name;
-        const holeName = name.split("-")[0];
-        const sectionName = name.split("-")[1];
+        //register to model
+        const name = fileName;
+        const holeName = name.split(/[-.]+/)[0];
+        const sectionName = name.split(/[-.]+/)[1];
         Object.assign(tempCore.projects[0].holes[0].sections[0], sectionData);
 
         return JSON.parse(JSON.stringify(tempCore));
+      }else{
+        
+        return false
       }
     }catch(err){
       console.error('Error loading file:', err);
-      return JSON.parse(JSON.stringify(tempCore));
-    }
+      return false
+    } 
+
   });
   ipcMain.handle("LabelerLoadModel", (_e) => {
     return JSON.parse(JSON.stringify(tempCore));
@@ -1144,6 +1406,7 @@ function createMainWIndow() {
     //LC plot age_collection id is as same as LCAge id
     LCPlot.age_selected_id = LCAge.selected_id;
 
+
     if (LCPlot) {
       console.log("MAIN: Load plot data from LCPlot");
       return LCPlot;
@@ -1167,14 +1430,7 @@ function createMainWIndow() {
     return JSON.parse(JSON.stringify(LCCore));
   });
 
-  ipcMain.handle("FileChoseDialog", async (_e, title, ext) => {
-    const result = await getfile(mainWindow, title, ext);
-    return result;
-  });
-  ipcMain.handle("FolderChoseDialog", async (_e, title) => {
-    const result = await getDirectory(mainWindow, title);
-    return result;
-  });
+
 
   ipcMain.handle("GetAgeFromEFD", async (_e, efd, method) => {
     //calc age
@@ -1753,6 +2009,7 @@ function createMainWIndow() {
       mainWindow.webContents.send("importedData", LCPlot);
     }else if(data.send_to == "plotter"){      
       LCPlot.addDataset(data.name, data.data);
+      LCPlot.sortDataBy("composite_depth")
       plotWindow.webContents.send("importedData", LCPlot);
       console.log("MAIN: Plot Data is imported into Plotter.")
     }
@@ -2228,7 +2485,7 @@ function createMainWIndow() {
   ipcMain.handle("changeEditMode", (_e,mode) => {
     
     isEditMode = mode;
-    menuRebuild(mainWindow);
+    menuRebuild();
     
   });
   ipcMain.handle("sendSettings", (_e,data, to) => {
@@ -2276,6 +2533,127 @@ function createMainWIndow() {
 
     return LCCore;
   }
+  function initialiseDataPath(type){
+    globalPath.dataPaths.filter(data => data.type !== type);
+  }
+  function registerModelFromCsv(fullpath){
+    try {
+      //register model
+      const isLoad = LCCore.loadModelFromCsv(fullpath);
+      if(isLoad == true){
+        //register path
+        globalPath.dataPaths.push({type:"csvmodel", path:fullpath});
+
+        console.log('MAIN: Registered correlation model from "' + fullpath + '"' );
+        return true
+      }else{
+        return null;
+      }
+      
+    } catch (error) {
+      console.log(error);
+      console.error("MAIN: Correlation model register error.");
+      return null;
+    }
+  }
+  function registerAgeFromCsv(fullpath){
+    try{
+      // loadAgeFromCsv
+      LCAge.loadAgeFromCsv(LCCore, fullpath);
+      //apply latest age model to the depth model
+
+      //register        
+      globalPath.dataPaths.push({type:"csvage",path:fullpath});
+      console.log("MAIN: Registered age model from " + fullpath);
+
+      //register all LCAge models
+      LCPlot.initialiseAgeCollection();
+      //register dage data from LCAge
+      registerLCPlot();
+
+      
+      return true
+    }catch(err){
+      console.log(err)
+    }
+  }
+  async function registerLCModel(fullpath){
+    globalPath.dataPaths.push({type:"lcmodel",path:fullpath});
+
+    //import data
+    const inData = await loadmodelfile(fullpath);
+
+    //register
+    if(inData!==null){
+        //initialise
+        LCCore = initialiseLCCore(mainWindow);
+        LCAge  = new LevelCompilerAge(); 
+        LCPlot.initialiseAgeCollection();
+
+      //register
+      assignObject(LCCore, inData.LCCore);
+      assignObject(LCAge, inData.LCAge);
+
+      //register all LCAge models     
+      registerLCPlot();
+
+      //get age list
+      let registeredAgeList = []; 
+      for (let i = 0; i < LCAge.AgeModels.length; i++) {
+        //make new collection
+        const model_name = LCAge.AgeModels[i].name;
+        const model_id = LCAge.AgeModels[i].id;
+        registeredAgeList.push({ id: model_id, name: model_name});
+      }
+
+      console.log("MAIN: Registered correlation model from: "+ fullpath);
+      return  registeredAgeList;
+    }else{
+      console.log("MAIN: Failed to register correlation model. There is no such a file.")
+      return false
+    }
+  }
+  function registerLCPlot(){
+    for (let i = 0; i < LCAge.AgeModels.length; i++) {
+      //make new collection
+      const model_name = LCAge.AgeModels[i].name;
+      const model_id = LCAge.AgeModels[i].id;
+      LCPlot.addNewAgeCollection(model_name, model_id);
+
+      //get idx
+      let age_idx = null;
+      LCAge.AgeModels.forEach((a, idx) => {
+        if (a.id == model_id) {
+          age_idx = idx;
+        }
+      });
+
+      //register dage data from LCAge
+      LCPlot.addAgesetFromLCAgeModel(
+        LCPlot.age_selected_id, //new made lotdata id
+        LCAge.AgeModels[age_idx]
+      );
+      LCPlot.calcAgeCollectionPosition(LCCore, LCAge);
+      console.log("MAIN: Registered age plot data from " + LCAge.AgeModels[age_idx].name);
+    }
+    
+  }
+  function initialiseGlobalPath(){
+    globalPath = {
+      saveModelPath:null,
+      dataPaths:[], //{type:[lcmodel, csvmodel, csvage, csvplot], path:""}
+    };
+  }
+  function registerCoreImage(fullpath, type, name){
+    try{
+      globalPath.dataPaths.push({type:type, path:fullpath, name:name});
+
+      console.log("MAIN: Folder of Core images is registered.")
+      return true
+    }catch(err){
+      return false
+    } 
+  }
   //--------------------------------------------------------------------------------------------------
   mainWindow.webContents.once("did-finish-load", () => {
     const LCSettingData = getSettings();
@@ -2283,414 +2661,419 @@ function createMainWIndow() {
       mainWindow.webContents.send("SettingsData", LCSettingData);
     }
   });
+  function buildMainMenu(){
+    return [
+      // for Mac ---------------------------------------------------------------------------------------
+      ...(isMac
+        ? [
+            {
+              label: app.name,
+              submenu: [
+                { label: "About", click: createAboutWindow },
+                { type: "separator" },
+                { role: "hide" },
+                { role: "hideOthers" },
+                { role: "unhide" },
+                { type: "separator" },
+                {
+                  label: "Developer tool",
+                  click: () => {
+                    if (mainWindow.webContents.isDevToolsOpened()) {
+                      mainWindow.webContents.closeDevTools();
+                    } else {
+                      mainWindow.webContents.openDevTools();
+                    }
+                    //mainWindow.webContents.openDevTools();
+                  },
+                },
+                { type: "separator" },
+                { role: "quit" },
+              ],
+            },
+          ]
+        : []),
+      // for common -----------------------------------------------------------------------------------
+      {
+        label: "File",
+        submenu: [
+          {
+            label:"Load",
+            submenu:[
+              {
+                label: "Load LC model",
+                accelerator: "CmdOrCtrl+M",
+                //accelerator: "CmdOrCtrl+S",
+                click: async () => {
+                  const fullpath = await getfile(mainWindow, "Please chose Correlation model file", [{name: "LCmodel file", extensions: ["lcmodel"]}]);
+                  await registerLCModel(fullpath);
+                  mainWindow.webContents.send("UpdateViewFromMain");                },
+              },
+              { type: "separator" },
+              {
+                label: "Load Core Images",
+                click: async() => {
+                  const imageDir = await getDirectory(mainWindow, "Please select image root directory.")
+                  if(imageDir!==false){
+                    //register path
+                    globalPath.dataPaths.push({type:"core_images", path:imageDir});
+
+                    //load
+                    let targetIds = [];                    
+                    LCCore.projects.forEach(p=>{
+                      p.holes.forEach(h=>{
+                        h.sections.forEach(s=>{
+                          targetIds.push(s.id);
+                        })
+                      })
+                    });
+                    const coreImages = await loadCoreImages({
+                      targetIds:targetIds,
+                      operations:["drilling_depth","composite_depth","event_free_depth","age"],
+                      dpcm:40,
+                    },"core_images")
+
+                    mainWindow.webContents.send("LoadCoreImagesMenuClicked", coreImages);
+                    //mainWindow.webContents.send("UpdateViewFromMain"); 
+                  }
+                },
+              },            
+            ],
+          },
+          {
+            label:"Import",
+            submenu:[
+              {
+                label: "Load Correlation Model",              
+                click: async() => {
+                  const fullpath = await getfile(mainWindow, "Please chose Correlation model CSV file", [{name: "CSV file", extensions: ["csv"]}]);
+                  if(fullpath){
+                    registerModelFromCsv(fullpath);
+                    mainWindow.webContents.send("UpdateViewFromMain");
+                  }
+                },
+              },
+              {
+                label: "Load Age model",
+                click: async() => {
+                  const fullpath = await getfile(mainWindow, "Please chose Age model CSV file", [{name: "CSV file", extensions: ["csv"]}]);
+                  if(fullpath){
+                    console.log(fullpath)
+                    //register
+                    registerAgeFromCsv(fullpath);
+                    mainWindow.webContents.send("UpdateViewFromMain");
+                  }
+                },
+              },
+            ]
+          },
+          {
+            label:"Save",
+            visible:isEditMode,
+            submenu:[
+              {
+                label: "Save",
+                accelerator: "CmdOrCtrl+S",
+                click: async () => {
+                  if(isEditMode){
+                    //remove plot data
+                    let out_LCPlot = JSON.parse(JSON.stringify(LCPlot));
+                    out_LCPlot.data_collections = [];
+                    out_LCPlot.data_selected_id = null;
+  
+                    const outData = {LCCore:LCCore, LCAge:LCAge, LCPlotAge:out_LCPlot};
+  
+                    if(globalPath.saveModelPath == null){
+                      //save as new file
+                      globalPath.saveModelPath = await putmodelfile(outData, null);
+                    }else{
+                      //save orverwrite
+                      globalPath.saveModelPath = await putmodelfile(outData, globalPath.saveModelPath);
+                    }
+                  }                
+                },
+              },
+              {
+                label:"Save As...",
+                click: async () => {
+                  if(isEditMode){
+                    //remove plot data
+                    let out_LCPlot = JSON.parse(JSON.stringify(LCPlot));
+                    out_LCPlot.data_collections = [];
+                    out_LCPlot.data_selected_id = null;
+  
+                    const outData = {LCCore:LCCore, LCAge:LCAge, LCPlotAge:out_LCPlot};
+  
+                    //save as new file
+                    globalPath.saveModelPath = await putmodelfile(outData, null);
+                    
+                  }                
+                },              
+              }
+            ],
+          },
+          {
+            label:"Export",
+            visible:isEditMode,
+            submenu:[
+              {
+                label: "Export model as csv",
+                click: () => {
+                  mainWindow.webContents.send("ExportCorrelationAsCsvMenuClicked");
+                },
+              },
+            ],
+          },
+          { type: "separator" },
+          {
+            label: "Unload all models",
+            accelerator: "CmdOrCtrl+U",
+            click: () => {
+              mainWindow.webContents.send("UnLoadModelsMenuClicked");
+            },
+          },
+          { type: "separator" },
+          {
+            label: "Preferences",
+            click: () => {
+              if (settingsWindow) {
+                settingsWindow.focus();
+                return;
+              }
+          
+              //create finder window
+              settingsWindow = new BrowserWindow({
+                title: "Settings",
+                width: 700,
+                height: 700,
+                webPreferences: {preload: path.join(__dirname, "preload_settings.js"),},
+              });
+              
+              //converterWindow.setAlwaysOnTop(true, "normal");
+              settingsWindow.on("closed", () => {
+                settingsWindow = null;
+                mainWindow.webContents.send("SettingsClosed", "");
+              });
+              settingsWindow.setMenu(null);
+          
+              settingsWindow.loadFile(path.join(__dirname, "./renderer/settings.html"));
+          
+              settingsWindow.once("ready-to-show", () => {
+                settingsWindow.show();
+               // converterWindow.setAlwaysOnTop(true, "normal");
+               //settingsWindow.webContents.openDevTools();
+                //converterWindow.setAlwaysOnTop(true, "normal");
+                const data = {
+                  output_type:"export",
+                  called_from:"main",
+                  path:null,
+                }; 
+                mainWindow.webContents.send("SettingsMenuClicked", data);
+              });
+            },
+          },
+          // for Windows--------------------
+          ...(!isMac
+            ? [
+                {
+                  label: "Exit",
+                  click: (menuItem, browserWindow, event) => {
+                    const options = {
+                      type: "question",
+                      buttons: ["No", "Yes"],
+                      defaultId: 0,
+                      title: "Confirm",
+                      message: "Are you sure you want to exit?",
+                    };
+  
+                    const response = dialog.showMessageBoxSync(null, options);
+  
+                    if (response === 1) {
+                      app.quit(); 
+                    }
+                  },
+                },              
+              ]
+            : []),
+        ],
+      },
+      {
+        label:"Edit",
+        submenu:[
+          {
+            label: "Edit mode",
+            accelerator: "CmdOrCtrl+E",
+            click: () =>{
+              mainWindow.webContents.send("EditCorrelation");
+            },
+          },
+          
+        ],
+      },
+      {
+        label: "Tools",
+        submenu: [
+          {
+            label: "Converter",
+            click: () => {
+              if (isDev == false){
+                if(LCCore.base_project_id==null){
+                  return
+                }
+              }
+              if (converterWindow) {
+                converterWindow.focus();
+                return;
+              }
+          
+              //create finder window
+              converterWindow = new BrowserWindow({
+                title: "Converter",
+                width: 700,
+                height: 700,
+                webPreferences: {preload: path.join(__dirname, "preload_converter.js"),},
+              });
+              
+              //converterWindow.setAlwaysOnTop(true, "normal");
+              converterWindow.on("closed", () => {
+                converterWindow = null;
+                mainWindow.webContents.send("ConverterClosed", "");
+              });
+              converterWindow.setMenu(null);
+          
+              converterWindow.loadFile(path.join(__dirname, "./renderer/converter.html"));
+          
+              converterWindow.once("ready-to-show", () => {
+                converterWindow.show();
+               // converterWindow.setAlwaysOnTop(true, "normal");
+                //converterWindow.webContents.openDevTools();
+                //converterWindow.setAlwaysOnTop(true, "normal");
+                const data = {
+                  output_type:"export",
+                  called_from:"main",
+                  path:null,
+                }; 
+                converterWindow.webContents.send("ConverterMenuClicked", data);
+              });
+            },
+          },
+          {
+            label: "Plotter",
+            accelerator: "CmdOrCtrl+P",
+            click: () => {
+              if (isDev == false){
+                if(LCCore.base_project_id==null){
+                  return
+                }
+              }
+              if (plotWindow) {
+                plotWindow.focus();
+                return;
+              }
+          
+              //create finder window
+              plotWindow = new BrowserWindow({
+                title: "Converter",
+                width: 280,//full: 900
+                height: 600,
+                webPreferences: {preload: path.join(__dirname, "preload_plotter.js"),},
+              });
+              
+              //converterWindow.setAlwaysOnTop(true, "normal");
+              plotWindow.on("closed", () => {
+                plotWindow = null;
+                mainWindow.webContents.send("PlotterClosed", "");
+              });
+              plotWindow.setMenu(null);
+          
+              plotWindow.loadFile(path.join(__dirname, "./renderer/plotter.html"));
+          
+              plotWindow.once("ready-to-show", () => {
+                plotWindow.show();
+                // plotWindow.setAlwaysOnTop(true, "normal");
+                //plotWindow.webContents.openDevTools();
+                plotWindow.webContents.send("PlotterMenuClicked");
+              });
+            },
+          },
+          {
+            label: "Labeler",
+            accelerator: "CmdOrCtrl+L",
+            click: () => {
+              if (labelerWindow) {
+                labelerWindow.focus();
+                return;
+              }
+          
+              tempCore = initialiseLCCore();
+              tempCore.addProject("correlation","temp");
+              tempCore.addHole([1,null,null,null],"temp");
+  
+              //create finder window
+              labelerWindow = new BrowserWindow({
+                title: "labeler",
+                width: 800,
+                height: 800,
+                webPreferences: {preload: path.join(__dirname, "preload_labeler.js"),},
+              });
+              
+              //converterWindow.setAlwaysOnTop(true, "normal");
+              labelerWindow.on("closed", () => {
+                labelerWindow = null;
+                tempCore = null;
+                mainWindow.webContents.send("LabelerClosed", "");
+              });
+              labelerWindow.setMenu(null);
+          
+              labelerWindow.loadFile(path.join(__dirname, "./renderer/labeler.html"));
+          
+              labelerWindow.once("ready-to-show", () => {
+                labelerWindow.show();
+                //labelerWindow.setAlwaysOnTop(true, "normal");
+                //labelerWindow.webContents.openDevTools();
+                //converterWindow.setAlwaysOnTop(true, "normal");
+                labelerWindow.webContents.send("LabelerMenuClicked");
+              });
+            },
+          },
+          { type: "separator" },
+          {
+            label: "Developer tool",
+            click: () => {
+              if (mainWindow.webContents.isDevToolsOpened()) {
+                mainWindow.webContents.closeDevTools();
+              } else {
+                mainWindow.webContents.openDevTools();
+              }
+              //mainWindow.webContents.openDevTools();
+            },
+          },
+        ],
+      },
+      // for windows ----------------------------------------------------------------------------------
+      ...(!isMac
+        ? [
+            {
+              label: "Help",
+              submenu: [
+                { label: "About", click: createAboutWindow },
+                { label: "Check update", click: async()=>{await checkUpdate()}},
+              ],
+            },
+          ]
+        : []),
+      // others
+    ];
+  }
+  function menuRebuild() {
+    const lcmenu = buildMainMenu(mainWindow);
+    let mainMenu = Menu.buildFromTemplate(lcmenu);
+    Menu.setApplicationMenu(mainMenu);
+  }
 }
+//===================================================================================================================================
 //===================================================================================================================================
 
 //--------------------------------------------------------------------------------------------------
-function buildMainMenu(mainWindow){
-  return [
-    // for Mac ---------------------------------------------------------------------------------------
-    ...(isMac
-      ? [
-          {
-            label: app.name,
-            submenu: [
-              { label: "About", click: createAboutWindow },
-              { type: "separator" },
-              { role: "hide" },
-              { role: "hideOthers" },
-              { role: "unhide" },
-              { type: "separator" },
-              {
-                label: "Developer tool",
-                click: () => {
-                  if (mainWindow.webContents.isDevToolsOpened()) {
-                    mainWindow.webContents.closeDevTools();
-                  } else {
-                    mainWindow.webContents.openDevTools();
-                  }
-                  //mainWindow.webContents.openDevTools();
-                },
-              },
-              { type: "separator" },
-              { role: "quit" },
-            ],
-          },
-        ]
-      : []),
-    // for common -----------------------------------------------------------------------------------
-    {
-      label: "File",
-      submenu: [
-        {
-          label:"Load",
-          submenu:[
-            {
-              label: "Load LC model",
-              accelerator: "CmdOrCtrl+M",
-              //accelerator: "CmdOrCtrl+S",
-              click: async () => {
-                const inData = await loadmodelfile();
-                if(inData!==null){
-                  console.log(inData)
-                  //initialise
-                    LCCore = initialiseLCCore();
-                    LCAge  = new LevelCompilerAge();
-                    
-                    //register
-                    assignObject(LCCore, inData.LCCore);
-                    assignObject(LCAge, inData.LCAge);
-                }
-                mainWindow.webContents.send("RegisteredLCModel");
-              },
-            },            
-          ],
-        },
-        {
-          label:"Import",
-          submenu:[
-            {
-              label: "Load Correlation Model",              
-              click: () => {
-                mainWindow.webContents.send("LoadCorrelationModelMenuClicked");
-              },
-            },
-            {
-              label: "Load Age model",
-              click: () => {
-                mainWindow.webContents.send("LoadAgeModelMenuClicked");
-              },
-            },
-            {
-              label: "Load Core Images",
-              click: () => {
-                mainWindow.webContents.send("LoadCoreImagesMenuClicked");
-              },
-            },
-          ]
-        },
-        {
-          label:"Save",
-          visible:isEditMode,
-          submenu:[
-            {
-              label: "Save",
-              accelerator: "CmdOrCtrl+S",
-              click: async () => {
-                if(isEditMode){
-                  //remove plot data
-                  let out_LCPlot = JSON.parse(JSON.stringify(LCPlot));
-                  out_LCPlot.data_collections = [];
-                  out_LCPlot.data_selected_id = null;
-
-                  const outData = {LCCore:LCCore, LCAge:LCAge, LCPlotAge:out_LCPlot};
-
-                  if(globalPath.saveModelPath == null){
-                    //save as new file
-                    globalPath.saveModelPath = await putmodelfile(outData, null);
-                  }else{
-                    //save orverwrite
-                    globalPath.saveModelPath = await putmodelfile(outData, globalPath.saveModelPath);
-                  }
-                }                
-              },
-            },
-            {
-              label:"Save As...",
-              click: async () => {
-                if(isEditMode){
-                  //remove plot data
-                  let out_LCPlot = JSON.parse(JSON.stringify(LCPlot));
-                  out_LCPlot.data_collections = [];
-                  out_LCPlot.data_selected_id = null;
-
-                  const outData = {LCCore:LCCore, LCAge:LCAge, LCPlotAge:out_LCPlot};
-
-                  //save as new file
-                  globalPath.saveModelPath = await putmodelfile(outData, null);
-                  
-                }                
-              },              
-            }
-          ],
-        },
-        {
-          label:"Export",
-          visible:isEditMode,
-          submenu:[
-            {
-              label: "Export model as csv",
-              click: () => {
-                mainWindow.webContents.send("ExportCorrelationAsCsvMenuClicked");
-              },
-            },
-          ],
-        },
-        { type: "separator" },
-        {
-          label: "Unload all models",
-          accelerator: "CmdOrCtrl+U",
-          click: () => {
-            mainWindow.webContents.send("UnLoadModelsMenuClicked");
-          },
-        },
-        { type: "separator" },
-        {
-          label: "Preferences",
-          click: () => {
-            if (settingsWindow) {
-              settingsWindow.focus();
-              return;
-            }
-        
-            //create finder window
-            settingsWindow = new BrowserWindow({
-              title: "Settings",
-              width: 700,
-              height: 700,
-              webPreferences: {preload: path.join(__dirname, "preload_settings.js"),},
-            });
-            
-            //converterWindow.setAlwaysOnTop(true, "normal");
-            settingsWindow.on("closed", () => {
-              settingsWindow = null;
-              mainWindow.webContents.send("SettingsClosed", "");
-            });
-            settingsWindow.setMenu(null);
-        
-            settingsWindow.loadFile(path.join(__dirname, "./renderer/settings.html"));
-        
-            settingsWindow.once("ready-to-show", () => {
-              settingsWindow.show();
-             // converterWindow.setAlwaysOnTop(true, "normal");
-             //settingsWindow.webContents.openDevTools();
-              //converterWindow.setAlwaysOnTop(true, "normal");
-              const data = {
-                output_type:"export",
-                called_from:"main",
-                path:null,
-              }; 
-              mainWindow.webContents.send("SettingsMenuClicked", data);
-            });
-          },
-        },
-        // for Windows--------------------
-        ...(!isMac
-          ? [
-              {
-                label: "Exit",
-                accelerator: "CmdOrCtrl+W",
-                click: (menuItem, browserWindow, event) => {
-                  const options = {
-                    type: "question",
-                    buttons: ["No", "Yes"],
-                    defaultId: 0,
-                    title: "Confirm",
-                    message: "Are you sure you want to exit?",
-                  };
-
-                  const response = dialog.showMessageBoxSync(null, options);
-
-                  if (response === 1) {
-                    app.quit(); 
-                  }
-                },
-              },              
-            ]
-          : []),
-      ],
-    },
-    {
-      label:"Edit",
-      submenu:[
-        {
-          label: "Edit mode",
-          accelerator: "CmdOrCtrl+E",
-          click: () =>{
-            mainWindow.webContents.send("EditCorrelation");
-          },
-        },
-        {
-          label: "Labeler",
-          click: () => {
-            if (labelerWindow) {
-              labelerWindow.focus();
-              return;
-            }
-        
-            tempCore = initialiseLCCore();
-            tempCore.addProject("correlation","temp");
-            tempCore.addHole([1,null,null,null],"temp");
-
-            //create finder window
-            labelerWindow = new BrowserWindow({
-              title: "labeler",
-              width: 800,
-              height: 800,
-              webPreferences: {preload: path.join(__dirname, "preload_labeler.js"),},
-            });
-            
-            //converterWindow.setAlwaysOnTop(true, "normal");
-            labelerWindow.on("closed", () => {
-              labelerWindow = null;
-              tempCore = null;
-              mainWindow.webContents.send("LabelerClosed", "");
-            });
-            labelerWindow.setMenu(null);
-        
-            labelerWindow.loadFile(path.join(__dirname, "./renderer/labeler.html"));
-        
-            labelerWindow.once("ready-to-show", () => {
-              labelerWindow.show();
-              //labelerWindow.setAlwaysOnTop(true, "normal");
-              //labelerWindow.webContents.openDevTools();
-              //converterWindow.setAlwaysOnTop(true, "normal");
-              labelerWindow.webContents.send("LabelerMenuClicked", "export");
-            });
-          },
-        },
-      ],
-    },
-    {
-      label: "Tools",
-      submenu: [
-        {
-          label: "Converter",
-          click: () => {
-            if (isDev == false){
-              if(LCCore.base_project_id==null){
-                return
-              }
-            }
-            if (converterWindow) {
-              converterWindow.focus();
-              return;
-            }
-        
-            //create finder window
-            converterWindow = new BrowserWindow({
-              title: "Converter",
-              width: 700,
-              height: 700,
-              webPreferences: {preload: path.join(__dirname, "preload_converter.js"),},
-            });
-            
-            //converterWindow.setAlwaysOnTop(true, "normal");
-            converterWindow.on("closed", () => {
-              converterWindow = null;
-              mainWindow.webContents.send("ConverterClosed", "");
-            });
-            converterWindow.setMenu(null);
-        
-            converterWindow.loadFile(path.join(__dirname, "./renderer/converter.html"));
-        
-            converterWindow.once("ready-to-show", () => {
-              converterWindow.show();
-             // converterWindow.setAlwaysOnTop(true, "normal");
-              //converterWindow.webContents.openDevTools();
-              //converterWindow.setAlwaysOnTop(true, "normal");
-              const data = {
-                output_type:"export",
-                called_from:"main",
-                path:null,
-              }; 
-              converterWindow.webContents.send("ConverterMenuClicked", data);
-            });
-          },
-        },
-        {
-          label: "Plotter",
-          click: () => {
-            if (isDev == false){
-              if(LCCore.base_project_id==null){
-                return
-              }
-            }
-            if (plotWindow) {
-              plotWindow.focus();
-              return;
-            }
-        
-            //create finder window
-            plotWindow = new BrowserWindow({
-              title: "Converter",
-              width: 280,//full: 900
-              height: 600,
-              webPreferences: {preload: path.join(__dirname, "preload_plotter.js"),},
-            });
-            
-            //converterWindow.setAlwaysOnTop(true, "normal");
-            plotWindow.on("closed", () => {
-              plotWindow = null;
-              mainWindow.webContents.send("PlotterClosed", "");
-            });
-            plotWindow.setMenu(null);
-        
-            plotWindow.loadFile(path.join(__dirname, "./renderer/plotter.html"));
-        
-            plotWindow.once("ready-to-show", () => {
-              plotWindow.show();
-              // plotWindow.setAlwaysOnTop(true, "normal");
-              //plotWindow.webContents.openDevTools();
-              plotWindow.webContents.send("PlotterMenuClicked");
-            });
-          },
-        },
-        { type: "separator" },
-        {
-          label: "Developer tool",
-          click: () => {
-            if (mainWindow.webContents.isDevToolsOpened()) {
-              mainWindow.webContents.closeDevTools();
-            } else {
-              mainWindow.webContents.openDevTools();
-            }
-            //mainWindow.webContents.openDevTools();
-          },
-        },
-      ],
-    },
-    // for windows ----------------------------------------------------------------------------------
-    ...(!isMac
-      ? [
-          {
-            label: "Help",
-            submenu: [
-              { label: "About", click: createAboutWindow },
-              { label: "Check update", click: async()=>{await checkUpdate()}},
-            ],
-          },
-        ]
-      : []),
-    // others
-  ];
-}
-function menuRebuild(mainWindow) {
-  const lcmenu = buildMainMenu(mainWindow);
-  let mainMenu = Menu.buildFromTemplate(lcmenu);
-  Menu.setApplicationMenu(mainMenu);
-}
-let activeThreads = 0;
-function startMakeModelImageWorker(data) {
-  return new Promise((resolve, reject) => {
-    activeThreads++;
-    //console.log(`Active threads: ${activeThreads}`);
-
-    const worker = new Worker(path.join(__dirname, './LC_modules/makeModelImageWorker.js'), {
-      workerData: { data },
-    });
-
-    worker.on('message', result=>{
-      activeThreads--;
-      //console.log(`Active threads: ${activeThreads}`);
-      resolve(result)
-    });
-    worker.on('error', reject);
-    worker.on('exit', (code) => {
-      if (code !== 0) reject(new Error(`MAIN: Worker stopped with exit code ${code}`));
-    });
-  });
-}
 function progressDialog(window, tit, txt){
   let progress = new ProgressBar({
     title: tit,
@@ -2714,13 +3097,14 @@ function progressDialog(window, tit, txt){
 }
 async function updateProgress(progress, n, N){
   try{
-    if (progress ) {
+    if (progress) {
       progress.value = (n / N) * 100;
       progress.detail ="Please wait..." + n + "/" + N + "  (" + round((n / N) * 100, 2) + "%)";
 
       if (n / N >= 1) {
         progress.setCompleted();
         progress.close();
+        progress = null;
       }
     }
     return progress;
@@ -2767,8 +3151,15 @@ async function getDirectory(mainWindow, title) {
     return null;
   }
 }
-function findFileInDir(dir, fileName) {
+function findFileInDir(in_path, fileName, type) {
   let results = [];
+  let dir = "";
+  if(typeof in_path === "string"){
+    dir = in_path;
+  }else{
+    const pathData = path.parse(in_path);
+    dir = path.join(pathData.dir, pathData.name);
+  }
 
   const files = fs.readdirSync(dir);
   for (const file of files) {
@@ -2776,9 +3167,17 @@ function findFileInDir(dir, fileName) {
       const stat = fs.statSync(filePath);
 
       if (stat.isDirectory()) {
-          results = results.concat(findFileInDir(filePath, fileName));
+        if(type == "get"){
+          results = results.concat(findFileInDir(filePath, fileName, type));
+        }else if(type == "check"){
+          results.push(true);
+        }
       } else if (file === fileName) {
+        if(type == "get"){
           results.push(filePath);
+        }else if(type =="check"){
+          results.push(true);
+        }
       }
   }
 

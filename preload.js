@@ -4,26 +4,27 @@ const { contextBridge, ipcRenderer, webUtils } = require("electron");
 contextBridge.exposeInMainWorld("LCapi", {
 
   getFilePath: (args) => ipcRenderer.invoke("getFilePath", webUtils.getPathForFile(args)),
-  getFilesInDir: (args1,args2) => ipcRenderer.invoke("getFilesInDir",args1,args2),
+  CheckImagesInDir: (args2) => ipcRenderer.invoke("CheckImagesInDir", args2),
+  FileChoseDialog: (args1, args2) => ipcRenderer.invoke("FileChoseDialog", args1, args2),
+  FolderChoseDialog: (args1) => ipcRenderer.invoke("FolderChoseDialog", args1),
 
-  //rederer <-> main
-  Test: (args1, args2) => ipcRenderer.invoke("test", args1, args2),
-  //lcfnc: () => ipcRenderer.invoke("lcfnc"),
 
   //initialise
   InitialiseCorrelationModel: () => ipcRenderer.invoke("InitialiseCorrelationModel"),
   InitialiseAgeModel: () => ipcRenderer.invoke("InitialiseAgeModel"),
-  InitialisePlot: () => ipcRenderer.invoke("InitialisePlot"),
+  InitialiseAgePlot: () => ipcRenderer.invoke("InitialisePlotAgeCollection"),
+  InitialiseDataPlot: () => ipcRenderer.invoke("InitialisePlotDataCollection"),
+  InitialisePaths: () => ipcRenderer.invoke("InitialisePaths"),
 
   //register and load models
-  RegisterModelFromCsv: (args) => ipcRenderer.invoke("RegisterModelFromCsv", args),
-  RegisterModelFromLCCore: () => ipcRenderer.invoke("RegisterModelFromLCCore"),
+  RegisterModelFromCsv: (args) => ipcRenderer.invoke("RegisterModelFromCsv",  webUtils.getPathForFile(args)),
+  RegisterAgeFromCsv: (args) => ipcRenderer.invoke("RegistertAgeFromCsv", webUtils.getPathForFile(args)),
+  RegisterLCmodel:(args1) => ipcRenderer.invoke("RegisterLCmodel", webUtils.getPathForFile(args1)),
   LoadModelFromLCCore: () => ipcRenderer.invoke("LoadModelFromLCCore"),
-  RegisterAgeFromCsv: (args) => ipcRenderer.invoke("RegistertAgeFromCsv", args),
   LoadAgeFromLCAge: (args) => ipcRenderer.invoke("LoadAgeFromLCAge", args),
-  RegisterAgePlotFromLCAge: () => ipcRenderer.invoke("RegisterAgePlotFromLCAge"),
-  RegisterDataPlot: (args) => ipcRenderer.invoke("RegisterDataPlot", args),
   LoadPlotFromLCPlot: () => ipcRenderer.invoke("LoadPlotFromLCPlot"),
+  MirrorAgeList: () => ipcRenderer.invoke("MirrorAgeList"),
+  Reregister: () => ipcRenderer.invoke("Reregister"),
 
   //export
   ExportCorrelationAsCsv: (args) => ipcRenderer.invoke("ExportCorrelationAsCsvFromRenderer",args),
@@ -46,18 +47,19 @@ contextBridge.exposeInMainWorld("LCapi", {
   OpenImporter: () => ipcRenderer.invoke("OpenImporter"),
   CloseImporter: () => ipcRenderer.invoke("CloseImporter"),
 
+  //image
+  RegisterCoreImage: (args1,args2) =>  ipcRenderer.invoke("RegisterCoreImage", webUtils.getPathForFile(args1),args2),
+  LoadCoreImage: (args1, args2) =>  ipcRenderer.invoke("LoadCoreImage", args1, args2),
+  GetResources: () => ipcRenderer.sendSync("GetResources"),
+
+
   //others
-  FileChoseDialog: (args1, args2) => ipcRenderer.invoke("FileChoseDialog", args1, args2),
-  FolderChoseDialog: (args1) => ipcRenderer.invoke("FolderChoseDialog", args1),
   Confirm: (args1, args2) => ipcRenderer.invoke("Confirm", args1, args2),
-  LoadRasterImage: (args1, args2) =>  ipcRenderer.invoke("LoadRasterImage", args1, args2),
   progressbar: (args1, args2) => ipcRenderer.invoke("progressbar", args1, args2),
   updateProgressbar: (args1, args2) => ipcRenderer.invoke("updateProgressbar", args1, args2),
   clearProgressbar: () => ipcRenderer.invoke("clearProgressbar"),
   askdialog: (args1, args2) => ipcRenderer.invoke("askdialog", args1, args2),
   inputdialog: (args1) => ipcRenderer.invoke("inputdialog", args1),
-  makeModelImage: (args1, args2, args3, args4) =>  ipcRenderer.invoke("makeModelImage", args1, args2, args3, args4),
-  getResourcePath: () => ipcRenderer.sendSync("getResourcePath"),
   toggleDevTools: (args1) => ipcRenderer.send('toggle-devtools',args1),
   showContextMenu: (args1) => ipcRenderer.invoke("showContextMenu", args1),
   connectMarkers: (args1,args2,args3) => ipcRenderer.invoke("connectMarkers", args1,args2,args3),
@@ -80,8 +82,7 @@ contextBridge.exposeInMainWorld("LCapi", {
   SetMaster: (args1,args2) => ipcRenderer.invoke("SetMaster", args1,args2),
   AddEvent: (args1,args2,args3,args4) => ipcRenderer.invoke("AddEvent", args1,args2,args3,args4),
   DeleteEvent: (args1,args2,args3) => ipcRenderer.invoke("DeleteEvent", args1,args2,args3),
-  loadLCmodel:(args1) => ipcRenderer.invoke("loadLCmodel",args1),
-  addSectionFromLcsection:(args1) => ipcRenderer.invoke("addSectionFromLcsection",args1),
+  addSectionFromLcsection:(args1) => ipcRenderer.invoke("addSectionFromLcsection", webUtils.getPathForFile(args1)),
   changeEditMode:(args1) => ipcRenderer.invoke("changeEditMode",args1),
   sendSettings:(args1,args2) => ipcRenderer.invoke("sendSettings",args1,args2),
 

@@ -7,7 +7,7 @@ document.addEventListener("DOMContentLoaded", () => {
   let sectionList = [];
   let inputDistance = null;
   let targetId = [null, null, null, null];
-  let resourcePaths ={};
+  let resourceData ={};
   let previousValue = {project:null,hole:null,section:null,distance:null,cd:null,efd:null,age:null,ageUpper:null,ageLower:null};
   
   //-------------------------------------------------------------------------------------------
@@ -21,9 +21,10 @@ document.addEventListener("DOMContentLoaded", () => {
     await limitDistance();
 
     //load tool icon images
-    resourcePaths = await window.FinderApi.getResourcePath();
-    document.getElementById("link").querySelector("img").src = resourcePaths.finder["linked"];
-    document.getElementById("fix").querySelector("img").src = resourcePaths.finder["fixed"];
+    resourceData = await window.FinderApi.GetResources();
+    console.log(resourceData)
+    document.getElementById("link").querySelector("img").src = resourceData.finder["linked"];
+    document.getElementById("fix").querySelector("img").src = resourceData.finder["fixed"];
 
     previousValue = {
       project:null,
@@ -463,11 +464,11 @@ document.addEventListener("DOMContentLoaded", () => {
     if (isFix) {
       isFix = false;
       //document.getElementById("fix").style.backgroundColor = "white";
-      document.getElementById("fix").querySelector("img").src = resourcePaths.finder["fix"];
+      document.getElementById("fix").querySelector("img").src = resourceData.finder["fix"];
     } else {
       isFix = true;
       //document.getElementById("fix").style.backgroundColor = "lightgray";
-      document.getElementById("fix").querySelector("img").src = resourcePaths.finder["fixed"];
+      document.getElementById("fix").querySelector("img").src = resourceData.finder["fixed"];
     }
     window.FinderApi.changeFix(isFix);
   });
@@ -476,11 +477,11 @@ document.addEventListener("DOMContentLoaded", () => {
     if (isLink) {
       isLink = false;
       //document.getElementById("fix").style.backgroundColor = "white";
-      document.getElementById("link").querySelector("img").src = resourcePaths.finder["link"];
+      document.getElementById("link").querySelector("img").src = resourceData.finder["link"];
     } else {
       isLink = true;
       //document.getElementById("fix").style.backgroundColor = "lightgray";
-      document.getElementById("link").querySelector("img").src = resourcePaths.finder["linked"];
+      document.getElementById("link").querySelector("img").src = resourceData.finder["linked"];
 
       //move to target
       const send_data = {
