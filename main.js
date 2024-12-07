@@ -24,6 +24,7 @@ const { stringify } = require("csv-stringify/sync");
 const ProgressBar = require("electron-progressbar");
 const prompt = require("electron-prompt");
 const JSZip = require('jszip');
+const zlib = require('zlib');
 const https = require('https');
 const { autoUpdater} = require('electron-updater');
 
@@ -477,7 +478,7 @@ function createMainWIndow() {
       //submit
       //make worker
       numTotalTasks =tasks.length;
-      progressBar = progressDialog(mainWindow, "Load modeled section images", "Now converting...");
+      progressBar = progressDialog(mainWindow, "Load modeled section images", "Now converting...", false);
       progressBar = await updateProgress(progressBar, 0, numTotalTasks);
       const workers = await initialiseWorkerPool(NUM_WORKERS, tasks, idleWorkers, coreImages);
 
@@ -777,9 +778,9 @@ function createMainWIndow() {
 
 
 
-  ipcMain.handle("progressbar", async (_e, tit, txt) => {
+  ipcMain.handle("progressbar", async (_e, tit, txt, indeterminate) => {
     progressBar = null;
-    progressBar = progressDialog(mainWindow, tit, txt);
+    progressBar = progressDialog(mainWindow, tit, txt, indeterminate);
 
     await new Promise(resolve => setTimeout(resolve, 100));
     progressBar.detail = "Processing...";
@@ -787,8 +788,11 @@ function createMainWIndow() {
   ipcMain.handle("updateProgressbar", async (_e, n, N) => {
     progressBar = await updateProgress(progressBar, n, N);
   });
-  ipcMain.handle("clearProgressbar", async (_e, n, N) => {
-      progressBar = null;    
+  ipcMain.handle("clearProgressbar", async (_e) => {
+    if(progressBar){
+      progressBar.close()
+      progressBar = null; 
+    }         
   });
   
 
@@ -1086,6 +1090,17 @@ function createMainWIndow() {
                 label: 'Move to left', 
                 click: () => {
                   resolve("holeMoveToLeft");                      
+                } 
+              },
+            ]
+          },
+          {
+            label:"Section",
+            submenu:[
+              { 
+                label: 'Properties', 
+                click: () => {
+                  resolve("showSectionProperties");                      
                 } 
               },
             ]
@@ -1408,9 +1423,16 @@ function createMainWIndow() {
 
 
     if (LCPlot) {
-      console.log("MAIN: Load plot data from LCPlot");
-      return LCPlot;
+      try{
+        const zipped = await zipData(LCPlot);
+        console.log("MAIN: Send LCPlot to renderer.")
+        return zipped;
+      }catch(err){
+        console.error("MAIN: Failed to zip: ", err);
+        return null;
+      }
     }
+    return null;
   });
 
   ipcMain.handle("CalcCompositeDepth", async (_e) => {
@@ -2003,17 +2025,39 @@ function createMainWIndow() {
     mainWindow.webContents.send("rendererLog", data);
   });
   ipcMain.handle("sendImportedData", async (_e, data) => {
+    progressBar = progressDialog(mainWindow, "Please wait", "Sending data", true);
+    await new Promise(resolve => setTimeout(resolve, 100));
+    progressBar.detail = "Processing...";
+
     data.name = path.basename(data.path);
     if(data.send_to == "main"){
       LCPlot.addDataset(data.name, data.data);
-      mainWindow.webContents.send("importedData", LCPlot);
+      zipData(LCPlot)
+        .then((zipped) => {
+          mainWindow.webContents.send("importedData", zipped);
+        })
+        .catch((err) => {
+          console.error("MAIN: Failed to zip: ", err);
+        }); 
     }else if(data.send_to == "plotter"){      
       LCPlot.addDataset(data.name, data.data);
       LCPlot.sortDataBy("composite_depth")
-      plotWindow.webContents.send("importedData", LCPlot);
-      console.log("MAIN: Plot Data is imported into Plotter.")
+      zipData(LCPlot)
+        .then((zipped) => {
+          plotWindow.webContents.send("importedData", zipped);
+          mainWindow.webContents.send("importedData", zipped);
+          console.log("MAIN: Plot Data is imported into Plotter.")
+        })
+        .catch((err) => {
+          console.error("MAIN: Failed to zip: ", err);
+        });
     }
     
+  });
+  ipcMain.handle("sendPlotOptions", (_e,data, to) => {
+    if(to=="renderer"){
+      mainWindow.webContents.send("PlotDataOptions", data);
+    }    
   });
   ipcMain.handle("depthConverter", async (_e, data, type, method) => {
     //data: ["name","depth_data","target_id"] e.g. ["name",[projectName(no use),holeName, sectionName, distance],[null, null, null, null]]
@@ -2490,15 +2534,44 @@ function createMainWIndow() {
   });
   ipcMain.handle("sendSettings", (_e,data, to) => {
     if(to=="settings"){
-      settingsWindow.webContents.send("SettingsData", data);
+      if(settingsWindow==null){
+        //case of call properties
+        if (settingsWindow) {
+          settingsWindow.focus();
+          return;
+        }
+    
+        //create finder window
+        settingsWindow = new BrowserWindow({
+          title: "Settings",
+          width: 700,
+          height: 700,
+          webPreferences: {preload: path.join(__dirname, "preload_settings.js"),},
+        });
+        
+        //converterWindow.setAlwaysOnTop(true, "normal");
+        settingsWindow.on("closed", () => {
+          settingsWindow = null;
+          mainWindow.webContents.send("SettingsClosed", "");
+        });
+        settingsWindow.setMenu(null);
+    
+        settingsWindow.loadFile(path.join(__dirname, "./renderer/settings.html"));
+    
+        settingsWindow.once("ready-to-show", () => {
+          settingsWindow.show();
+         // converterWindow.setAlwaysOnTop(true, "normal");
+         //settingsWindow.webContents.openDevTools();
+          //converterWindow.setAlwaysOnTop(true, "normal");
+          settingsWindow.webContents.send("SettingsData", data);
+        });
+      }else{
+        settingsWindow.webContents.send("SettingsData", data);
+      }
+
     }else if(to=="renderer"){
       mainWindow.webContents.send("SettingsData", data);
       setSettings(data);
-    }    
-  });
-  ipcMain.handle("sendPlotOptions", (_e,data, to) => {
-    if(to=="renderer"){
-      mainWindow.webContents.send("PlotDataOptions", data);
     }    
   });
   ipcMain.handle("openExtarnalLink", (_e,url) => {
@@ -3074,13 +3147,13 @@ function createMainWIndow() {
 //===================================================================================================================================
 
 //--------------------------------------------------------------------------------------------------
-function progressDialog(window, tit, txt){
+function progressDialog(window, tit, txt, indeterminate){
   let progress = new ProgressBar({
     title: tit,
     icon: "./icon/levelcompiler.png",
-    indeterminate: false,
+    indeterminate: indeterminate,
     text: txt,
-    detail: "Please wait...(0%)",
+    detail: "Please wait...",
     browserWindow: {
       parent: window,
       modal: false,
@@ -3132,6 +3205,18 @@ async function getfile(mainWindow, title, ext) {
     console.log(err);
     return null;
   }
+}
+async function zipData(data) {
+  return new Promise((resolve, reject) => {
+    const jsonData = JSON.stringify(data);
+    zlib.gzip(jsonData, (err, buffer) => {
+      if (err) {
+        reject(err);
+      } else {
+        resolve(buffer);
+      }
+    });
+  });
 }
 //--------------------------------------------------------------------------------------------------
 async function getDirectory(mainWindow, title) {

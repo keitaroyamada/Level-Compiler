@@ -98,7 +98,7 @@ document.addEventListener("DOMContentLoaded", () => {
   
     objOpts.section.line_colour = "gray";
     objOpts.section.face_colour = "lightgray";
-    objOpts.section.line_width = 4;
+    objOpts.section.line_width = 2;
     objOpts.section.width = 20;
     objOpts.section.font = "Arial";
     objOpts.section.font_size = 20;
@@ -241,202 +241,202 @@ document.addEventListener("DOMContentLoaded", () => {
   
   document.getElementById("scroller").addEventListener("drop", async (e) => {
     e.preventDefault(e);
-    //get list
-    let dataList = [];
-    for(const file of e.dataTransfer.files){
-      dataList.push({type:file.name.split(".").pop(), name:file.name, path:file});
-    }
-
-    //check
-    let order = [];
-
-    //check LCMODEL first
-    dataList.forEach((data,i)=>{
-      if(data.type == "lcmodel"){
-        order.push(i);
+    try{
+      //get list
+      let dataList = [];
+      for(const file of e.dataTransfer.files){
+        dataList.push({type:file.name.split(".").pop(), name:file.name, path:file});
       }
-    })
 
-    //check correlation model
-    let numModel = 0;
-    dataList.forEach((data,i)=>{
-      if(data.name.includes("[correlation]")){
-        order.push(i);
-        numModel++;
-      }
-    })
+      //check
+      let order = [];
 
-    if(order.length>1){
-      alert("Multiple [correlation] model detected. Please load base [correlation] model first.");
-      return;
-    }
-
-    dataList.forEach((data,i)=>{
-      if(data.name.includes("[duo]")){
-        order.push(i);
-        numModel++;
-      }
-    })
-    
-    if(!LCCore && order.length == 0){
-      alert("There is no correlation/duo model. Please load correlation model first.");
-      return;
-    }
-
-    //check age model
-    let isAgeLoaded = false;
-    dataList.forEach((data,i)=>{
-      if(data.name.includes("[age]")){
-        isAgeLoaded = true;
-        order.push(i);
-      }
-    })
-
-    //check corephoto
-    let isPhotoLoaded = false;
-    dataList.forEach((data,i)=>{
-      if(!["csv","lcmodel","lcsection"].includes(data.type)){
-        order.push(i);
-        isPhotoLoaded = true;
-      }
-    })
-
-    //check lc section
-    if(objOpts.edit.editable == true){
+      //check LCMODEL first
       dataList.forEach((data,i)=>{
-        if(data.type == "lcsection"){
+        if(data.type == "lcmodel"){
           order.push(i);
         }
       })
-    }else{
+
+      //check correlation model
+      let numModel = 0;
       dataList.forEach((data,i)=>{
-        if(data.type == "lcsection"){
-          alert("The section model can only be loaded in edit mode.")
-          return;
+        if(data.name.includes("[correlation]")){
+          order.push(i);
+          numModel++;
         }
       })
-    }
 
-    //check jpg
-    let numIm = 0;
-    dataList.forEach((data,i)=>{
-      if(data.type == "jpg"){
-        //order.push(i);
-        numIm ++;
+      if(order.length>1){
+        alert("Multiple [correlation] model detected. Please load base [correlation] model first.");
+        return;
       }
-    })
 
-    if(numIm>0){
-      alert("To load images, please drop the folder where they are saved. The image names also must be 'holeName-sectionName'.")
-      return
-    }
-    
-    //get
-    let N = order.length;
-    if(isPhotoLoaded==true){
-      N-=1;
-    }
-    
-
-    if(N>0){
-      await window.LCapi.progressbar("Load models", "Now loading...");
-      await window.LCapi.updateProgressbar(0, N, "");
-    }
-
-    for(let i=0;i<order.length;i++){
-      const droppedData = dataList[order[i]];//type,name,path
-      if(droppedData.type == "lcmodel"){
-        console.log("[Renderer]: LCmodel load from drop..");
-        await initialiseCorrelationModel();
-        await initialiseAgeModel();
-        await initialiseCanvas();
-        await initialisePlot();
-        modelImages = initialiseImages();
-        await initialisePaths();
-
-        //load into LCCore (load process is in receive("RegisteredLCModel")
-        await registerLCModel(droppedData.path);
-        //load registered model from main to renderer with making up hole list view
-        await loadModel();
-        updateView();
-        const selected_age_model_id = document.getElementById("AgeModelSelect").value; 
-        await loadAge(selected_age_model_id);//load age data included LCCore
-    
-        await loadPlotData();
-      }else if(droppedData.type == "csv"){
-        if(droppedData.name.includes("[correlation]") || droppedData.name.includes("[duo]") ){
-          //case model file
-          console.log("[Renderer]: Correlation model file load from drop.");
-          //register correlation model
-          console.log(droppedData.path)
-          await registerModel(droppedData.path);
-
-          if(numModel==i+1){
-            await loadModel();
-          }
-          updateView();
-        } else if(droppedData.name.includes("[age]")){
-          //case age file
-          console.log("[Renderer]: Age model file load from drop.");
-          //register age model
-          await registerAge(droppedData.path);
-
-          if(age_model_list.length >0){
-            document.getElementById("AgeModelSelect").value = age_model_list[age_model_list.length-1].id;
-            await loadAge(age_model_list[age_model_list.length-1].id);
-            await loadPlotData();//age plot
-          }
-          updateView();
+      dataList.forEach((data,i)=>{
+        if(data.name.includes("[duo]")){
+          order.push(i);
+          numModel++;
         }
-      }else if(droppedData.type == "lcsection"){
-        const result = await window.LCapi.addSectionFromLcsection(droppedData.path);
-        //"duplicate_section","duplicate_hole","fail_to_add","no_path","no_hole"
-        if(result==true){
-          await loadModel();
-          console.log(LCCore)
-          updateView();
-        }else{
-          console.log("[Renderer]: Failed to load section data"+result);
-          await window.LCapi.updateProgressbar(N, N);
-          alert("Failed to load lcsectoion because: "+result);
-          
-          return
-        }
-      }else{        
-        //case core image
-        const response = await window.LCapi.askdialog(
-          "Load core images",
-          "Do you want to load the core images?"
-        );
-  
-        if (response.response) {
-          console.log("[Renderer]: Directory load from drop..");
-          //register dir path
-          await window.LCapi.RegisterCoreImage(droppedData.path, "core_images");
+      })
 
-          //load images
-          modelImages = await loadCoreImages(modelImages, LCCore, objOpts, ["drilling_depth","composite_depth","event_free_depth","age"]);
-        }
-
+      if(!LCCore && order.length == 0){
+        alert("There is no correlation/duo model. Please load correlation model first.");
+        return;
       }
+
+      //check age model
+      let isAgeLoaded = false;
+      dataList.forEach((data,i)=>{
+        if(data.name.includes("[age]")){
+          isAgeLoaded = true;
+          order.push(i);
+        }
+      })
+
+      //check corephoto
+      let isPhotoLoaded = false;
+      dataList.forEach((data,i)=>{
+        if(!["csv","lcmodel","lcsection"].includes(data.type)){
+          order.push(i);
+          isPhotoLoaded = true;
+        }
+      })
+
+      //check lc section
+      if(objOpts.edit.editable == true){
+        dataList.forEach((data,i)=>{
+          if(data.type == "lcsection"){
+            order.push(i);
+          }
+        })
+      }else{
+        dataList.forEach((data,i)=>{
+          if(data.type == "lcsection"){
+            alert("The section model can only be loaded in edit mode.")
+            return;
+          }
+        })
+      }
+
+      //check jpg
+      let numIm = 0;
+      dataList.forEach((data,i)=>{
+        if(data.type == "jpg"){
+          //order.push(i);
+          numIm ++;
+        }
+      })
+
+      if(numIm>0){
+        alert("To load images, please drop the folder where they are saved. The image names also must be 'holeName-sectionName'.")
+        return
+      }
+
+      //get
+      let N = order.length;
+      if(isPhotoLoaded==true){
+        N-=1;
+      }
+
 
       if(N>0){
-        await window.LCapi.updateProgressbar(i+1, N);
+        await window.LCapi.progressbar("Load models", "Now loading...", true);
       }
-        
-      
-    }
 
-    //update photo
-    if(isPhotoLoaded == false && isAgeLoaded == true){
-      if(Object.keys(modelImages.drilling_depth).length>0){
-        modelImages = await loadCoreImages(modelImages, LCCore, objOpts, ["drilling_depth", "age"]);
+      for(let i=0;i<order.length;i++){
+        const droppedData = dataList[order[i]];//type,name,path
+        if(droppedData.type == "lcmodel"){
+          console.log("[Renderer]: LCmodel load from drop..");
+          await initialiseCorrelationModel();
+          await initialiseAgeModel();
+          await initialiseCanvas();
+          await initialisePlot();
+          modelImages = initialiseImages();
+          await initialisePaths();
+
+          //load into LCCore (load process is in receive("RegisteredLCModel")
+          await registerLCModel(droppedData.path);
+          //load registered model from main to renderer with making up hole list view
+          await loadModel();
+          updateView();
+          const selected_age_model_id = document.getElementById("AgeModelSelect").value; 
+          await loadAge(selected_age_model_id);//load age data included LCCore
+
+          await loadPlotData();
+        }else if(droppedData.type == "csv"){
+          if(droppedData.name.includes("[correlation]") || droppedData.name.includes("[duo]") ){
+            //case model file
+            console.log("[Renderer]: Correlation model file load from drop.");
+            //register correlation model
+            console.log(droppedData.path)
+            await registerModel(droppedData.path);
+
+            if(numModel==i+1){
+              await loadModel();
+            }
+            updateView();
+          } else if(droppedData.name.includes("[age]")){
+            //case age file
+            console.log("[Renderer]: Age model file load from drop.");
+            //register age model
+            await registerAge(droppedData.path);
+
+            if(age_model_list.length >0){
+              document.getElementById("AgeModelSelect").value = age_model_list[age_model_list.length-1].id;
+              await loadAge(age_model_list[age_model_list.length-1].id);
+              await loadPlotData();//age plot
+            }
+            updateView();
+          }
+        }else if(droppedData.type == "lcsection"){
+          const result = await window.LCapi.addSectionFromLcsection(droppedData.path);
+          //"duplicate_section","duplicate_hole","fail_to_add","no_path","no_hole"
+          if(result==true){
+            await loadModel();
+            console.log(LCCore)
+            updateView();
+          }else{
+            console.log("[Renderer]: Failed to load section data"+result);
+            alert("Failed to load lcsectoion because: "+result);
+            
+            return
+          }
+        }else{        
+          //case core image
+          const response = await window.LCapi.askdialog(
+            "Load core images",
+            "Do you want to load the core images?"
+          );
+
+          if (response.response) {
+            await window.LCapi.clearProgressbar()
+            console.log("[Renderer]: Directory load from drop..");
+            //register dir path
+            await window.LCapi.RegisterCoreImage(droppedData.path, "core_images");
+
+            //load images
+            modelImages = await loadCoreImages(modelImages, LCCore, objOpts, ["drilling_depth","composite_depth","event_free_depth","age"]);
+          }
+
+        }      
       }
-    }
 
-    //update
-    await window.LCapi.clearProgressbar()
-    updateView();
+      //update photo
+      if(isPhotoLoaded == false && isAgeLoaded == true){
+        if(Object.keys(modelImages.drilling_depth).length>0){
+          modelImages = await loadCoreImages(modelImages, LCCore, objOpts, ["drilling_depth", "age"]);
+        }
+      }
+
+      //update
+      await window.LCapi.clearProgressbar()
+      updateView();
+    }catch(err){
+      console.log(err)
+      await window.LCapi.clearProgressbar()
+      updateView();
+    }
+    
   });
   //============================================================================================
   //open divider
@@ -704,13 +704,6 @@ document.addEventListener("DOMContentLoaded", () => {
     
     //load renderer
     await loadPlotData()
-    console.log("[Renderer]: Load plot data.");
-
-    objOpts.plot.show_dot = true;
-    objOpts.plot.show_line = true;
-    document.getElementById("bt_chart").style.backgroundColor = "#ccc";
-
-    updateView();
   });
   
   //============================================================================================
@@ -762,7 +755,7 @@ document.addEventListener("DOMContentLoaded", () => {
   window.LCapi.receive("AlertRenderer", async (data) => {
     //data: status, statusDetails, hasError, statusDetails
 
-    console.error("Error: \n",data);
+    console.log("Error: \n",data);
     alert(data.statusDetails)
     //data.errorDetails
   });
@@ -770,7 +763,7 @@ document.addEventListener("DOMContentLoaded", () => {
   window.LCapi.receive("PlotDataOptions", async (data) => {
     console.log("[Renderer]: Plot options are received.",data)
     if(data.emitType=="new"){
-      await loadPlotData();
+      //await loadPlotData();//latest ver is load plot data at the same time of loading plotter
     }
 
     objOpts.plot.selected_options = data.data;
@@ -879,10 +872,39 @@ document.addEventListener("DOMContentLoaded", () => {
         }
       })
       updateView();
-    }else if(clickResult=="holeMoveToLeft"){
-
+    }else if(clickResult=="showSectionProperties"){
+      if(LCCore){
+        if(objOpts.edit.hittest.section!==null){
+          const ht = objOpts.edit.hittest;
+          let sectionProperties = {
+            options:{
+              title:"Properties: ",
+              editable:false,
+            },
+            data:null,
+          };
+          LCCore.projects.forEach(p=>{
+            if(p.id[0]==ht.project){
+              p.holes.forEach(h=>{
+                if(h.id[1]==ht.hole){
+                  h.sections.forEach(s=>{
+                    if(s.id[2]==ht.section){
+                      console.log(p.name)
+                      sectionProperties.options.title += p.name+" "+h.name+"-"+s.name; 
+                      sectionProperties.data = s;
+                    }
+                  })
+                }              
+              })
+            }
+          })
+          if(sectionProperties.data!==null){
+            console.log(sectionProperties)
+            await window.LCapi.sendSettings(sectionProperties, "settings");
+          }
+        }
+      }      
     }
-    
   }
   //0 Context menu--------------------------------------------
   async function handleEditContextmenu(event) {
@@ -2815,18 +2837,26 @@ document.addEventListener("DOMContentLoaded", () => {
     const age = objOpts.age;
     const pen = objOpts.pen;
     const plot = objOpts.plot; 
+    const options={
+      editable:true,
+      called_from:"renderer",
+      title:"Preferences",
+    }
 
     const settings = {
-      canvas,
-      project,
-      hole,
-      section,
-      marker,
-      event,
-      connection,
-      age,
-      pen,
-      plot,  
+      options,
+      data:{
+        canvas,
+        project,
+        hole,
+        section,
+        marker,
+        event,
+        connection,
+        age,
+        pen,
+        plot,
+      }
     };
       
    await window.LCapi.sendSettings(settings, "settings");
@@ -3572,7 +3602,8 @@ document.addEventListener("DOMContentLoaded", () => {
           sketch.textSize(objOpts.hole.font_size);
           sketch.text(
             hole.name,
-            (hole_x0 + shift_x + objOpts.hole.width * 0.3) * xMag + pad_x,
+            // /(hole_x0 + shift_x + objOpts.hole.width * 0.3) * xMag + pad_x
+            (hole_x0 + shift_x) * xMag + pad_x + objOpts.section.width * xMag /2 - sketch.textWidth(hole.name)/2,
             (hole_top + shift_y) * yMag + pad_y - 20
           );
 
@@ -3777,9 +3808,9 @@ document.addEventListener("DOMContentLoaded", () => {
                   sketch.noStroke();
                   sketch.stroke(objOpts.event.face_colour[event[3]]);
                   sketch.rect(
-                    (hole_x0 + shift_x) * xMag + pad_x + 3,
+                    (hole_x0 + shift_x) * xMag + pad_x + (objOpts.section.line_width+2)/2,
                     (lowerDepth + shift_y) * yMag + pad_y,
-                    objOpts.section.width * ew * xMag - 6,
+                    objOpts.section.width * ew * xMag - objOpts.section.line_width-2,
                     eventThickness * yMag * objOpts.event.face_height,
                     1,1,1,1 //rounded option
                   );
@@ -5210,16 +5241,25 @@ document.addEventListener("DOMContentLoaded", () => {
   async function loadPlotData() {
     //LC plot age_collection id is as same as LCAge id
     const results = await window.LCapi.LoadPlotFromLCPlot();
-    if (results) {
-      LCPlot = results;
-      const num_age_collections = results.age_collections.length;
-      const num_data_collections= results.data_collections.length;
+    if (results!==null) {
+      //unzip
+      const cs = new DecompressionStream('gzip');
+      const decompressedStream = new Response(
+        new Blob([results]).stream().pipeThrough(cs)
+      );
+      const decompressed = await decompressedStream.text();
+      const originalData = JSON.parse(decompressed);
+
+      //load
+      LCPlot = originalData;
+      const num_age_collections = LCPlot.age_collections.length;
+      const num_data_collections= LCPlot.data_collections.length;
       console.log("[Renderer]: Plot Data have been loaded into the renderer.");
       console.log(
         "Plot data summary:",
         "\nAge dataset: " + num_age_collections,
         "\nData dataset:" + num_data_collections,
-        "\nData: ", results
+        "\nData: ", LCPlot
       );
     }
   }
@@ -5955,12 +5995,13 @@ async function assignCoreImages(coreImages, imageBuffers, objOpts) {
   await new Promise((resolve, reject) => {
     new p5(async (p) => {
       try {
-        await window.LCapi.progressbar("Assigning images", "Now assigning...");
-        await window.LCapi.updateProgressbar(0, N, "");
+        await window.LCapi.progressbar("Assigning images", "Now assigning...",true);
+        //await window.LCapi.updateProgressbar(0, N, "");
         let n = 0;
         if(imageBuffers==null){
           console.log("[Renderer]: Failed to assign images because there are no loaded images.");
-          await window.LCapi.updateProgressbar(N, N, "");
+          //await window.LCapi.updateProgressbar(N, N, "");
+          await window.LCapi.clearProgressbar();
           reject();
         }
 
@@ -5992,7 +6033,7 @@ async function assignCoreImages(coreImages, imageBuffers, objOpts) {
               }
 
               n+=1;
-              await window.LCapi.updateProgressbar(n, N, "");
+              //await window.LCapi.updateProgressbar(n, N, "");
             });
             promises.push(promise);            
           }
@@ -6007,6 +6048,7 @@ async function assignCoreImages(coreImages, imageBuffers, objOpts) {
     });
   });
 
+  await window.LCapi.clearProgressbar();
   console.log("[Renderer]: Load " + suc + " images / " + N + " models.");
   return results;
 }

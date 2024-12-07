@@ -250,6 +250,7 @@ document.addEventListener("DOMContentLoaded", () => {
   //convert
   document.getElementById("cvt_bt_convert").addEventListener("click", async (event) => {
       console.log("[Converter]: Converting...");
+      document.body.style.cursor = "wait"; 
 
       //get model ids
       const corId = parseInt(document.getElementById("cvt_correlation_model").value.split(",")[0]);
@@ -441,7 +442,7 @@ document.addEventListener("DOMContentLoaded", () => {
         return
       }
 
-      
+      document.body.style.cursor = "default"; 
       //console.log(convertedData);
     });
 

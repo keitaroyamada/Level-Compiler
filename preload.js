@@ -55,7 +55,7 @@ contextBridge.exposeInMainWorld("LCapi", {
 
   //others
   Confirm: (args1, args2) => ipcRenderer.invoke("Confirm", args1, args2),
-  progressbar: (args1, args2) => ipcRenderer.invoke("progressbar", args1, args2),
+  progressbar: (args1, args2, args3) => ipcRenderer.invoke("progressbar", args1, args2, args3),
   updateProgressbar: (args1, args2) => ipcRenderer.invoke("updateProgressbar", args1, args2),
   clearProgressbar: () => ipcRenderer.invoke("clearProgressbar"),
   askdialog: (args1, args2) => ipcRenderer.invoke("askdialog", args1, args2),

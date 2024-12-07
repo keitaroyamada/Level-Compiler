@@ -16,7 +16,7 @@ contextBridge.exposeInMainWorld("PlotterApi", {
   getPlotData: (args1) => ipcRenderer.invoke("PlotterGetData", args1),
   initialiseLCPlot_data_collection: () => ipcRenderer.invoke("InitialisePlotDataCollection"),
   sendPlotOptions:(args1,args2) => ipcRenderer.invoke("sendPlotOptions",args1,args2),
-
+  clearProgressbar:() => ipcRenderer.invoke("clearProgressbar"),
   
   //main -> renderer
   receive: (channel, func) => {

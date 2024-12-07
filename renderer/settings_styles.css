@@ -3,8 +3,10 @@ body {
   margin: 20px;
 }
 
-h1 {
+#title {
   color: #333;
+  font-weight: bold;
+  font-size:30px;
 }
 
 details {
@@ -13,12 +15,11 @@ details {
 
 details summary {
   cursor: pointer;
-  font-weight: bold;
 }
 
 label {
   margin-right: 20px;
-  font-weight: bold;
+  /*font-weight: bold;*/
 }
 
 input[type="text"],

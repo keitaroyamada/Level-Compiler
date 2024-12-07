@@ -1,5 +1,6 @@
 window.addEventListener("DOMContentLoaded", () => {
     let settings = {};
+    let isEditable = false;
     function createMenu(data, container) {
       Object.entries(data).forEach(([key, value]) => {
         if (typeof value === "object" && value !== null) {
@@ -7,6 +8,7 @@ window.addEventListener("DOMContentLoaded", () => {
           const summary = document.createElement("summary");
           summary.textContent = key;
           summary.style.fontSize = "25px";
+          details.style.fontSize = "20px";
           details.appendChild(summary);
           createMenu(value, details);
           container.appendChild(details);
@@ -14,29 +16,40 @@ window.addEventListener("DOMContentLoaded", () => {
           const wrapper = document.createElement("div");
           const label = document.createElement("label");
           label.textContent = key;
-          const input = createInput(value);
-          input.addEventListener("change", () => {
-            data[key] = parseInputValue(input, value);
-            const parentNames = [];
-            let currentElement = wrapper.parentElement;
-            while (currentElement && currentElement.tagName !== "BODY") {
-            if (currentElement.tagName === "DETAILS") {
-                const summary = currentElement.querySelector("summary");
-                if (summary) parentNames.unshift(summary.textContent);
-            }
-                currentElement = currentElement.parentElement;
-            }
 
-            console.log("Updated:", parentNames,settings);
-            window.SettingsApi.sendSettings(settings,"renderer")
-          });
-          wrapper.appendChild(label);
-          wrapper.appendChild(input);
+          
+          if (isEditable) {
+            const input = createInput(value);
+            input.addEventListener("change", () => {
+              data[key] = parseInputValue(input, value);
+              const parentNames = [];
+              let currentElement = wrapper.parentElement;
+              while (currentElement && currentElement.tagName !== "BODY") {
+                if (currentElement.tagName === "DETAILS") {
+                  const summary = currentElement.querySelector("summary");
+                  if (summary) parentNames.unshift(summary.textContent);
+                }
+                currentElement = currentElement.parentElement;
+              }
+              console.log("Updated:", parentNames, settings);
+              window.SettingsApi.sendSettings(settings, "renderer");
+            });
+            wrapper.appendChild(label);
+            wrapper.appendChild(input);
+          } else {
+            const textNode = document.createElement("span");
+            textNode.textContent = value;
+            label.style.fontSize = "25px";
+            textNode.style.fontSize = "25px";
+            wrapper.appendChild(label);
+            wrapper.appendChild(textNode);
+          }
+
+          
           container.appendChild(wrapper);
         }
       });
-    }
-  
+    } 
     function createInput(value) {
       let input;
       if (typeof value === "string") {
@@ -58,7 +71,6 @@ window.addEventListener("DOMContentLoaded", () => {
       }
       return input;
     }
-  
     function parseInputValue(input, originalValue) {
       if (typeof originalValue === "string") {
         return input.value;
@@ -74,16 +86,23 @@ window.addEventListener("DOMContentLoaded", () => {
     
     //----------------------------------------------------------------
     window.SettingsApi.receive("SettingsData", async (data) => {
+      console.log("Received data: ", data)
+      document.getElementById("title").textContent = data.options.title;
 
-        console.log(data)
-        settings = data;
+        if(data.options.title=="Preferences"){
+          document.getElementById("default").style.display = "block";
+        }else{
+        document.getElementById("default").style.display = "none";  
+        }
+          
+        settings = data.data;
+        isEditable = data.options.editable;
         const container = document.getElementById("menu-container");
         if (container) {
-        createMenu(settings, container);
+         createMenu(settings, container);
         }
         
     });
-
     document.getElementById("default").addEventListener("click", async (event) => {
       const response = await window.SettingsApi.askdialog(
         "Initialise settings",

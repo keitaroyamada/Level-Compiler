@@ -176,9 +176,14 @@ document.addEventListener("DOMContentLoaded", () => {
             seriesDiv.appendChild(plotTypeDropdown);
             container.appendChild(seriesDiv);
 
-            getSelectedData();
             updateView();
-            sendToRenderer("new")
+
+            let selectedList = getSelectedData();
+            if(selectedList.length==1){
+                sendToRenderer("new")
+            }else{
+                sendToRenderer("add")
+            }
         }    
     });
     document.getElementById('bt_remove').addEventListener("click", async (e) => {
@@ -269,11 +274,20 @@ document.addEventListener("DOMContentLoaded", () => {
             isSVG = false;
         }    
     });
-    
+    document.getElementById('bt_load').style.display = "none";
     window.PlotterApi.receive("importedData", async (data) => {
-        //load LCPlot
-        LCPlot = data;
+        document.body.style.cursor = "wait"; 
         console.log("[Plotter]: Imported data recieved.");
+        //unzip
+        const cs = new DecompressionStream('gzip');
+        const decompressedStream = new Response(
+            new Blob([data]).stream().pipeThrough(cs)
+        );
+        const decompressed = await decompressedStream.text();
+        const originalData = JSON.parse(decompressed);
+
+        //load LCPlot
+        LCPlot = originalData;
         console.log(LCPlot)
 
         //initialise
@@ -290,6 +304,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
             document.getElementById("c_collection").appendChild(option);
         });
+        document.body.style.cursor = "default"; 
+        window.PlotterApi.clearProgressbar();
     }); 
     function getSelectedData(){
         const children = document.getElementById("plot_list").children;
