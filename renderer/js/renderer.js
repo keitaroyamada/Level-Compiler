@@ -1192,23 +1192,7 @@ document.addEventListener("DOMContentLoaded", () => {
       
 
       
-    }else if(clickResult == "cancel"){
-      console.log("[Renderer]: Edit cancelled.")
-      objOpts.edit.editable = true;
-      objOpts.edit.contextmenu_enable = true;
-      objOpts.edit.hittest = null;
-      objOpts.edit.marker_from = null;
-      objOpts.edit.marker_to = null;
-      document.body.style.cursor = "default";
-      if(objOpts.edit.handleClick !== null){
-        document.removeEventListener('click', objOpts.edit.handleClick);
-        objOpts.edit.handleClick = null;
-      }
-      if(objOpts.edit.handleMove !== null){
-        document.removeEventListener('mousemove', objOpts.edit.handleMove);
-        objOpts.edit.handleMove = null;
-      }
-      updateView();
+    
     }else if(clickResult=="loadHighResolutionImage"){
       const curDPCM = JSON.parse(JSON.stringify(objOpts.image.dpcm));
 
@@ -1253,7 +1237,6 @@ document.addEventListener("DOMContentLoaded", () => {
       })
       updateView();
     }else if(clickResult == "cancel"){
-      console.log("[Renderer]: Edit cancelled.")
       objOpts.edit.editable = true;
       objOpts.edit.contextmenu_enable = true;
       objOpts.edit.hittest = null;
@@ -1269,6 +1252,7 @@ document.addEventListener("DOMContentLoaded", () => {
         document.removeEventListener('mousemove', objOpts.edit.handleMove);
         objOpts.edit.handleMove = null;
       }
+      console.log("[Renderer]: Edit cancelled.",objOpts.edit.handleMove, objOpts.edit.handleClick);
       updateView();
     }else{
       objOpts.edit.contextmenu_enable = true;
@@ -1333,7 +1317,7 @@ document.addEventListener("DOMContentLoaded", () => {
       }else if(objOpts.edit.mode == "connect_section" || objOpts.edit.mode == "disconnect_section"){
         //case piston core
         if(objOpts.edit.marker_from.project == ht.project && objOpts.edit.marker_from.hole ==ht.hole && objOpts.edit.marker_from.section !== ht.section){
-          if((objOpts.edit.marker_from.name.includes("top") && ht.markerName.includes("bottom")) || (objOpts.edit.marker_from.name.includes("bottom") && ht.markerName.includes("top"))){
+          if((objOpts.edit.marker_from.markerName.includes("top") && ht.markerName.includes("bottom")) || (objOpts.edit.marker_from.markerName.includes("bottom") && ht.markerName.includes("top"))){
             objOpts.edit.marker_to = ht;
           }
         }
@@ -1924,6 +1908,7 @@ document.addEventListener("DOMContentLoaded", () => {
             await undo("save");//undo
             result = await window.LCapi.AddEvent(upperId, [], response1, response2);
           }
+
           if(result == true){
             await loadModel();
             await loadAge(document.getElementById("AgeModelSelect").value);
@@ -1933,7 +1918,7 @@ document.addEventListener("DOMContentLoaded", () => {
               modelImages.load_target_ids = affectedSections;
               modelImages = await loadCoreImages(modelImages, LCCore, objOpts, ["drilling_depth","event_free_depth", "age"]);
             }
-            updateView();
+
             console.log("[Renderer]: Add a new event.]");
           }else if(result == "occupied"){
             alert("The input deposition type of event has already used between the markers.");
@@ -1978,32 +1963,6 @@ document.addEventListener("DOMContentLoaded", () => {
     document.removeEventListener("mousemove", objOpts.edit.handleMove);
     objOpts.edit.handleClick = null;
     objOpts.edit.handleMove = null;
-
-    ///update scroller position
-    let canvasPosY = null;
-    let canvasPosX = (ht.x + objOpts.canvas.shift_y) * (objOpts.canvas.dpir * objOpts.canvas.zoom_level[1]) + objOpts.canvas.pad_y;
-    if (objOpts.canvas.depth_scale == "age") {
-      canvasPosY = ((ht.y+ objOpts.canvas.shift_y) * (objOpts.canvas.dpir * objOpts.canvas.zoom_level[1]) + objOpts.canvas.pad_y + objOpts.canvas.age_zoom_correction[1])  * objOpts.canvas.age_zoom_correction[0];
-    } else {
-      canvasPosY = (ht.y + objOpts.canvas.shift_y) * (objOpts.canvas.dpir * objOpts.canvas.zoom_level[1]) + objOpts.canvas.pad_y;
-    }
-
-    //if move to centre
-    //scroller.scrollTop = canvasPosY - scroller.clientHeight / 2;
-    //scroller.moveTo(scroller.scrollLeft, pos_y);
-
-    //move canvas
-    let newPosY = canvasPosY - scroller.clientHeight / 2;
-    let newPosX = canvasPosX - scroller.clientWidth / 2;
-    if(newPosY <= 0){
-      newPosY = 0;
-    }
-    if(newPosX <= 0){
-      newPosX = 0;
-    }
-
-    //scroller.scrollTop = newPosY - canvasPos[1]; 
-    //canvasPos[1] = newPosY;
 
     updateView();
   }
@@ -2132,35 +2091,43 @@ document.addEventListener("DOMContentLoaded", () => {
         value:"",
         type:"text",
       };
-      inData.name            = await window.LCapi.inputdialog(askData);
-      askData = {
-        title:"Add a new section",
-        label:"Section TOP distance (cm)?",
-        value:0.0,
-        type:"number",
-      };
-      inData.distance_top    = parseFloat(await window.LCapi.inputdialog(askData));
-      askData = {
-        title:"Add a new section",
-        label:"Section BOTTOM distance (cm)?",
-        value:100.0,
-        type:"number",
-      };
-      inData.distance_bottom = parseFloat(await window.LCapi.inputdialog(askData));
-      askData = {
-        title:"Add a new section",
-        label:"Section TOP drilling depth (cm)?",
-        value:0.0,
-        type:"number",
-      };
-      inData.dd_top          = parseFloat(await window.LCapi.inputdialog(askData));
-      askData = {
-        title:"Add a new section",
-        label:"Section BOTTOM drilling depth (cm)?",
-        value:100.0,
-        type:"number",
-      };
-      inData.dd_bottom       = parseFloat(await window.LCapi.inputdialog(askData));
+      inData.name = await window.LCapi.inputdialog(askData);
+      if(inData.name!==null){
+        askData = {
+          title:"Add a new section",
+          label:"Section TOP distance (cm)?",
+          value:0.0,
+          type:"number",
+        };
+        inData.distance_top    = parseFloat(await window.LCapi.inputdialog(askData));
+        if(inData.distance_top!==NaN){
+          askData = {
+            title:"Add a new section",
+            label:"Section BOTTOM distance (cm)?",
+            value:100.0,
+            type:"number",
+          };
+          inData.distance_bottom = parseFloat(await window.LCapi.inputdialog(askData));
+          if(inData.distance_bottom!==NaN){
+            askData = {
+              title:"Add a new section",
+              label:"Section TOP drilling depth (cm)?",
+              value:0.0,
+              type:"number",
+            };
+            inData.dd_top = parseFloat(await window.LCapi.inputdialog(askData));
+            if(inData.dd_top!==NaN){
+              askData = {
+                title:"Add a new section",
+                label:"Section BOTTOM drilling depth (cm)?",
+                value:100.0,
+                type:"number",
+              };
+              inData.dd_bottom       = parseFloat(await window.LCapi.inputdialog(askData));
+            }
+          }
+        }
+      }
       
       //check data
       if(inData.distance_top !== null && inData.distance_bottom !== null && inData.dd_top !== null && inData.dd_bottom !== null){
@@ -2173,7 +2140,6 @@ document.addEventListener("DOMContentLoaded", () => {
             await loadModel();
             await loadAge(document.getElementById("AgeModelSelect").value);
             await loadPlotData();
-            updateView();
           }else{
             console.log("[Renderer]: Failed to add section.")
           }
@@ -2202,7 +2168,6 @@ document.addEventListener("DOMContentLoaded", () => {
     const mouseY = event.clientY - rect.top;
     const ht = JSON.parse(JSON.stringify(getClickedItemIdx(mouseX, mouseY, LCCore, objOpts)));
     objOpts.edit.hittest = ht;
-   console.log(ht.project+"-"+ht.hole)
     updateView();
   
     //context menu
@@ -3662,7 +3627,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 const hole_ht_y0 = (hole_top + shift_y) * yMag + pad_y - 3;
                 const hole_ht_w  = objOpts.section.width * xMag + 6;
                 const hole_ht_h  = (hole_bottom_e - hole_top) * yMag + 6;
-                console.log(hole_ht_x0,hole_ht_y0,hole_ht_w,hole_ht_h)
+                //console.log(hole_ht_x0,hole_ht_y0,hole_ht_w,hole_ht_h)
                 sketch.rect(hole_ht_x0, hole_ht_y0, hole_ht_w, hole_ht_h, 3, 3, 3, 3); //rounded
                 sketch.pop();
               }
@@ -5900,10 +5865,10 @@ async function loadCoreImages(modelImages, LCCore, objOpts, operations) {
   //await window.LCapi.progressbar("Load images"+depthScale, txt);
   //await window.LCapi.updateProgressbar(1, 1);
   return new Promise(async (resolve, reject) => {
-    try{
-      //initialise
-      let results = modelImages;
+    //initialise
+    let results = modelImages;
 
+    try{
       //check
       if (LCCore == null) {
         console.log("[Renderer]: There is no LCCore.");
@@ -5956,7 +5921,7 @@ async function loadCoreImages(modelImages, LCCore, objOpts, operations) {
       }
 
       //main Progress   
-      await new Promise(async(p5resolve,reject) => {
+      await new Promise(async(p5resolve,p5reject) => {
         try{
           //load image
           const imageBuffers = await new Promise(async(resolve, reject)=>{
@@ -5972,14 +5937,15 @@ async function loadCoreImages(modelImages, LCCore, objOpts, operations) {
           results.load_target_ids = [];
           p5resolve();
         }catch(err){
-          reject();
+          p5reject();
         }
         
       });
       
       resolve(results);
     }catch(err){
-      reject(err);
+      console.error(err);
+      reject(results);
     }
   });
 
@@ -5992,65 +5958,72 @@ async function assignCoreImages(coreImages, imageBuffers, objOpts) {
     N += Object.keys(imageBuffers[depthTyep]).length;
   }
 
-  await new Promise((resolve, reject) => {
-    new p5(async (p) => {
-      try {
-        await window.LCapi.progressbar("Assigning images", "Now assigning...",true);
-        //await window.LCapi.updateProgressbar(0, N, "");
-        let n = 0;
-        if(imageBuffers==null){
-          console.log("[Renderer]: Failed to assign images because there are no loaded images.");
-          //await window.LCapi.updateProgressbar(N, N, "");
-          await window.LCapi.clearProgressbar();
-          reject();
-        }
-
-        const promises = [];
-
-        for (const depthScale of Object.keys(imageBuffers)) {
-          for (const imName in imageBuffers[depthScale]) {
-            const promise = new Promise(async (resolveImage) => {
-              try {
-                let blob = new Blob([imageBuffers[depthScale][imName]], { type: 'image/jpeg' });
-                let url = URL.createObjectURL(blob);
-                results[depthScale][imName] = await p.loadImage(
-                  url,
-                  async () => {
-                    //console.log("[Renderer]: Assign image of " + imName +" in "+depthScale);
-                    suc+=1;
-                    resolveImage();
-                  },
-                  async () => {
-                    //console.log("[Renderer]: Failed to assign image of " + imName +" in "+depthScale);
-                    resolveImage();
-                  }
-                );
-                results.image_resolution[imName] = objOpts.image.dpcm;
-              } catch (err) {
-                console.log(err);
-                results[depthScale][imName] = undefined;
-                resolveImage();
-              }
-
-              n+=1;
-              //await window.LCapi.updateProgressbar(n, N, "");
-            });
-            promises.push(promise);            
+  try{
+    await new Promise((resolve, reject) => {
+      new p5(async (p) => {
+        try {
+          await window.LCapi.progressbar("Assigning images", "Now assigning...",true);
+          //await window.LCapi.updateProgressbar(0, N, "");
+          let n = 0;
+          if(imageBuffers==null){
+            console.log("[Renderer]: Failed to assign images because there are no loaded images.");
+            //await window.LCapi.updateProgressbar(N, N, "");
+            await window.LCapi.clearProgressbar();
+            //reject();
+            resolve();
           }
+  
+          const promises = [];
+  
+          for (const depthScale of Object.keys(imageBuffers)) {
+            for (const imName in imageBuffers[depthScale]) {
+              const promise = new Promise(async (resolveImage) => {
+                try {
+                  let blob = new Blob([imageBuffers[depthScale][imName]], { type: 'image/jpeg' });
+                  let url = URL.createObjectURL(blob);
+                  results[depthScale][imName] = await p.loadImage(
+                    url,
+                    async () => {
+                      //console.log("[Renderer]: Assign image of " + imName +" in "+depthScale);
+                      suc+=1;
+                      resolveImage();
+                    },
+                    async () => {
+                      //console.log("[Renderer]: Failed to assign image of " + imName +" in "+depthScale);
+                      resolveImage();
+                    }
+                  );
+                  results.image_resolution[imName] = objOpts.image.dpcm;
+                } catch (err) {
+                  console.log(err);
+                  results[depthScale][imName] = undefined;
+                  resolveImage();
+                }
+  
+                n+=1;
+                //await window.LCapi.updateProgressbar(n, N, "");
+              });
+              promises.push(promise);            
+            }
+          }
+          
+          await Promise.all(promises);
+          
+          resolve(results);
+        } catch (err) {
+          reject(err);
         }
-        
-        await Promise.all(promises);
-        
-        resolve(results);
-      } catch (err) {
-        reject(err);
-      }
+      });
     });
-  });
 
-  await window.LCapi.clearProgressbar();
-  console.log("[Renderer]: Load " + suc + " images / " + N + " models.");
-  return results;
+    await window.LCapi.clearProgressbar();
+    console.log("[Renderer]: Load " + suc + " images / " + N + " models.");
+    return results;
+  }catch(err){
+    console.error("[Renderer]: An error occurred during image assignment:", error);
+    await window.LCapi.clearProgressbar();
+    return results;
+  }  
 }
 
 async function loadResourcePath(objOpts){
