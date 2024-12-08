@@ -4994,111 +4994,122 @@ document.addEventListener("DOMContentLoaded", () => {
   async function loadModel() {
     //load model into LCCore
     //now, LC is able to hold one project file, model_id is dummy
-    LCCore = await window.LCapi.LoadModelFromLCCore();
+     const result = await window.LCapi.LoadModelFromLCCore();
 
-    if (LCCore) {
-      //initialise hole list
-      while (document.getElementById("hole_list").firstChild) {
-        document.getElementById("hole_list").removeChild(document.getElementById("hole_list").firstChild);
-      }
+     if(result !== null){
+      //unzip
+      const cs = new DecompressionStream('gzip');
+      const decompressedStream = new Response(
+        new Blob([result]).stream().pipeThrough(cs)
+      );
+      const decompressed = await decompressedStream.text();
+      LCCore = JSON.parse(decompressed);
 
-      //add hole list
-      LCCore.projects.forEach((project, p) => {
-        const container = document.getElementById("hole_list");
-        const projItemDiv = document.createElement("div");
-        const projListCheck = document.createElement("input");
-        projListCheck.type = "checkbox";
-        projListCheck.id = project.id;
-        projListCheck.checked = backup_hole_enable[project.id.toString()] !== undefined?  backup_hole_enable[project.id.toString()]:true;
-        const projListlabel = document.createElement("label");
-        projListlabel.htmlFor = projListCheck.id;
-        projListlabel.textContent = project.name;
-        projItemDiv.style.paddingLeft = "0px";
-
-        projItemDiv.appendChild(projListCheck);
-        projItemDiv.appendChild(projListlabel);
-
-        project.holes.forEach((hole) => {
-          const checkboxDiv = document.createElement("div");
-          const checkbox = document.createElement("input");
-          checkbox.type = "checkbox";
-          checkbox.id = hole.id.toString();
-          checkbox.name = hole.name;
-          checkbox.checked = backup_hole_enable[hole.id.toString()] !== undefined ?  backup_hole_enable[hole.id.toString()] : true;
-          const label = document.createElement("label");
-          label.htmlFor = hole.id.toString();
-          label.textContent = hole.name;
-          checkboxDiv.style.paddingLeft = "20px";
-
-          checkboxDiv.appendChild(checkbox);
-          checkboxDiv.appendChild(label);
-
-          projItemDiv.appendChild(checkboxDiv);
-        });
-
-        container.appendChild(projItemDiv);
-      });
-
-      //calc composite depth
-      LCCore = await window.LCapi.CalcCompositeDepth();
-
-      //calc event free depth
-      LCCore = await window.LCapi.CalcEventFreeDepth();
-
-      //sort
-      sortHoleByOrder(LCCore);
-
-      //apply enable info
-      for(let  project of LCCore.projects){
-        let en = backup_hole_enable[project.id.toString()];
-        if(en === undefined){
-          //initial case
-          project.enable = true;
-        }else{
-          project.enable = en;
+      if (LCCore) {
+        //initialise hole list
+        while (document.getElementById("hole_list").firstChild) {
+          document.getElementById("hole_list").removeChild(document.getElementById("hole_list").firstChild);
         }
-        for(let hole of project.holes){
-          en = backup_hole_enable[hole.id.toString()];
+  
+        //add hole list
+        LCCore.projects.forEach((project, p) => {
+          const container = document.getElementById("hole_list");
+          const projItemDiv = document.createElement("div");
+          const projListCheck = document.createElement("input");
+          projListCheck.type = "checkbox";
+          projListCheck.id = project.id;
+          projListCheck.checked = backup_hole_enable[project.id.toString()] !== undefined?  backup_hole_enable[project.id.toString()]:true;
+          const projListlabel = document.createElement("label");
+          projListlabel.htmlFor = projListCheck.id;
+          projListlabel.textContent = project.name;
+          projItemDiv.style.paddingLeft = "0px";
+  
+          projItemDiv.appendChild(projListCheck);
+          projItemDiv.appendChild(projListlabel);
+  
+          project.holes.forEach((hole) => {
+            const checkboxDiv = document.createElement("div");
+            const checkbox = document.createElement("input");
+            checkbox.type = "checkbox";
+            checkbox.id = hole.id.toString();
+            checkbox.name = hole.name;
+            checkbox.checked = backup_hole_enable[hole.id.toString()] !== undefined ?  backup_hole_enable[hole.id.toString()] : true;
+            const label = document.createElement("label");
+            label.htmlFor = hole.id.toString();
+            label.textContent = hole.name;
+            checkboxDiv.style.paddingLeft = "20px";
+  
+            checkboxDiv.appendChild(checkbox);
+            checkboxDiv.appendChild(label);
+  
+            projItemDiv.appendChild(checkboxDiv);
+          });
+  
+          container.appendChild(projItemDiv);
+        });
+  
+        //calc composite depth
+        LCCore = await window.LCapi.CalcCompositeDepth();
+  
+        //calc event free depth
+        LCCore = await window.LCapi.CalcEventFreeDepth();
+  
+        //sort
+        sortHoleByOrder(LCCore);
+  
+        //apply enable info
+        for(let  project of LCCore.projects){
+          let en = backup_hole_enable[project.id.toString()];
           if(en === undefined){
-            hole.enable = true;
+            //initial case
+            project.enable = true;
           }else{
-            hole.enable = en;
+            project.enable = en;
+          }
+          for(let hole of project.holes){
+            en = backup_hole_enable[hole.id.toString()];
+            if(en === undefined){
+              hole.enable = true;
+            }else{
+              hole.enable = en;
+            }
           }
         }
+  
+        //update position
+        let yMag = objOpts.canvas.dpir * objOpts.canvas.zoom_level[1];
+        let pad_y = objOpts.canvas.pad_y;
+        const shift_y = objOpts.canvas.shift_y;
+  
+        if (objOpts.canvas.depth_scale == "age") {
+          yMag = yMag * objOpts.canvas.age_zoom_correction[0];
+          pad_y = pad_y + objOpts.canvas.age_zoom_correction[1];
+        }
+  
+        /*
+        let newPad_y = objOpts.canvas.pad_y;;
+        if(LCCore.projects[0].composite_depth_top !==null){
+          newPad_y = (LCCore.projects[0].composite_depth_top + shift_y) * yMag + pad_y;
+        }
+        objOpts.canvas.pad_y = newPad_y;
+        */
+  
+        //shwo model summary
+        console.log("[Renderer]: Correlation Model has been loaded into the renderer.");
+        LCCore.projects.forEach(p=>{
+          console.log(
+            "Project ID: " + p.id[0],
+            "\nProject name: " + p.name,
+            "\nVersion: " + p.correlation_version,
+            "\nType: " + p.model_type,
+            "\nModel data: " , LCCore
+          );
+        })
+  
+        //updateView();
       }
 
-      //update position
-      let yMag = objOpts.canvas.dpir * objOpts.canvas.zoom_level[1];
-      let pad_y = objOpts.canvas.pad_y;
-      const shift_y = objOpts.canvas.shift_y;
-
-      if (objOpts.canvas.depth_scale == "age") {
-        yMag = yMag * objOpts.canvas.age_zoom_correction[0];
-        pad_y = pad_y + objOpts.canvas.age_zoom_correction[1];
-      }
-
-      /*
-      let newPad_y = objOpts.canvas.pad_y;;
-      if(LCCore.projects[0].composite_depth_top !==null){
-        newPad_y = (LCCore.projects[0].composite_depth_top + shift_y) * yMag + pad_y;
-      }
-      objOpts.canvas.pad_y = newPad_y;
-      */
-
-      //shwo model summary
-      console.log("[Renderer]: Correlation Model has been loaded into the renderer.");
-      LCCore.projects.forEach(p=>{
-        console.log(
-          "Project ID: " + p.id[0],
-          "\nProject name: " + p.name,
-          "\nVersion: " + p.correlation_version,
-          "\nType: " + p.model_type,
-          "\nModel data: " , LCCore
-        );
-      })
-
-      //updateView();
-    }
+     }    
   }
   async function registerAge(in_path) {
     if (in_path == null) {
@@ -5128,8 +5139,14 @@ document.addEventListener("DOMContentLoaded", () => {
     const results = await window.LCapi.LoadAgeFromLCAge(age_id);
 
     if (results) {
-      //shwo model summary
-      LCCore = results;
+      //unzip
+      const cs = new DecompressionStream('gzip');
+      const decompressedStream = new Response(
+        new Blob([results]).stream().pipeThrough(cs)
+      );
+      const decompressed = await decompressedStream.text();
+      LCCore = JSON.parse(decompressed);
+
       //apply enable info
       for(let  project of LCCore.projects){
         let en = backup_hole_enable[project.id.toString()];

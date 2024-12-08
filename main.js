@@ -210,8 +210,15 @@ function createMainWIndow() {
   });
   ipcMain.handle("LoadModelFromLCCore", async (_e) => {
     //import model
-    console.log("MAIN: Load correlation model.");
-    return JSON.parse(JSON.stringify(LCCore));
+    try{
+      const zipped = await zipData(LCCore);
+
+      console.log("MAIN: Load correlation model.");
+      return zipped;
+    }catch(err){
+      console.error("MAIN: Failed to zip: ", err);
+      return null;
+    }
   });
   ipcMain.handle("LoadAgeFromLCAge", async (_e, age_id) => {
     //apply latest age model to the depth model
@@ -250,9 +257,16 @@ function createMainWIndow() {
       mainWindow.webContents.send("AlertRenderer", err);
     }
 
-    console.log("MAIN: Load age model into LCCore. id: " +  LCAge.selected_id + " name:" +  model_name);
+    try{
+      const zipped = await zipData(LCCore);
 
-    return JSON.parse(JSON.stringify(LCCore));
+      console.log("MAIN: Load age model into LCCore. id: " +  LCAge.selected_id + " name:" +  model_name);
+      return zipped;
+    }catch(err){
+      console.error("MAIN: Failed to zip: ", err);
+      return null;
+    }
+    
   });
   ipcMain.handle("MirrorAgeList", async (_e) => {
     let registeredAgeList = []; 
@@ -3208,11 +3222,15 @@ async function getfile(mainWindow, title, ext) {
 }
 async function zipData(data) {
   return new Promise((resolve, reject) => {
+    console.time("zipped")
+      console.time("zippped_in_stringify")
     const jsonData = JSON.stringify(data);
+      console.timeEnd("zippped_in_stringify")
     zlib.gzip(jsonData, (err, buffer) => {
       if (err) {
         reject(err);
       } else {
+        console.timeEnd("zipped")
         resolve(buffer);
       }
     });
