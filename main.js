@@ -428,6 +428,7 @@ function createMainWIndow() {
       let targetList = globalPath.dataPaths.filter(item=>item.type==type);
 
       if(targetList.length < 1){
+        console.log("MAIN: There is no registered image folders.")
         return null
       }
       console.log("MAIN: Load images: N = "+loadOptions.targetIds.length+"; Operations: "+loadOptions.operations);
@@ -524,6 +525,7 @@ function createMainWIndow() {
       }
       return coreImages;
     }catch(err){
+      console.log(err)
       return null;
     }
       //-----------------------------------------------------------
@@ -1860,10 +1862,29 @@ function createMainWIndow() {
     if(type=="main"){
       const result = await history.undo({LCCore:LCCore, LCAge:LCAge, LCPlot:LCPlot});   
       if(result !== null){
+        //for Undo image
+        const changedSections = checkChanges(LCCore, result.LCCore);
+
         //Undo deep copy
         assignObject(LCCore, result.LCCore);
+        LCCore.updateSearchIdx();
         assignObject(LCAge, result.LCAge);
         assignObject(LCPlot, result.LCPlot);
+
+        //Undo images
+        let imagePaths = globalPath.dataPaths.filter(item=>item.type=="core_images");
+        if(imagePaths.length>0 && changedSections.length>0){
+          const coreImages = await loadCoreImages({
+            targetIds:changedSections,
+            operations:["drilling_depth","composite_depth","event_free_depth","age"],
+            dpcm:40,
+          },"core_images");
+
+          if(coreImages!==null){
+            mainWindow.webContents.send("LoadCoreImagesMenuClicked", coreImages);
+          }
+        }
+
         console.log("MAIN: Undo loaded.");
         return true;
       }else{
@@ -2595,6 +2616,25 @@ function createMainWIndow() {
   });
   
   //--------------------------------------------------------------------------------------------------
+  function checkChanges(currentLCCore, beforeLCCore){
+    let changedIds = [];
+    beforeLCCore.projects.forEach((project,p)=>{
+      project.holes.forEach((hole,h)=>{
+        hole.sections.forEach((section,s)=>{
+          const beforeId = section.id;
+          const aidx = currentLCCore.search_idx_list[beforeId.toString()];
+
+          const beforeHash = JSON.stringify(section);
+          const currentHash = JSON.stringify(currentLCCore.projects[aidx[0]].holes[aidx[1]].sections[aidx[2]]);
+          if(beforeHash !== currentHash){
+            changedIds.push(beforeId);
+          }
+        })
+      })
+    })
+    console.log("MAIN: ",changedIds.length, "sections are chenged.")
+    return changedIds;
+  }
   function initialiseLCCore(){
     LCCore = new LevelCompilerCore();
 
@@ -2815,9 +2855,9 @@ function createMainWIndow() {
                     });
                     const coreImages = await loadCoreImages({
                       targetIds:targetIds,
-                      operations:["drilling_depth","composite_depth","event_free_depth","age"],
+                      operations:["composite_depth","event_free_depth","age"],
                       dpcm:40,
-                    },"core_images")
+                    },"core_images");
 
                     mainWindow.webContents.send("LoadCoreImagesMenuClicked", coreImages);
                     //mainWindow.webContents.send("UpdateViewFromMain"); 
