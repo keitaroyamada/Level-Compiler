@@ -5077,6 +5077,8 @@ document.addEventListener("DOMContentLoaded", () => {
         }
   
         //update position
+        objOpts.canvas.depth_scale = document.getElementById("YAxisSelect").value;    
+
         let yMag = objOpts.canvas.dpir * objOpts.canvas.zoom_level[1];
         let pad_y = objOpts.canvas.pad_y;
         const shift_y = objOpts.canvas.shift_y;
@@ -5085,7 +5087,7 @@ document.addEventListener("DOMContentLoaded", () => {
           yMag = yMag * objOpts.canvas.age_zoom_correction[0];
           pad_y = pad_y + objOpts.canvas.age_zoom_correction[1];
         }
-  
+
         /*
         let newPad_y = objOpts.canvas.pad_y;;
         if(LCCore.projects[0].composite_depth_top !==null){
@@ -5106,7 +5108,7 @@ document.addEventListener("DOMContentLoaded", () => {
           );
         })
   
-        //updateView();
+        updateView();
       }
 
      }    
