@@ -227,7 +227,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
         if (event.shiftKey) {
             zoom_rate[2] += 0.01 * deltaY;
-
+            console.log(zoom_rate)
         }
 
         if (event.altKey) {      

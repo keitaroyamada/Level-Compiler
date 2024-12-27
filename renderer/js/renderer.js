@@ -4271,48 +4271,49 @@ document.addEventListener("DOMContentLoaded", () => {
               name:"",
               unit:"",
               max_x:NaN,
-              min_x:NaN,              
+              min_x:NaN,
+              pos_max_x:NaN,
+              pos_min_x:NaN,            
               data:{
                 global:{
                   data:[],
-                  plot_max_x:NaN,
-                  plot_min_x:NaN,
-                  plot_zero_x:NaN,
+                  max_x:NaN,
+                  min_x:NaN,
+                  hole_max_x:NaN,
+                  hole_min_x:NaN,
+                  hole_zero_x:NaN,
                 },
               },//stack each hole data
             };
             LCCore.projects.forEach(tempp=>{
               tempp.holes.forEach(temph=>{
-                drawPositions.data[temph.id.toString()] = {data:[],plot_max_x:NaN,plot_min_x:NaN,plot_zero_x:NaN};
+                drawPositions.data[temph.id.toString()] = {data:[],max_x:NaN,min_x:NaN,hole_max_x:NaN,hole_min_x:NaN,hole_zero_x:NaN};
               })
             })
 
             if(nIdx!==null && dIdx!==null){
               //case numerator/denominator
-              //case 1/denominator
 
               //get original data
               const numeratorData   = LCPlot.data_collections[colIdx].datasets[nIdx];
               const denominatorData = LCPlot.data_collections[colIdx].datasets[dIdx];
-
-              const minNum = Math.min(...numeratorData.data_series.filter(value => !isNaN(value.data)).map(value => value.data));
-              const maxNum = Math.max(...numeratorData.data_series.filter(value => !isNaN(value.data)).map(value => value.data));
-              const minDno = Math.min(...denominatorData.data_series.filter(value => !isNaN(value.data)).map(value => value.data));
-              const maxDno = Math.max(...denominatorData.data_series.filter(value => !isNaN(value.data)).map(value => value.data));
-
-              const dataMin = minNum/maxDno;
-              const dataMax = maxNum/minDno;
-              drawPositions.max_x = dataMin;
-              drawPositions.min_x = dataMax;
-              drawPositions.unit  = numeratorData.unit +" / "+ denominatorData.unit;
-              drawPositions.name  = numeratorData.name +" / "+ denominatorData.name;
+              const numdenoData = numeratorData.data_series.map((val,idx)=>val.data / denominatorData.data_series[idx].data);
+              const minNumDno = Math.min(...numdenoData.filter(val=>val!==null&&!isNaN(val)&&val!==Infinity&&val!==-Infinity));
+              const maxNumDno = Math.max(...numdenoData.filter(val=>val!==null&&!isNaN(val)&&val!==Infinity&&val!==-Infinity));
+                            
+              const dataMin = minNumDno;
+              const dataMax = maxNumDno;
+              drawPositions.max_x = dataMax;
+              drawPositions.min_x = dataMin;
+              drawPositions.unit  = numeratorData.unit + "/" + denominatorData.unit;
+              drawPositions.name  = numeratorData.name + "/" + denominatorData.name;
               
-              for(let i=0; i<denominatorData.data_series.length;i++){
+              for(let i=0; i<numeratorData.data_series.length;i++){
                 //get hole name
                 let holeName = "global";
-                if(denominatorData.data_series[i].original_depth_type=="trinity"){
+                if(numeratorData.data_series[i].original_depth_type=="trinity"){
                   LCCore.projects.forEach(tempp=>{tempp.holes.forEach(temph=>{
-                    if(temph.name == denominatorData.data_series[i].trinity.hole_name){
+                    if(temph.name == numeratorData.data_series[i].trinity.hole_name){
                       holeName = temph.id.toString();//at this point, different prroject but same hole is not supported
                     }
                   })})                  
@@ -4323,27 +4324,35 @@ document.addEventListener("DOMContentLoaded", () => {
                   type: "data", //used
                   amplification_x: (objOpts.hole.width / 2) * target.amplification / (dataMax - dataMin),//used
                   amplification_y: 1, //used
-                  original_depth_type: denominatorData.data_series[i].original_depth_type,//used
+                  original_depth_type: numeratorData.data_series[i].original_depth_type,//used
       
-                  x: numeratorData.data_series[i].data/denominatorData.data_series[i].data, //used
+                  x: numeratorData.data_series[i].data / denominatorData.data_series[i].data, //used
                   min_x: dataMin,
       
-                  hole_name: denominatorData.data_series[i].original_depth_type=="trinity" ? denominatorData.data_series[i].trinity.hole_name : null, //used
-                  section_name: denominatorData.data_series[i].original_depth_type=="trinity" ? denominatorData.data_series[i].trinity.section_name : null,
-                  distance: denominatorData.data_series[i].original_depth_type=="trinity" ? denominatorData.data_series[i].trinity.distance : null,
-                  composite_depth: denominatorData.data_series[i].composite_depth,//used
-                  evemnt_free_depth: denominatorData.data_series[i].event_free_depth,//used
-                  age: denominatorData.data_series[i].age,//used
+                  hole_name: numeratorData.data_series[i].original_depth_type=="trinity" ? numeratorData.data_series[i].trinity.hole_name : null, //used
+                  section_name: numeratorData.data_series[i].original_depth_type=="trinity" ? numeratorData.data_series[i].trinity.section_name : null,
+                  distance: numeratorData.data_series[i].original_depth_type=="trinity" ? numeratorData.data_series[i].trinity.distance : null,
+                  composite_depth: numeratorData.data_series[i].composite_depth,//used
+                  evemnt_free_depth: numeratorData.data_series[i].event_free_depth,//used
+                  age: numeratorData.data_series[i].age,//used
                 }  
 
                 //get position
                 let result = getPlotPosiotion( pData, LCCore, objOpts);
 
-                if(isNaN(drawPositions.data[holeName].plot_max_x) || drawPositions.data[holeName].plot_max_x > result.pos_canvas_x){
-                  drawPositions.data[holeName].plot_max_x = result.pos_canvas_x;
+                if(isNaN(drawPositions.data[holeName].hole_max_x) || drawPositions.data[holeName].hole_max_x < result.pos_canvas_x){
+                  drawPositions.data[holeName].hole_max_x = result.pos_canvas_x;
+                  drawPositions.data[holeName].max_x      = result.original_x;
                 }
-                if(isNaN(drawPositions.data[holeName].plot_min_x) || drawPositions.data[holeName].plot_min_x < result.pos_canvas_x){
-                  drawPositions.data[holeName].plot_min_x = result.pos_canvas_x;
+                if(isNaN(drawPositions.data[holeName].hole_min_x) || drawPositions.data[holeName].hole_min_x > result.pos_canvas_x){
+                  drawPositions.data[holeName].hole_min_x = result.pos_canvas_x;
+                  drawPositions.data[holeName].min_x      = result.original_x;
+                }
+                //get 0 position
+                if(isNaN(drawPositions.data[holeName].hole_zero_x)){
+                  pData.x = 0;
+                  const zeroResult = getPlotPosiotion( pData, LCCore, objOpts);
+                  drawPositions.data[holeName].hole_zero_x = zeroResult.pos_canvas_x;
                 }
 
                 //add plot list
@@ -4363,15 +4372,15 @@ document.addEventListener("DOMContentLoaded", () => {
                   }
                 }
               }
-
+             
               
             }else if(nIdx!==null){
               //case numerator
               //get original data
               const numeratorData   = LCPlot.data_collections[colIdx].datasets[nIdx];
 
-              const minNum = Math.min(...numeratorData.data_series.filter(value => !isNaN(value.data)).map(value => value.data));
-              const maxNum = Math.max(...numeratorData.data_series.filter(value => !isNaN(value.data)).map(value => value.data));
+              const minNum = Math.min(...numeratorData.data_series.filter(value => (!isNaN(value.data) && value.data!==null)).map(value => value.data));
+              const maxNum = Math.max(...numeratorData.data_series.filter(value => (!isNaN(value.data) && value.data!==null)).map(value => value.data));
               const dataMin = minNum;
               const dataMax = maxNum;
               drawPositions.max_x = dataMax;
@@ -4411,11 +4420,20 @@ document.addEventListener("DOMContentLoaded", () => {
                 //get position
                 let result = getPlotPosiotion( pData, LCCore, objOpts);
 
-                if(isNaN(drawPositions.data[holeName].plot_max_x) || drawPositions.data[holeName].plot_max_x > result.pos_canvas_x){
-                  drawPositions.data[holeName].plot_max_x = result.pos_canvas_x;
+                if(isNaN(drawPositions.data[holeName].hole_max_x) || drawPositions.data[holeName].hole_max_x < result.pos_canvas_x){
+                  drawPositions.data[holeName].hole_max_x = result.pos_canvas_x;
+                  drawPositions.data[holeName].max_x      = result.original_x;
                 }
-                if(isNaN(drawPositions.data[holeName].plot_min_x) || drawPositions.data[holeName].plot_min_x < result.pos_canvas_x){
-                  drawPositions.data[holeName].plot_min_x = result.pos_canvas_x;
+                if(isNaN(drawPositions.data[holeName].hole_min_x) || drawPositions.data[holeName].hole_min_x > result.pos_canvas_x){
+                  drawPositions.data[holeName].hole_min_x = result.pos_canvas_x;
+                  drawPositions.data[holeName].min_x      = result.original_x;
+                }
+
+                //get 0 position
+                if(isNaN(drawPositions.data[holeName].hole_zero_x)){
+                  pData.x = 0;
+                  const zeroResult = getPlotPosiotion( pData, LCCore, objOpts);
+                  drawPositions.data[holeName].hole_zero_x = zeroResult.pos_canvas_x;
                 }
 
                 //add plot list
@@ -4441,14 +4459,15 @@ document.addEventListener("DOMContentLoaded", () => {
               //get original data
               const denominatorData = LCPlot.data_collections[colIdx].datasets[dIdx];
 
-              const minDno = Math.min(...denominatorData.data_series.filter(value => !isNaN(value.data)).map(value => 1/value.data));
-              const maxDno = Math.max(...denominatorData.data_series.filter(value => !isNaN(value.data)).map(value => 1/value.data));
-              const dataMin = maxDno;
-              const dataMax = minDno;
-              drawPositions.max_x = dataMin;
-              drawPositions.min_x = dataMax;
-              drawPositions.unit  = "1 / "+denominatorData.unit;
-              drawPositions.name  = "1 / "+denominatorData.name;
+              const minDno = Math.min(...denominatorData.data_series.filter(value => (!isNaN(value.data) && value.data!==null)).map(value => 1 / value.data));
+              const maxDno = Math.max(...denominatorData.data_series.filter(value => (!isNaN(value.data) && value.data!==null)).map(value => 1 / value.data));
+
+              const dataMin = minDno;
+              const dataMax = maxDno;
+              drawPositions.max_x = dataMax;
+              drawPositions.min_x = dataMin;
+              drawPositions.unit  = denominatorData.unit;
+              drawPositions.name  = denominatorData.name;
               
               for(let i=0; i<denominatorData.data_series.length;i++){
                 //get hole name
@@ -4468,7 +4487,7 @@ document.addEventListener("DOMContentLoaded", () => {
                   amplification_y: 1, //used
                   original_depth_type: denominatorData.data_series[i].original_depth_type,//used
       
-                  x: 1/denominatorData.data_series[i].data, //used
+                  x: 1 / denominatorData.data_series[i].data, //used
                   min_x: dataMin,
       
                   hole_name: denominatorData.data_series[i].original_depth_type=="trinity" ? denominatorData.data_series[i].trinity.hole_name : null, //used
@@ -4482,11 +4501,19 @@ document.addEventListener("DOMContentLoaded", () => {
                 //get position
                 let result = getPlotPosiotion( pData, LCCore, objOpts);
 
-                if(isNaN(drawPositions.data[holeName].plot_max_x) || drawPositions.data[holeName].plot_max_x > result.pos_canvas_x){
-                  drawPositions.data[holeName].plot_max_x = result.pos_canvas_x;
+                if(isNaN(drawPositions.data[holeName].hole_max_x) || drawPositions.data[holeName].hole_max_x < result.pos_canvas_x){
+                  drawPositions.data[holeName].hole_max_x = result.pos_canvas_x;
+                  drawPositions.data[holeName].max_x      = result.original_x;
                 }
-                if(isNaN(drawPositions.data[holeName].plot_min_x) || drawPositions.data[holeName].plot_min_x < result.pos_canvas_x){
-                  drawPositions.data[holeName].plot_min_x = result.pos_canvas_x;
+                if(isNaN(drawPositions.data[holeName].hole_min_x) || drawPositions.data[holeName].hole_min_x > result.pos_canvas_x){
+                  drawPositions.data[holeName].hole_min_x = result.pos_canvas_x;
+                  drawPositions.data[holeName].min_x      = result.original_x;
+                }
+                //get 0 position
+                if(isNaN(drawPositions.data[holeName].hole_zero_x)){
+                  pData.x = 0;
+                  const zeroResult = getPlotPosiotion( pData, LCCore, objOpts);
+                  drawPositions.data[holeName].hole_zero_x = zeroResult.pos_canvas_x;
                 }
 
                 //add plot list
@@ -4507,7 +4534,12 @@ document.addEventListener("DOMContentLoaded", () => {
                 }
               }
 
+
+
             }
+
+            drawPositions.pos_max_x = Math.max(...Object.values(drawPositions.data).flatMap(item=>item.hole_max_x).filter(value => !isNaN(value)));
+            drawPositions.pos_min_x = Math.min(...Object.values(drawPositions.data).flatMap(item=>item.hole_min_x).filter(value => !isNaN(value)));
 
             //draw plot
             if(target.plotType =="line"){
@@ -4576,12 +4608,9 @@ document.addEventListener("DOMContentLoaded", () => {
               }
               sketch.pop();              
             }else if(target.plotType == "bar"){
-              //under construction
-              /*
-              sketch.push();
-              sketch.noStroke();
-              sketch.fill(target.colour);
-              
+              sketch.push()
+              const binWidth = 4;
+
               for(let holeKey in drawPositions.data){
                 const posData = drawPositions.data[holeKey].data;
                 if(posData.length==0){
@@ -4589,36 +4618,31 @@ document.addEventListener("DOMContentLoaded", () => {
                 }
 
                 //if data exist
-                sketch.strokeWeight(1);
-                sketch.stroke(target.colour);
-                for(let i=0; i<posData.length-1;i++){
+                sketch.noStroke();
+                sketch.fill(target.colour);
+                for(let i=0; i<posData.length;i++){
                   //check is draw
                   const data_rect = {
                     x: posData[i].pos_canvas_x,
                     y: posData[i].pos_canvas_y,
-                    width: posData[i+1].pos_canvas_x-posData[i].pos_canvas_x,
-                    height: posData[i+1].pos_canvas_y-posData[i].pos_canvas_y,
+                    width: posData.hole_max_x = posData.hole_min_x,
+                    height: binWidth,
                   };
                   if (!isInside(view_rect, data_rect, 500)) {
                     continue;
                   } 
 
-                  //calc pos
-                  const plot_min_x = drawPositions.data[holeKey].plot_min_x;
-                  const plot_min_y = drawPositions.data[holeKey].plot_min_y;
-                  let rectY  = posData[i].pos_canvas_y;
-                  let rectY0 = rectY -2;
-                  let rectY1 = rectY +2;
 
-                  let rectX0 = 0 - plot_min_x;
-                  let rectX1 = posData[i].pos_canvas_x - drawPositions.plot_min_x;
-
-                  if(0>drawPositions.plot_max_x){
-                      rectX0 = drawPositions.plot_max_x - drawPositions.plot_min_x;
+                  let rectX0 = drawPositions.data[holeKey].hole_zero_x;//hole_min_x
+                  if(drawPositions.max_x < 0){
+                    rectX0 = drawPositions.pos_max_x;
                   }
-                  if(0<drawPositions.plot_min_x){
-                      rectX0 = 0 - drawPositions.plot_min_x;
+                  if(drawPositions.min_x > 0){
+                    rectX0 = drawPositions.pos_min_x;
                   }
+                  let rectX1 = posData[i].pos_canvas_x;
+                  let rectY0 = posData[i].pos_canvas_y - binWidth/2;
+                  let rectY1 = posData[i].pos_canvas_y + binWidth/2;
                   
                   //draw
                   sketch.rect(
@@ -4626,47 +4650,47 @@ document.addEventListener("DOMContentLoaded", () => {
                     rectY0,
                     rectX1 - rectX0,
                     rectY1 - rectY0,
-                  ); 
-                  
+                  );
                 }
 
-              }       
-              sketch.pop(); 
-              */
+              }
+              sketch.pop()
             }
 
             //x scale
+            sketch.push()
             for(const plotKey in drawPositions.data){
               if(drawPositions.data[plotKey].data.length>0){
+                sketch.strokeWeight(1);
+                sketch.stroke(target.colour);    
                 sketch.line(
-                  drawPositions.data[plotKey].plot_min_x,
+                  drawPositions.data[plotKey].hole_min_x,
                   100    + scroller.scrollTop,
-                  drawPositions.data[plotKey].plot_max_x,
+                  drawPositions.data[plotKey].hole_max_x,
                   100    + scroller.scrollTop,
                 )
-                sketch.push()
                 sketch.textSize(12);
                 sketch.noStroke();
                 sketch.fill(target.colour)
                 sketch.text(
-                  autoRound(drawPositions.min_x).toString(),
-                  drawPositions.data[plotKey].plot_min_x,
+                  autoRound(drawPositions.data[plotKey].min_x).toString(),
+                  drawPositions.data[plotKey].hole_min_x - sketch.textWidth(autoRound(drawPositions.data[plotKey].min_x).toString()),
                   90    + scroller.scrollTop,
                 )
                 sketch.text(
-                  autoRound(drawPositions.max_x).toString(),
-                  drawPositions.data[plotKey].plot_max_x,
+                  autoRound(drawPositions.data[plotKey].max_x).toString(),
+                  drawPositions.data[plotKey].hole_max_x,
                   90    + scroller.scrollTop,
                 )
                 const title = drawPositions.name + " [" +drawPositions.unit+"]";
                 sketch.text(
                   title,
-                  drawPositions.data[plotKey].plot_min_x + (drawPositions.data[plotKey].plot_max_x - drawPositions.data[plotKey].plot_min_x)/2 - sketch.textSize(title)/2,
+                  drawPositions.data[plotKey].hole_min_x + (drawPositions.data[plotKey].hole_max_x - drawPositions.data[plotKey].hole_min_x)/2 - sketch.textSize(title),
                   70    + scroller.scrollTop,
                 )
-                sketch.pop()
               }
             }
+            sketch.pop()
           }
           sketch.pop();
         }
