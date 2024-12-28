@@ -39,8 +39,7 @@ html {
   z-index: 100;
 }
 #scroller {
-  /*Size is displayed size*/
-  top: 100px;
+  /*Size is displayed size*/  top: 100px;
   width: 100%;
   height: calc(100% - 70px);
   /*border: 1px solid lightblue;*/

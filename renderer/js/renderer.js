@@ -3290,14 +3290,30 @@ document.addEventListener("DOMContentLoaded", () => {
     };
 
     //draw data=============================================================================================
+    console.log(canvasBase.style)
+    
     sketch.draw = () => {
       //sketch.resizeCanvas(scroller.clientWidth, scroller.clientHeight);
       //back ground
       sketch.background(objOpts.canvas.background_colour);
 
-      //translate plot position
+      //translate plot position 
       sketch.push(); //save
+      
+      //under construction
+      //sketch.translate(scroller.clientWidth, scroller.clientHeight);
+      //sketch.rotate(-Math.PI / 2);
+
       sketch.translate(-canvasPos[0], -canvasPos[1]); //if you want revers move
+
+      //calc draw area
+      const view_rect = {
+        x: scroller.scrollLeft,
+        y: scroller.scrollTop,
+        width: window.innerWidth,
+        height: window.innerHeight,
+      };
+
 
       //draw model
       //get adjust values
@@ -3315,13 +3331,7 @@ document.addEventListener("DOMContentLoaded", () => {
       const shift_x = objOpts.canvas.shift_x;
       const shift_y = objOpts.canvas.shift_y;
 
-      //calc draw area
-      const view_rect = {
-        x: scroller.scrollLeft,
-        y: scroller.scrollTop,
-        width: window.innerWidth,
-        height: window.innerHeight,
-      };
+      
       //-----------------------------------------------------------------------------------------
       //draw grid
       if (LCCore && objOpts.canvas.is_grid) {
