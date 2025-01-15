@@ -871,6 +871,7 @@ document.addEventListener("DOMContentLoaded", () => {
           })
         }
       })
+      LCCore = sortHoleByOrder(LCCore);
       updateView();
     }else if(clickResult=="showSectionProperties"){
       if(LCCore){
@@ -5089,7 +5090,7 @@ document.addEventListener("DOMContentLoaded", () => {
         LCCore = await window.LCapi.CalcEventFreeDepth();
   
         //sort
-        sortHoleByOrder(LCCore);
+        LCCore = sortHoleByOrder(LCCore);
   
         //apply enable info
         for(let  project of LCCore.projects){
@@ -5819,15 +5820,12 @@ async function loadPlotIcons(agePlotIcons, objOpts) {
 }
 
 function sortHoleByOrder(LCCore) {
-  LCCore.projects.sort((a, b) => {
-    a.order < b.order ? -1 : 1;
-  });
-
   LCCore.projects.forEach((project) => {
     project.holes.sort((a, b) => {
-      a.order < b.order ? -1 : 1;
+      return a.order - b.order;
     });
   });
+  return LCCore;
 }
 
 //--------------------------------------------------------------------------------------------------
