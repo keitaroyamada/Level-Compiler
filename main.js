@@ -3499,10 +3499,16 @@ function assignObject (obj,data){
   });
 }
 async function checkUpdate(){
+
   //check update in the github
   autoUpdater.allowPrerelease = true;
   autoUpdater.autoDownload = false;
-  autoUpdater.forceDevUpdateConfig = false; // for dev
+  if (isDev) {
+    autoUpdater.forceDevUpdateConfig = true; // for dev
+  }else{
+    autoUpdater.forceDevUpdateConfig = false; // for dev
+  }
+  
   autoUpdater.on('update-available', (info) => {
     dialog.showMessageBox({
       type: 'info',
@@ -3567,11 +3573,11 @@ function setSettings(data){
 }
 //--------------------------------------------------------------------------------------------------
 app.whenReady().then(() => {
-  //check update
-  checkUpdate();
-
   //create main window
   createMainWIndow();
+
+  //check update
+  checkUpdate();
 
   app.on("activate", (I) => {
     if (BrowserWindow.getAllWindows().length === 0) {

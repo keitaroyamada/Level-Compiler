@@ -25,7 +25,7 @@
     "appId": "io.github.ky_apps.Level-Compiler",
     "publish": {
       "provider": "github",
-      "owner": "ky",
+      "owner": "keitaroyamada",
       "repo": "Level-Compiler"
     },
     "win": {
