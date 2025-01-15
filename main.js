@@ -3502,7 +3502,7 @@ async function checkUpdate(){
   //check update in the github
   autoUpdater.allowPrerelease = true;
   autoUpdater.autoDownload = false;
-  autoUpdater.forceDevUpdateConfig = false; 
+  autoUpdater.forceDevUpdateConfig = false; // for dev
   autoUpdater.on('update-available', (info) => {
     dialog.showMessageBox({
       type: 'info',
