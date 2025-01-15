@@ -3480,11 +3480,14 @@ function createAboutWindow() {
   aboutWindow.setMenu(null);
   aboutWindow.loadFile(path.join(__dirname, "./renderer/about.html"));
 
+  
+
   aboutWindow.once("ready-to-show", () => {
     aboutWindow.show();
    // converterWindow.setAlwaysOnTop(true, "normal");
    //aboutWindow.webContents.openDevTools();
     //converterWindow.setAlwaysOnTop(true, "normal");
+    aboutWindow.webContents.send("Version", app.getVersion());
   });
 }
 function assignObject (obj,data){
