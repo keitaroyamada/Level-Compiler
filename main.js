@@ -79,7 +79,7 @@ function createMainWIndow() {
     webPreferences: {
       //nodeIntegration: false, //Do not change for security reason
       //contextIsolation: true, //Do not change for security reason
-      preload: path.join(__dirname, "preload.js"),
+      preload: path.join(__dirname, "preload", "preload.js"),
     },
     icon: "./icon/levelcompiler.png",
   });
@@ -1369,7 +1369,7 @@ function createMainWIndow() {
       title: "Converter",
       width: 700,
       height: 800,
-      webPreferences: {preload: path.join(__dirname, "preload_converter.js"),},
+      webPreferences: {preload: path.join(__dirname, "preload", "preload_converter.js"),},
     });
     
     //converterWindow.setAlwaysOnTop(true, "normal");
@@ -1402,7 +1402,7 @@ function createMainWIndow() {
       width: 700,
       height: 700,
       webPreferences: {
-        preload: path.join(__dirname, "preload_converter.js"),
+        preload: path.join(__dirname, "preload", "preload_converter.js"),
       },
     });
 
@@ -1717,7 +1717,7 @@ function createMainWIndow() {
       width: 1500,
       height: 800,
       webPreferences: {
-        preload: path.join(__dirname, "preload_divider.js"),
+        preload: path.join(__dirname, "preload", "preload_divider.js"),
       },
     });
 
@@ -1761,7 +1761,7 @@ function createMainWIndow() {
       width: 230,
       height: 550,
       webPreferences: {
-        preload: path.join(__dirname, "preload_finder.js"),
+        preload: path.join(__dirname, "preload", "preload_finder.js"),
       },
     });
 
@@ -2581,7 +2581,7 @@ function createMainWIndow() {
           title: "Settings",
           width: 700,
           height: 700,
-          webPreferences: {preload: path.join(__dirname, "preload_settings.js"),},
+          webPreferences: {preload: path.join(__dirname, "preload", "preload_settings.js"),},
         });
         
         //converterWindow.setAlwaysOnTop(true, "normal");
@@ -2972,7 +2972,7 @@ function createMainWIndow() {
                 title: "Settings",
                 width: 700,
                 height: 700,
-                webPreferences: {preload: path.join(__dirname, "preload_settings.js"),},
+                webPreferences: {preload: path.join(__dirname, "preload", "preload_settings.js"),},
               });
               
               //converterWindow.setAlwaysOnTop(true, "normal");
@@ -3057,7 +3057,7 @@ function createMainWIndow() {
                 title: "Converter",
                 width: 700,
                 height: 700,
-                webPreferences: {preload: path.join(__dirname, "preload_converter.js"),},
+                webPreferences: {preload: path.join(__dirname, "preload", "preload_converter.js"),},
               });
               
               //converterWindow.setAlwaysOnTop(true, "normal");
@@ -3102,7 +3102,7 @@ function createMainWIndow() {
                 title: "Converter",
                 width: 280,//full: 900
                 height: 600,
-                webPreferences: {preload: path.join(__dirname, "preload_plotter.js"),},
+                webPreferences: {preload: path.join(__dirname, "preload", "preload_plotter.js"),},
               });
               
               //converterWindow.setAlwaysOnTop(true, "normal");
@@ -3140,7 +3140,7 @@ function createMainWIndow() {
                 title: "labeler",
                 width: 800,
                 height: 800,
-                webPreferences: {preload: path.join(__dirname, "preload_labeler.js"),},
+                webPreferences: {preload: path.join(__dirname, "preload", "preload_labeler.js"),},
               });
               
               //converterWindow.setAlwaysOnTop(true, "normal");
@@ -3475,7 +3475,7 @@ function createAboutWindow() {
     title: "About Level Compiler",
     width: 500,
     height: 300,
-    webPreferences: {preload: path.join(__dirname, "preload_about.js"),},
+    webPreferences: {preload: path.join(__dirname, "preload", "preload_about.js"),},
   });
   aboutWindow.setMenu(null);
   aboutWindow.loadFile(path.join(__dirname, "./renderer/about.html"));
