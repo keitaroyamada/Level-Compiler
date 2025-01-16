@@ -5,11 +5,11 @@
 ## 2. Install
 ### 2.1. Recommended environments(Development environment)
 - WIndows11
+- macOS (+Apple silicon)
+  
 ### 2.2. Windows
 1. Download installer (*.msi) from the right panel "Releases".
 2. Run downloaded msi file.
-3. 
-
 
 
 ### 2.3. Mac(Apple silicon)
@@ -26,4 +26,6 @@
 
     <img src=https://github.com/user-attachments/assets/8c2defa2-22ce-4efc-abf0-1fc65158ec0f width="400" >
 
-## 3. References
+## 3. Usage
+
+## 4. References
