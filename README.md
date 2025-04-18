@@ -62,7 +62,8 @@
    - Generate Certificate Signing Request(CSR) file from Keychain.
    - Enroll in the Apple Developer Program.
    - Generate the Developer ID Application certificate(*.cer) from ADP using CSR.
-   - Download and install CSR file.
+   - Download and install CER file.
+   - Download　Apple PKI file.
    - Check “Trust" the certificate.
    - The app will be automatically signed during the build process.
    
