@@ -2,7 +2,7 @@
 <img src=https://github.com/user-attachments/assets/b80709f2-e609-445f-a5c5-542b0d91c9ba width="500" >
 
 ## 1. About
-## 2. Build
+## 2. Build(optional)
   __This section is optional.__ If it is not necessary, please proceed to [the next section](#3-Install).
   
   This step explains how to build the application from the source code.
@@ -29,8 +29,17 @@
    ```
    npm run build:mac
    ```
-      
-8. Move to next section.
+
+8. Signing to the application (optional)
+   - Install Command line developper tools.
+   - Generate Certificate Signing Request(CSR) file from Keychain.
+   - Enroll in the Apple Developer Program.
+   - Generate the Developer ID Application certificate(*.cer) from ADP using CSR.
+   - Download and install CSR file.
+   - Check “Trust" the certificate.
+   - The app will be automatically signed during the build process.
+   
+9. Move to next section.
 
 ## 3. Install
 ### 2.1. Recommended environments(Development environment)
