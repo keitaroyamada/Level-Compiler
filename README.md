@@ -3,7 +3,7 @@
 
 ## 1. About
 ## 2. Build
-  This step is optional. If it is not necessary, please proceed to the next step.
+  __This section is optional.__ If it is not necessary, please proceed to [the next section](#3.-Install).
   
   This step explains how to build the application from the source code.
 
@@ -14,17 +14,25 @@
 4. Unzip the downloaded Zip file.
 5. Start terminanl and move to the unzipped directory using change directory command("cd") and list segments command("ls").
 6. Run the following code into the terminal to Install requirement packages.
-   '''
+   ```
    npm install
    npm list
-   '''
+   ```
+   
 7. Run the following code into the terminal to build executable file.
-   '''
-   npm run build:mac
-   '''
-8. Run the built executable file.
 
-## 2. Install
+   - Windows11
+   ```
+   npm run build:win
+   ```
+   - Mac (+Apple silicon)
+   ```
+   npm run build:mac
+   ```
+      
+8. Move to next section.
+
+## 3. Install
 ### 2.1. Recommended environments(Development environment)
 - Windows11
 - macOS (+Apple silicon)
@@ -48,6 +56,6 @@
 
     <img src=https://github.com/user-attachments/assets/8c2defa2-22ce-4efc-abf0-1fc65158ec0f width="400" >
 
-## 3. Usage
+## 4. Usage
 
-## 4. References
+## 5. References
