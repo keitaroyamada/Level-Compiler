@@ -2,9 +2,31 @@
 <img src=https://github.com/user-attachments/assets/b80709f2-e609-445f-a5c5-542b0d91c9ba width="500" >
 
 ## 1. About
+## 2. Build
+  This step is optional. If it is not necessary, please proceed to the next step.
+  
+  This step explains how to build the application from the source code.
+
+- Windows11 & Mac (+Apple silicon)    
+1. Download and install Python3 from [official site](https://www.python.org/).
+2. Download and install Node.js form [official site](https://nodejs.org/en/).
+3. Download and this repository from right upper green "Code" > "Download Zip".
+4. Unzip the downloaded Zip file.
+5. Start terminanl and move to the unzipped directory using change directory command("cd") and list segments command("ls").
+6. Run the following code into the terminal to Install requirement packages.
+   '''
+   npm install
+   npm list
+   '''
+7. Run the following code into the terminal to build executable file.
+   '''
+   npm run build:mac
+   '''
+8. Run the built executable file.
+
 ## 2. Install
 ### 2.1. Recommended environments(Development environment)
-- WIndows11
+- Windows11
 - macOS (+Apple silicon)
   
 ### 2.2. Windows
