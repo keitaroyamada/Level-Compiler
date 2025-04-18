@@ -3,7 +3,7 @@
 
 ## 1. About
 ## 2. Build
-  __This section is optional.__ If it is not necessary, please proceed to [the next section](#3.-Install).
+  __This section is optional.__ If it is not necessary, please proceed to [the next section](#3-Install).
   
   This step explains how to build the application from the source code.
 
