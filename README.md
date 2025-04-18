@@ -2,7 +2,34 @@
 <img src=https://github.com/user-attachments/assets/b80709f2-e609-445f-a5c5-542b0d91c9ba width="500" >
 
 ## 1. About
-## 2. Build(optional)
+
+## 2. Install
+### 2.1. Recommended environments(Development environment)
+- Windows11
+- macOS (+Apple silicon)
+  
+### 2.2. Windows
+1. Download installer (*.msi) from the right panel "Releases".
+2. Run downloaded msi file.
+
+
+### 2.3. Mac(Apple silicon)
+1. Download installer (*.dmg) from the right panel "Releases".
+2. Run downloaded "*.dmg" file and install Level Compiler.
+
+   <img src=https://github.com/user-attachments/assets/3a655662-f4a7-4ef6-b2ff-37fea310978b width="300" >
+
+3. Run installed Level Compiler and press "Done" on the security warning. This is because this app is signed but not notarised. This action is required only during the first launch.
+
+   <img src=https://github.com/user-attachments/assets/3921d79a-2cd5-4bf3-b79f-b100c54c3945 width="300" >
+
+4. Go to Settings > Privacy and Security, and allow the execution of Level Compiler.
+
+    <img src=https://github.com/user-attachments/assets/8c2defa2-22ce-4efc-abf0-1fc65158ec0f width="400" >
+
+## 3. Usage
+
+## 4. Build from code(optional)
   __This section is optional.__ If it is not necessary, please proceed to [the next section](#3-Install).
   
   This step explains how to build the application from the source code.
@@ -30,7 +57,7 @@
    npm run build:mac
    ```
 
-8. Signing to the application (optional)
+8. Signing to the application (more optional)
    - Install Command line developper tools.
    - Generate Certificate Signing Request(CSR) file from Keychain.
    - Enroll in the Apple Developer Program.
@@ -40,31 +67,5 @@
    - The app will be automatically signed during the build process.
    
 9. Move to next section.
-
-## 3. Install
-### 2.1. Recommended environments(Development environment)
-- Windows11
-- macOS (+Apple silicon)
-  
-### 2.2. Windows
-1. Download installer (*.msi) from the right panel "Releases".
-2. Run downloaded msi file.
-
-
-### 2.3. Mac(Apple silicon)
-1. Download installer (*.dmg) from the right panel "Releases".
-2. Run downloaded "*.dmg" file and install Level Compiler.
-
-   <img src=https://github.com/user-attachments/assets/3a655662-f4a7-4ef6-b2ff-37fea310978b width="300" >
-
-3. Run installed Level Compiler and press "Done" on the security warning. This is because this app is signed but not notarised. This action is required only during the first launch.
-
-   <img src=https://github.com/user-attachments/assets/3921d79a-2cd5-4bf3-b79f-b100c54c3945 width="300" >
-
-4. Go to Settings > Privacy and Security, and allow the execution of Level Compiler.
-
-    <img src=https://github.com/user-attachments/assets/8c2defa2-22ce-4efc-abf0-1fc65158ec0f width="400" >
-
-## 4. Usage
 
 ## 5. References
