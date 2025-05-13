@@ -343,6 +343,8 @@ function createMainWIndow() {
   });
   ipcMain.handle("CheckImagesInDir", async (_e, name) => {
     let targetList = globalPath.dataPaths.filter(item=>item.type=="core_images");
+    //mainWindow.webContents.send("rendererLog", targetList);
+
     let result = false;
     for(const target of targetList){
       const res = findFileInDir(target.path, name, "check");
@@ -2775,7 +2777,7 @@ function createMainWIndow() {
     try{
       globalPath.dataPaths.push({type:type, path:fullpath, name:name});
 
-      console.log("MAIN: Folder of Core images is registered.")
+      console.log("MAIN: Core images in the folder is registered.")
       return true
     }catch(err){
       return false

@@ -340,7 +340,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
 
       if(N>0){
-        await window.LCapi.progressbar("Load models", "Now loading...", true);
+        await window.LCapi.progressbar("Load models", "Now chacking...", true);
       }
 
       for(let i=0;i<order.length;i++){
@@ -424,6 +424,7 @@ document.addEventListener("DOMContentLoaded", () => {
       //update photo
       if(isPhotoLoaded == false && isAgeLoaded == true){
         if(Object.keys(modelImages.drilling_depth).length>0){
+          await window.LCapi.clearProgressbar(); // clear previous progress bar
           modelImages = await loadCoreImages(modelImages, LCCore, objOpts, ["drilling_depth", "age"]);
         }
       }
@@ -3291,7 +3292,7 @@ document.addEventListener("DOMContentLoaded", () => {
     };
 
     //draw data=============================================================================================
-    console.log(canvasBase.style)
+    //console.log(canvasBase.style)
     
     sketch.draw = () => {
       //sketch.resizeCanvas(scroller.clientWidth, scroller.clientHeight);
@@ -5902,6 +5903,7 @@ async function updateImageRegistration(modelImages, LCCore){
       }
     }
 
+    console.log(modelImages);
     if(modelImages.load_target_ids.length == 0){
       modelImages.load_target_ids = null;
       console.log("[Renderer]: No images added.")
@@ -6068,10 +6070,10 @@ async function assignCoreImages(coreImages, imageBuffers, objOpts) {
     });
 
     await window.LCapi.clearProgressbar();
-    console.log("[Renderer]: Load " + suc + " images / " + N + " models.");
+    console.log("[Renderer]: Load " + suc + " images / " + N + " models(DD, CD, EFD, Age).");
     return results;
   }catch(err){
-    console.error("[Renderer]: An error occurred during image assignment:", error);
+    console.error("[Renderer]: An error occurred during image assignment:", err);
     await window.LCapi.clearProgressbar();
     return results;
   }  
