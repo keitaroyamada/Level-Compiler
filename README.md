@@ -33,11 +33,11 @@ Loading models is very simple — just drop the corresponding model file (*.csv 
 <img src="https://github.com/keitaroyamada/Level-Compiler/blob/37423240b553b71ece38986fda87700962ab56d6/resources/tool/reload.png" width="30"/>
  **Reload**: Reload all models.  
 <img src="https://github.com/keitaroyamada/Level-Compiler/blob/37423240b553b71ece38986fda87700962ab56d6/resources/tool/finder.png" width="30"/>
- **Finder**: Find target horizon using depth, age and etc.
+ **Finder**: Find target horizon using depth, age and etc.  
 <img src="https://github.com/keitaroyamada/Level-Compiler/blob/37423240b553b71ece38986fda87700962ab56d6/resources/tool/zoomin.png" width="30"/>
- **Zoom in**: Zooms in along the depth direction. Zooms in horizontally when used with the Ctrl key. Expands the distance between cores with the Shift key.
+ **Zoom in**: Zooms in along the depth direction. Zooms in horizontally when used with the Ctrl key. Expands the distance between cores with the Shift key.  
 <img src="https://github.com/keitaroyamada/Level-Compiler/blob/37423240b553b71ece38986fda87700962ab56d6/resources/tool/zoom0.png" width="30"/>
- **Default zoom level**: Resets the zoom level to the default.
+ **Default zoom level**: Resets the zoom level to the default.  
 <img src="https://github.com/keitaroyamada/Level-Compiler/blob/37423240b553b71ece38986fda87700962ab56d6/resources/tool/zoomout.png" width="30"/>
  **Zoom out**: Zooms out along the depth direction. Zooms out horizontally when used with the Ctrl key. Reduces the distance between cores with the Shift key.
  
