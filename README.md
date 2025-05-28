@@ -2,6 +2,7 @@
 <img src=https://github.com/user-attachments/assets/b80709f2-e609-445f-a5c5-542b0d91c9ba width="500" >
 
 ## 1. About
+Level Compiler (LC) is an integrated stratigraphic management software capable of creating and managing correlation models of sedimentary sequences. The system enables the management of multiple sediment cores on a unified depth or age scale. It also incorporates a "divider" that reprojects actual stratigraphic samples onto modelled depths, facilitating precise correlation across different researchers.
 
 ## 2. Install
 ### 2.1. Recommended environments(Development environment)
