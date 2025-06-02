@@ -756,9 +756,11 @@ function createMainWIndow() {
 
       let targetHoleIds = [];
       for(let p=0;p<LCCore.projects.length;p++){
+
         for(let h=0;h<LCCore.projects[p].holes.length;h++){
           if(LCCore.projects[p].holes[h].name == holeName){
             targetHoleIds.push(LCCore.projects[p].holes[h].id);
+
             for(let s=0; s<LCCore.projects[p].holes[h].sections.length;s++){
               if(LCCore.projects[p].holes[h].sections[s].name == sectionName){
                 //case duplicate section

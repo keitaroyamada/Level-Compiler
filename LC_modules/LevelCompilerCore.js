@@ -695,11 +695,12 @@ class LevelCompilerCore extends EventEmitter{
         this.setError("","E015: There is no Zero point in the project: "+this.projects[p].name)
         console.log("LCCore: E015: There is no Zero point in the project: "+this.projects[p].name);
         continue;
-      }
-      const [id_zero_point, startVal, isBaseProject] = zeroPoints[p];
+      } else {
+        const [id_zero_point, startVal, isBaseProject] = zeroPoints[p];
 
-      if(calcRange == "project" || (calcRange == "all" && isBaseProject == true)){
-        masterDfsList.push([this.projects[p].id, this.dfs(id_zero_point, startVal, calcRange, calcType)]);
+        if(calcRange == "project" || (calcRange == "all" && isBaseProject == true)){
+          masterDfsList.push([this.projects[p].id, this.dfs(id_zero_point, startVal, calcRange, calcType)]);
+        }
       }
     }
     
@@ -3824,6 +3825,7 @@ class LevelCompilerCore extends EventEmitter{
       if(holeId){
         targetId = holeId;
       }
+
       if(!targetId){
         return
       }
@@ -3834,8 +3836,17 @@ class LevelCompilerCore extends EventEmitter{
   
       //make sectiondata
       let sectionData = sectionModel;
-      const newId = Math.max(holeData.reserved_hole_ids)+1;
+      const newId = Math.max(holeData.reserved_section_ids)+1;
       sectionData.id = [holeData.id[0], holeData.id[1], newId, null];
+
+      //upodate marker id & connections
+      for (let m=0;m<sectionData.markers.length;m++){
+        sectionData.markers[m].id = [sectionData.id[0], sectionData.id[1], sectionData.id[2], sectionData.markers[m].id[3]];
+        for (let vc=0; vc<sectionData.markers[m].v_connection.length;vc++){
+          sectionData.markers[m].v_connection[vc] = [sectionData.id[0], sectionData.id[1], sectionData.id[2], sectionData.markers[m].v_connection[vc][3]];
+        }
+      }
+
   
       holeData.reserved_section_ids.push(newId);
       holeData.sections.push(sectionData);

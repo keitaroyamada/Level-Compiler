@@ -398,7 +398,7 @@ document.addEventListener("DOMContentLoaded", () => {
           }else{
             console.log("[Renderer]: Failed to load section data"+result);
             alert("Failed to load lcsectoion because: "+result);
-            
+            await window.LCapi.clearProgressbar()
             return
           }
         }else{        
@@ -5665,6 +5665,7 @@ function getIdxById(LCCore, id) {
         const projectData = LCCore.projects[p];
         if (projectData.id[0] == id[0]) {
           relative_idxs[0] = p;
+
           if (id[1] !== null || id[1] !== "") {
             const num_holes = projectData.holes.length;
             for (let h = 0; h < num_holes; h++) {
