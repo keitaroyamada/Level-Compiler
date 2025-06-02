@@ -6,7 +6,7 @@
   "main": "main.js",
   "scripts": {
     "start": "electron .",
-    "build:win": "electron-builder --win",
+    "build:win": "electron-builder --win --x64",
     "build:mac": "electron-builder --mac --universal",
     "build": "electron-builder --win --mac"
   },
@@ -30,7 +30,6 @@
     },
     "win": {
       "target": [
-        "msi",
         "nsis"
       ],
       "icon": "./icon/levelcompiler.png"

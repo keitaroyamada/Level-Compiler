@@ -3187,7 +3187,8 @@ function createMainWIndow() {
               label: "Help",
               submenu: [
                 { label: "About", click: createAboutWindow },
-                { label: "Check update", click: async()=>{await checkUpdate()}},
+                { label: "Check update", click: async()=>{await checkUpdate("button")}},
+                { label: "Usage", click: ()=>{shell.openExternal('https://github.com/keitaroyamada/Level-Compiler/')} },
               ],
             },
           ]
@@ -3502,16 +3503,16 @@ function assignObject (obj,data){
     }
   });
 }
-async function checkUpdate(){
-
+async function checkUpdate(from){
+  //this process does not work in MSI app.
   //check update in the github
   autoUpdater.allowPrerelease = true;
   autoUpdater.autoDownload = false;
-  if (isDev) {
-    autoUpdater.forceDevUpdateConfig = true; // for dev
-  }else{
-    autoUpdater.forceDevUpdateConfig = false; // for dev
-  }
+  //if (isDev) {
+  //  autoUpdater.forceDevUpdateConfig = true; // for dev
+  //}else{
+  //  autoUpdater.forceDevUpdateConfig = false; // for dev
+  //}
   
   autoUpdater.on('update-available', (info) => {
     dialog.showMessageBox({
@@ -3527,31 +3528,37 @@ async function checkUpdate(){
       }
     }).catch((err) => {
       console.error('Error displaying message box:', err);
+      dialog.showMessageBox({
+      type: 'info',
+      title: 'No Updates',
+      message: 'Error displaying message box:', err,
+    });
     });
 
   });
 
   autoUpdater.on('update-not-available', () => {
-    /*
-    dialog.showMessageBox({
+    if (from == "button"){
+      dialog.showMessageBox({
       type: 'info',
-      title: 'No Updates',
-      message: 'You are using the latest version.',
+      title: 'No Updates Available',
+      message: 'You are already using the latest version.',
     });
-    */
+    }    
   });
 
   autoUpdater.on('error', (err) => {
-    /*
-    dialog.showMessageBox({
-      type: 'error',
-      title: 'Update Error',
-      message: `An error occurred: ${err.message}`,
-    });
-    */
+    if (from == "button"){
+      dialog.showMessageBox({
+        type: 'error',
+        title: 'Update Error',
+        message: `An error occurred: ${err.message}`,
+      });
+    }
   });
 
-  autoUpdater.checkForUpdates();
+  await autoUpdater.checkForUpdates();
+
 }
 //--------------------------------------------------------------------------------------------------
 function getSettings(){
@@ -3581,7 +3588,7 @@ app.whenReady().then(() => {
   createMainWIndow();
 
   //check update
-  checkUpdate();
+  checkUpdate("startup");
 
   app.on("activate", (I) => {
     if (BrowserWindow.getAllWindows().length === 0) {
