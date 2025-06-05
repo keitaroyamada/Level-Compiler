@@ -31,7 +31,7 @@ Level Compiler (LC) is an integrated stratigraphic management software capable o
 ## 3. Usage
 The detailed usage will be published by this summer.  
 - Make model  
-  ['モデルの作成 (日本語)'](https://youtu.be/UeYxQ2s9BPE)
+  ['Make model (English / 日本語)'](https://youtu.be/iKafKTT8cCY)
 - Show correlation model
 - Labeler
 - FInder
