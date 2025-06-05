@@ -30,6 +30,13 @@ Level Compiler (LC) is an integrated stratigraphic management software capable o
 
 ## 3. Usage
 The detailed usage will be published by this summer.  
+- Make model  
+  ['モデルの作成 (日本語)'](https://youtu.be/UeYxQ2s9BPE)
+- Show correlation model
+- Labeler
+- FInder
+- Divider
+- Plot data
   
 ### 3.1. Load correlation models
 Loading models is very simple — just drop the corresponding model file (*.csv or *.lcmodel)into Level Compiler, and it will be loaded automatically. Each icon has the following function:  
