@@ -15,6 +15,7 @@ document.addEventListener("DOMContentLoaded", () => {
   let holeName = "";
   let sectionName = "";
   let rect = null;  
+  let isRotate = false;
   let modelImages = {
     load_target_ids: [],
     image_resolution: {},
@@ -119,6 +120,16 @@ document.addEventListener("DOMContentLoaded", () => {
     original_image_height = objOpts.dpcm * (100 - 0);
     return true
   }
+  document.getElementById("rotateButton").addEventListener("click", async (event) => {
+    isRotate = !isRotate;
+    updateView();
+    if (isRotate){
+      console.log('Vertical mode');
+    } else {
+      console.log('Horizontal mode');
+    }
+    
+  });
   
   //-------------------------------------------------------------------------------------------
   document.getElementById("scroller").addEventListener("dragover", (e) => {
@@ -693,8 +704,11 @@ document.addEventListener("DOMContentLoaded", () => {
   //2 Marker Add--------------------------------------------
   async function handleMarkerAddClick(event) {
     const rect = document.getElementById("p5Canvas").getBoundingClientRect(); 
-    const mouseX = event.clientX - rect.left;
-    const mouseY = event.clientY - rect.top;
+    let mouseX;
+    let mouseY;
+    mouseX =  event.clientX - rect.left;
+    mouseY =  event.clientY - rect.top;
+
     const ht = JSON.parse(JSON.stringify(getClickedItemIdx(mouseX, mouseY, tempCore, zoom_rate, pad)));
     console.log("[Labeler]: Add Marker clicked at " + ht.distance +" cm.")
 
@@ -1187,6 +1201,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     //draw data=============================================================================================
     sketch.draw = () => {
+
       if(Object.keys(modelImages.drilling_depth).length==0){
         let centerX = window.innerWidth / 2;
         let centerY = window.innerHeight / 2;
@@ -1203,7 +1218,14 @@ document.addEventListener("DOMContentLoaded", () => {
       let imgLoaded = false;
       //translate plot position
       sketch.push(); //save
-      sketch.translate(-canvasPos[0], -canvasPos[1]);
+      if (isRotate){
+        sketch.translate(sketch.height / 2, sketch.width / 2);
+        sketch.rotate(-sketch.HALF_PI);
+        sketch.translate(-canvasPos[1], -canvasPos[0]);
+      } else {
+        sketch.translate(-canvasPos[0], -canvasPos[1]);
+      }
+      
 
       //draw grid
       const grid_step = 2;//grid/cm  
@@ -1336,12 +1358,17 @@ document.addEventListener("DOMContentLoaded", () => {
                 sketch.push();
                 sketch.strokeWeight(5);
                 sketch.stroke("Red");
-                sketch.line(
-                  sectionLeft + (sectionRight-sectionLeft)*relativeX, 
-                  marker_y, 
-                  sectionRight, 
-                  marker_y,
-                );
+                let x1;
+                let x2;
+                let y1;
+                let y2;
+                x1 = sectionLeft + (sectionRight-sectionLeft) * relativeX;
+                y1 = marker_y;
+                x2 = sectionRight; 
+                y2 = marker_y;
+                
+
+                sketch.line(x1, y1, x2, y2);
                 sketch.pop();
               }
             }
@@ -1352,12 +1379,16 @@ document.addEventListener("DOMContentLoaded", () => {
             sketch.push();
             sketch.strokeWeight(1);
             sketch.stroke("Red");
-            sketch.line(
-              sectionLeft + (sectionRight-sectionLeft)*relativeX, 
-              sectionTop + (sectionBottom-sectionTop) * objOpts.hittest.relative_y,
-              sectionRight, 
-              sectionTop + (sectionBottom-sectionTop) * objOpts.hittest.relative_y,
-            );
+            let x1;
+            let y1;
+            let x2;
+            let y2;
+            x1 = sectionLeft + (sectionRight-sectionLeft)*relativeX;
+            y1 = sectionTop + (sectionBottom-sectionTop) * objOpts.hittest.relative_y;
+            x2 = sectionRight;
+            y2 = sectionTop + (sectionBottom-sectionTop) * objOpts.hittest.relative_y;
+            
+            sketch.line(x1,y1,x2,y2);
             sketch.pop();
           }
           
@@ -1630,6 +1661,8 @@ document.addEventListener("DOMContentLoaded", () => {
           */
         };
       }
+
+
       
     }    
     //draw data=============================================================================================
