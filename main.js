@@ -455,7 +455,9 @@ function createMainWIndow() {
           }
           
           let imBaseName = targetHoleData.name +"-"+targetSectionData.name;
-         
+          //if(imBaseName+".jpg" != target.name){
+          // imBaseName = target.name;
+          //}
 
           //get image path
           let fullpath;

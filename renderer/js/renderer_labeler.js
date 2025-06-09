@@ -15,7 +15,6 @@ document.addEventListener("DOMContentLoaded", () => {
   let holeName = "";
   let sectionName = "";
   let rect = null;  
-  let isRotate = false;
   let modelImages = {
     load_target_ids: [],
     image_resolution: {},
@@ -120,16 +119,6 @@ document.addEventListener("DOMContentLoaded", () => {
     original_image_height = objOpts.dpcm * (100 - 0);
     return true
   }
-  document.getElementById("rotateButton").addEventListener("click", async (event) => {
-    isRotate = !isRotate;
-    updateView();
-    if (isRotate){
-      console.log('Vertical mode');
-    } else {
-      console.log('Horizontal mode');
-    }
-    
-  });
   
   //-------------------------------------------------------------------------------------------
   document.getElementById("scroller").addEventListener("dragover", (e) => {
@@ -204,11 +193,17 @@ document.addEventListener("DOMContentLoaded", () => {
     }else{
       //load from image
       if(orderImage.length > 0){
-        //chekc image exist, read only first image
+        console.log("Labeler: Load the core image");
+
+        //check image exist, read only first image
         droppedData = dataList[orderImage[0]];
         const baseName = droppedData.name.split(/[.]+/)[0];
         holeName = baseName.split(/[-]+/)[0];
         sectionName = baseName.split(/[-]+/)[1];
+        if (/^\d$/.test(sectionName)){
+          alert("Single-digit numbers are not allowed as section names");
+          return
+        }
 
         tempCore = await addSectionData(holeName, sectionName);
         console.log("Create new annotation data: \n",tempCore);
@@ -237,10 +232,6 @@ document.addEventListener("DOMContentLoaded", () => {
         }
       }
     }
-
-    
-  
-    
 
 
 
@@ -1218,13 +1209,7 @@ document.addEventListener("DOMContentLoaded", () => {
       let imgLoaded = false;
       //translate plot position
       sketch.push(); //save
-      if (isRotate){
-        sketch.translate(sketch.height / 2, sketch.width / 2);
-        sketch.rotate(-sketch.HALF_PI);
-        sketch.translate(-canvasPos[1], -canvasPos[0]);
-      } else {
-        sketch.translate(-canvasPos[0], -canvasPos[1]);
-      }
+      sketch.translate(-canvasPos[0], -canvasPos[1]);
       
 
       //draw grid
