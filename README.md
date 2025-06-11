@@ -34,6 +34,7 @@ The detailed usage will be published by this summer.
   ['Make model (English / 日本語)'](https://youtu.be/iKafKTT8cCY)
 - Show correlation model
 - Labeler
+  ['Labeler Usage (English / 日本語)'](https://youtu.be/SkIqG0wph_U)
 - FInder
 - Divider
 - Plot data
