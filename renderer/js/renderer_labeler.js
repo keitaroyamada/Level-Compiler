@@ -2,7 +2,6 @@ document.addEventListener("DOMContentLoaded", () => {
   //-------------------------------------------------------------------------------------------
   const scroller = document.getElementById("scroller");
   let canvasBase = document.getElementById("canvasBase");
-  let original_image_height = 0;
   let zoom_rate = [0.3, 0.3];
   let mousePos = [0,0];
   let canvasPos = [0, 0]; //canvas scroller position
@@ -116,7 +115,6 @@ document.addEventListener("DOMContentLoaded", () => {
       dpcm:150,
     };
 
-    original_image_height = objOpts.dpcm * (100 - 0);
     return true
   }
   
@@ -245,12 +243,19 @@ document.addEventListener("DOMContentLoaded", () => {
     //wheel event
     var deltaX = event.deltaX;
     var deltaY = event.deltaY;
+
+    if (event.ctrlKey) {
+      //scroll lateral
+      event.preventDefault();
+      scroller.scrollBy({ left: deltaY * 1, behavior: "auto" });
+    }
+
     if (event.altKey) {      
       //add zoom level
       if(event.ctrlKey){
+        zoom_rate[0] += 0.001 * deltaY;
         zoom_rate[1] += 0.001 * deltaY;  
       }else{
-        zoom_rate[0] += 0.001 * deltaY;
         zoom_rate[1] += 0.001 * deltaY;
       }
 
@@ -265,6 +270,7 @@ document.addEventListener("DOMContentLoaded", () => {
       //mouse position
       const relative_scroll_pos_x = (scroller.scrollLeft - pad[0]) / scroller.scrollWidth;
       const relative_scroll_pos_y = (scroller.scrollTop  - pad[1]) / scroller.scrollHeight;
+      
 
       //calc new canvas size
       //makeRasterObjects(false); //make only base canvas
@@ -540,6 +546,16 @@ document.addEventListener("DOMContentLoaded", () => {
       document.getElementById("bt_change_name").style.backgroundColor = "#f0f0f0";
       
     }
+    updateView();
+  });
+  document.getElementById("bt_zoom0").addEventListener("click", async (event) => {
+    if(!tempCore){
+      return
+    }
+    
+    zoom_rate[0] = 0.3;
+    zoom_rate[1] = 0.3; 
+
     updateView();
   });
    //2 Marker move--------------------------------------------
@@ -1225,9 +1241,10 @@ document.addEventListener("DOMContentLoaded", () => {
       let sectionTopDistance    = null;
       let sectionBottomDistance = null;
       
-      if(tempCore !== null && modelImages["drilling_depth"][holeName+"-"+sectionName] !== undefined){
+      if(tempCore !== null && modelImages["drilling_depth"][holeName+"-"+sectionName] !== undefined){        
+      
         coreLength = tempCore.projects[0].holes[0].sections[0].markers[tempCore.projects[0].holes[0].sections[0].markers.length-1].distance - tempCore.projects[0].holes[0].sections[0].markers[0].distance;
-        dpcm = original_image_height / coreLength;
+        dpcm = modelImages["drilling_depth"][holeName+"-"+sectionName].height / coreLength;
 
         sectionTop    = zoom_rate[1] * pad[1];
         sectionBottom = zoom_rate[1] * (pad[1]+ modelImages["drilling_depth"][holeName+"-"+sectionName].height);
@@ -1241,18 +1258,27 @@ document.addEventListener("DOMContentLoaded", () => {
         sketch.push();
         if(g%grid_step===0){
           sketch.strokeWeight(2);
+          sketch.stroke("White");
+          sketch.line(
+            sectionLeft -200,
+            (pad[1]-(sectionTopDistance*dpcm) + dpcm*g/grid_step) * zoom_rate[1],
+            sectionRight + 200,
+            (pad[1]-(sectionTopDistance*dpcm) + (dpcm/grid_step)*g) * zoom_rate[1],
+          );
+          sketch.pop();
         }else{
           sketch.strokeWeight(1);
+          sketch.stroke("White");
+          sketch.line(
+            sectionLeft -150,
+            (pad[1]-(sectionTopDistance*dpcm)+(dpcm/grid_step)*g) * zoom_rate[1],
+            sectionRight + 150,
+            (pad[1]-(sectionTopDistance*dpcm)+(dpcm/grid_step)*g) * zoom_rate[1],
+          );
+          sketch.pop();
         }
         
-        sketch.stroke("White");
-        sketch.line(
-          sectionLeft -200,
-          (pad[1]-(sectionTopDistance*dpcm)+(dpcm/grid_step)*g) * zoom_rate[1],
-          sectionRight + 200,
-          (pad[1]-(sectionTopDistance*dpcm)+(dpcm/grid_step)*g) * zoom_rate[1],
-        );
-        sketch.pop();
+        
       }
       
 
@@ -1420,40 +1446,49 @@ document.addEventListener("DOMContentLoaded", () => {
 
   //---------------------------------------------------------
   let saveBuffer;
-  let OutSizeType = "fix_dpcm";//cm
-  const dpcm = 100;
+  const dpcm = 90;
   const density = 1;
+  let bufferPad = [1000, 1100, 500, 200]; //xr, xl, yt, yb
+  let fontRate = 3.0;
+  let outRate = 1.0; 
+  let modRatio = 0.6;
+  const maxDrawSize = [3500, 19000];  
   const exportSketch = (sketch) => {
 
-    let outSize = [0,0];//less than 20000px
+    let outSize  = [0,0];//less than 20000px
     let drawSize = [0,0];
-    let mod = 1;
-    let r = 1;
-    if(OutSizeType == "relative"){
-      const coreLength = tempCore.projects[0].holes[0].sections[0].markers[tempCore.projects[0].holes[0].sections[0].markers.length-1].distance - tempCore.projects[0].holes[0].sections[0].markers[0].distance;
-      outSize[0] = parseInt(600 + pad[0] * 2 + modelImages["drilling_depth"][holeName+"-"+sectionName].width * density);
-      outSize[1] = parseInt(coreLength * dpcm  * density + 3000);
-      if(outSize[1]>=20000){
-        mod = 20000/outSize[1];//limit size
+    let coreLength = 0;
+
+    //calc draw size
+    coreLength = tempCore.projects[0].holes[0].sections[0].markers[tempCore.projects[0].holes[0].sections[0].markers.length-1].distance - tempCore.projects[0].holes[0].sections[0].markers[0].distance;
+    console.log("Load image size:"+modelImages["drilling_depth"][holeName+"-"+sectionName].width+","+modelImages["drilling_depth"][holeName+"-"+sectionName].height)
+
+    //おそらくbuffer drawSize の上限サイズ(13000, おおくは8192？)を超えるため、padサイズの調整が必要 
+    outRate = parseInt(coreLength * dpcm  * density) / (modelImages["drilling_depth"][holeName+"-"+sectionName].height);   
+
+    drawSize[0] =  parseInt(bufferPad[0]/outRate + modelImages["drilling_depth"][holeName+"-"+sectionName].width  + bufferPad[1]/outRate);
+    drawSize[1] =  parseInt(bufferPad[2]/outRate + modelImages["drilling_depth"][holeName+"-"+sectionName].height + bufferPad[3]/outRate);
+
+    //check drawing size
+    if (maxDrawSize[0]/drawSize[0] > maxDrawSize[1]/drawSize[1]){
+      if (modRatio > maxDrawSize[1]/drawSize[1]){
+        modRatio = maxDrawSize[1]/drawSize[1];
+      }      
+    } else {
+      if (modRatio > maxDrawSize[0]/drawSize[0]){
+        modRatio = maxDrawSize[0]/drawSize[0];
       }
-    }else if(OutSizeType=="fix_outsize"){
-      drawSize[0] = pad[0] * 2 + modelImages["drilling_depth"][holeName+"-"+sectionName].width;
-      drawSize[1] = pad[1] * 2 + modelImages["drilling_depth"][holeName+"-"+sectionName].height;
-      outSize[0]  = pad[0] * 2 + modelImages["drilling_depth"][holeName+"-"+sectionName].width;
-      outSize[1]  = pad[1] * 2 + modelImages["drilling_depth"][holeName+"-"+sectionName].height;
-    }else if(OutSizeType=="fix_dpcm"){
-      const coreLength = tempCore.projects[0].holes[0].sections[0].markers[tempCore.projects[0].holes[0].sections[0].markers.length-1].distance - tempCore.projects[0].holes[0].sections[0].markers[0].distance;
-      r = (pad[1] * 2 + 100 * 100) / (pad[1] * 2+ coreLength * 100);//load size(cm)/actural size(cm)
-      console.log("Load size:"+modelImages["drilling_depth"][holeName+"-"+sectionName].width+","+modelImages["drilling_depth"][holeName+"-"+sectionName].height)
-      console.log("Modified rate: "+ r+"(100/"+coreLength+")")
+    }    
 
-      drawSize[0] =  pad[0] * 2 + modelImages["drilling_depth"][holeName+"-"+sectionName].width;
-      drawSize[1] =  pad[1] * 2 + modelImages["drilling_depth"][holeName+"-"+sectionName].height;
-      outSize[0]  = (pad[0] * 2 + modelImages["drilling_depth"][holeName+"-"+sectionName].width) * (1/r);
-      outSize[1]  =  pad[1] * 2 + (parseInt(coreLength * dpcm  * density));
-    }
+    //update size
+    drawSize[0] = drawSize[0] * modRatio;
+    drawSize[1] = drawSize[1] * modRatio;    
+    outSize[0]  =  parseInt(drawSize[0] * outRate);
+    outSize[1]  =  parseInt(drawSize[1] * outRate);
     
-
+    console.log("Draw size: "+drawSize, ", Out size: "+outSize);
+    console.log("Draw mod: "+modRatio, ",Output mod: "+outRate);
+     
     sketch.setup = () => {
       let sketchCanvas = null;
       sketchCanvas = sketch.createCanvas(
@@ -1463,6 +1498,7 @@ document.addEventListener("DOMContentLoaded", () => {
       );
 
       buffer = sketch.createGraphics(drawSize[0], drawSize[1], sketch.P2D);
+
       buffer.pixelDensity(density);
       sketch.strokeWeight(2);
       sketch.stroke("#ED225D");
@@ -1483,10 +1519,10 @@ document.addEventListener("DOMContentLoaded", () => {
           if(modelImages["drilling_depth"][holeName+"-"+sectionName]){
             buffer.image(
               modelImages["drilling_depth"][holeName+"-"+sectionName],
-              pad[0] * zoom_rate[0],
-              pad[1] * zoom_rate[1],
-              modelImages["drilling_depth"][holeName+"-"+sectionName].width * zoom_rate[0],
-              modelImages["drilling_depth"][holeName+"-"+sectionName].height * zoom_rate[1],
+              bufferPad[0] * zoom_rate[0] / outRate * modRatio,
+              bufferPad[2] * zoom_rate[1] / outRate * modRatio,
+              modelImages["drilling_depth"][holeName+"-"+sectionName].width  * zoom_rate[0] * modRatio,
+              modelImages["drilling_depth"][holeName+"-"+sectionName].height * zoom_rate[1] * modRatio,
             );
 
           }else{
@@ -1499,39 +1535,39 @@ document.addEventListener("DOMContentLoaded", () => {
 
       //main
       if(tempCore){
-        const sectionTop    = zoom_rate[1] * pad[1];
-        const sectionBottom = zoom_rate[1] * (pad[1]+ modelImages["drilling_depth"][holeName+"-"+sectionName].height);
-        const sectionLeft   = zoom_rate[0] * pad[0];
-        const sectionRight  = zoom_rate[0] * (pad[0]+ modelImages["drilling_depth"][holeName+"-"+sectionName].width);
+        const sectionTop    = zoom_rate[1] * bufferPad[2] / outRate * modRatio;
+        const sectionBottom = zoom_rate[1] * bufferPad[2] / outRate * modRatio +  modelImages["drilling_depth"][holeName+"-"+sectionName].height * modRatio;
+
+        const sectionLeft   = zoom_rate[0] * bufferPad[0] / outRate * modRatio;
+        const sectionRight  = zoom_rate[0] * bufferPad[0] / outRate * modRatio  + modelImages["drilling_depth"][holeName+"-"+sectionName].width * modRatio;
+        
         const sectionTopDistance    = tempCore.projects[0].holes[0].sections[0].markers[0].distance;
         const sectionBottomDistance = tempCore.projects[0].holes[0].sections[0].markers[tempCore.projects[0].holes[0].sections[0].markers.length-1].distance;
-        const fontRate = 1.6 * r;
+        const fontRelativeSize = fontRate * modRatio / outRate ;
 
         for(let m=0; m<tempCore.projects[0].holes[0].sections[0].markers.length; m++){
           //calc marker position
-          const relativeDistance = (tempCore.projects[0].holes[0].sections[0].markers[m].distance-sectionTopDistance)/(sectionBottomDistance-sectionTopDistance);
+          const relativeDistance = (tempCore.projects[0].holes[0].sections[0].markers[m].distance - sectionTopDistance) / (sectionBottomDistance-sectionTopDistance);
           const marker_y = sectionTop + (sectionBottom-sectionTop) * relativeDistance;
           const relativeX = tempCore.projects[0].holes[0].sections[0].markers[m].definition_relative_x;
 
           //show section name
           buffer.push();
-          buffer.strokeWeight(2);
-          buffer.stroke("Magenta");
-          buffer.line(sectionLeft, sectionTop, sectionRight, sectionTop);
-          
           buffer.fill("black");
           buffer.noStroke();
           buffer.textFont("Arial");
-          buffer.textSize(fontRate*80);
+          buffer.textSize(fontRelativeSize*80);
           //sketch.rotate((-90 / 180) * Math.PI);
           const holeName = tempCore.projects[0].holes[0].name;
           const secName  = tempCore.projects[0].holes[0].sections[0].name;
+          const coreName = holeName+"-"+secName;
           buffer.text(
-            holeName+"-"+secName, 
-            pad[0]*0.1,
-            pad[1]*0.5,
+            coreName, 
+            sectionLeft + (sectionRight - sectionLeft)/2 - buffer.textWidth(coreName)/2,
+            buffer.textAscent() * 0.7,
           );
           buffer.pop();
+
           //show top/bottom
           if(tempCore.projects[0].holes[0].sections[0].markers[m].name.includes("top")){
             buffer.push();
@@ -1542,12 +1578,12 @@ document.addEventListener("DOMContentLoaded", () => {
             buffer.fill("black");
             buffer.noStroke();
             buffer.textFont("Arial");
-            buffer.textSize(fontRate*60);
+            buffer.textSize(fontRelativeSize*60);
             //sketch.rotate((-90 / 180) * Math.PI);
             buffer.text(
               "Top", 
-              sectionLeft + (sectionRight - sectionLeft)/2 -100, 
-              sectionTop -70
+              sectionLeft + (sectionRight - sectionLeft)/2 -buffer.textWidth("Top")/2, 
+              sectionTop -70 * modRatio
             );
             buffer.pop();
           }
@@ -1556,18 +1592,18 @@ document.addEventListener("DOMContentLoaded", () => {
           if(tempCore.projects[0].holes[0].sections[0].markers[m].name.includes("bottom")){
             buffer.push();
             buffer.strokeWeight(2);
-            buffer.stroke("Black");
+            buffer.stroke("Magenta");
             buffer.line(sectionLeft, sectionBottom, sectionRight, sectionBottom);
 
             buffer.fill("black");
             buffer.noStroke();
             buffer.textFont("Arial");
-            buffer.textSize(fontRate*60);
+            buffer.textSize(fontRelativeSize*60);
             //buffer.rotate((-90 / 180) * Math.PI);
             buffer.text(
               "Bottom", 
-              sectionLeft + (sectionRight - sectionLeft)/2 -100, 
-              sectionBottom + 170
+              sectionLeft + (sectionRight - sectionLeft)/2 -buffer.textWidth("Bottom")/2, 
+              sectionBottom + 170 * modRatio
             );
             buffer.pop();
           }
@@ -1578,7 +1614,7 @@ document.addEventListener("DOMContentLoaded", () => {
             buffer.strokeWeight(5);
             buffer.stroke("Magenta");
             buffer.line(
-              sectionLeft + (sectionRight-sectionLeft)*relativeX, 
+              sectionLeft + (sectionRight-sectionLeft) * relativeX, 
               marker_y, 
               sectionRight, 
               marker_y,
@@ -1587,47 +1623,63 @@ document.addEventListener("DOMContentLoaded", () => {
           }
                     
 
-          //show distance
+          //show marker distance
           buffer.push();
           buffer.fill("black");
           buffer.noStroke();
           buffer.textFont("Arial");
-          buffer.textSize(fontRate*50);
+          buffer.textSize(fontRelativeSize*50);
           //buffer.rotate((-90 / 180) * Math.PI);
+          const distText = tempCore.projects[0].holes[0].sections[0].markers[m].distance.toFixed(1) + " cm";
           buffer.text(
-            tempCore.projects[0].holes[0].sections[0].markers[m].distance.toFixed(1) + " cm", 
+            distText, 
             sectionRight + 40, 
-            marker_y,
+            marker_y + buffer.textAscent() * 0.3,
           );
           buffer.pop();
 
-          //show name
+          //show marker name
           buffer.push();
           buffer.fill("black");
           buffer.noStroke();
           buffer.textFont("Arial");
-          buffer.textSize(fontRate*50);
+          buffer.textSize(fontRelativeSize*50);
           //buffer.rotate((-90 / 180) * Math.PI);
+          const mNameText = tempCore.projects[0].holes[0].sections[0].markers[m].name;
           buffer.text(
-            tempCore.projects[0].holes[0].sections[0].markers[m].name, 
+            mNameText, 
             sectionLeft - buffer.textWidth(tempCore.projects[0].holes[0].sections[0].markers[m].name) -40, 
-            marker_y,
+            marker_y +  buffer.textAscent() * 0.3,
           );
           buffer.pop();
         }
 
         //for export
         saveBuffer = () => {
-          let img = buffer.createImage(drawSize[0], drawSize[1]);//output size
-         
-          console.log("Draw size: "+ parseInt(drawSize[0]) +","+ parseInt(drawSize[1]))
-          console.log("Out size: "+ parseInt(outSize[0]) +","+ parseInt(outSize[1]))
+          const isResize = false;
+          let img;
 
-          img.copy(
-            buffer,
-            0, 0, drawSize[0], drawSize[1],     // source size
-            0, 0, outSize[0], outSize[1],    // actural size
-          );
+          if (isResize){
+            img = buffer.createImage(drawSize[0], drawSize[1]);//output size
+         
+            console.log("Draw size: "+ parseInt(drawSize[0]) +","+ parseInt(drawSize[1]))
+            console.log("Out size: "+ parseInt(outSize[0]) +","+ parseInt(outSize[1]))
+
+            img.copy(
+              buffer,
+              0, 0, drawSize[0], drawSize[1],  // source size
+              0, 0, outSize[0], outSize[1],    // actural size
+            );
+          } else {
+            img = buffer.createImage(outSize[0], outSize[1]);//output size
+            img.copy(
+              buffer,
+              0, 0, drawSize[0], drawSize[1],  // source size
+              0, 0, outSize[0], outSize[1],    // actural size
+            );
+          }
+
+          
           img.loadPixels();
 
           console.log("Image data: "+img)

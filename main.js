@@ -684,7 +684,7 @@ function createMainWIndow() {
       bt_change_name:     path.join(resourcePath, "resources","tool","edit_name.png"),
       bt_add_marker:      path.join(resourcePath, "resources","tool","add_marker.png"),
       bt_delete_marker:   path.join(resourcePath, "resources","tool","delete_marker.png"),
-
+      bt_zoom0:           path.join(resourcePath, "resources","tool","zoom0.png"),
     };
   
     //make fuction

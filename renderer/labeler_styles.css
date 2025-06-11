@@ -22,8 +22,7 @@ html {
 
 .container {
   display: flex;
-  direction: column;
-  flex-grow: 1;
+  flex-direction: column;
   height: 100%;
   width: 100%;
   overflow-y: hidden;
@@ -175,6 +174,11 @@ html {
   z-index: 10;
 }
 #bt_delete_marker img {
+  height: 75%;
+  width: 100%;
+  z-index: 10;
+}
+#bt_zoom0 img {
   height: 75%;
   width: 100%;
   z-index: 10;
