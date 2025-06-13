@@ -29,16 +29,18 @@ Level Compiler (LC) is an integrated stratigraphic management software capable o
     <img src=https://github.com/user-attachments/assets/8c2defa2-22ce-4efc-abf0-1fc65158ec0f width="400" >
 
 ## 3. Usage
-The detailed usage will be published by this summer.  
-- Make model  
-  ['Make model (English / 日本語)'](https://youtu.be/iKafKTT8cCY)
-- Show correlation model
-- Labeler  
-  ['Labeler Usage (English / 日本語)'](https://youtu.be/SkIqG0wph_U)
-- FInder
-- Divider
-- Plot data
-  
+The detailed usage will be uploaded by this summer.  
+- 0. About Level Compiler
+- 1.1. Load correlation and age models
+- 1.2. Plot data -Plotter-
+- 1.3. Batch depth conversion -Converter-
+- 1.4. Calc sampling depth -Divider-
+- 2.1. Description on core image -Labeler-  
+        ['Labeler Usage (English / 日本語)'](https://youtu.be/SkIqG0wph_U)
+- 2.2. Make model -Edit mode-  
+        ['Make model (English / 日本語)'](https://youtu.be/iKafKTT8cCY)
+- 2.3. Make model -with spreadsheet-    
+    
 ### 3.1. Load correlation models
 Loading models is very simple — just drop the corresponding model file (*.csv or *.lcmodel)into Level Compiler, and it will be loaded automatically. Each icon has the following function:  
 <img src="https://github.com/keitaroyamada/Level-Compiler/blob/37423240b553b71ece38986fda87700962ab56d6/resources/tool/reload.png" width="30"/>
