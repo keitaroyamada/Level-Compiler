@@ -10,8 +10,8 @@ Level Compiler (LC) is an integrated stratigraphic management software capable o
 - macOS (+Apple silicon)
   
 ### 2.2. Windows
-1. Download installer (*.msi) from the right panel "Releases".
-2. Run downloaded msi file.
+1. Download installer (*.exe) from the right panel ["Releases"](https://github.com/keitaroyamada/Level-Compiler/releases).
+2. Run downloaded exe file.
 
 
 ### 2.3. Mac(Apple silicon)
@@ -40,27 +40,6 @@ The detailed usage will be uploaded by this summer.
 - 2.2. Make model -Edit mode-  
         ['Make model (English / 日本語)'](https://youtu.be/iKafKTT8cCY)
 - 2.3. Make model -with spreadsheet-    
-    
-### 3.1. Load correlation models
-Loading models is very simple — just drop the corresponding model file (*.csv or *.lcmodel)into Level Compiler, and it will be loaded automatically. Each icon has the following function:  
-<img src="https://github.com/keitaroyamada/Level-Compiler/blob/37423240b553b71ece38986fda87700962ab56d6/resources/tool/reload.png" width="30"/>
- **Reload**: Reload all models.  
-<img src="https://github.com/keitaroyamada/Level-Compiler/blob/37423240b553b71ece38986fda87700962ab56d6/resources/tool/finder.png" width="30"/>
- **Finder**: Find target horizon using depth, age and etc.  
-<img src="https://github.com/keitaroyamada/Level-Compiler/blob/37423240b553b71ece38986fda87700962ab56d6/resources/tool/zoomin.png" width="30"/>
- **Zoom in**: Zooms in along the depth direction. (+Ctrl: Zooms in horizontally; +Shift: Expands the hole distance)  
-<img src="https://github.com/keitaroyamada/Level-Compiler/blob/37423240b553b71ece38986fda87700962ab56d6/resources/tool/zoom0.png" width="30"/>
- **Default zoom level**: Resets the zoom level to the default.  
-<img src="https://github.com/keitaroyamada/Level-Compiler/blob/37423240b553b71ece38986fda87700962ab56d6/resources/tool/zoomout.png" width="30"/>
- **Zoom out**: Zooms out along the depth direction. (+Ctrl: Zooms out horizontally; +Shift: Reduces the hole distance)   
- 
- 
-
-### 3.2. Load core images
-After loading the model, you can drop a folder containing photos to automatically load the corresponding images. The image names are defined by 'hole name' + 'section name' + '.jpg'. Images are loaded at a minimum required resolution. If higher-resolution images are needed, they can be loaded from the context menu.
-### 3.3. Load plot data
-
-### 3.x. Construct models
 
 ## 4. Build from code(optional)
   __This section is optional.__ If it is not necessary, please proceed to [the next section](#3-Install).
