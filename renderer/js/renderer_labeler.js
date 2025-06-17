@@ -2,7 +2,7 @@ document.addEventListener("DOMContentLoaded", () => {
   //-------------------------------------------------------------------------------------------
   const scroller = document.getElementById("scroller");
   let canvasBase = document.getElementById("canvasBase");
-  let zoom_rate = [0.3, 0.3];
+  let zoom_rate = [0.3, 0.05];
   let mousePos = [0,0];
   let canvasPos = [0, 0]; //canvas scroller position
   let pad = [0,0];
@@ -32,7 +32,8 @@ document.addEventListener("DOMContentLoaded", () => {
     handleMove: null,
     handleClick: null,
     sensibility:20,
-    dpcm:150,
+    dpcm:150, // load dpcm
+    disp_dpcm:100, //display dpcm
   };
   //-------------------------------------------------------------------------------------------
   window.LabelerApi.receive("LabelerMenuClicked", async () => {
@@ -78,7 +79,7 @@ document.addEventListener("DOMContentLoaded", () => {
   async function initialise(){
     tempCore = await window.LabelerApi.InitialiseTempCore();
 
-    zoom_rate = [0.3, 0.3];
+    zoom_rate = [0.3, 0.05];
     relative_pos = [0, 0];
     mousePos = [0,0];
     canvasPos = [0, 0]; //canvas scroller position
@@ -113,6 +114,8 @@ document.addEventListener("DOMContentLoaded", () => {
       handleClick: null,
       sensibility:20,
       dpcm:150,
+      xMag:1,
+      yMag:1,
     };
 
     return true
@@ -133,7 +136,15 @@ document.addEventListener("DOMContentLoaded", () => {
     //get list
     let dataList = [];
     for(const file of e.dataTransfer.files){
-      dataList.push({type:file.name.split(".").pop(), name:file.name, path:file});
+      const isHyphenSeparated = (text) => /^([^\s-]+-)+[^\s-]+$/.test(text);
+
+      if (isHyphenSeparated(file.name)){
+        dataList.push({type:file.name.split(".").pop(), name:file.name, path:file});
+      } else {
+        console.log("Image has incorrect name.");
+        alert("Image has incorrect name.");
+      }
+      
     }
 
     //check
@@ -260,11 +271,11 @@ document.addEventListener("DOMContentLoaded", () => {
       }
 
       //limit of smaller
-      if (zoom_rate[1] < 0.1) {
-        zoom_rate[1] = 0.1;
+      if (zoom_rate[1] < 0.001) {
+        zoom_rate[1] = 0.001;
       }
-      if (zoom_rate[0] < 0.1) {
-        zoom_rate[0] = 0.1;
+      if (zoom_rate[0] < 0.001) {
+        zoom_rate[0] = 0.001;
       }
 
       //mouse position
@@ -290,6 +301,8 @@ document.addEventListener("DOMContentLoaded", () => {
       //update data
       canvasPos = [x, y];
       updateView();
+
+      //console.log(scroller.clientHeight, zoom_rate, objOpts.disp_dpcm)
     }
   });  
   scroller.addEventListener("scroll",async function (event) {
@@ -553,11 +566,13 @@ document.addEventListener("DOMContentLoaded", () => {
       return
     }
     
+    console.log("Labeler: Reset zoom.");
     zoom_rate[0] = 0.3;
-    zoom_rate[1] = 0.3; 
+    zoom_rate[1] = 0.05; 
 
     updateView();
   });
+
    //2 Marker move--------------------------------------------
   function handleMarkerMouseMove(event) {
     const rect = document.getElementById("p5Canvas").getBoundingClientRect(); 
@@ -805,7 +820,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     //reset zoom level
     if (event.ctrlKey && event.key === "0") {
-      zoom_rate = [0.3, 0.3];
+      zoom_rate = [0.3, 0.05];
       scroller.scrollTo(0,0); 
     }
 
@@ -1245,6 +1260,7 @@ document.addEventListener("DOMContentLoaded", () => {
       
         coreLength = tempCore.projects[0].holes[0].sections[0].markers[tempCore.projects[0].holes[0].sections[0].markers.length-1].distance - tempCore.projects[0].holes[0].sections[0].markers[0].distance;
         dpcm = modelImages["drilling_depth"][holeName+"-"+sectionName].height / coreLength;
+        objOpts.disp_dpcm = dpcm;
 
         sectionTop    = zoom_rate[1] * pad[1];
         sectionBottom = zoom_rate[1] * (pad[1]+ modelImages["drilling_depth"][holeName+"-"+sectionName].height);
@@ -1290,7 +1306,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 modelImages["drilling_depth"][holeName+"-"+sectionName],
                 pad[0] * zoom_rate[0],
                 pad[1] * zoom_rate[1],
-                modelImages["drilling_depth"][holeName+"-"+sectionName].width * zoom_rate[0],
+                modelImages["drilling_depth"][holeName+"-"+sectionName].width  * zoom_rate[0],
                 modelImages["drilling_depth"][holeName+"-"+sectionName].height * zoom_rate[1],
               );
             }else{
@@ -1668,14 +1684,14 @@ document.addEventListener("DOMContentLoaded", () => {
             img.copy(
               buffer,
               0, 0, drawSize[0], drawSize[1],  // source size
-              0, 0, outSize[0], outSize[1],    // actural size
+              0, 0, outSize[0], outSize[1],    // actual size
             );
           } else {
             img = buffer.createImage(outSize[0], outSize[1]);//output size
             img.copy(
               buffer,
               0, 0, drawSize[0], drawSize[1],  // source size
-              0, 0, outSize[0], outSize[1],    // actural size
+              0, 0, outSize[0], outSize[1],    // actual size
             );
           }
 

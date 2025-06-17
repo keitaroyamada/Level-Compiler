@@ -62,7 +62,7 @@ document.addEventListener("DOMContentLoaded", () => {
       image:{},
     };
     objOpts.canvas.depth_scale = "composite_depth";
-    objOpts.canvas.zoom_level = [4, 3]; //[x, y](1pix/2cm)
+    objOpts.canvas.zoom_level = [4, 3]; //[x, y](300pix/1m)
     objOpts.canvas.age_zoom_correction = [1/10, 100];//[zoom level, pad level]
     objOpts.canvas.dpir = 1; //window.devicePixelRatio || 1;
     objOpts.canvas.mouse_over_colour = "red";
@@ -82,6 +82,7 @@ document.addEventListener("DOMContentLoaded", () => {
     objOpts.canvas.draw_core_photo = false;
     objOpts.canvas.finder_y = 0;
     objOpts.canvas.age_precision = 0;
+    objOpts.canvas.display_dpcm = 52;
   
     objOpts.project.interval = 0;
     objOpts.project.font = "Arial";
@@ -2645,6 +2646,7 @@ document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("bt_zoom0").addEventListener("click", async (event) => {
     if (LCCore) {
       objOpts.canvas.zoom_level = [4,3];
+      objOpts.hole.distance = 20;
 
       
       //mouse position
@@ -2680,6 +2682,46 @@ document.addEventListener("DOMContentLoaded", () => {
     updateView();
     }
   });  
+  //============================================================================================
+  //zoom actual
+  document.getElementById("bt_zoomactual").addEventListener("click", async (event) => {
+    if (LCCore) {
+        objOpts.canvas.zoom_level = [objOpts.canvas.display_dpcm/3,objOpts.canvas.display_dpcm];
+        objOpts.hole.distance = 1;
+        
+        //mouse position
+        const relative_scroll_pos_x =
+        scroller.scrollLeft / scroller.scrollWidth;
+      const relative_scroll_pos_y =
+        scroller.scrollTop / scroller.scrollHeight;
+
+      //calc new canvas size
+      makeP5CanvasBase();
+      const canvasBase_height = parseInt(
+        canvasBase.style.height.match(/\d+/)[0],
+        10
+      );
+      const canvasBase_width = parseInt(
+        canvasBase.style.width.match(/\d+/)[0],
+        10
+      );
+
+      //get new scroll pos
+      const new_scroll_pos_x = canvasBase_width * relative_scroll_pos_x;
+      const new_scroll_pos_y = canvasBase_height * relative_scroll_pos_y;
+
+      let x = new_scroll_pos_x;
+      let y = new_scroll_pos_y;
+
+      scroller.scrollTo(x, y); //move scroll position
+
+      //update data
+      canvasPos = [x, y];
+
+      //update plot
+      updateView();
+    }
+  });
   //============================================================================================
   //zoomin
   document.getElementById("bt_zoomin").addEventListener("click", async (event) => {
@@ -2740,8 +2782,9 @@ document.addEventListener("DOMContentLoaded", () => {
         canvasPos = [x, y];
 
         //update plot
-        updateView();
+        updateView();     
       }
+      
     });
   //============================================================================================
   //open finder
@@ -2950,6 +2993,7 @@ document.addEventListener("DOMContentLoaded", () => {
     //target line
     var target_line = document.getElementById("horizontal_target");
     target_line.style.top = event.clientY + "px";
+
   });
   //============================================================================================
   //scroll event
@@ -3101,11 +3145,53 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     }
 
+    // Ctrl + 0 => zoom actual size
+    if (event.ctrlKey && event.key === "1") {
+      //zoom actural
+      if (LCCore) {
+        objOpts.canvas.zoom_level = [objOpts.canvas.display_dpcm/3, objOpts.canvas.display_dpcm];
+        objOpts.hole.distance = 1;
+        
+        //mouse position
+        const relative_scroll_pos_x =
+        scroller.scrollLeft / scroller.scrollWidth;
+      const relative_scroll_pos_y =
+        scroller.scrollTop / scroller.scrollHeight;
+  
+      //calc new canvas size
+      makeP5CanvasBase();
+      const canvasBase_height = parseInt(
+        canvasBase.style.height.match(/\d+/)[0],
+        10
+      );
+      const canvasBase_width = parseInt(
+        canvasBase.style.width.match(/\d+/)[0],
+        10
+      );
+  
+      //get new scroll pos
+      const new_scroll_pos_x = canvasBase_width * relative_scroll_pos_x;
+      const new_scroll_pos_y = canvasBase_height * relative_scroll_pos_y;
+  
+      let x = new_scroll_pos_x;
+      let y = new_scroll_pos_y;
+  
+      scroller.scrollTo(x, y); //move scroll position
+  
+      //update data
+      canvasPos = [x, y];
+  
+      //update plot
+      updateView();
+      }    
+    }
+
     // Ctrl + 0 => reset zoom leevel
     if (event.ctrlKey && event.key === "0") {
       //reset zoom
       if (LCCore) {
         objOpts.canvas.zoom_level = [4,3];
+        objOpts.hole.distance = 20;
   
         
         //mouse position

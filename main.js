@@ -28,7 +28,7 @@ const zlib = require('zlib');
 const https = require('https');
 const { autoUpdater} = require('electron-updater');
 
-const { app, BrowserWindow, Menu, ipcMain, dialog, shell } = require("electron");
+const { app, BrowserWindow, Menu, ipcMain, dialog, shell, screen } = require("electron");
 const { LevelCompilerCore } = require("./LC_modules/LevelCompilerCore.js");
 const { Project } = require("./LC_modules/Project.js");
 const { lcfnc } = require("./LC_modules/lcfnc.js");
@@ -656,6 +656,7 @@ function createMainWIndow() {
       bt_finder:      path.join(resourcePath, "resources","tool","finder.png"),
       bt_zoomin:      path.join(resourcePath, "resources","tool","zoomin.png"),
       bt_zoom0:       path.join(resourcePath, "resources","tool","zoom0.png"),
+      bt_zoomactual:  path.join(resourcePath, "resources","tool","zoomactual.png"),
       bt_zoomout:     path.join(resourcePath, "resources","tool","zoomout.png"),
       bt_measure:     path.join(resourcePath, "resources","tool","measure.png"),
       bt_snapshot:    path.join(resourcePath, "resources","tool","snapshot.png"),
@@ -685,6 +686,7 @@ function createMainWIndow() {
       bt_add_marker:      path.join(resourcePath, "resources","tool","add_marker.png"),
       bt_delete_marker:   path.join(resourcePath, "resources","tool","delete_marker.png"),
       bt_zoom0:           path.join(resourcePath, "resources","tool","zoom0.png"),
+      bt_zoomactual:      path.join(resourcePath, "resources","tool","zoomactual.png"),
     };
   
     //make fuction
@@ -3597,6 +3599,7 @@ app.whenReady().then(() => {
       createMainWIndow();
     }
   });
+  
 
 });
 

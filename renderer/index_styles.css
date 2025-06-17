@@ -132,6 +132,11 @@ html {
   width: 100%;
   z-index: 10;
 }
+#bt_zoomactual img {
+  height: 75%;
+  width: 100%;
+  z-index: 10;
+}
 #bt_zoomout {
   flex-shrink: 0;  
   box-sizing: border-box;
