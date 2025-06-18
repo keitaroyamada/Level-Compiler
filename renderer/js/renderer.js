@@ -82,7 +82,7 @@ document.addEventListener("DOMContentLoaded", () => {
     objOpts.canvas.draw_core_photo = false;
     objOpts.canvas.finder_y = 0;
     objOpts.canvas.age_precision = 0;
-    objOpts.canvas.display_dpcm = 52;
+    objOpts.canvas.display_height = 20.2;
   
     objOpts.project.interval = 0;
     objOpts.project.font = "Arial";
@@ -217,23 +217,14 @@ document.addEventListener("DOMContentLoaded", () => {
   //hide test event
   document.getElementById("footerLeftText").addEventListener("click", async () => {
     if(developerMode){
-      await loadPlotData();
-      console.log(LCPlot);
-      updateView()
+      const results = await window.LCapi.getDisplayInfo();
 
-      LCPlot.age_collections.forEach(c=>{
-        c.datasets[0].data_series.forEach(s=>{
-          if(s.enable==true&&s.reliable==false){
-            console.log(c.name, "true/false",s)
-          }
-          if(s.enable==false&&s.reliable==false){
-            console.log(c.name, "false/false",s)
-          }
-          
-        })
-      })
+      const dpi = results.height / objOpts.canvas.display_height; // hight is already divided by scale factor
 
-  }
+      console.log(results.height , objOpts.canvas.display_height , results.scaleFactor,dpi)
+      
+
+    }
   });
   //============================================================================================
   document.getElementById("scroller").addEventListener("dragover", (e) => {
@@ -2686,7 +2677,11 @@ document.addEventListener("DOMContentLoaded", () => {
   //zoom actual
   document.getElementById("bt_zoomactual").addEventListener("click", async (event) => {
     if (LCCore) {
-        objOpts.canvas.zoom_level = [objOpts.canvas.display_dpcm/3,objOpts.canvas.display_dpcm];
+        //update display dpcm
+        const results = await window.LCapi.getDisplayInfo();
+        const display_dpcm = results.height / objOpts.canvas.display_height; 
+
+        objOpts.canvas.zoom_level = [display_dpcm/3, display_dpcm];
         objOpts.hole.distance = 1;
         
         //mouse position
@@ -3149,7 +3144,11 @@ document.addEventListener("DOMContentLoaded", () => {
     if (event.ctrlKey && event.key === "1") {
       //zoom actural
       if (LCCore) {
-        objOpts.canvas.zoom_level = [objOpts.canvas.display_dpcm/3, objOpts.canvas.display_dpcm];
+        //update display dpcm
+        const results = await window.LCapi.getDisplayInfo();
+        const display_dpcm = results.height / objOpts.canvas.display_height; 
+
+        objOpts.canvas.zoom_level = [display_dpcm/3, display_dpcm];
         objOpts.hole.distance = 1;
         
         //mouse position

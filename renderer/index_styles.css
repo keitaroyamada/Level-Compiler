@@ -132,6 +132,13 @@ html {
   width: 100%;
   z-index: 10;
 }
+#bt_zoomactual {
+  flex-shrink: 0;  
+  box-sizing: border-box;
+  width: 40px;
+  height: 40px;
+  z-index: 10;
+}
 #bt_zoomactual img {
   height: 75%;
   width: 100%;

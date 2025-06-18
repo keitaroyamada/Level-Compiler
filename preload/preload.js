@@ -85,6 +85,7 @@ contextBridge.exposeInMainWorld("LCapi", {
   addSectionFromLcsection:(args1) => ipcRenderer.invoke("addSectionFromLcsection", webUtils.getPathForFile(args1)),
   changeEditMode:(args1) => ipcRenderer.invoke("changeEditMode",args1),
   sendSettings:(args1,args2) => ipcRenderer.invoke("sendSettings",args1,args2),
+  getDisplayInfo:() => ipcRenderer.invoke("getDisplayInfo"),
 
   
   

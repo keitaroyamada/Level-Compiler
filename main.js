@@ -43,6 +43,7 @@ const { Worker } = require('worker_threads');
 const { isString } = require("util");
 const { resolve } = require("dns");
 const { rejects } = require("assert");
+const { resolveObjectURL } = require("buffer");
 
 //mode properties
 const isMac = process.platform === "darwin";
@@ -1195,7 +1196,13 @@ function createMainWIndow() {
     console.log("MAIN: Labeler Project data is initialised.");
     return JSON.parse(JSON.stringify(tempCore));
   });
-  
+  ipcMain.handle("getDisplayInfo", async (_e) => {
+    //get data
+    const results = getDisplayInfo(screen);
+
+    return results;
+  });
+
   ipcMain.handle("LabelerAddSectionData", async (_e, holeName, sectionName) => {
     //change temp hole name
     tempCore.changeName([1,1,null,null],holeName);
@@ -3584,6 +3591,21 @@ function setSettings(data){
     console.log('MAIN: Settings are saved.');
   } catch (error) {
     console.error('MAIN: Failed to save settings.', error);
+  }
+}
+function getDisplayInfo(screen){
+  try {
+    const primaryDisplay = screen.getPrimaryDisplay();
+
+    const resolution = primaryDisplay.size;  
+    const scaleFactor = primaryDisplay.scaleFactor; 
+    const results = {width: resolution.width, height: resolution.height, scaleFactor:scaleFactor};
+
+    console.log('MAIN: Get display Settings: ', rejects);
+
+    return results
+  } catch (error) {
+    console.error('MAIN: Failed to get display settings.', error);
   }
 }
 //--------------------------------------------------------------------------------------------------
