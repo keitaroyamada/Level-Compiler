@@ -3454,8 +3454,7 @@ document.addEventListener("DOMContentLoaded", () => {
         sketch.text(title(objOpts.canvas.depth_scale), 0, 0);
         sketch.pop();
 
-        //
-        const gridStartY = (0 + shift_y) * yMag + pad_y; //pix
+        const gridStartY = (0 + shift_y) * yMag + pad_y; //pix scroller.scrollTop;
         let age_mod = 1;
         if (objOpts.canvas.depth_scale == "age") {
           age_mod = objOpts.canvas.age_zoom_correction[0];
@@ -3482,14 +3481,24 @@ document.addEventListener("DOMContentLoaded", () => {
           }
         };
 
-        //ygrid downward
+        
+        //ygrid downward from zero
         for (let y = gridStartY; y < gridMaxY; y += gridStepY) {
+          const grid_rect = {
+            x: 120,
+            y: y,
+            width: gridMaxX - 120,
+            height: 1,
+          };
+          if (!isInside(view_rect, grid_rect, 500 * yMag)) {
+            continue;
+          }
           //grid
           sketch.drawingContext.setLineDash([]);
           sketch.strokeWeight(objOpts.canvas.grid_width);
           sketch.stroke(objOpts.canvas.grid_colour);
           sketch.line(120, y, gridMaxX, y);
-
+        
           //label
           const tickLabel = txt(tickType, y);
           const tickWidth = ctx.measureText(tickLabel).width;
@@ -3500,8 +3509,17 @@ document.addEventListener("DOMContentLoaded", () => {
           sketch.text(tickLabel, scroller.scrollLeft + 50, y + 8);
         }
 
-        //ygrid upward
         for (let y = gridStartY; y > gridMinY; y -= gridStepY) {
+          const grid_rect = {
+            x: 120,
+            y: y,
+            width: gridMaxX - 120,
+            height: 1,
+          };
+          if (!isInside(view_rect, grid_rect, 500 * yMag)) {
+            continue;
+          }
+
           //grid
           sketch.drawingContext.setLineDash([]);
           sketch.strokeWeight(objOpts.canvas.grid_width);
@@ -3516,7 +3534,8 @@ document.addEventListener("DOMContentLoaded", () => {
           sketch.textFont("Arial");
           sketch.textSize("20px");
           sketch.text(tickLabel, scroller.scrollLeft + 50, y + 8);
-        }
+        }      
+        
       }
       //-----------------------------------------------------------------------------------------
 
