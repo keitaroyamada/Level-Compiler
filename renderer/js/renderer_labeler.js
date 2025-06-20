@@ -1359,7 +1359,7 @@ document.addEventListener("DOMContentLoaded", () => {
             sketch.text(
               "Bottom", 
               sectionLeft + (sectionRight - sectionLeft)/2 -40, 
-              sectionBottom + 20
+              sectionBottom + (sketch.textAscent() + sketch.textDescent())
             );
             sketch.pop();
           }
@@ -1599,7 +1599,7 @@ document.addEventListener("DOMContentLoaded", () => {
             buffer.text(
               "Top", 
               sectionLeft + (sectionRight - sectionLeft)/2 -buffer.textWidth("Top")/2, 
-              sectionTop -70 * modRatio
+              sectionTop -(buffer.textAscent()+buffer.textDescent())*modRatio
             );
             buffer.pop();
           }
@@ -1619,8 +1619,9 @@ document.addEventListener("DOMContentLoaded", () => {
             buffer.text(
               "Bottom", 
               sectionLeft + (sectionRight - sectionLeft)/2 -buffer.textWidth("Bottom")/2, 
-              sectionBottom + 170 * modRatio
+              sectionBottom + (buffer.textAscent()+buffer.textDescent()) * modRatio
             );
+            console.log(modRatio, buffer.textAscent() , buffer.textDescent())
             buffer.pop();
           }
 

@@ -3836,7 +3836,7 @@ class LevelCompilerCore extends EventEmitter{
   
       //make sectiondata
       let sectionData = sectionModel;
-      const newId = Math.max(holeData.reserved_section_ids)+1;
+      const newId = Math.max(...holeData.reserved_section_ids)+1;
       sectionData.id = [holeData.id[0], holeData.id[1], newId, null];
 
       //upodate marker id & connections
