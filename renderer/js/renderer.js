@@ -3850,7 +3850,7 @@ document.addEventListener("DOMContentLoaded", () => {
             sketch.fill(objOpts.section.font_colour);
             sketch.noStroke();
             sketch.textFont(objOpts.section.font);
-            sketch.textSize(objOpts.section.font_size);
+            sketch.textSize(objOpts.section.font_size); 
             sketch.push();
             sketch.translate(
               (hole_x0 + shift_x) * xMag + pad_x - secNamePos, //-10
