@@ -103,6 +103,7 @@ document.addEventListener("DOMContentLoaded", () => {
     objOpts.section.width = 20;
     objOpts.section.font = "Arial";
     objOpts.section.font_size = 20;
+    objOpts.section.font_angle =  -90;
     objOpts.section.font_colour = "black";
   
     objOpts.marker.line_colour = "gray";
@@ -3456,9 +3457,15 @@ document.addEventListener("DOMContentLoaded", () => {
 
         const gridStartY = (0 + shift_y) * yMag + pad_y; //pix scroller.scrollTop;
         let age_mod = 1;
-        if (objOpts.canvas.depth_scale == "age") {
-          age_mod = objOpts.canvas.age_zoom_correction[0];
+        try {
+          if (objOpts.canvas.depth_scale == "age") {
+            age_mod = objOpts.canvas.age_zoom_correction[0];
+          }
+        } catch (err){
+          alert("An unexpected error has occurred. There may be a problem with the LC cache or temporary files.");
+          return
         }
+        
         const gridStepY = fitScaler(objOpts.canvas.zoom_level[1], yMag / age_mod); //pix
 
         const gridMaxY = parseInt(canvasBase.style.height.match(/\d+/)[0], 10);
@@ -3836,16 +3843,20 @@ document.addEventListener("DOMContentLoaded", () => {
             }
 
             //add section name-------------------------------------------------
+            let secNamePos = 10;
+            if (objOpts.section.font_angle>0){
+               secNamePos =  sketch.textAscent(hole.name+section.name) + sketch.textDescent(hole.name+section.name) + 10;
+            }
             sketch.fill(objOpts.section.font_colour);
             sketch.noStroke();
             sketch.textFont(objOpts.section.font);
             sketch.textSize(objOpts.section.font_size);
             sketch.push();
             sketch.translate(
-              (hole_x0 + shift_x) * xMag + pad_x - 10,
+              (hole_x0 + shift_x) * xMag + pad_x - secNamePos, //-10
               (section_mid + shift_y) * yMag + pad_y
             );
-            sketch.rotate((-90 / 180) * Math.PI);
+            sketch.rotate((objOpts.section.font_angle / 180) * Math.PI);
             sketch.text(hole.name + "-" + section.name, 0, 0);
             sketch.pop();
 
