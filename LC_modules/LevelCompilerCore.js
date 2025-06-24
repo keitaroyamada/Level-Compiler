@@ -295,12 +295,12 @@ class LevelCompilerCore extends EventEmitter{
                 //add 2 events for upward and downward
                 eventData.push(["deposition", "through-up", null, eventCategory, null]);
                 eventData.push(["deposition", "through-down", null, eventCategory, null]);
-              } else if (event[1] == "upward" || event[1]) {
+              } else if (event[1] == "upward") {
                 let thickness = parseFloat(event[2]);
                 if (!isNaN(thickness)) {
                   eventData.push(["deposition", "upward", -thickness, eventCategory, -thickness]);
                 }
-              } else if (event[1] == "downward" || event[1]) {
+              } else if (event[1] == "downward") {
                 let thickness = parseFloat(event[2]);
                 if (!isNaN(thickness)) {
                   eventData.push(["deposition", "downward", thickness, eventCategory, thickness]);
