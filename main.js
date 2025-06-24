@@ -3574,9 +3574,35 @@ async function putmodelfile(data, path) {
       }
     }   
     
+    dialog.showMessageBox({
+      type: 'info',
+      title: 'Saved',
+      message: `The correlation model was saved successfully.`,
+      buttons: ['OK']
+    }).catch((err) => {
+      console.error('Error displaying message box:', err);
+      dialog.showMessageBox({
+      type: 'info',
+      title: 'No Saved',
+      message: 'Error displaying message box:', err,
+      });
+    });
     return filePath;
   }catch(err) {
       console.log(err);
+      dialog.showMessageBox({
+      type: 'info',
+      title: 'Saved',
+      message: `Failed to save the correlation model.` + err,
+      buttons: ['OK']
+    }).catch((err) => {
+      console.error('Error displaying message box:', err);
+      dialog.showMessageBox({
+      type: 'info',
+      title: 'No Saved',
+      message: 'Error displaying message box:', err,
+      });
+    });
   };
 }
 //--------------------------------------------------------------------------------------------------
