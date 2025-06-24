@@ -48,7 +48,7 @@ contextBridge.exposeInMainWorld("LCapi", {
   CloseImporter: () => ipcRenderer.invoke("CloseImporter"),
 
   //image
-  RegisterCoreImage: (args1,args2) =>  ipcRenderer.invoke("RegisterCoreImage", webUtils.getPathForFile(args1),args2),
+  RegisterCoreImage: (args1,args2) =>  ipcRenderer.invoke("RegisterCoreImage", webUtils.getPathForFile(args1), args2),
   LoadCoreImage: (args1, args2) =>  ipcRenderer.invoke("LoadCoreImage", args1, args2),
   GetResources: () => ipcRenderer.sendSync("GetResources"),
 

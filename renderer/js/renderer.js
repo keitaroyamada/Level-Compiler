@@ -71,6 +71,7 @@ document.addEventListener("DOMContentLoaded", () => {
     objOpts.canvas.shift_x = 0; //[cm]
     objOpts.canvas.shift_y = 100; //[cm]
     objOpts.canvas.bottom_pad = 100; //[cm]
+    objOpts.canvas.buffer_depth = 500; //[cm]
     objOpts.canvas.background_colour = "#f4f5f7";//"#f7f7f7"//"#f8fbff";//"#fffdfa";//""white
     objOpts.canvas.target_horizon = false;
     objOpts.canvas.is_grid = false;
@@ -3497,7 +3498,7 @@ document.addEventListener("DOMContentLoaded", () => {
             width: gridMaxX - 120,
             height: 1,
           };
-          if (!isInside(view_rect, grid_rect, 500 * yMag)) {
+          if (!isInside(view_rect, grid_rect, objOpts.canvas.buffer_depth * yMag)) {
             continue;
           }
           //grid
@@ -3523,7 +3524,7 @@ document.addEventListener("DOMContentLoaded", () => {
             width: gridMaxX - 120,
             height: 1,
           };
-          if (!isInside(view_rect, grid_rect, 500 * yMag)) {
+          if (!isInside(view_rect, grid_rect, objOpts.canvas.buffer_depth * yMag)) {
             continue;
           }
 
@@ -3789,7 +3790,7 @@ document.addEventListener("DOMContentLoaded", () => {
             };
 
             //draw section-----------------------------------------------------
-            if (!isInside(view_rect, sec_rect, 500)) {
+            if (!isInside(view_rect, sec_rect, objOpts.canvas.buffer_depth * yMag)) {
               continue;
             }
             //sketch.drawingContext.setLineDash([]);
@@ -4298,7 +4299,7 @@ document.addEventListener("DOMContentLoaded", () => {
             width: objOpts.age.incon_size,
             height: objOpts.age.incon_size,
           };
-          if (!isInside(view_rect, age_rect, 500)) {
+          if (!isInside(view_rect, age_rect, objOpts.canvas.buffer_depth * yMag)) {
             continue;
           }
 
@@ -4687,7 +4688,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     width: posData[i+1].pos_canvas_x-posData[i].pos_canvas_x,
                     height: posData[i+1].pos_canvas_y-posData[i].pos_canvas_y,
                   };
-                  if (!isInside(view_rect, data_rect, 500)) {
+                  if (!isInside(view_rect, data_rect, objOpts.canvas.buffer_depth * yMag)) {
                     continue;
                   } 
                   //draw
@@ -4722,7 +4723,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     width: posData[i+1].pos_canvas_x-posData[i].pos_canvas_x,
                     height: posData[i+1].pos_canvas_y-posData[i].pos_canvas_y,
                   };
-                  if (!isInside(view_rect, data_rect, 500)) {
+                  if (!isInside(view_rect, data_rect, objOpts.canvas.buffer_depth * yMag)) {
                     continue;
                   } 
                   //draw
@@ -4755,7 +4756,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     width: posData.hole_max_x = posData.hole_min_x,
                     height: binWidth,
                   };
-                  if (!isInside(view_rect, data_rect, 500)) {
+                  if (!isInside(view_rect, data_rect, objOpts.canvas.buffer_depth * yMag)) {
                     continue;
                   } 
 
