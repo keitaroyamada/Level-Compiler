@@ -1090,6 +1090,41 @@ function createMainWIndow() {
             } 
           },
           {
+            label:"LC",
+            submenu:[
+              { 
+                label: 'Finder', 
+                click: () => {
+                  resolve("finder");                      
+                } 
+              },
+              { 
+                label: 'Zoom in', 
+                click: () => {
+                  resolve("zoomin");                      
+                } 
+              },
+              { 
+                label: 'Zoom out', 
+                click: () => {
+                  resolve("zoomout");                      
+                } 
+              },
+              { 
+                label: 'Zoom default', 
+                click: () => {
+                  resolve("zoom0");                      
+                } 
+              },
+              { 
+                label: 'Zoom actual size', 
+                click: () => {
+                  resolve("zoomactual");                      
+                } 
+              }
+            ]
+          },
+          {
             label:"Cancel",
             click: () => {
               resolve("cancel"); 
@@ -1098,8 +1133,49 @@ function createMainWIndow() {
         ];
         
       }else if(type=="normalContextMenu"){
-        //template = [  ] 
-        return
+        template = [
+          {
+            label:"LC",
+            submenu:[
+              { 
+                label: 'Reload', 
+                click: () => {
+                  resolve("reload");                      
+                } 
+              },
+              { 
+                label: 'Finder', 
+                click: () => {
+                  resolve("finder");                      
+                } 
+              },
+              { 
+                label: 'Zoom in', 
+                click: () => {
+                  resolve("zoomin");                      
+                } 
+              },
+              { 
+                label: 'Zoom out', 
+                click: () => {
+                  resolve("zoomout");                      
+                } 
+              },
+              { 
+                label: 'Zoom default', 
+                click: () => {
+                  resolve("zoom0");                      
+                } 
+              },
+              { 
+                label: 'Zoom actual size', 
+                click: () => {
+                  resolve("zoomactual");                      
+                } 
+              }
+            ]
+          }
+        ]
       }else if(type=="sectionContextMenu"){
         template = [
           {
@@ -1148,6 +1224,47 @@ function createMainWIndow() {
                 } 
               }
             ]
+          },
+          {
+            label:"LC",
+            submenu:[
+              { 
+                label: 'Reload', 
+                click: () => {
+                  resolve("reload");                      
+                } 
+              },
+              { 
+                label: 'Finder', 
+                click: () => {
+                  resolve("finder");                      
+                } 
+              },
+              { 
+                label: 'Zoom in', 
+                click: () => {
+                  resolve("zoomin");                      
+                } 
+              },
+              { 
+                label: 'Zoom out', 
+                click: () => {
+                  resolve("zoomout");                      
+                } 
+              },
+              { 
+                label: 'Zoom default', 
+                click: () => {
+                  resolve("zoom0");                      
+                } 
+              },
+              { 
+                label: 'Zoom actual size', 
+                click: () => {
+                  resolve("zoomactual");                      
+                } 
+              }
+            ]
           }
         ] 
       }else if(type=="holeContextMenu"){
@@ -1167,6 +1284,47 @@ function createMainWIndow() {
                   resolve("holeMoveToLeft");                      
                 } 
               },
+            ]
+          },
+          {
+            label:"LC",
+            submenu:[
+              { 
+                label: 'Reload', 
+                click: () => {
+                  resolve("reload");                      
+                } 
+              },
+              { 
+                label: 'Finder', 
+                click: () => {
+                  resolve("finder");                      
+                } 
+              },
+              { 
+                label: 'Zoom in', 
+                click: () => {
+                  resolve("zoomin");                      
+                } 
+              },
+              { 
+                label: 'Zoom out', 
+                click: () => {
+                  resolve("zoomout");                      
+                } 
+              },
+              { 
+                label: 'Zoom default', 
+                click: () => {
+                  resolve("zoom0");                      
+                } 
+              },
+              { 
+                label: 'Zoom actual size', 
+                click: () => {
+                  resolve("zoomactual");                      
+                } 
+              }
             ]
           }
         ] 

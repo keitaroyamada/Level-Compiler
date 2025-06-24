@@ -910,6 +910,18 @@ document.addEventListener("DOMContentLoaded", () => {
       
       updateView();
       objOpts.image.dpcm = curDPCM;
+    }else if(clickResult=="reload"){
+      document.getElementById("bt_reload").click();
+    }else if(clickResult=="finder"){
+      document.getElementById("bt_finder").click();
+    }else if(clickResult=="zoomin"){
+      document.getElementById("bt_zoomin").click();
+    }else if(clickResult=="zoomout"){
+      document.getElementById("bt_zoomout").click();
+    }else if(clickResult=="zoom0"){
+      document.getElementById("bt_zoom0").click();
+    }else if(clickResult=="zoomactual"){
+      document.getElementById("bt_zoomactual").click();
     }
   }
   //0 Context menu--------------------------------------------
