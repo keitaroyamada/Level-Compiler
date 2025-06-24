@@ -900,6 +900,16 @@ document.addEventListener("DOMContentLoaded", () => {
           }
         }
       }      
+    }else if(clickResult=="reloadImage"){
+      const curDPCM = JSON.parse(JSON.stringify(objOpts.image.dpcm));
+
+      const targetId = [objOpts.edit.hittest.project, objOpts.edit.hittest.hole,objOpts.edit.hittest.section,null];
+      modelImages.load_target_ids = [targetId];//load target
+      objOpts.image.dpcm = objOpts.image.dpcm;
+      modelImages = await loadCoreImages(modelImages, LCCore, objOpts, ["drilling_depth", "composite_depth","event_free_depth","age"]);
+      
+      updateView();
+      objOpts.image.dpcm = curDPCM;
     }
   }
   //0 Context menu--------------------------------------------
@@ -5999,6 +6009,8 @@ async function updateImageRegistration(modelImages, LCCore){
           //console.log(modelImages.image_dir, h.name+"-"+s.name+".jpg")
           if(Object.keys(modelImages.drilling_depth).length > 0){
             const isImExist = await window.LCapi.CheckImagesInDir(h.name+"-"+s.name+".jpg");
+            console.log(h.name+"-"+s.name,  isImExist)
+
             // /im_in_dir
             if(im_in_array==undefined){
               if(isImExist == true){

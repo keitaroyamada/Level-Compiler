@@ -349,7 +349,7 @@ function createMainWIndow() {
     let result = false;
     for(const target of targetList){
       const res = findFileInDir(target.path, name, "check");
-      if(res[0]==true){
+      if(res==true){
         result = true;
         break;
       }
@@ -434,7 +434,7 @@ function createMainWIndow() {
         console.log("MAIN: There is no registered image folders.")
         return null
       }
-      console.log("MAIN: Load images: N = "+loadOptions.targetIds.length+"; Operations: "+loadOptions.operations);
+      console.log("MAIN: Load images: N = "+loadOptions.targetIds.length+"; Operations: ["+loadOptions.operations+"]");
 
       //make tasks
       const NUM_WORKERS = Math.min(Math.round(os.cpus().length/2,0), loadOptions.targetIds.length);
@@ -468,7 +468,7 @@ function createMainWIndow() {
             fullpath = findFileInDir(target.path, imBaseName+".jpg", "get");
           }
 
-          if(fullpath.length==0){
+          if(fullpath == false){
             continue
           }
   
@@ -483,7 +483,7 @@ function createMainWIndow() {
           tasks.push({
             type:"continue",
             imageName:imBaseName,
-            imagePath:fullpath[0],
+            imagePath:fullpath,
             imageSize:new_size,
             operations:loadOptions.operations,
             sectionData:targetSectionData,
@@ -1140,6 +1140,13 @@ function createMainWIndow() {
                   resolve("loadHighResolutionImage");                      
                 } 
               },
+              { 
+                label: 'Reload image', 
+                click: () => {
+                  console.log('MAIN: reload image'); 
+                  resolve("reloadImage");                      
+                } 
+              }
             ]
           }
         ] 
@@ -3311,8 +3318,8 @@ async function getDirectory(mainWindow, title) {
   }
 }
 function findFileInDir(in_path, fileName, type) {
-  let results = [];
   let dir = "";
+
   if(typeof in_path === "string"){
     dir = in_path;
   }else{
@@ -3327,20 +3334,29 @@ function findFileInDir(in_path, fileName, type) {
 
       if (stat.isDirectory()) {
         if(type == "get"){
-          results = results.concat(findFileInDir(filePath, fileName, type));
+          const res = findFileInDir(filePath, fileName, "get");
+          if(res){
+            return res;
+          }
         }else if(type == "check"){
-          results.push(true);
+          if(findFileInDir(filePath, fileName, "check") == true){
+            return true;
+          }
         }
       } else if (file === fileName) {
         if(type == "get"){
-          results.push(filePath);
+          return filePath;
         }else if(type =="check"){
-          results.push(true);
+          return true;
         }
       }
   }
 
-  return results;
+  if(type == "check"){
+    return false;
+  } else if(type == "get"){
+    return false;
+  }
 }
 //--------------------------------------------------------------------------------------------------
 async function putcsvfile(mainWindow, filePath, data) {
