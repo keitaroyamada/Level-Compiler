@@ -474,8 +474,8 @@ function createMainWIndow() {
   
           //calc new image size
           let new_height = Math.round(loadOptions.dpcm * (targetSectionData.markers[targetSectionData.markers.length - 1].distance - targetSectionData.markers[0].distance), 0);
-          if(new_height > loadOptions.dpcm * 120){
-            new_height = loadOptions.dpcm * 120;
+          if(new_height > loadOptions.dpcm * loadOptions.coreLength){
+            new_height = loadOptions.dpcm * loadOptions.coreLength;
           }
           //calc resize        
           const new_size = { height: new_height, width: 1 };
