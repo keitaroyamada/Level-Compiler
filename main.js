@@ -473,7 +473,7 @@ function createMainWIndow() {
           }
   
           //calc new image size
-          let new_height = Math.round(loadOptions.dpcm * (targetSectionData.markers[targetSectionData.markers.length - 1].distance - targetSectionData.markers[0].distance), 0);
+          let new_height = Math.round(loadOptions.dpcm * 100, 0);
           if(new_height > loadOptions.dpcm * loadOptions.coreLength){
             new_height = loadOptions.dpcm * loadOptions.coreLength;
           }

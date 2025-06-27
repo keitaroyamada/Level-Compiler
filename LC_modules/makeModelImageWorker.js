@@ -25,7 +25,7 @@ parentPort.on("message", async(task) => {
         //load original image from file
         const imageBufferDD = await fs.promises.readFile(task.imagePath);
         //resize
-        resizedBuffer = await sharp(imageBufferDD).resize({ height: task.imageSize.height,width: 30000, fit: 'inside' }).toBuffer();
+        resizedBuffer = await sharp(imageBufferDD).resize({ height: task.imageSize.height, width: 30000, fit: 'inside' }).toBuffer();
         //save
         results["drilling_depth"][task.imageName] = resizedBuffer;
       }
@@ -51,7 +51,7 @@ parentPort.on("message", async(task) => {
       
           // Calculate pixels per cm for scaling
           const pixPerCm = task.imageSize.height / (task.sectionData.markers[task.sectionData.markers.length - 1].distance - task.sectionData.markers[0].distance);
-      
+
           // Initialize new image height and operation list
           let newHeight = 0;
           const operations = [];
@@ -119,28 +119,33 @@ parentPort.on("message", async(task) => {
               if (Math.round(op.fromBottom - op.fromTop) === 0 || Math.round(op.toBottom - op.toTop) === 0) {
                 continue; // Skip invalid sections
               }
-      
-              // Extract and resize each section of the original image
-              const currSection = await sharp(resizedBuffer)
-                .extract({
+              
+              try{
+                // Extract and resize each section of the original image
+                const currSection = await sharp(resizedBuffer)
+                  .extract({
+                    left: 0,
+                    top: Math.round(op.fromTop),
+                    width: metadata.width,
+                    height: Math.round(op.fromBottom - op.fromTop),
+                  })
+                  .resize({
+                    width: metadata.width,
+                    height: Math.round(op.toBottom - op.toTop),
+                    fit: "fill",
+                  })
+                  .toBuffer();
+        
+                // Add the processed section to composite operations
+                compositeOperations.push({
+                  input: currSection,
+                  top: Math.round(op.toTop),
                   left: 0,
-                  top: Math.round(op.fromTop),
-                  width: metadata.width,
-                  height: Math.round(op.fromBottom - op.fromTop),
-                })
-                .resize({
-                  width: metadata.width,
-                  height: Math.round(op.toBottom - op.toTop),
-                  fit: "fill",
-                })
-                .toBuffer();
-      
-              // Add the processed section to composite operations
-              compositeOperations.push({
-                input: currSection,
-                top: Math.round(op.toTop),
-                left: 0,
-              });
+                });
+              }catch(err){
+                console.error("Worker:", error, task);
+                console.log(op)
+              }             
             }
       
             // Apply composite operations to the new image
@@ -154,11 +159,12 @@ parentPort.on("message", async(task) => {
         }
       }
     } catch (error) {
-      console.error("Worker:", error);
+      console.error("Worker:", error, task);
       parentPort.postMessage({
         status: "error",
         message: error.message,
       });
+      
     }    
 
   }

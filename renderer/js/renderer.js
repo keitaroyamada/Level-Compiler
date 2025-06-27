@@ -1216,7 +1216,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
       const targetId = [objOpts.edit.hittest.project, objOpts.edit.hittest.hole,objOpts.edit.hittest.section,null];
       modelImages.load_target_ids = [targetId];//load all
-      objOpts.image.dpcm = 200;
+      objOpts.image.dpcm = objOpts.image.dpcm_high;
       modelImages = await loadCoreImages(modelImages, LCCore, objOpts, ["drilling_depth","composite_depth","event_free_depth", "age"]);
       updateView();
       objOpts.image.dpcm = curDPCM;
@@ -2866,6 +2866,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const age = objOpts.age;
     const pen = objOpts.pen;
     const plot = objOpts.plot; 
+    const image = objOpts.image;
     const options={
       editable:true,
       called_from:"renderer",
@@ -2884,7 +2885,7 @@ document.addEventListener("DOMContentLoaded", () => {
         connection,
         age,
         pen,
-        plot,
+        image,
       }
     };
       
@@ -2907,6 +2908,7 @@ document.addEventListener("DOMContentLoaded", () => {
       const connection = objOpts.connection;
       const age = objOpts.age;
       const pen = objOpts.pen;
+      const image = objOpts.image; 
       const plot = objOpts.plot; 
 
       const settings = {
@@ -2919,7 +2921,7 @@ document.addEventListener("DOMContentLoaded", () => {
         connection,
         age,
         pen,
-        plot,  
+        image,  
       };
         
     await window.LCapi.sendSettings(settings, "settings");
@@ -2933,7 +2935,7 @@ document.addEventListener("DOMContentLoaded", () => {
       Object.assign(objOpts.connection, data.connection);
       Object.assign(objOpts.age, data.age);
       Object.assign(objOpts.pen, data.pen);
-      Object.assign(objOpts.plot, data.plot); 
+      Object.assign(objOpts.image, data.image); 
     }
     
     console.log("[RENDERER]: Setting is updated.",data)
@@ -6095,7 +6097,7 @@ async function loadCoreImages(modelImages, LCCore, objOpts, operations) {
               h.sections.forEach((s) => {
                 modelImages.load_target_ids.push(s.id);
                 coreLength = s.markers[s.markers.length-1].distance - s.markers[0].distance;
-                console.log(s.name,coreLength)
+                //console.log(s.name,coreLength)
               });
             });
           });
@@ -6149,6 +6151,7 @@ async function loadCoreImages(modelImages, LCCore, objOpts, operations) {
 
 }
 async function assignCoreImages(coreImages, imageBuffers, objOpts) {
+  const allowedScalses = ["drilling_depth", "composite_depth", "event_free_depth", "age"];
   let results = coreImages;
   let suc = 0; 
   let N = 0;
@@ -6174,6 +6177,9 @@ async function assignCoreImages(coreImages, imageBuffers, objOpts) {
           const promises = [];
   
           for (const depthScale of Object.keys(imageBuffers)) {
+            if (!allowedScalses.includes(depthScale)){
+              continue;
+            }
             for (const imName in imageBuffers[depthScale]) {
               const promise = new Promise(async (resolveImage) => {
                 try {
