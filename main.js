@@ -2816,29 +2816,29 @@ function createMainWIndow() {
     return changedIds;
   }
   function initialiseLCCore(){
-    LCCore = new LevelCompilerCore();
+    let newLCCore = new LevelCompilerCore();
 
     //minor error
-    LCCore.on('error', (err) => {      
+    newLCCore.on('error', (err) => {      
       console.error('LCCore => '+ err.statusDetails);
       //window.webContents.send("AlertRenderer", err);
     });
 
     //alert error
-    LCCore.on('error_alert', (err) => {
+    newLCCore.on('error_alert', (err) => {
       console.error('LCCore => '+ err.statusDetails);
       mainWindow.webContents.send("AlertRenderer", err);
     });
 
     //depth update event
-    LCCore.on('update_depth', () => {
-      LCAge.updateAgeDepth(LCCore);
-      LCCore.calcMarkerAges(LCAge);
-      LCPlot.calcAgeCollectionPosition(LCCore, LCAge);
-      LCPlot.calcDataCollectionPosition(LCCore,LCAge);
+    newLCCore.on('update_depth', () => {
+      LCAge.updateAgeDepth(newLCCore);
+      newLCCore.calcMarkerAges(LCAge);
+      LCPlot.calcAgeCollectionPosition(newLCCore, LCAge);
+      LCPlot.calcDataCollectionPosition(newLCCore,LCAge);
     });  
 
-    return LCCore;
+    return newLCCore;
   }
   function initialiseDataPath(type){
     globalPath.dataPaths.filter(data => data.type !== type);
