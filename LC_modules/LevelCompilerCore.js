@@ -4718,6 +4718,10 @@ class LevelCompilerCore extends EventEmitter{
     this.setStatus("completed","");
     return output;
   }
+
+  changeBaseProject(baseProjectId){
+    this.base_project_id = baseProjectId;
+  }
  
 }
 

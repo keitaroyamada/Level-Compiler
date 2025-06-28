@@ -1541,6 +1541,9 @@ function createMainWIndow() {
   ipcMain.handle("LabelerLoadModel", (_e) => {
     return JSON.parse(JSON.stringify(tempCore));
   });
+  ipcMain.handle("ChangeDepthScale", async (_e, newId) => {
+    LCCore.changeBaseProject(newId);
+  });
   ipcMain.handle("PlotterGetData", (_e, data) => {
     if (converterWindow) {
       converterWindow.focus();
