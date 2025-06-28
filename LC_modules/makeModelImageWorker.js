@@ -75,12 +75,14 @@ parentPort.on("message", async(task) => {
             const toP0 = (mTop - m0) * pixPerCm * ageCorrection;
             const toP1 = (mBottom - m0) * pixPerCm * ageCorrection;
             if(toP0>toP1){
+              console.log(task.sectionData.markers[i].name,task.sectionData.markers[i + 1].name)
+              console.log(mTop, mBottom, m0, pixPerCm)
               console.log(
-                "Contradiction is detected in ",
+                "Worker: Contradiction is detected in ", 
+                " of ",task.sectionData.markers[i].name,
                 task.sectionData.markers[0].name.split("-")[0],
                 "-",
                 task.sectionData.markers[0].name.split("-")[1],
-                " of ",task.sectionData.markers[i].name,
                 " (", depthScale,": ",toP0,"<->", toP1,")"
               );
             }

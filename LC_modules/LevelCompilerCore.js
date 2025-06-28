@@ -854,12 +854,12 @@ class LevelCompilerCore extends EventEmitter{
                   const hConnectedMarkerData = JSON.parse(JSON.stringify(this.getDataByIdx(this.search_idx_list[hConnectedId.toString()])));
                   if(hConnectedMarkerData[calcType]!==null){
                     comparisonData.push([
-                      hConnectedMarkerData.id,              //base project
-                      hConnectedMarkerData.composite_depth, //base project
-                      hConnectedMarkerData.event_free_depth,//base project
-                      currentMarkerData.id,                 //duo project
-                      currentMarkerData.composite_depth,    //duo project
-                      currentMarkerData.event_free_depth    //duo project
+                      hConnectedMarkerData.id,              //[0] base project
+                      hConnectedMarkerData.composite_depth, //[1] base project
+                      hConnectedMarkerData.event_free_depth,//[2] base project
+                      currentMarkerData.id,                 //[3] duo project
+                      currentMarkerData.composite_depth,    //[4] duo project
+                      currentMarkerData.event_free_depth    //[5] duo project
                     ]);
                   }
                   
@@ -874,6 +874,7 @@ class LevelCompilerCore extends EventEmitter{
      
       comparisonChart.push([this.projects[p].id.toString(), comparisonData]);      
     }
+
     //apply base CD/EFD
     for(let p=0;p<this.projects.length; p++){
       const [comparisonId, comparisonData] = comparisonChart[p];
@@ -886,18 +887,32 @@ class LevelCompilerCore extends EventEmitter{
           for(let m=0;m<this.projects[p].holes[h].sections[s].markers.length;m++){
             const currentMarkerData = this.projects[p].holes[h].sections[s].markers[m];
             //search upper and lower marker [base ID, base CD, base EFD, duo ID, duo CD, duo EFD]
+
             let upperIdx = -1;
             let lowerIdx = -1;
+            let type = "none";
 
             const epsilon = 1e-3;
             for(let c=0;c<comparisonData.length;c++){ 
-              if(Math.abs(comparisonData[c][4] - currentMarkerData.composite_depth) < epsilon ||  comparisonData[c][4] < currentMarkerData.composite_depth){
-                lowerIdx = c;
-              }
-              if(Math.abs(comparisonData[c][4] - currentMarkerData.composite_depth) < epsilon || comparisonData[c][4] > currentMarkerData.composite_depth){
-                upperIdx = c;
-                break;
-              }
+              if(calcType == "event_free_depth"){
+                if (comparisonData[c][5] <= currentMarkerData.event_free_depth + epsilon) {
+                  lowerIdx = c;
+                }
+
+                if (comparisonData[c][5] >= currentMarkerData.event_free_depth - epsilon) {
+                  upperIdx = c;
+                  break;
+                }
+              } else {
+                if (comparisonData[c][4] <= currentMarkerData.composite_depth + epsilon) {
+                  lowerIdx = c;
+                }
+
+                if (comparisonData[c][4] >= currentMarkerData.composite_depth - epsilon) {
+                  upperIdx = c;
+                  break;
+                }
+              }              
             }
 
             //chec end of project
@@ -912,6 +927,7 @@ class LevelCompilerCore extends EventEmitter{
                 lowerIdx = -1;//extrapolate
               }
             }
+
             if(upperIdx !== -1){
               let val = null;
               if(calcType == "event_free_depth"){
@@ -925,12 +941,12 @@ class LevelCompilerCore extends EventEmitter{
             }
 
             if(upperIdx == -1 && lowerIdx == -1){
-              this.setError("","E017: Undefiened marker detected during connecintg duo model. " + this.getMarkerNameFromId(currentMarkerData.id));
+              this.setError("","E017: Undefined marker detected during connecinting duo model. " + this.getMarkerNameFromId(currentMarkerData.id));
               //console.log("LCCore: Undefiened marker detected during connecintg duo model. " + this.getMarkerNameFromId(currentMarkerData.id));
             }
 
-            if(upperIdx == -1 && lowerIdx !== -1){
-              //case upward extrapolation(project top)
+            //case upward extrapolation(project top)
+            if(upperIdx == -1 && lowerIdx !== -1){              
               let D1 = null;
               let D2 = null;
               let D3 = null;
@@ -946,7 +962,7 @@ class LevelCompilerCore extends EventEmitter{
                 d3 = comparisonData[lowerIdx][4];
                 d2 = currentMarkerData.composite_depth;
               }
-              
+
               if(false){
                 //master model is null
                 D2 = null;  
@@ -956,8 +972,9 @@ class LevelCompilerCore extends EventEmitter{
               
               this.projects[p].holes[h].sections[s].markers[m][calcType]  = D2;
             }
+
+            //case downward extrapolation(project bottom)
             if(upperIdx !== -1 && lowerIdx == -1){
-              //case downward extrapolation(project bottom)
               let D1 = null;
               let D2 = null;
               let D3 = null;
@@ -979,12 +996,12 @@ class LevelCompilerCore extends EventEmitter{
                 D2 = null;
               }else{
                 D2 = D1 + (d2 - d1);
-              }
-              
+              }              
               this.projects[p].holes[h].sections[s].markers[m][calcType] = D2;
             }
+
+            //case interpolation
             if(upperIdx !== -1 && lowerIdx !== -1){
-              //case interpolation
               let D1 = null;
               let D2 = null;
               let D3 = null;
@@ -1044,7 +1061,7 @@ class LevelCompilerCore extends EventEmitter{
         projectCdBottom  = 1000;
       }
       if(projectCdTop == Infinity){
-        projectCdTop= 0;
+        projectCdTop = 0;
       }
       this.projects[p].composite_depth_top = projectCdTop;
       this.projects[p].composite_depth_bottom = projectCdBottom;
@@ -4588,7 +4605,6 @@ class LevelCompilerCore extends EventEmitter{
       return a[0] - b[0];
     })
     
-
     //make output data
     let prevMasterHole = "";
     let output = [];
