@@ -122,14 +122,22 @@ parentPort.on("message", async(task) => {
                 continue; // Skip invalid sections
               }
               
+              let extractHeight = op.fromBottom - op.fromTop;
               try{
+                //limit size
+                
+                if (Math.round(op.fromTop) + Math.round(extractHeight) > metadata.height) {
+                  console.log("Worker: change ",task.imageName," height at ",depthScale," from", Math.round(extractHeight) + " to ", metadata.height - Math.round(op.fromTop));
+                  extractHeight = metadata.height - Math.round(op.fromTop);
+                }
+
                 // Extract and resize each section of the original image
                 const currSection = await sharp(resizedBuffer)
                   .extract({
                     left: 0,
                     top: Math.round(op.fromTop),
                     width: metadata.width,
-                    height: Math.round(op.fromBottom - op.fromTop),
+                    height: Math.round(extractHeight),
                   })
                   .resize({
                     width: metadata.width,
@@ -145,8 +153,8 @@ parentPort.on("message", async(task) => {
                   left: 0,
                 });
               }catch(err){
-                console.error("Worker:", error, task);
-                console.log(op)
+                console.error("Worker:", err);
+                console.log(op, metadata, Math.round(op.fromTop) + Math.round(extractHeight))
               }             
             }
       
