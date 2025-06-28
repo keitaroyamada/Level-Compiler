@@ -1336,18 +1336,21 @@ function createMainWIndow() {
   });
   
 
-  ipcMain.handle("ExportCorrelationAsCsvFromRenderer", async (_e, MD) => {
+  ipcMain.handle("ExportCorrelationAsCsvFromRenderer", async (_e, MD, baseProjectID) => {
     let exportLCCore = initialiseLCCore();
     
     //exportLCCore <- MD
     assignObject(exportLCCore, MD);
 
     //make export array
-    let outputArray = exportLCCore.constructCSVModel();
-    const saveName = "[correlation]"+exportLCCore.projects[0].name+"("+exportLCCore.projects[0].correlation_version+").csv"; 
-
+    let dataMap = exportLCCore.constructModelMap()
+    let outputArray = exportLCCore.constructCSVdata(dataMap, baseProjectID);
+    const idx = exportLCCore.search_idx_list[baseProjectID.toString()];
+    const saveName = "[correlation]"+exportLCCore.projects[idx[0]].name+"("+exportLCCore.projects[0].correlation_version+").csv"; 
+    
     putcsvfile(mainWindow, saveName, outputArray);
     
+    console.log("MAIN: Export ", saveName);
   });
   ipcMain.handle("InitialiseTempCore", async (_e) => {
     //import modeln

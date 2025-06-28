@@ -4476,7 +4476,7 @@ class LevelCompilerCore extends EventEmitter{
     this.setStatus("completed","");
     return idx;
   }
-  constructCSVModel(){
+  constructModelMap(){
     this.setStatus("running","start constructCSVModel");
     //NOT RECOMMENDED, becase all descriptions are not saved.
     //check model
@@ -4504,7 +4504,6 @@ class LevelCompilerCore extends EventEmitter{
     let visited = new Set();
     
     for(let p=0; p<this.projects.length;p++){
-      const projectData = this.projects[p];
       for(let h=0;h<this.projects[p].holes.length;h++){
         for(let s=0;s<this.projects[p].holes[h].sections.length;s++){
           for(let m=0;m<this.projects[p].holes[h].sections[s].markers.length;m++){
@@ -4570,10 +4569,7 @@ class LevelCompilerCore extends EventEmitter{
                       })
                     })
                   }
-                }
-
-                
-                
+                }                
               }else{
                 //case "master","master-transfer","duo-master","duo-master-transfer","interpolate","transfer"
                 cd = markerData.composite_depth;
@@ -4605,6 +4601,9 @@ class LevelCompilerCore extends EventEmitter{
       return a[0] - b[0];
     })
     
+    return resultIds; 
+  }
+  constructCSVdata(resultIds, baseProjectID=this.base_project_id){
     //make output data
     let prevMasterHole = "";
     let output = [];
@@ -4650,12 +4649,12 @@ class LevelCompilerCore extends EventEmitter{
               }
               cellsData[3] = eventFlag;//for test cd
 
-              //get master connections              
-              if(this.base_project_id.toLocaleString() == this.projects[p].id.toString() && markerData.isMaster == true){
+              //get master connections
+              if(baseProjectID.toLocaleString() == this.projects[p].id.toString() && markerData.isMaster == true){
                 curMasterHole.push(this.getDataByIdx(this.search_idx_list[[markerData.id[0],markerData.id[1],null,null].toString()]).name);
-              }
-
-              if(markerData.isZeroPoint !== false){
+              }        
+             
+              if(baseProjectID.toLocaleString() == this.projects[p].id.toString() && markerData.isZeroPoint !== false){
                 zeroMarker  = "(" + markerData.isZeroPoint + ")";
               }
             }
@@ -4717,7 +4716,7 @@ class LevelCompilerCore extends EventEmitter{
     }
     
     this.setStatus("completed","");
-    return output; 
+    return output;
   }
  
 }

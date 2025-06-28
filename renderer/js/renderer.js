@@ -2484,7 +2484,9 @@ document.addEventListener("DOMContentLoaded", () => {
   //============================================================================================
   //load correlation model
   window.LCapi.receive("ExportCorrelationAsCsvMenuClicked", async () => {
-    await window.LCapi.ExportCorrelationAsCsv(LCCore);
+    for (let i=0; LCCore.projects.length -1; i++){
+      await window.LCapi.ExportCorrelationAsCsv(LCCore, LCCore.projects[i].id);
+    }
   });
   window.LCapi.receive("ExportCorrelationAsLFMenuClicked", async () => {
     await window.LCapi.ExportCorrelationAsLF(LCCore);
