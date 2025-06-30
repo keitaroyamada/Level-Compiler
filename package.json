@@ -38,12 +38,8 @@
       "target": "dmg",
       "icon": "./icon/levelcompiler.png",
       "hardenedRuntime": true,
-      "entitlements": "build/entitlements.mac.plist",
-      "entitlementsInherit": "build/entitlements.mac.plist",
-      "notarize": {
-        "tool": "notarytool",
-        "keychainProfile": "notarytool-profile"
-      }
+      "entitlements": "entitlements.mac.plist",
+      "entitlementsInherit": "entitlements.mac.plist"
     },
     "linux": {
       "icon": "./icon/levelcompiler.png"

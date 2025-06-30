@@ -2561,6 +2561,15 @@ function createMainWIndow() {
     }
     
   });
+  ipcMain.handle("disconnectAllConnections", (_e, fromId, direction) => {
+    const res = LCCore.disconnectAllConnections(fromId, direction);
+    if(res==true){
+      return true
+    }else{
+      return false
+    }
+    
+  });
   ipcMain.handle("deleteMarker", (_e, targetId) => {
     LCCore.deleteMarker(targetId);
     console.log("MAIN: Delete target marker.");

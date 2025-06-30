@@ -946,8 +946,12 @@ document.addEventListener("DOMContentLoaded", () => {
       objOpts.edit.marker_from = null;
       objOpts.edit.marker_to = null;
       objOpts.edit.mode = "disconnect_marker";
-      objOpts.edit.handleMove = handleConnectMouseMove;
+      objOpts.edit.handleMove = handleMarkerMouseMove;
       objOpts.edit.handleClick = null;
+      if(objOpts.edit.handleClick !== null){
+        document.removeEventListener('click', objOpts.edit.handleClick);
+        objOpts.edit.handleClick = null;
+      }
       document.addEventListener("mousemove", objOpts.edit.handleMove);
     }else if(clickResult == "connectSections"){
       objOpts.edit.contextmenu_enable = false;
@@ -1317,7 +1321,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     //if clicked same hole
     if(objOpts.edit.marker_from == null && ht.nearest_marker !== null){
-      if(objOpts.edit.mode == "connect_marker" || objOpts.edit.mode == "disconnect_marker"){
+      if(objOpts.edit.mode == "connect_marker"){
         objOpts.edit.marker_from = ht;
       }else if(objOpts.edit.mode == "connect_section" || objOpts.edit.mode == "disconnect_section"){
         //case piston core
@@ -1328,7 +1332,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     if(objOpts.edit.marker_to == null && ht.nearest_marker !== null){
-      if(objOpts.edit.mode == "connect_marker" || objOpts.edit.mode == "disconnect_marker"){
+      if(objOpts.edit.mode == "connect_marker"){
         if(!(objOpts.edit.marker_from.project == ht.project && objOpts.edit.marker_from.hole == ht.hole)){
           objOpts.edit.marker_to = ht;
         }  
@@ -1374,34 +1378,6 @@ document.addEventListener("DOMContentLoaded", () => {
             updateView();
           }
          
-        }
-      } else if(objOpts.edit.mode == "disconnect_marker"){
-        const response = await window.LCapi.askdialog(
-          "Connect markers",
-          "Do you want to DISCONNECT between selected markers?"
-        );
-        if (response.response) {
-          const fromId = [objOpts.edit.marker_from.project, objOpts.edit.marker_from.hole, objOpts.edit.marker_from.section, objOpts.edit.marker_from.nearest_marker];
-          const toId   = [objOpts.edit.marker_to.project,   objOpts.edit.marker_to.hole,   objOpts.edit.marker_to.section,   objOpts.edit.marker_to.nearest_marker];
-
-          console.log("[Editor]: Disconnected markers between " + fromId +" and " + toId);
-
-          await undo("save");//undo
-          const result = await window.LCapi.disconnectMarkers(fromId, toId, "horizontal");
-          if(result == true){
-            await loadModel();
-
-            const affectedSections = getConnectedSectionIds([fromId, toId]);
-            if(affectedSections.length>0){
-              modelImages.load_target_ids = affectedSections;
-              modelImages = await loadCoreImages(modelImages, LCCore, objOpts, ["drilling_depth","composite_depth","event_free_depth", "age"]);
-            }
-  
-            updateView();
-          }else{
-            console.log("Fail")
-          }
-          
         }
       } else if(objOpts.edit.mode == "connect_section"){
         const response = await window.LCapi.askdialog(
@@ -1503,7 +1479,7 @@ document.addEventListener("DOMContentLoaded", () => {
         document.removeEventListener('click', objOpts.edit.handleClick);
         objOpts.edit.handleClick = null;
       }
-    }else if(["change_marker_name","change_marker_distance", "set_zero_point", "enable_master","disable_master"].includes(objOpts.edit.mode)){
+    }else if(["change_marker_name","change_marker_distance", "set_zero_point", "enable_master","disable_master","disconnect_marker"].includes(objOpts.edit.mode)){
       if (ht.section !== null && Math.abs(ht.nearest_distance) < objOpts.edit.sensibility) {
         objOpts.edit.handleClick = handleMarkerChangeClick;
         document.addEventListener('click', objOpts.edit.handleClick);
@@ -1569,7 +1545,7 @@ document.addEventListener("DOMContentLoaded", () => {
           response = await window.LCapi.inputdialog(askData);
             
           console.log("[Editor]: Change marker: " + target);
-        }
+        } 
          
         if (response !== null) {
           const targetId = [ht.project, ht.hole, ht.section, ht.nearest_marker];
@@ -1698,7 +1674,42 @@ document.addEventListener("DOMContentLoaded", () => {
           }
         }            
         
-      }
+      }else if (objOpts.edit.mode == "disconnect_marker"){
+          console.log(11111111111111111111111111111)
+          const response = await window.LCapi.askdialog(
+            "Disconnect markers",
+            "Do you want to DISCONNECT connections in this marker?"
+          );
+          if (response.response) {
+            const fromId = [objOpts.edit.marker_from.project, objOpts.edit.marker_from.hole, objOpts.edit.marker_from.section, objOpts.edit.marker_from.nearest_marker];
+            const toIdx  = getIdxById(LCCore, fromId);
+            const toIds  = LCCore.projects[toIdx[0]].holes[toIdx[1]].sections[toIdx[2]].markers[toIdx[3]].h_connection;
+
+            console.log("[Editor]: Disconnected connections in " + fromId);
+
+            await undo("save");//undo
+            const result = await window.LCapi.disconnectAllConnections(fromId, "horizontal");
+            if(result == true){
+              await loadModel();
+              const disconnectedIds = toIds;
+              disconnectedIds.push(fromId);
+            
+              console.log("[Renderer]: Disconnect markers: ", disconnectedIds)
+
+              const affectedSections = getConnectedSectionIds(disconnectedIds);
+              
+              if(affectedSections.length>0){
+                modelImages.load_target_ids = affectedSections;
+                modelImages = await loadCoreImages(modelImages, LCCore, objOpts, ["drilling_depth","composite_depth","event_free_depth", "age"]);
+              }
+    
+              updateView();
+            }else{
+              console.log("Fail")
+            }
+            
+          }
+        }
 
     }
 
@@ -3986,11 +3997,11 @@ document.addEventListener("DOMContentLoaded", () => {
               if(objOpts.edit.editable){
                 //live hittest
                 if(objOpts.edit.hittest !== null){
-                  if(["connect_marker", "disconnect_marker","connect_section", "disconnect_section", "delete_marker","change_marker_name","change_marker_distance","set_zero_point","enable_master","disable_master"].includes(objOpts.edit.mode)){
+                  if(["connect_marker","disconnect_marker","connect_section", "disconnect_section", "delete_marker","change_marker_name","change_marker_distance","set_zero_point","enable_master","disable_master"].includes(objOpts.edit.mode)){
                     const hitId = [objOpts.edit.hittest.project, objOpts.edit.hittest.hole, objOpts.edit.hittest.section, objOpts.edit.hittest.nearest_marker];
                     if(Math.abs(objOpts.edit.hittest.nearest_distance) < objOpts.edit.sensibility){
                       if(hitId.toString() == marker.id.toString()){
-                        if(["disconnect_marker","connect_section"].includes(objOpts.edit.mode)){
+                        if(["connect_section"].includes(objOpts.edit.mode)){
                           if(marker.name.includes("top") || marker.name.includes("bottom")){
                             sketch.strokeWeight(3);
                             sketch.stroke("Red");
@@ -4017,7 +4028,7 @@ document.addEventListener("DOMContentLoaded", () => {
                   }
                 } 
 
-                if(objOpts.edit.marker_from !== null && ["connect_marker", "disconnect_marker", "connect_section", "disconnect_section", "delete_marker"].includes(objOpts.edit.mode)){
+                if(objOpts.edit.marker_from !== null && ["connect_marker", "connect_section", "disconnect_section", "delete_marker", "disconnect_marker"].includes(objOpts.edit.mode)){
                   const hitId = [objOpts.edit.marker_from.project, objOpts.edit.marker_from.hole, objOpts.edit.marker_from.section, objOpts.edit.marker_from.nearest_marker];
                   if(hitId.toString() == marker.id.toString()){
                     sketch.strokeWeight(3);
