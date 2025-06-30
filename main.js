@@ -2562,8 +2562,30 @@ function createMainWIndow() {
     
   });
   ipcMain.handle("disconnectAllConnections", (_e, fromId, direction) => {
-    const res = LCCore.disconnectAllConnections(fromId, direction);
-    if(res==true){
+    const fromIdx = LCCore.search_idx_list[fromId.toString()];
+    let connections = [];
+    if (direction == "horizontal"){
+      connections = LCCore.projects[fromIdx[0]].holes[fromIdx[1]].sections[fromIdx[2]].markers[fromIdx[3]].h_connection;
+    }else{
+      connections = LCCore.projects[fromIdx[0]].holes[fromIdx[1]].sections[fromIdx[2]].markers[fromIdx[3]].v_connection;
+    }
+
+    let results = true;
+    if (connections.length==0){
+      console.log("MAIN: There is no connections.")
+      return false;
+    }else{
+      while (connections.length > 0) {
+        const toId = connections[0];
+
+        const res = LCCore.disconnectMarkers(fromId, toId, direction);
+        if(!res){
+          results = false;
+        }
+      }
+    }
+
+    if(results==true){
       return true
     }else{
       return false

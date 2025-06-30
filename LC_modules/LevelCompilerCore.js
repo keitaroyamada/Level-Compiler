@@ -3214,60 +3214,7 @@ class LevelCompilerCore extends EventEmitter{
     }
     this.setStatus("completed","");
   }
-  disconnectAllConnections(fromId, direction) {
-    this.setStatus("running","start disconnectMarkers");
-    this.updateSearchIdx();
-    const fromIdx = this.search_idx_list[fromId.toString()];
 
-    if (direction == "vertical") {
-      return false;
-    } else if (direction == "horizontal") {
-      let connectionIdxFroms = [];
-
-      //check in connection of from
-      const numConnections = this.projects[fromIdx[0]].holes[fromIdx[1]].sections[fromIdx[2]].markers[fromIdx[3]].h_connection.length;
-
-      for (let i=0; i<numConnections;i++){
-        connectionIdxFroms.push(i);
-        const toId  = this.projects[fromIdx[0]].holes[fromIdx[1]].sections[fromIdx[2]].markers[fromIdx[3]].h_connection[i];
-        console.log(toId)
-        const toIdx = this.search_idx_list[toId.toString()];
-
-        //search index in to_h_connections
-        let connectionIdxTo = null;
-        this.projects[toIdx[0]].holes[toIdx[1]].sections[toIdx[2]].markers[toIdx[3]].h_connection.forEach((h_c, n) => {
-          if(h_c.toString() == fromId.toString()){
-            connectionIdxTo = n;
-          }
-        });
-
-        //disconnect connection of "to"
-        if (connectionIdxFroms.length !== 0 && connectionIdxTo !== null) {
-          this.projects[toIdx[0]].holes[toIdx[1]].sections[toIdx[2]].markers[toIdx[3]].h_connection.splice(connectionIdxTo, 1);
-        }
-      }
-
-      //disconnect connections of "from"
-      if(connectionIdxFroms.length !== 0){
-        connectionIdxFroms.sort((a,b)=>(b - a)).forEach(index => {
-          this.projects[fromIdx[0]].holes[fromIdx[1]].sections[fromIdx[2]].markers[fromIdx[3]].h_connection.splice(index, 1);
-        })
-
-        console.log(
-          "Disconnected between " +
-            this.getMarkerNameFromId(fromId) +
-            " and others"
-        );
-        return true;
-      }else{
-        this.setError("","E042: Fail to disconnect markers because there is no connection in " + this.getMarkerNameFromId(fromId) + ".")
-        console.log("E042: Fail to disconnect markers because there is no connection in  " + this.getMarkerNameFromId(fromId) + ".");
-        return false
-      }
-
-    }
-    this.setStatus("completed","");
-  }
   deleteMarker(targetId){
     this.setStatus("running","start deleteMarker");
     this.updateSearchIdx();
