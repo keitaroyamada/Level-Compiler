@@ -122,7 +122,8 @@ document.addEventListener("DOMContentLoaded", () => {
     objOpts.marker.font = "Arial";
     objOpts.marker.font_size = 12;
     objOpts.marker.font_colour = "black";
-    objOpts.marker.show_labels = true;
+    objOpts.marker.show_name_labels = true;
+    objOpts.marker.show_distance_labels = true;
   
     objOpts.event.line_colour = "red";
     objOpts.event.face_colour = {
@@ -539,13 +540,33 @@ document.addEventListener("DOMContentLoaded", () => {
   //show labels
   document.getElementById("bt_show_labels").addEventListener("click", async (event) => {
     if(LCCore){
-      if (objOpts.marker.show_labels) {
-        objOpts.marker.show_labels = false;
-        document.getElementById("bt_show_labels").style.backgroundColor = "#f0f0f0";
+      if (objOpts.marker.show_name_labels || objOpts.marker.show_distance_labels) {      
+        if (event.shiftKey){
+          objOpts.marker.show_name_labels = false;
+          objOpts.marker.show_distance_labels = true;
+        } else if (event.ctrlKey){
+          objOpts.marker.show_name_labels = true;
+          objOpts.marker.show_distance_labels = false;
+        } else {
+          objOpts.marker.show_name_labels = false;
+          objOpts.marker.show_distance_labels = false;
+          document.getElementById("bt_show_labels").style.backgroundColor = "#f0f0f0";
+        }
       } else {
-        objOpts.marker.show_labels = true;
+        if (event.shiftKey){
+          objOpts.marker.show_name_labels = false;
+          objOpts.marker.show_distance_labels = true;
+        } else if (event.ctrlKey){
+          objOpts.marker.show_name_labels = true;
+          objOpts.marker.show_distance_labels = false;
+        } else {
+          objOpts.marker.show_name_labels = true;
+          objOpts.marker.show_distance_labels = true;
+        }
         document.getElementById("bt_show_labels").style.backgroundColor = "#ccc";
       }
+
+      
       updateView();
       }        
     });
@@ -1675,7 +1696,6 @@ document.addEventListener("DOMContentLoaded", () => {
         }            
         
       }else if (objOpts.edit.mode == "disconnect_marker"){
-          console.log(11111111111111111111111111111)
           const response = await window.LCapi.askdialog(
             "Disconnect markers",
             "Do you want to DISCONNECT connections in this marker?"
@@ -4157,7 +4177,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
               
               //add marker name without top/bottom name
-              if(objOpts.marker.show_labels){
+              if(objOpts.marker.show_name_labels){
                 //add marker name--------------------------------------------
                 if (m !== 0 && m !== section.markers.length - 1) {
                   sketch.fill(objOpts.marker.font_colour);
@@ -4170,7 +4190,8 @@ document.addEventListener("DOMContentLoaded", () => {
                     (marker_top + shift_y) * yMag + pad_y - 2
                   );
                 }
-
+              }
+              if(objOpts.marker.show_distance_labels){
                 //add marker distance----------------------------------------
                 sketch.fill(objOpts.marker.font_colour);
                 sketch.noStroke();
