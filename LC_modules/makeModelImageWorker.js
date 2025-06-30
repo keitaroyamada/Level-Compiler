@@ -25,7 +25,7 @@ parentPort.on("message", async(task) => {
         //load original image from file
         const imageBufferDD = await fs.promises.readFile(task.imagePath);
         //resize
-        resizedBuffer = await sharp(imageBufferDD).resize({ height: task.imageSize.height, width: 30000, fit: 'inside' }).toBuffer();
+        resizedBuffer = await sharp(imageBufferDD).resize({ height: task.imageSize.height, fit: 'inside' }).toBuffer();
         //save
         results["drilling_depth"][task.imageName] = resizedBuffer;
       }

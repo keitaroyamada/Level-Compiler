@@ -456,9 +456,6 @@ function createMainWIndow() {
           }
           
           let imBaseName = targetHoleData.name +"-"+targetSectionData.name;
-          //if(imBaseName+".jpg" != target.name){
-          // imBaseName = target.name;
-          //}
 
           //get image path
           let fullpath;
@@ -473,12 +470,15 @@ function createMainWIndow() {
           }
   
           //calc new image size
-          let new_height = Math.round(loadOptions.dpcm * 100, 0);
-          if(new_height > loadOptions.dpcm * loadOptions.coreLength){
-            new_height = loadOptions.dpcm * loadOptions.coreLength;
+          const coreLength = targetSectionData.markers[targetSectionData.markers.length-1].distance - targetSectionData.markers[0].distance;
+          let new_height = Math.round(200 * 100, 0); //max
+          if(new_height > loadOptions.dpcm * coreLength){
+            new_height = Math.round(loadOptions.dpcm * coreLength);
           }
           //calc resize        
           const new_size = { height: new_height, width: 1 };
+
+          //console.log(imBaseName, loadOptions.dpcm, Math.round(coreLength,1), new_size)
   
           tasks.push({
             type:"continue",

@@ -6121,7 +6121,6 @@ async function loadCoreImages(modelImages, LCCore, objOpts, operations) {
 
       //get target image list
       let N = 0;
-      let coreLength = 100;
       if(modelImages.load_target_ids !== null){
         if(modelImages.load_target_ids.length == 0){
           //case all
@@ -6130,8 +6129,6 @@ async function loadCoreImages(modelImages, LCCore, objOpts, operations) {
             p.holes.forEach((h) => {
               h.sections.forEach((s) => {
                 modelImages.load_target_ids.push(s.id);
-                coreLength = s.markers[s.markers.length-1].distance - s.markers[0].distance;
-                //console.log(s.name,coreLength)
               });
             });
           });
@@ -6153,17 +6150,18 @@ async function loadCoreImages(modelImages, LCCore, objOpts, operations) {
         return;
       }
 
+      const loadOptions = {
+        targetIds:modelImages.load_target_ids, 
+        operations:operations,
+        dpcm:objOpts.image.dpcm,
+      };
+
       //main Progress   
       await new Promise(async(p5resolve,p5reject) => {
         try{
           //load image
           const imageBuffers = await new Promise(async(resolve, reject)=>{
-            const imBufferDict = await window.LCapi.LoadCoreImage({
-              targetIds:modelImages.load_target_ids,
-              operations:operations,
-              dpcm:objOpts.image.dpcm,
-              coreLength:coreLength,
-            },"core_images");
+            const imBufferDict = await window.LCapi.LoadCoreImage(loadOptions,"core_images");
             resolve(imBufferDict)
           }) 
 
