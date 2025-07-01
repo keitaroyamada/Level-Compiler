@@ -7,7 +7,7 @@
   "scripts": {
     "start": "electron .",
     "build:win": "electron-builder --win --x64",
-    "build:mac": "electron-builder --mac --universal"
+    "build:mac": "electron-builder --mac --arm64"
   },
   "author": "ky",
   "license": "MIT",
