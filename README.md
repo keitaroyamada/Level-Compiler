@@ -32,7 +32,7 @@ Level Compiler (LC) is an integrated stratigraphic management software capable o
 The detailed usage will be uploaded by this summer.  
 - 0. About Level Compiler
 - 1.1. Load correlation and age models  ['Load models' (English / 日本語)](https://youtu.be/Ydsx8dgI5Ec)
-- 1.2. Load section images
+- 1.2. Load section images ['Load section images' (English / 日本語)](https://youtu.be/wR7f6GwND_s)
 - 1.3. Plot data -Plotter-
 - 1.4. Batch depth conversion -Converter-
 - 1.5. Calc sampling depth -Divider-
