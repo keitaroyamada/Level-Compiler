@@ -388,7 +388,7 @@ function createMainWIndow() {
         dirPath = path.join(pathData.dir, pathData.name);
         //register path
         registerCoreImage(dirPath, type, null);
-      }else if(pathData.ext==".jpg"){
+      }else if(pathData.ext==".jpg"|| pathData.ext === ".jpeg"|| pathData.ext === ".tif"|| pathData.ext === ".tiff"|| pathData.ext === ".png"){
         dirPath = pathData.dir;
         //register path
         registerCoreImage(dirPath, type, pathData.base);
@@ -464,10 +464,15 @@ function createMainWIndow() {
 
           //get image path
           let fullpath;
-          if(imBaseName.includes(".jpg")){
+          if(imBaseName.includes(".jpg")||imBaseName.includes(".jpeg")||imBaseName.includes(".tif")||imBaseName.includes(".tiff")||imBaseName.includes(".png")){
             fullpath = findFileInDir(target.path, imBaseName, "get");
           }else{
-            fullpath = findFileInDir(target.path, imBaseName+".jpg", "get");
+            const exts = [".jpg", ".jpeg", ".png", ".tif", ".tiff"];
+
+            for (const ext of exts) {
+              fullpath = findFileInDir(target.path, imBaseName + ext, "get");
+              if (fullpath) break;
+            }
           }
 
           if(fullpath == false){
@@ -1578,7 +1583,7 @@ function createMainWIndow() {
         //case folder
         const dirPath = path.join(pathData.dir, pathData.name);
         fullpath = path.join(dirPath, fileName);
-      }else if(pathData.ext==".jpg"){
+      }else if(pathData.ext==".jpg"||pathData.ext==".jpeg"||pathData.ext==".tif"||pathData.ext==".tiff"||pathData.ext==".png"){
         const dirPath = pathData.dir;
         const baseName = fileName.split(".")[0];
         fullpath = path.join(dirPath, baseName+".lcsection");
