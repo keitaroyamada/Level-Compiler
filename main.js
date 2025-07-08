@@ -3016,8 +3016,12 @@ function createMainWIndow() {
         LCPlot.initialiseAgeCollection();
 
       //register
-      assignObject(LCCore, inData.LCCore);
-      assignObject(LCAge, inData.LCAge);
+      if(inData.LCCore!==null){
+        assignObject(LCCore, inData.LCCore);
+      } 
+      if(inData.LCAge!==null){
+        assignObject(LCAge, inData.LCAge);
+      }
 
       //register all LCAge models     
       registerLCPlot();
@@ -3196,8 +3200,28 @@ function createMainWIndow() {
             visible:isEditMode,
             submenu:[
               {
-                label: "Save",
+                label: "Save correlation model",
                 accelerator: "CmdOrCtrl+S",
+                click: async () => {
+                  if(isEditMode){
+                    //remove plot data
+                    const outLCAge  = new LevelCompilerAge();
+                    const outLCPlot = new LevelCompilerPlot();
+  
+                    const outData = {LCCore:LCCore, LCAge:outLCAge, LCPlotAge:outLCPlot};
+  
+                    if(globalPath.saveModelPath == null){
+                      //save as new file
+                      globalPath.saveModelPath = await putmodelfile(outData, null);
+                    }else{
+                      //save orverwrite
+                      globalPath.saveModelPath = await putmodelfile(outData, globalPath.saveModelPath);
+                    }
+                  }                
+                },
+              },
+              {
+                label: "Save correlation model with ages",
                 click: async () => {
                   if(isEditMode){
                     //remove plot data
@@ -3218,7 +3242,7 @@ function createMainWIndow() {
                 },
               },
               {
-                label:"Save As...",
+                label:"Save correlation As...",
                 click: async () => {
                   if(isEditMode){
                     //remove plot data
