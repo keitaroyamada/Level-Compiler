@@ -189,7 +189,7 @@ document.addEventListener("DOMContentLoaded", () => {
         if(res==true){
           //load images
           console.log("loading")
-          modelImages = await loadCoreImages(modelImages, tempCore, objOpts, ["drilling_depth"]);
+          modelImages = await loadCoreImages(modelImages, tempCore, objOpts, ["drilling_depth", "composite_depth"]);
           console.log("Created model Info: \n",modelImages);
         }else{
           alert("Failed to load image. The image name and the model name need to match.")

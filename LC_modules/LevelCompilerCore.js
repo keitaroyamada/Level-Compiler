@@ -3612,6 +3612,7 @@ class LevelCompilerCore extends EventEmitter{
     return true;
    
   }
+
   addEvent(upperId, lowerId, depositionType, value){
     this.setStatus("running","start addEvent");
     //depositionType: deposition, erosion, markup

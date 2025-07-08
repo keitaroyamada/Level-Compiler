@@ -46,6 +46,8 @@ contextBridge.exposeInMainWorld("LCapi", {
   CloseDivider: () => ipcRenderer.invoke("CloseDivider"),
   OpenImporter: () => ipcRenderer.invoke("OpenImporter"),
   CloseImporter: () => ipcRenderer.invoke("CloseImporter"),
+  floatingImageViewer: (args0) => ipcRenderer.invoke("floatingImageViewer",args0),
+  
 
   //image
   RegisterCoreImage: (args1,args2) =>  ipcRenderer.invoke("RegisterCoreImage", webUtils.getPathForFile(args1), args2),

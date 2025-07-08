@@ -81,6 +81,8 @@ document.addEventListener("DOMContentLoaded", () => {
     objOpts.canvas.is_event = true;
     objOpts.canvas.is_connection = true;
     objOpts.canvas.draw_core_photo = false;
+    objOpts.canvas.draw_core_photo_plot = true;
+    objOpts.canvas.photo_plot_colour = "Red";
     objOpts.canvas.finder_y = 0;
     objOpts.canvas.age_precision = 0;
     objOpts.canvas.display_height = 20.2;
@@ -411,6 +413,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
             //load images
             modelImages = await loadCoreImages(modelImages, LCCore, objOpts, ["drilling_depth","composite_depth","event_free_depth","age"]);
+            console.log(modelImages)
           }
 
         }      
@@ -674,16 +677,7 @@ document.addEventListener("DOMContentLoaded", () => {
       await initialisePaths();
       isLoadedLCModel = false;
 
-      modelImages = {
-        image_dir: "",
-        load_target_ids: [],
-        drilling_depth: {},
-        composite_depth: {},
-        event_free_depth: {},
-        image_resolution:{},
-        age:{},
-      };
-
+      modelImages = initialiseImages();
 
       console.log("[Renderer]: Unload Models of Correlations, Ages and Canvas.");
     } else {
@@ -1245,6 +1239,34 @@ document.addEventListener("DOMContentLoaded", () => {
       modelImages = await loadCoreImages(modelImages, LCCore, objOpts, ["drilling_depth","composite_depth","event_free_depth", "age"]);
       updateView();
       objOpts.image.dpcm = curDPCM;
+    }else if(clickResult=="plotImageBrightness"){
+      if(LCCore){
+        if(objOpts.edit.hittest.section!==null){
+          const ht = objOpts.edit.hittest;
+
+          LCCore.projects.forEach(p=>{
+            if(p.id[0]==ht.project){
+              p.holes.forEach(h=>{
+                if(h.id[1]==ht.hole){
+                  h.sections.forEach(s=>{
+                    if(s.id[2]==ht.section){
+                      modelImages.plot_colour[h.name+"-"+s.name] = !modelImages.plot_colour[h.name+"-"+s.name];
+                      console.log(h.name+"-"+s.name, modelImages.plot_colour[h.name+"-"+s.name])
+                    }
+                  })
+                }              
+              })
+            }
+          })
+        }
+      }
+      updateView();      
+    }else if(clickResult=="showFloatingImage"){
+      const targetId = [objOpts.edit.hittest.project, objOpts.edit.hittest.hole,objOpts.edit.hittest.section,null];
+      if(Object.keys(modelImages["drilling_depth"]).length>0){
+        console.log("Renderer: openfloating image viewer");
+        await window.LCapi.floatingImageViewer(targetId);
+      }
     }else if(clickResult.includes("holeMoveTo")){
       const minHoleOrder = Math.min(...LCCore.projects.flatMap(p => p.holes.map(h => h.order)));
       const maxHoleOrder = Math.max(...LCCore.projects.flatMap(p => p.holes.map(h => h.order)));
@@ -3144,7 +3166,7 @@ document.addEventListener("DOMContentLoaded", () => {
   );
   //============================================================================================
   //YAxis dropdown changed event
-  document.getElementById("YAxisSelect").addEventListener("change", (event) => {
+  document.getElementById("YAxisSelect").addEventListener("change", async (event) => {
     console.log(`Selected: ${event.target.value}`);
     objOpts.canvas.depth_scale = event.target.value;
     var mouseX = scroller.scrollLeft;
@@ -3152,6 +3174,15 @@ document.addEventListener("DOMContentLoaded", () => {
 
     //update plot
     updateView();
+
+    //update images
+    //if(Object.keys(modelImages[event.target.value]).length==0){
+      //load images
+    //  modelImages = await loadCoreImages(modelImages, LCCore, objOpts, ["drilling_depth", event.target.value]); 
+    //}
+
+    //updateView();
+
   });
   //============================================================================================
   document.addEventListener("keydown", async (event) => {
@@ -3885,13 +3916,48 @@ document.addEventListener("DOMContentLoaded", () => {
 
                 if (isPhtoExist) {
                   try {
+                    const img = modelImages[ptoto_depth_scale][hole.name + "-" + section.name];
                     sketch.image(
-                      modelImages[ptoto_depth_scale][hole.name + "-" + section.name],
+                      img,
                       sec_x0,
                       sec_y0,
                       sec_w,
                       sec_h
                     );
+                    if(objOpts.canvas.draw_core_photo_plot && modelImages.plot_colour[hole.name + "-" + section.name]){
+                      const getWidth = 10;
+                      const scanWidth = (getWidth*2)+1;
+                      const imCx = img.width / 2;
+                      const px = img.get(imCx-getWidth, 0, scanWidth, img.height);
+                      px.loadPixels();
+
+                      sketch.noFill();
+                      sketch.stroke(objOpts.canvas.photo_plot_colour); sketch.beginShape(); 
+                      
+                      for (let y = 0; y < img.height; y++) {
+                        let rSum = 0, gSum = 0, bSum = 0;
+
+                        for (let x = 0; x < scanWidth; x++) {
+                          const i = (y * scanWidth+ x) * 4;
+                          rSum += px.pixels[i];
+                          gSum += px.pixels[i + 1];
+                          bSum += px.pixels[i + 2];
+                        }
+
+                        const rAvg = rSum / scanWidth;
+                        const gAvg = gSum / scanWidth
+                        const bAvg = bSum / scanWidth;
+
+                        const L = (0.2126 * rAvg + 0.7152 * gAvg + 0.0722 * bAvg) * (100 / 255);
+
+                        const impy = sec_y0 + (y /img.height) *  sec_h;
+                        const impx = sec_x0 + (L / 100) * sec_w
+
+                        sketch.stroke(objOpts.canvas.photo_plot_colour); sketch.vertex(impx, impy);
+                      }
+                      sketch.endShape();
+
+                    }
                   } catch (error) {
                     console.error(error);
                     console.log(modelImages[ptoto_depth_scale][hole.name + "-" + section.name]);
@@ -5496,12 +5562,16 @@ document.addEventListener("DOMContentLoaded", () => {
   }
   function initialiseImages(){
     let modelImages = {
+      image_dir: "",
       load_target_ids: [],
       image_resolution: {},
+      plot_colour:{},
+
       drilling_depth: {},
       composite_depth: {},
       event_free_depth: {},
       age:{},
+      
       operations:[],
     };
     return modelImages
@@ -6230,6 +6300,7 @@ async function assignCoreImages(coreImages, imageBuffers, objOpts) {
                     }
                   );
                   results.image_resolution[imName] = objOpts.image.dpcm;
+                  results.plot_colour[imName] = false; 
                 } catch (err) {
                   console.log(err);
                   results[depthScale][imName] = undefined;
@@ -6545,4 +6616,5 @@ function getPlotPosiotion(data, LCCore, objOpts){
 
   return result
 }
+
 //============================================================================================

@@ -1,0 +1,91 @@
+body,
+html {
+  margin: 0;
+  padding-bottom: 30px;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  overflow-y: hidden;
+  overflow-x: hidden;
+}
+
+#drag-header {
+  -webkit-app-region: drag;
+  height: 50px;
+  width: 100%;
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 9999;
+  background-color: transparent;
+}
+
+.container {
+  display: flex;
+  height: 100%;
+  overflow-y: hidden;
+  overflow-x: hidden;
+  position: relative;
+  background-color: transparent;
+}
+
+#base0 {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  width: 100%;
+  overflow-y: hidden;
+  overflow-x: hidden;
+  background-color: transparent;
+}
+#options {
+  display: flex;
+  flex-direction: row;
+  height: 50px;
+  width: 100%;
+}
+#base1 {
+  height: 100%;
+  width: 100%;
+  overflow-y: hidden;
+  overflow-x: hidden;
+  position: relative;
+  background-color: gray;
+}
+
+#scroller {
+  /*Size is displayed size*/
+  width: 100%;
+  height: 100%;
+  /*border: 1px solid lightblue;*/
+  overflow-y: scroll;
+  overflow-x: scroll;
+  display: block;
+  z-index: 1;
+  background-color: transparent;
+  position: relative;
+}
+#scroller::-webkit-scrollbar {
+  display: none;
+}
+
+#canvasBase {
+  /*Size is virtual full size. make blank area for getting scroll.*/
+  overflow: hidden;
+  position: relative;
+
+  width: 100px;
+  height: 100px;
+  background-color: transparent;
+}
+
+#p5Canvas {
+  width: 500px;
+  height: 500px;
+  top: 0px;
+  left: 0px;
+  z-index: 0;
+  position: absolute;
+  pointer-events: none;
+  background-color: transparent;
+}

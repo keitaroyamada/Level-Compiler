@@ -57,6 +57,7 @@ let LCPlot = new LevelCompilerPlot();
 const history = new UndoManager();
 let labelerHistory = new UndoManager();
 let tempCore = null; //for labeler
+let viewerCore = null; //for floating viewer
 let globalPath = {
   saveModelPath:null,
   dataPaths:[], //{type:[lcmodel, csvmodel, csvage, csvplot], path:""}
@@ -69,6 +70,7 @@ let converterWindow = null;
 let importerWindow = null;
 let labelerWindow = null;
 let settingsWindow = null;
+let imageViewerWindow = null;
 let plotWindow = null;
 let progressBar = null;
 
@@ -105,6 +107,9 @@ function createMainWIndow() {
     }
     if (labelerWindow && !labelerWindow.isDestroyed()) {
       labelerWindow.close();
+    }
+    if (imageViewerWindow && !imageViewerWindow.isDestroyed()) {
+      imageViewerWindow.close();
     }
     if (settingsWindow && !settingsWindow.isDestroyed()) {
       settingsWindow.close();
@@ -738,7 +743,47 @@ function createMainWIndow() {
       return false
     } 
   });
-  
+  ipcMain.handle("floatingImageViewer", async (_e, targetId) => {
+    const loadOptions = {
+      targetIds: [targetId], 
+      operations: ["drilling_depth"],
+      dpcm: 100,
+    };
+    const sectionImage = await loadCoreImages(loadOptions, "core_images");
+    const metadata = await sharp(sectionImage["drilling_depth"][Object.keys(sectionImage["drilling_depth"])[0]]).metadata();
+
+    if (imageViewerWindow) {
+      imageViewerWindow.focus();
+      return;
+    }
+
+    //create finder window
+    imageViewerWindow = new BrowserWindow({
+      title: "imageViewer",
+      frame: false,
+      width: 300,//metadata.width,
+      height: 800,
+      webPreferences: {preload: path.join(__dirname, "preload", "preload_image_viewer.js"),},
+    });
+    
+    //converterWindow.setAlwaysOnTop(true, "normal");
+    imageViewerWindow.on("closed", () => {
+      imageViewerWindow = null;
+      mainWindow.webContents.send("ImageViewerClosed", "");
+    });
+    imageViewerWindow.setMenu(null);
+
+    imageViewerWindow.loadFile(path.join(__dirname, "./renderer/image_viewer.html"));
+
+    imageViewerWindow.once("ready-to-show", () => {
+      imageViewerWindow.show();
+      imageViewerWindow.setAlwaysOnTop(true, "normal");
+      //imageViewerWindow.webContents.openDevTools();
+      //converterWindow.setAlwaysOnTop(true, "normal");
+      imageViewerWindow.webContents.send("ImageViewerMenuClicked", sectionImage);
+    });
+
+  });
  //============================================================================================
   ipcMain.handle("addSectionFromLcsection", async (_e,pathHandle) => {
     try {
@@ -1083,12 +1128,31 @@ function createMainWIndow() {
           }, 
           { type: 'separator' },
           {
-            label: 'Load high-resolution image', 
-            click: () => {
-              console.log('MAIN: Load high-resolution image'); 
-              resolve("loadHighResolutionImage");                      
-            } 
-          },
+            label:"Image",
+            submenu:[
+              {
+                label: 'Load high-resolution image', 
+                click: () => {
+                  console.log('MAIN: Load high-resolution image'); 
+                  resolve("loadHighResolutionImage");                      
+                } 
+              },
+              {
+                label: 'Show floating image', 
+                click: () => {
+                  console.log('MAIN: Open floating image viewer'); 
+                  resolve("showFloatingImage");                      
+                } 
+              },
+              {
+                label: 'Plot image brightness', 
+                click: () => {
+                  console.log('MAIN: Plot image brightness'); 
+                  resolve("plotImageBrightness");                      
+                } 
+              },
+            ]
+          },          
           {
             label:"LC",
             submenu:[
@@ -1328,10 +1392,21 @@ function createMainWIndow() {
             ]
           }
         ] 
+      }else if(type=="imageViewerContextMenu"){
+        template = [
+          {
+            label:"Close",
+            click: () => {
+              if (imageViewerWindow && !imageViewerWindow.isDestroyed()) {
+                imageViewerWindow.close();
+              }                  
+            } 
+          }
+        ] 
       }
        
       const menu = Menu.buildFromTemplate(template);
-      menu.popup(BrowserWindow.fromWebContents(event.sender));
+      menu.popup({ window:BrowserWindow.fromWebContents(event.sender)});
     });
   });
   
@@ -2022,6 +2097,12 @@ function createMainWIndow() {
         labelerWindow.webContents.closeDevTools();
       } else {
         labelerWindow.webContents.openDevTools();
+      }
+    }else if(data == "viewer"){
+      if (imageViewerWindow.webContents.isDevToolsOpened()) {
+        imageViewerWindow.webContents.closeDevTools();
+      } else {
+        imageViewerWindow.webContents.openDevTools();
       }
     }else if(data == "importer"){
       if (importerWindow.webContents.isDevToolsOpened()) {
