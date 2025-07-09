@@ -14,6 +14,7 @@ window.addEventListener("DOMContentLoaded", () => {
           container.appendChild(details);
         } else {
           const wrapper = document.createElement("div");
+          wrapper.classList.add("settings-item");
           const label = document.createElement("label");
           label.textContent = key;
 
@@ -52,7 +53,53 @@ window.addEventListener("DOMContentLoaded", () => {
     } 
     function createInput(value) {
       let input;
-      if (typeof value === "string") {
+
+      const isColor = (() => {
+        const s = new Option().style;
+        s.color = "";
+        s.color = value;
+        return s.color !== "";
+      })();
+
+      const fontOptions = [
+        "Arial", "Verdana", "Tahoma", "Trebuchet MS",
+        "Georgia", "Times New Roman", "Courier New",
+        "Lucida Console", "Comic Sans MS", "Monospace"
+      ];
+
+      if (typeof value === "string" && isColor) {
+        // カラーを正規化してから設定（to hex）
+        const dummy = document.createElement("div");
+        dummy.style.color = value;
+        document.body.appendChild(dummy);
+        const rgb = getComputedStyle(dummy).color;
+        document.body.removeChild(dummy);
+        
+        const match = rgb.match(/\d+/g);
+        let hex = "#000000";
+        if (match && match.length >= 3) {
+          hex = "#" + match.slice(0, 3).map(c => {
+            const h = parseInt(c).toString(16);
+            return h.length === 1 ? "0" + h : h;
+          }).join("");
+        }
+
+        input = document.createElement("input");
+        input.type = "color";
+        input.value = hex;
+      }else if(typeof value === "string" && fontOptions.includes(value)){
+        input = document.createElement("select");
+        fontOptions.forEach(font => {
+          const option = document.createElement("option");
+          option.value = font;
+          option.textContent = font;
+          option.style.fontFamily = font;
+          if (font.toLowerCase() === value.toLowerCase()) {
+            option.selected = true;
+          }
+          input.appendChild(option);
+        });
+      }else if (typeof value === "string") {
         input = document.createElement("input");
         input.type = "text";
         input.value = value;

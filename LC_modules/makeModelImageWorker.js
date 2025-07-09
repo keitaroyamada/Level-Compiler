@@ -1,6 +1,7 @@
 const { parentPort } = require("worker_threads");
 const fs = require("fs");
 const sharp = require("sharp");
+const JSZip = require("jszip");
 
 parentPort.on("message", async(task) => {
   if(task.type=="exit"){
@@ -21,14 +22,34 @@ parentPort.on("message", async(task) => {
     try {
       //load original images
       let resizedBuffer;
+      let imageBufferDD;
       if(task.operations.includes("drilling_depth")){
         //load original image from file
-        const imageBufferDD = await fs.promises.readFile(task.imagePath);
-        //resize
-        resizedBuffer = await sharp(imageBufferDD).resize({ height: task.imageSize.height, fit: 'inside' }).toBuffer();
-        //save
-        results["drilling_depth"][task.imageName] = resizedBuffer;
+        if(task.imagePath == null){
+          //there is noimage
+          parentPort.postMessage(results);
+          return;
+        }else{
+          if(typeof task.imagePath === "string"){
+            imageBufferDD = await fs.promises.readFile(task.imagePath);
+          } else if (typeof task.imagePath === "object" && task.imagePath.zipPath && task.imagePath.innerPath) {
+            // if zip
+            const zipBuffer = await fs.promises.readFile(task.imagePath.zipPath);
+            const zip = await JSZip.loadAsync(zipBuffer);
+            const file = zip.file(task.imagePath.innerPath);
+            if (!file) throw new Error("File not found in zip: " + task.imagePath.innerPath);
+            imageBufferDD = await file.async("nodebuffer");
+          } else {
+            throw new Error("Invalid imagePath: " + JSON.stringify(task.imagePath));
+          }
+
+          //resize
+          resizedBuffer = await sharp(imageBufferDD).resize({ height: task.imageSize.height, fit: 'inside' }).toBuffer();
+          //save
+          results["drilling_depth"][task.imageName] = resizedBuffer;
+        }       
       }
+      
       if(!resizedBuffer){
         console.error("Worker: Please load image of drilling depth scale");
         parentPort.postMessage({

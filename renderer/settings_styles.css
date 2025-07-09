@@ -1,41 +1,104 @@
 body {
   font-family: Arial, sans-serif;
   margin: 20px;
+  background-color: #fafafa;
+  color: #333;
 }
 
 #title {
-  color: #333;
+  font-size: 30px;
   font-weight: bold;
-  font-size:30px;
+  margin-bottom: 20px;
+}
+
+#menu_button {
+  margin-bottom: 20px;
+}
+
+#default {
+  background-color: #e74c3c;
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  font-size: 16px;
+  border-radius: 5px;
+  cursor: pointer;
+  margin-top: 20px;
+}
+
+#default:hover {
+  background-color: #c0392b;
 }
 
 details {
   margin-left: 20px;
+  margin-top: 10px;
+  border-left: 2px solid #ccc;
+  padding-left: 10px;
 }
 
 details summary {
   cursor: pointer;
+  font-size: 20px;
+  font-weight: bold;
+  padding: 5px 0;
 }
 
-label {
-  margin-right: 20px;
-  /*font-weight: bold;*/
+/* settings-item: 各オプション項目を横並びで整える */
+.settings-item {
+  display: flex;
+  align-items: center;
+  margin: 8px 0;
+  gap: 10px;
 }
 
-input[type="text"],
-input[type="number"] {
-  padding: 5px;
-  margin-bottom: 10px;
+/* 階層に応じてインデント */
+details > .settings-item {
+  margin-left: 20px;
+}
+details details > .settings-item {
+  margin-left: 40px;
+}
+details details details > .settings-item {
+  margin-left: 60px;
+}
+
+.settings-item label {
+  min-width: 150px;
+  font-size: 16px;
+}
+
+.settings-item input[type="text"],
+.settings-item input[type="number"] {
+  padding: 6px 10px;
   border: 1px solid #ccc;
-  border-radius: 3px;
+  border-radius: 4px;
   width: 200px;
+  font-size: 16px;
 }
 
-input[type="checkbox"] {
+.settings-item input[type="color"] {
+  width: 60px;
+  height: 30px;
+  padding: 0;
+  border: none;
+  background: none;
+}
+
+.settings-item input[type="checkbox"] {
   transform: scale(1.2);
-  margin-right: 5px;
+  margin-left: 5px;
 }
 
-#menu_button{
-  margin-bottom: 20px;
+.settings-item select {
+  padding: 5px;
+  font-size: 16px;
+  border-radius: 4px;
+  border: 1px solid #ccc;
+  font-family: inherit;
+}
+
+.settings-item span {
+  font-size: 16px;
+  margin-left: 10px;
 }

@@ -915,7 +915,7 @@ class LevelCompilerCore extends EventEmitter{
               }              
             }
 
-            //chec end of project
+            //check end of project
             if(lowerIdx !== -1){
               let val = null;
               if(calcType == "event_free_depth"){
@@ -963,13 +963,12 @@ class LevelCompilerCore extends EventEmitter{
                 d2 = currentMarkerData.composite_depth;
               }
 
-              if(false){
+              if(D1 == null || d2 == null || d1 == null){
                 //master model is null
                 D2 = null;  
               }else{
                 D2  = D3  - (d3 - d2);
               }
-              
               this.projects[p].holes[h].sections[s].markers[m][calcType]  = D2;
             }
 
@@ -991,12 +990,12 @@ class LevelCompilerCore extends EventEmitter{
                 d2 = currentMarkerData.composite_depth;
               }
               
-              if(false){
+              if(D1 == null || d2 == null || d1 == null){
                 //master model is null
                 D2 = null;
               }else{
                 D2 = D1 + (d2 - d1);
-              }              
+              }     
               this.projects[p].holes[h].sections[s].markers[m][calcType] = D2;
             }
 
@@ -1023,15 +1022,18 @@ class LevelCompilerCore extends EventEmitter{
                 d2 = currentMarkerData.composite_depth;
               }
                
-              if(true){
-                const d2d1 = d2 - d1;
-                const d3d1 = d3 - d1;
-                D2 = this.linearInterp(D1, D3, d2d1, d3d1);
-              }else{
+              if(D1 == null || D3 == null || d1 == null || d2 == null || d3 == null){
                 //master model is null
                 D2 = null;
+              }else{
+                const d2d1 = d2 - d1;
+                const d3d1 = d3 - d1;
+                
+                D2 = this.linearInterp(D1, D3, d2d1, d3d1);                
               }
               //console.log(this.getMarkerNameFromId(comparisonData[lowerIdx][3])+"--"+this.getMarkerNameFromId(currentMarkerData.id)+"--"+this.getMarkerNameFromId(comparisonData[upperIdx][3]));
+         
+
               this.projects[p].holes[h].sections[s].markers[m][calcType] = D2;
             }
             
@@ -1467,6 +1469,7 @@ class LevelCompilerCore extends EventEmitter{
         }
       }
     }
+    console.log("LCCore: Initiarised CD & EFD");
     this.setStatus("completed","Initialised");
   }
   calcMarkerAges(LCAge) {

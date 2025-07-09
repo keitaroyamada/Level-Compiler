@@ -353,7 +353,7 @@ function createMainWIndow() {
 
     let result = false;
     for(const target of targetList){
-      const res = findFileInDir(target.path, name, "check");
+      const res = await findFileInDir(target.path, name, "check");
       if(res==true){
         result = true;
         break;
@@ -383,7 +383,11 @@ function createMainWIndow() {
       }
 
       let dirPath = null; 
-      if(pathData.ext==""){
+      if (pathData.ext === ".zip") {
+        // if zip
+        dirPath = path.join(pathData.dir, pathData.base);
+        registerCoreImage(dirPath, type, null);
+      } else if(pathData.ext==""){
         //case folder
         dirPath = path.join(pathData.dir, pathData.name);
         //register path
@@ -465,12 +469,12 @@ function createMainWIndow() {
           //get image path
           let fullpath;
           if(imBaseName.includes(".jpg")||imBaseName.includes(".jpeg")||imBaseName.includes(".tif")||imBaseName.includes(".tiff")||imBaseName.includes(".png")){
-            fullpath = findFileInDir(target.path, imBaseName, "get");
+            fullpath = await findFileInDir(target.path, imBaseName, "get");
           }else{
             const exts = [".jpg", ".jpeg", ".png", ".tif", ".tiff"];
 
             for (const ext of exts) {
-              fullpath = findFileInDir(target.path, imBaseName + ext, "get");
+              fullpath = await findFileInDir(target.path, imBaseName + ext, "get");
               if (fullpath) break;
             }
           }
@@ -3622,7 +3626,21 @@ async function getDirectory(mainWindow, title) {
     return null;
   }
 }
-function findFileInDir(in_path, fileName, type) {
+async function findFileInDir(in_path, fileName, type) {
+  if (in_path.endsWith(".zip")) {
+    const zipBuffer = fs.readFileSync(in_path);
+    const zip = await JSZip.loadAsync(zipBuffer);
+
+    for (const name in zip.files) {
+      if (path.basename(name) === fileName) {
+        if (type === "check") return true;
+        if (type === "get") return { zipPath: in_path, innerPath: name };
+      }
+    }
+
+    return type === "check" ? false : null;
+  }
+
   let dir = "";
 
   if(typeof in_path === "string"){
@@ -3639,12 +3657,12 @@ function findFileInDir(in_path, fileName, type) {
 
       if (stat.isDirectory()) {
         if(type == "get"){
-          const res = findFileInDir(filePath, fileName, "get");
+          const res = await findFileInDir(filePath, fileName, "get");
           if(res){
             return res;
           }
         }else if(type == "check"){
-          if(findFileInDir(filePath, fileName, "check") == true){
+          if(await findFileInDir(filePath, fileName, "check") == true){
             return true;
           }
         }

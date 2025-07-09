@@ -107,6 +107,7 @@ document.addEventListener("DOMContentLoaded", () => {
     objOpts.section.font = "Arial";
     objOpts.section.font_size = 20;
     objOpts.section.font_angle =  -90;
+    objOpts.section.font_pos_x = -10;
     objOpts.section.font_colour = "black";
   
     objOpts.marker.line_colour = "gray";
@@ -3967,17 +3968,13 @@ document.addEventListener("DOMContentLoaded", () => {
             }
 
             //add section name-------------------------------------------------
-            let secNamePos = 10;
-            if (objOpts.section.font_angle>0){
-               secNamePos =  sketch.textAscent(hole.name+section.name) + sketch.textDescent(hole.name+section.name) + 10;
-            }
             sketch.fill(objOpts.section.font_colour);
             sketch.noStroke();
             sketch.textFont(objOpts.section.font);
             sketch.textSize(objOpts.section.font_size); 
             sketch.push();
             sketch.translate(
-              (hole_x0 + shift_x) * xMag + pad_x - secNamePos, //-10
+              (hole_x0 + shift_x) * xMag + pad_x + objOpts.section.font_pos_x, //-10
               (section_mid + shift_y) * yMag + pad_y
             );
             sketch.rotate((objOpts.section.font_angle / 180) * Math.PI);
