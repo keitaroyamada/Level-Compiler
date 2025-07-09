@@ -26,8 +26,8 @@ The detailed usage will be uploaded by this summer.
 - 1.4. Batch depth conversion -Converter-
 - 1.5. Calc sampling depth -Divider-
 - 2.1. Description on core image -Labeler-   ['Labeler Usage (English / 日本語)'](https://youtu.be/SkIqG0wph_U)
-- 2.2. Make model from GUI  ['Make model (English / 日本語)'](https://youtu.be/iKafKTT8cCY)
-- 2.3. Make model from spreadsheet    
+- 2.2. Make model from GUI  ['Make model by GUI (English / 日本語)'](https://youtu.be/iKafKTT8cCY)
+- 2.3. Make model from spreadsheet  ['Make model by csv (English / 日本語)'](https://youtu.be/sbdBxqxL3Cc)  
 
 ## 4. Build from code(optional)
   __This section is optional.__ If it is not necessary, please proceed to [the next section](#3-Install).
