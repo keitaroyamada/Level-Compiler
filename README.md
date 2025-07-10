@@ -13,20 +13,9 @@ Level Compiler (LC) is an integrated stratigraphic management software capable o
 1. Download installer (*.exe) from the right panel ["Releases"](https://github.com/keitaroyamada/Level-Compiler/releases).
 2. Run downloaded exe file.
 
-
 ### 2.3. Mac(Apple silicon)
 1. Download installer (*.dmg) from the right panel ["Releases"](https://github.com/keitaroyamada/Level-Compiler/releases).
 2. Run downloaded "*.dmg" file and install Level Compiler.
-
-   <img src=https://github.com/user-attachments/assets/3a655662-f4a7-4ef6-b2ff-37fea310978b width="300" >
-
-3. Run installed Level Compiler and press "Done" on the security warning. This is because this app is signed but not notarised. This action is required only during the first launch.
-
-   <img src=https://github.com/user-attachments/assets/3921d79a-2cd5-4bf3-b79f-b100c54c3945 width="300" >
-
-4. Go to Settings > Privacy and Security, and allow the execution of Level Compiler.
-
-    <img src=https://github.com/user-attachments/assets/8c2defa2-22ce-4efc-abf0-1fc65158ec0f width="400" >
 
 ## 3. Usage
 The detailed usage will be uploaded by this summer.  
@@ -37,8 +26,8 @@ The detailed usage will be uploaded by this summer.
 - 1.4. Batch depth conversion -Converter-
 - 1.5. Calc sampling depth -Divider-
 - 2.1. Description on core image -Labeler-   ['Labeler Usage (English / 日本語)'](https://youtu.be/SkIqG0wph_U)
-- 2.2. Make model from GUI  ['Make model (English / 日本語)'](https://youtu.be/iKafKTT8cCY)
-- 2.3. Make model from spreadsheet    
+- 2.2. Make model from GUI  ['Make model by GUI (English / 日本語)'](https://youtu.be/iKafKTT8cCY)
+- 2.3. Make model from spreadsheet  ['Make model by csv (English / 日本語)'](https://youtu.be/sbdBxqxL3Cc)  
 
 ## 4. Build from code(optional)
   __This section is optional.__ If it is not necessary, please proceed to [the next section](#3-Install).
