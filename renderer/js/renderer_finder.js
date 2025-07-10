@@ -168,11 +168,15 @@ document.addEventListener("DOMContentLoaded", () => {
     const selectedHole = document.getElementById("holeOptions").value;
     //mout date into dropdown list
     if (sectionList.length !== 0) {
-      for (let i = 0; i < sectionList[selectedHole].length; i++) {
+      const sortedList = sectionList[selectedHole].slice().sort((a, b) => {
+        return a[2].localeCompare(b[2]); // sort by name
+      });
+
+      for (let i = 0; i < sortedList.length; i++) {
         const option = document.createElement("option");
-        option.textContent = sectionList[selectedHole][i][2]; //name
-        option.value       = sectionList[selectedHole][i][0]; //idx
-        option.id          = sectionList[selectedHole][i][1]; //id
+        option.textContent = sortedList[i][2]; //name
+        option.value       = sortedList[i][0]; //idx
+        option.id          = sortedList[i][1]; //id
 
         document.getElementById("sectionOptions").appendChild(option);
       }
