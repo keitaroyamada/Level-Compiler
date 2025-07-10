@@ -144,7 +144,7 @@ class LevelCompilerCore extends EventEmitter{
         return null;
       }
     } else {
-      this.setError("","E051: The is no project data.");
+      this.setError("","E051: This is no project data.");
       return null;
     }
 
@@ -1480,11 +1480,12 @@ class LevelCompilerCore extends EventEmitter{
       console.log("","LCCore: E021: There is no correlation model.");
       return;
     }
-    if (LCAge.AgeModels.length == 0) {
-      this.setError("","E022: There is no age model.")
-      console.log("LCCore: E022: There is no age model.");
-      return;
-    }
+
+    //if (LCAge.AgeModels.length == 0) {
+    //  this.setError("","E022: There is no age model.")
+    //  console.log("LCCore: E022: There is no age model.");
+    //  return;
+    //}
 
     for (let p = 0; p < this.projects.length; p++) {
       for (let h = 0; h < this.projects[p].holes.length; h++) {
@@ -1495,10 +1496,17 @@ class LevelCompilerCore extends EventEmitter{
             m++
           ) {
             const marker = this.projects[p].holes[h].sections[s].markers[m];
-            if (marker.event_free_depth !== null) {
-              const age = LCAge.getAgeFromEFD(marker.event_free_depth, "linear"); //{age: { type: null, mid: null, upper: null, lower: null }, age_idx:null};
-              this.projects[p].holes[h].sections[s].markers[m].age = age.age.mid;
+
+            if(LCAge.AgeModels.length == 0){
+              //without age model (initialise)
+              this.projects[p].holes[h].sections[s].markers[m].age = null;
+            }else{
+              if (marker.event_free_depth !== null) {
+                const age = LCAge.getAgeFromEFD(marker.event_free_depth, "linear"); //{age: { type: null, mid: null, upper: null, lower: null }, age_idx:null};
+                this.projects[p].holes[h].sections[s].markers[m].age = age.age.mid;
+              }
             }
+
           }
         }
       }

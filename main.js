@@ -3213,11 +3213,17 @@ function createMainWIndow() {
                 accelerator: "CmdOrCtrl+S",
                 click: async () => {
                   if(isEditMode){
+                    //111111111111111111111
                     //remove plot data
+                    let outLCCore   = new LevelCompilerCore();
+                    Object.assign(outLCCore, JSON.parse(JSON.stringify(LCCore)));
+
                     const outLCAge  = new LevelCompilerAge();
                     const outLCPlot = new LevelCompilerPlot();
+                    
+                    outLCCore.calcMarkerAges(outLCAge);
   
-                    const outData = {LCCore:LCCore, LCAge:outLCAge, LCPlotAge:outLCPlot};
+                    const outData = {LCCore:outLCCore, LCAge:outLCAge, LCPlotAge:outLCPlot};
   
                     if(globalPath.saveModelPath == null){
                       //save as new file
