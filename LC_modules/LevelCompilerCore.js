@@ -879,6 +879,7 @@ class LevelCompilerCore extends EventEmitter{
     for(let p=0;p<this.projects.length; p++){
       const [comparisonId, comparisonData] = comparisonChart[p];
       if(comparisonData == null){
+        //if master project
         continue;
       }
 
@@ -886,6 +887,16 @@ class LevelCompilerCore extends EventEmitter{
         for(let s=0;s<this.projects[p].holes[h].sections.length;s++){
           for(let m=0;m<this.projects[p].holes[h].sections[s].markers.length;m++){
             const currentMarkerData = this.projects[p].holes[h].sections[s].markers[m];
+            if(calcType == "event_free_depth"){
+              if(currentMarkerData.event_free_depth==null){
+                continue;
+              }
+            }else{
+              if(currentMarkerData.composite_depth==null){
+                continue;
+              }
+            }
+            
             //search upper and lower marker [base ID, base CD, base EFD, duo ID, duo CD, duo EFD]
 
             let upperIdx = -1;
@@ -946,7 +957,7 @@ class LevelCompilerCore extends EventEmitter{
             }
 
             //case upward extrapolation(project top)
-            if(upperIdx == -1 && lowerIdx !== -1){              
+            if(upperIdx == -1 && lowerIdx !== -1){        
               let D1 = null;
               let D2 = null;
               let D3 = null;
@@ -963,7 +974,7 @@ class LevelCompilerCore extends EventEmitter{
                 d2 = currentMarkerData.composite_depth;
               }
 
-              if(D1 == null || d2 == null || d1 == null){
+              if(D3 == null || d2 == null || d3 == null){
                 //master model is null
                 D2 = null;  
               }else{
@@ -973,7 +984,7 @@ class LevelCompilerCore extends EventEmitter{
             }
 
             //case downward extrapolation(project bottom)
-            if(upperIdx !== -1 && lowerIdx == -1){
+            if(upperIdx !== -1 && lowerIdx == -1){              
               let D1 = null;
               let D2 = null;
               let D3 = null;
@@ -995,7 +1006,7 @@ class LevelCompilerCore extends EventEmitter{
                 D2 = null;
               }else{
                 D2 = D1 + (d2 - d1);
-              }     
+              } 
               this.projects[p].holes[h].sections[s].markers[m][calcType] = D2;
             }
 
