@@ -12,6 +12,7 @@ class Project {
     this.enable = true;
     this.model_type = "correlation"; //"duo"
     this.duo_connection = {};
+    this.descriptions = "";
   }
 }
 

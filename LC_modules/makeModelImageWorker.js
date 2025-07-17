@@ -71,8 +71,7 @@ parentPort.on("message", async(task) => {
           const metadata = await sharp(resizedBuffer).metadata();
       
           // Calculate pixels per cm for scaling
-          const pixPerCm = task.imageSize.height / (task.sectionData.markers[task.sectionData.markers.length - 1].distance - task.sectionData.markers[0].distance);
-
+          const pixPerCm = (task.imageSize.height / (task.sectionData.markers[task.sectionData.markers.length - 1].distance - task.sectionData.markers[0].distance));
           // Initialize new image height and operation list
           let newHeight = 0;
           const operations = [];
@@ -100,7 +99,8 @@ parentPort.on("message", async(task) => {
               console.log(mTop, mBottom, m0, pixPerCm)
               console.log(
                 "Worker: Contradiction is detected in ", 
-                " of ",task.sectionData.markers[i].name,
+                task.sectionData.markers[i].name,
+                " of ", 
                 task.sectionData.markers[0].name.split("-")[0],
                 "-",
                 task.sectionData.markers[0].name.split("-")[1],
@@ -114,8 +114,8 @@ parentPort.on("message", async(task) => {
               name,
               fromTop: fromP0,
               fromBottom: fromP1,
-              toTop: toP0,
-              toBottom: toP1,
+              toTop: Math.floor(toP0),
+              toBottom: Math.ceil(toP1),
             });
       
             // Update the total height of the new image
@@ -145,12 +145,12 @@ parentPort.on("message", async(task) => {
               
               let extractHeight = op.fromBottom - op.fromTop;
               try{
-                //limit size
-                
+                //limit size                
                 if (Math.round(op.fromTop) + Math.round(extractHeight) > metadata.height) {
                   console.log("Worker: change ",task.imageName," height at ",depthScale," from", Math.round(extractHeight) + " to ", metadata.height - Math.round(op.fromTop));
                   extractHeight = metadata.height - Math.round(op.fromTop);
                 }
+                extractHeight = Math.max(1, Math.round(extractHeight));
 
                 // Extract and resize each section of the original image
                 const currSection = await sharp(resizedBuffer)

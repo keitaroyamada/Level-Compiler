@@ -894,7 +894,7 @@ function createMainWIndow() {
           title: data.title,
           label: data.label,
           value: data.value,
-          height:200,
+          height:data.type === "textarea" ? 300 : 200,
           width:500,
           alwaysOnTop:true,
           inputAttrs: {
@@ -1012,6 +1012,13 @@ function createMainWIndow() {
                 } 
               },
               { 
+                label: 'Edit descriptions', 
+                click: () => {
+                  console.log('MAIN: Change Project descriptions'); 
+                  resolve("changeProjectDescriptions"); 
+                } 
+              },
+              { 
                 label: 'Merge projects', 
                 click: () => {
                   console.log('MAIN: Merge Projects'); 
@@ -1044,6 +1051,14 @@ function createMainWIndow() {
                 click: () => {
                   console.log('MAIN: Edit Hole name'); 
                   resolve("changeHoleName"); 
+                 
+                } 
+              },
+              { 
+                label: 'Edit descriptions', 
+                click: () => {
+                  console.log('MAIN: Edit Hole descriptions'); 
+                  resolve("changeHoleDescriptions"); 
                  
                 } 
               },
@@ -1087,6 +1102,13 @@ function createMainWIndow() {
                   resolve("changeSectionName"); 
                 } 
               },
+              { 
+                label: 'Edit descriptions', 
+                click: () => {
+                  console.log('MAIN: Edit section descriptions'); 
+                  resolve("changeSectionDescriptions"); 
+                } 
+              },
               { type: 'separator' },
               { 
                 label: 'Delete section', 
@@ -1114,6 +1136,14 @@ function createMainWIndow() {
                 click: () => {
                   console.log('MAIN: Edit marker name'); 
                   resolve("changeMarkerName"); 
+                 
+                } 
+              },
+              { 
+                label: 'Edit descriptions', 
+                click: () => {
+                  console.log('MAIN: Edit marker descriptions'); 
+                  resolve("changeMarkerDescriptions"); 
                  
                 } 
               },
@@ -1421,6 +1451,7 @@ function createMainWIndow() {
   
 
   ipcMain.handle("ExportCorrelationAsCsvFromRenderer", async (_e, MD, baseProjectID) => {
+    console.log("MAIN: Start contructing CSV data.");
     let exportLCCore = initialiseLCCore();
     
     //exportLCCore <- MD
@@ -2653,6 +2684,7 @@ function createMainWIndow() {
   });
   ipcMain.handle("disconnectAllConnections", (_e, fromId, direction) => {
     const fromIdx = LCCore.search_idx_list[fromId.toString()];
+    
     let connections = [];
     if (direction == "horizontal"){
       connections = LCCore.projects[fromIdx[0]].holes[fromIdx[1]].sections[fromIdx[2]].markers[fromIdx[3]].h_connection;
@@ -2662,7 +2694,7 @@ function createMainWIndow() {
 
     let results = true;
     if (connections.length==0){
-      console.log("MAIN: There is no connections.")
+      console.log("MAIN: There is no connections at "+LCCore.projects[fromIdx[0]].holes[fromIdx[1]].sections[fromIdx[2]].name+"-"+LCCore.projects[fromIdx[0]].holes[fromIdx[1]].sections[fromIdx[2]].markers[fromIdx[3]].name)
       return false;
     }else{
       while (connections.length > 0) {
@@ -2755,6 +2787,9 @@ function createMainWIndow() {
     }else if(type=="name"){
       const result = LCCore.changeName(markerId, value)
       return result;
+    }else if(type=="descriptions"){
+      const result = LCCore.changeDescriptions(markerId, value)
+      return result;
     }
   });
   ipcMain.handle("changeSection", (_e, sectionId, type, value) => {
@@ -2763,6 +2798,9 @@ function createMainWIndow() {
     
     if(type=="name"){
       const result = LCCore.changeName(sectionId, value);
+      return result;
+    }else if(type=="descriptions"){
+      const result = LCCore.changeDescriptions(sectionId, value)
       return result;
     }
   });
@@ -2823,6 +2861,9 @@ function createMainWIndow() {
     if(type=="name"){
       const result = LCCore.changeName(holeId, value);
       return result;
+    }else{
+      const result = LCCore.changeDescriptions(holeId, value);
+      return result;
     }
   });
   ipcMain.handle("addProject", async(_e, type, name) => {
@@ -2854,6 +2895,9 @@ function createMainWIndow() {
   ipcMain.handle("changeProject", (_e, projectId, type, value) => {
     if(type=="name"){
       const result = LCCore.changeName(projectId, value);
+      return result;
+    }else if(type=="descriptions"){
+      const result = LCCore.changeDescriptions(projectId, value);
       return result;
     }
   });
@@ -2904,7 +2948,7 @@ function createMainWIndow() {
           settingsWindow.show();
          // converterWindow.setAlwaysOnTop(true, "normal");
          //settingsWindow.webContents.openDevTools();
-          //converterWindow.setAlwaysOnTop(true, "normal");
+          settingsWindow.setAlwaysOnTop(true, "normal");
           settingsWindow.webContents.send("SettingsData", data);
         });
       }else{
@@ -3027,6 +3071,7 @@ function createMainWIndow() {
       //register
       if(inData.LCCore!==null){
         assignObject(LCCore, inData.LCCore);
+        LCCore.validateProperties();
       } 
       if(inData.LCAge!==null){
         assignObject(LCAge, inData.LCAge);
@@ -3213,7 +3258,6 @@ function createMainWIndow() {
                 accelerator: "CmdOrCtrl+S",
                 click: async () => {
                   if(isEditMode){
-                    //111111111111111111111
                     //remove plot data
                     let outLCCore   = new LevelCompilerCore();
                     Object.assign(outLCCore, JSON.parse(JSON.stringify(LCCore)));
@@ -3282,6 +3326,7 @@ function createMainWIndow() {
               {
                 label: "Export model as csv",
                 click: () => {
+                  console.log(2222222222222)
                   mainWindow.webContents.send("ExportCorrelationAsCsvMenuClicked");
                 },
               },

@@ -19,6 +19,7 @@ class Marker {
     this.enable = true;
     this.depth_source = ["", null, null];
     this.definition_relative_x = 0; //[0~1]: definitoin position on the photo
+    this.descriptions = "";
   }
 }
 

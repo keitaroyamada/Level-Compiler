@@ -8,6 +8,7 @@ class Hole {
     this.order = null;
     this.reserved_section_ids = [0];
     this.enable = true;
+    this.descriptions = "";
   }
 }
 

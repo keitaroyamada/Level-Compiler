@@ -12,6 +12,7 @@ class Event {
     this.age_error = null;
     this.thickness = null;
     this.type = "";
+    this.descriptions = "";
   }
 }
 

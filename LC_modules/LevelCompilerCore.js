@@ -1220,8 +1220,51 @@ class LevelCompilerCore extends EventEmitter{
       results.push(result);
     });
 
+
     this.setStatus("completed","Checked model.")
     return results;
+  }
+  validateProperties(){
+    const newProject = new Project;
+    const newHole    = new Hole;
+    const newSection = new Section;
+    const newMarker  = new Marker;
+
+    this.projects.forEach(p=>{
+      for(const key in newProject){
+        if(!(key in p)){
+          p[key] = newProject[key];
+          console.log("LCCore: Fixed project properties");
+        }
+      }
+
+      p.holes.forEach(h=>{
+        for(const key in newHole){
+          if(!(key in h)){
+            h[key] = newHole[key];
+            console.log("LCCore: Fixed hole properties");
+          }
+        }
+
+        h.sections.forEach(s=>{
+          for(const key in newSection){
+            if(!(key in s)){
+              s[key] = newSection[key];
+              console.log("LCCore: Fixed section properties");
+            }
+          }
+
+          s.markers.forEach(m=>{
+            for(const key in newMarker){
+              if(!(key in m)){
+                m[key] = newMarker[key];
+                console.log("LCCore: Fixed marker properties");
+              }
+            }
+          })
+        })
+      })
+    })
   }
   getDepthFromTrinity(targetId, trinityList, calcType) {
     this.setStatus("running","start getDepthFromTrinity");
@@ -2313,6 +2356,9 @@ class LevelCompilerCore extends EventEmitter{
           this.projects[p].holes[h].sections[s].markers.sort((a, b) => 
             a.distance < b.distance ? -1 : 1
           );
+          for (let m = 0; m < this.projects[p].holes[h].sections[s].markers.length; m++){
+            this.projects[p].holes[h].sections[s].markers[m].order = m;
+          }
         }
       }
     }
@@ -2323,6 +2369,9 @@ class LevelCompilerCore extends EventEmitter{
         this.projects[p].holes[h].sections.sort((a, b) =>{
           a.markers[0].drilling_depth < b.markers[0].drilling_depth ? -1 : 1
         });
+        for (let s = 0; s < this.projects[p].holes[h].sections.length; s++){
+          this.projects[p].holes[h].sections[s].order = s;
+        }
       }
     }
 
@@ -2668,7 +2717,8 @@ class LevelCompilerCore extends EventEmitter{
     for (let h = 0; h < this.projects[p].holes.length; h++) {
       for (let s = 0; s < this.projects[p].holes[h].sections.length; s++) {
         for (let m = 0; m < this.projects[p].holes[h].sections[s].markers.length; m++) {
-          if (this.projects[p].holes[h].sections[s].markers[m][calcType]==null){
+          //check reversed markers
+          if(this.projects[p].holes[h].sections[s].markers[m][calcType]==null){
             //if target depth(CD/EFD) is null
             let targetId = this.projects[p].holes[h].sections[s].markers[m].id;
 
@@ -2743,9 +2793,30 @@ class LevelCompilerCore extends EventEmitter{
           const hConnectedIdx = this.search_idx_list[hConnectedId.toString()];
           const hConnectedRank = this.projects[hConnectedIdx[0]].holes[hConnectedIdx[1]].sections[hConnectedIdx[2]].markers[hConnectedIdx[3]].connection_rank;
           const hConnectedIsMaster = this.projects[hConnectedIdx[0]].holes[hConnectedIdx[1]].sections[hConnectedIdx[2]].markers[hConnectedIdx[3]].isMaster;
-          if(
-            hConnectedRank == null || 
-            (hConnectedIsMaster == false && hConnectedRank >= maxRank + addRank)
+          
+          //check new data is loated bweteen upper and lower markers.
+          let upperMarkerDepth = null;
+          let lowerMarkerDepth = null;
+          for(let hi=0; hi<this.projects[hConnectedIdx[0]].holes[hConnectedIdx[1]].sections[hConnectedIdx[2]].markers[hConnectedIdx[3]].v_connection.length;hi++){
+            const vh = this.projects[hConnectedIdx[0]].holes[hConnectedIdx[1]].sections[hConnectedIdx[2]].markers[hConnectedIdx[3]].v_connection[hi];
+            const tempIdx = this.search_idx_list[vh.toString()];
+            const tempMarkerData = this.projects[tempIdx[0]].holes[tempIdx[1]].sections[tempIdx[2]].markers[tempIdx[3]];
+            
+            if(tempMarkerData.distance > this.projects[hConnectedIdx[0]].holes[hConnectedIdx[1]].sections[hConnectedIdx[2]].markers[hConnectedIdx[3]].distance){
+              lowerMarkerDepth = tempMarkerData[calcType];
+            }else if(tempMarkerData.distance < this.projects[hConnectedIdx[0]].holes[hConnectedIdx[1]].sections[hConnectedIdx[2]].markers[hConnectedIdx[3]].distance){
+              upperMarkerDepth = tempMarkerData[calcType];
+            }else{
+              upperMarkerDepth = tempMarkerData[calcType];
+              lowerMarkerDepth = tempMarkerData[calcType];
+            }
+          }
+
+          //if(this.projects[hConnectedIdx[0]].holes[hConnectedIdx[1]].sections[hConnectedIdx[2]].markers[hConnectedIdx[3]].id.toString()=="2,7,9,28"){
+          //  console.log(upperMarkerDepth,depth,lowerMarkerDepth)
+          //}
+
+          if(hConnectedIsMaster == false && (hConnectedRank == null || hConnectedRank >= maxRank + addRank) && (upperMarkerDepth == null || depth >= upperMarkerDepth) && (lowerMarkerDepth == null || depth <= lowerMarkerDepth)
           ){
             if(calcRange=="all"){
               this.projects[hConnectedIdx[0]].holes[hConnectedIdx[1]].sections[hConnectedIdx[2]].markers[hConnectedIdx[3]][calcType] = depth;
@@ -2758,7 +2829,8 @@ class LevelCompilerCore extends EventEmitter{
                 this.projects[hConnectedIdx[0]].holes[hConnectedIdx[1]].sections[hConnectedIdx[2]].markers[hConnectedIdx[3]].depth_source = ["transfer", targetMarkerData.id,null];
               }
             }
-            
+          }else{
+
           }
 
         }
@@ -2794,9 +2866,9 @@ class LevelCompilerCore extends EventEmitter{
           let exDistance = this.calcMarkerDistance(targetMarkerData, upperMarkerData, calcType);
 
           //check connection rank
-          if(targetMarkerData.connection_rank !== null || targetMarkerData.connection_rank <= upperMarkerData + addRank){
+          if(targetMarkerData[calcType] >= upperMarkerData[calcType] + exDistance  && (targetMarkerData.connection_rank !== null || targetMarkerData.connection_rank <= upperMarkerData + addRank)){
             continue;
-          }
+          }          
 
           //set values
           this.projects[tIdx[0]].holes[tIdx[1]].sections[tIdx[2]].markers[tIdx[3]][calcType] = upperMarkerData[calcType] + exDistance;
@@ -4239,6 +4311,23 @@ class LevelCompilerCore extends EventEmitter{
         this.setErrorAlert("","E064: Inupt name has been already used.")
         return "used"
       }        
+    }
+  }
+  changeDescriptions(targetId, value){
+    this.setStatus("running","start changeDescriptions");
+    this.updateSearchIdx();
+    const idx = this.search_idx_list[targetId.toString()];
+    const targetData = this.getDataByIdx(idx);
+    
+    //apply to reference type array
+    if(targetData.descriptions == value){
+      this.setError("","E067: Descriptions is the same as previous values.")
+      return "same"
+    }else{
+      targetData.descriptions = value.toString();
+      console.log("MAIN: Change descriptions of " + targetData.name + ".");
+      this.setStatus("completed","");
+      return true;
     }
   }
   searchHconnection(startId) {
