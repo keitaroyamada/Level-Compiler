@@ -2957,7 +2957,7 @@ function createMainWIndow() {
 
     }else if(to=="renderer"){
       mainWindow.webContents.send("SettingsData", data);
-      setSettings(data);
+      setSettings("settings", data);
     }    
   });
   ipcMain.handle("openExtarnalLink", (_e,url) => {
@@ -3139,7 +3139,8 @@ function createMainWIndow() {
   }
   //--------------------------------------------------------------------------------------------------
   mainWindow.webContents.once("did-finish-load", () => {
-    const LCSettingData = getSettings();
+    const LCSettingData = getSettings("settings");
+    const LCBookmarkData= getSettings("bookmarks");
     if (LCSettingData !== null) {
       mainWindow.webContents.send("SettingsData", LCSettingData);
     }
@@ -3988,9 +3989,15 @@ async function checkUpdate(from){
 
 }
 //--------------------------------------------------------------------------------------------------
-function getSettings(){
+function getSettings(type){
   let LCSettingData = null;
-  const settingPath = path.join(app.getPath('userData'), "lcsettings.json");
+  let settingPath ;
+  if(type == "settings"){
+    settingPath = path.join(app.getPath('userData'), "lcsettings.json");
+  }else if(type == "bookmarks"){
+    settingPath = path.join(app.getPath('userData'), "lcbookmarks.json");
+  }
+
   if(fs.existsSync(settingPath)){
     const settingsData = fs.readFileSync(settingPath, 'utf-8');
     LCSettingData = JSON.parse(settingsData);   
@@ -4000,8 +4007,14 @@ function getSettings(){
   }
   return LCSettingData;
 }
-function setSettings(data){
-  const settingPath = path.join(app.getPath('userData'), "lcsettings.json");
+function setSettings(type, data){
+  let settingPath ;
+  if(type == "settings"){
+    settingPath = path.join(app.getPath('userData'), "lcsettings.json");
+  }else if(type == "bookmarks"){
+    settingPath = path.join(app.getPath('userData'), "lcbookmarks.json");
+  }
+  
   try {
     fs.writeFileSync(settingPath, JSON.stringify(data, null, 2), 'utf-8');
     console.log('MAIN: Settings are saved.');
