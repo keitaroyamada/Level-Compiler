@@ -13,10 +13,12 @@ const { Console } = require("console");
 class LevelCompilerCore extends EventEmitter{
   constructor() {
     super();
+    this.name = "";
     this.projects = [];
     this.search_idx_list = {};
     this.base_project_id = null;
     this.reserved_project_ids = [0];
+    this.descriptions = "";
     this.state = {
       status: 'Initialise',
       statusDetails: null,      
@@ -1229,6 +1231,7 @@ class LevelCompilerCore extends EventEmitter{
     const newHole    = new Hole;
     const newSection = new Section;
     const newMarker  = new Marker;
+
 
     this.projects.forEach(p=>{
       for(const key in newProject){

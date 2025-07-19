@@ -16,6 +16,10 @@ contextBridge.exposeInMainWorld("FinderApi", {
   GetResources: () => ipcRenderer.sendSync("GetResources"),
   toggleDevTools: (args1) => ipcRenderer.send('toggle-devtools',args1),
 
+  inputdialog: (args1) => ipcRenderer.invoke("inputdialog", args1),
+  askdialog: (args1, args2) => ipcRenderer.invoke("askdialog", args1, args2),
+  saveBookmarks: (args1) => ipcRenderer.invoke("saveBookmarks", args1),
+
   //main -> renderer
   receive: (channel, func) => {
     ipcRenderer.on(channel, (event, ...args) => func(...args));

@@ -79,6 +79,7 @@ contextBridge.exposeInMainWorld("LCapi", {
   addProject: (args1,args2) => ipcRenderer.invoke("addProject", args1,args2),
   deleteProject: (args1) => ipcRenderer.invoke("deleteProject", args1),
   changeProject: (args1,args2,args3) => ipcRenderer.invoke("changeProject", args1,args2,args3),
+  changeWorkspace: (args1,args2) => ipcRenderer.invoke("changeWorkspace", args1,args2),
   mergeProjects: () => ipcRenderer.invoke("mergeProjects"),
   RegisterAgeFromLCAge: () => ipcRenderer.invoke('RegisterAgeFromLCAge'),
   SetZeroPoint: (args1,args2) => ipcRenderer.invoke("SetZeroPoint", args1,args2),

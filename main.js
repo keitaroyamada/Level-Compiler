@@ -28,7 +28,7 @@ const zlib = require('zlib');
 const https = require('https');
 const { autoUpdater} = require('electron-updater');
 
-const { app, BrowserWindow, Menu, ipcMain, dialog, shell, screen } = require("electron");
+const { app, BrowserWindow, Menu, ipcMain, dialog, shell, screen, session } = require("electron");
 const { LevelCompilerCore } = require("./LC_modules/LevelCompilerCore.js");
 const { Project } = require("./LC_modules/Project.js");
 const { lcfnc } = require("./LC_modules/lcfnc.js");
@@ -900,9 +900,8 @@ function createMainWIndow() {
           inputAttrs: {
               type: data.type,
               required: true,
-              step: '0.0001' ,
+              step: '0.0001',
           },
-          type: "input"
       });
 
       return result
@@ -993,6 +992,25 @@ function createMainWIndow() {
             ]
           },
           { type: 'separator' },
+          {
+            label:"Workspace",
+            submenu:[
+              { 
+                label: 'Edit name', 
+                click: () => {
+                  console.log('MAIN: Edit workspace name'); 
+                  resolve("editWorkspaceName"); 
+                } 
+              },
+              { 
+                label: 'Edit descriptions', 
+                click: () => {
+                  console.log('MAIN: Edit workspace descriptions'); 
+                  resolve("editWorkspaceDescriptions"); 
+                } 
+              },
+            ]
+          },
           {
             label:"Project",
             submenu:[
@@ -2060,7 +2078,7 @@ function createMainWIndow() {
     finderWindow = new BrowserWindow({
       title: "Finder",
       width: 230,
-      height: 550,
+      height: 580,
       webPreferences: {
         preload: path.join(__dirname, "preload", "preload_finder.js"),
       },
@@ -2079,6 +2097,14 @@ function createMainWIndow() {
       //finderWindow.webContents.openDevTools();
       finderWindow.setAlwaysOnTop(true, "floating");
       finderWindow.webContents.send("FinderToolClicked", "");
+
+      const LCBookmarkSet= getSettings("bookmarks");
+      let LCBookmarkData = null;
+      if(LCBookmarkSet!==null){
+        LCBookmarkData = LCBookmarkSet[LCCore.name];
+      }
+      
+      finderWindow.webContents.send("Bookmarks", LCBookmarkData);
     });
   });
   ipcMain.handle("CloseFinder", async (_e) => {
@@ -2901,6 +2927,15 @@ function createMainWIndow() {
       return result;
     }
   });
+  ipcMain.handle("changeWorkspace", (_e, type, value) => {
+    if(type=="name"){
+      LCCore.name = value;
+      return true;
+    }else if(type=="descriptions"){
+      LCCore.descriptions = value;
+      return true;
+    }
+  });
   ipcMain.handle("mergeProjects", (_e) => {
     const result = LCCore.mergeProjects();
 
@@ -2959,6 +2994,14 @@ function createMainWIndow() {
       mainWindow.webContents.send("SettingsData", data);
       setSettings("settings", data);
     }    
+  });
+  ipcMain.handle("saveBookmarks", (_e, data) => {
+    let LCBookmarkSet= getSettings("bookmarks");
+    if(LCBookmarkSet==null){
+      LCBookmarkSet = {};
+    }
+    LCBookmarkSet[LCCore.name] = data;
+    setSettings("bookmarks", LCBookmarkSet);
   });
   ipcMain.handle("openExtarnalLink", (_e,url) => {
     if(url){
@@ -3140,7 +3183,7 @@ function createMainWIndow() {
   //--------------------------------------------------------------------------------------------------
   mainWindow.webContents.once("did-finish-load", () => {
     const LCSettingData = getSettings("settings");
-    const LCBookmarkData= getSettings("bookmarks");
+    
     if (LCSettingData !== null) {
       mainWindow.webContents.send("SettingsData", LCSettingData);
     }
@@ -4038,7 +4081,9 @@ function getDisplayInfo(screen){
   }
 }
 //--------------------------------------------------------------------------------------------------
-app.whenReady().then(() => {
+app.whenReady().then(async() => {
+  await session.defaultSession.clearCache();  //clear cache
+
   //create main window
   createMainWIndow();
 
@@ -4053,6 +4098,7 @@ app.whenReady().then(() => {
   
 
 });
+
 
 
 //================================================================================================

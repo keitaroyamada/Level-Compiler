@@ -9,7 +9,9 @@ document.addEventListener("DOMContentLoaded", () => {
   let targetId = [null, null, null, null];
   let resourceData ={};
   let previousValue = {project:null,hole:null,section:null,distance:null,cd:null,efd:null,age:null,ageUpper:null,ageLower:null};
-  
+  let bookmarks = {};
+  bookmarks["Please select"] = {holeName: null, holeId: null, sectionName:null, sectionId:null, distance:null};
+
   //-------------------------------------------------------------------------------------------
   //when startup
   window.FinderApi.receive("FinderToolClicked", async () => {
@@ -22,7 +24,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
     //load tool icon images
     resourceData = await window.FinderApi.GetResources();
-    console.log(resourceData)
     document.getElementById("link").querySelector("img").src = resourceData.finder["linked"];
     document.getElementById("fix").querySelector("img").src = resourceData.finder["fixed"];
 
@@ -39,7 +40,29 @@ document.addEventListener("DOMContentLoaded", () => {
     };
 
   });
+  window.FinderApi.receive("Bookmarks", async (bookmarkData) => {
+    window.FinderApi.rendererLog("[Finder]: Finder received bookmarks.");
 
+    if(bookmarkData !== null){
+      bookmarks = bookmarkData;
+      //clear
+      var parentElement = document.getElementById("bookmarksOptions");
+      while (parentElement.firstChild) {
+        parentElement.removeChild(parentElement.firstChild);
+      }
+
+      //update
+      for (const key in bookmarks) {
+        const option = document.createElement("option");
+        option.textContent = key; //name
+        //option.value       = holeList[i][0]; //idx
+        //option.id          = holeList[i][1]; //id
+        document.getElementById("bookmarksOptions").appendChild(option);
+      }
+    }
+  });
+
+  
   //-------------------------------------------------------------------------------------------
   //-------------------------------------------------------------------------------------------
   //distance
@@ -520,6 +543,130 @@ document.addEventListener("DOMContentLoaded", () => {
       }
       
     }
+  });
+  //-------------------------------------------------------------------------------------------
+
+  document.getElementById("add_bookmark").addEventListener("click", async (event) => {
+    const holeNameCurrent = holeList[document.getElementById("holeOptions").value][2];
+    const holeIdCurrent   = holeList[document.getElementById("holeOptions").value][1];
+    const sectionNameCurrent = sectionList[document.getElementById("holeOptions").value][document.getElementById("sectionOptions").value][2];
+    const sectionIdCurrent   = sectionList[document.getElementById("holeOptions").value][document.getElementById("sectionOptions").value][1];
+    const distanceCUrrent = document.getElementById("distanceInput").value;
+
+    const numBookmarks = Object.keys(bookmarks).length;
+    const defName = `Bookmark${String(numBookmarks).padStart(2, '0')}`;
+
+    const askData = {
+      title:"Bookmark name",
+      label:"Please enter new bookmark name.",
+      value:defName,
+      type:"text",
+    };
+
+      response = await window.FinderApi.inputdialog(askData);
+      if(response !==null){
+        bookmarks[response] = {holeName: holeNameCurrent, holeId: holeIdCurrent, sectionName:sectionNameCurrent, sectionId:sectionIdCurrent, distance:distanceCUrrent};
+        console.log("Finder: "+response+" is bookmarked.")
+
+        //update list
+        //clear
+        var parentElement = document.getElementById("bookmarksOptions");
+        while (parentElement.firstChild) {
+          parentElement.removeChild(parentElement.firstChild);
+        }
+
+        //update        
+        for (const key in bookmarks) {
+          const option = document.createElement("option");
+          option.textContent = key; //name
+          //option.value       = holeList[i][0]; //idx
+          //option.id          = holeList[i][1]; //id
+          document.getElementById("bookmarksOptions").appendChild(option);
+        }
+
+        //save
+        await window.FinderApi.saveBookmarks(bookmarks);
+      }
+    
+  });
+  document.getElementById("delete_bookmark").addEventListener("click", async (event) => {
+    const select = document.getElementById("bookmarksOptions").value;
+
+    if(select == "Please select"){
+      return
+    }
+    const response = await window.FinderApi.askdialog(
+        "Delete bookmark",
+        "Are you sure you want to delete this bookmark?"
+      );
+
+
+    //delete
+    delete bookmarks[select];
+    console.log("Finder: "+select+" is deleted.")
+
+    //update list
+    //clear
+    var parentElement = document.getElementById("bookmarksOptions");
+    while (parentElement.firstChild) {
+      parentElement.removeChild(parentElement.firstChild);
+    }
+
+    //update
+    for (const key in bookmarks) {
+      const option = document.createElement("option");
+      option.textContent = key; //name
+      //option.value       = holeList[i][0]; //idx
+      //option.id          = holeList[i][1]; //id
+      document.getElementById("bookmarksOptions").appendChild(option);
+    }
+
+    //save
+    await window.FinderApi.saveBookmarks(bookmarks);
+  });
+  document.getElementById("bookmarksOptions").addEventListener("change", async (event) => {
+    console.log("Finder: "+event.target.value+" is selected.")
+    console.log(bookmarks[event.target.value])
+    console.log(holeList)
+
+
+    //get hole index
+    let hole_idx = null;
+    let selected_hole_id = null;
+    holeList.forEach((hole, h) => {
+      if (hole[2] == bookmarks[event.target.value].holeName) {
+        hole_idx = h;
+        selected_hole_id = hole[0];
+      }
+    });
+
+    if(selected_hole_id == null){
+      return
+    }
+
+    //get section index
+    let sec_idx = null;
+    let selected_sec_id = null;
+    sectionList[hole_idx].forEach((sec, s)=>{
+      if (sec[2] == bookmarks[event.target.value].sectionName) {        
+        sec_idx = s;
+        selected_sec_id = sec[0];
+      }
+    })
+
+    //change selections
+    document.getElementById("holeOptions").value = selected_hole_id;
+    await updateSectionList();
+    document.getElementById("sectionOptions").value = selected_sec_id;
+    document.getElementById("distanceInput").value  = isNaN(bookmarks[event.target.value].distance) ? "" : Math.round(bookmarks[event.target.value].distance * 10) / 10;
+          
+
+    //
+    isCalledFinder = true;
+    targetId = [null,null,null,null];
+    
+    await calc("trinity");
+    await limitDistance();    
   });
 
   //-------------------------------------------------------------------------------------------

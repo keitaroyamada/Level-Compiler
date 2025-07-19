@@ -71,7 +71,7 @@ document.addEventListener("DOMContentLoaded", () => {
     objOpts.canvas.shift_x = 0; //[cm]
     objOpts.canvas.shift_y = 100; //[cm]
     objOpts.canvas.bottom_pad = 100; //[cm]
-    objOpts.canvas.buffer_depth = 500; //[cm]
+    objOpts.canvas.buffer_depth = 0; //[cm]
     objOpts.canvas.background_colour = "#f4f5f7";//"#f7f7f7"//"#f8fbff";//"#fffdfa";//""white
     objOpts.canvas.target_horizon = false;
     objOpts.canvas.is_grid = false;
@@ -1339,7 +1339,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
       
     
-    }else if(clickResult=="loadHighResolutionImage"){
+    }else if(clickResult =="loadHighResolutionImage"){
       const curDPCM = JSON.parse(JSON.stringify(objOpts.image.dpcm));
 
       const targetId = [objOpts.edit.hittest.project, objOpts.edit.hittest.hole,objOpts.edit.hittest.section,null];
@@ -1348,7 +1348,7 @@ document.addEventListener("DOMContentLoaded", () => {
       modelImages = await loadCoreImages(modelImages, LCCore, objOpts, ["drilling_depth","composite_depth","event_free_depth", "age"]);
       updateView();
       objOpts.image.dpcm = curDPCM;
-    }else if(clickResult=="plotImageBrightness"){
+    }else if(clickResult =="plotImageBrightness"){
       if(LCCore){
         if(objOpts.edit.hittest.section!==null){
           const ht = objOpts.edit.hittest;
@@ -1370,7 +1370,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }
       }
       updateView();      
-    }else if(clickResult=="showFloatingImage"){
+    }else if(clickResult =="showFloatingImage"){
       const targetId = [objOpts.edit.hittest.project, objOpts.edit.hittest.hole,objOpts.edit.hittest.section,null];
       if(Object.keys(modelImages["drilling_depth"]).length>0){
         console.log("Renderer: openfloating image viewer");
@@ -1430,6 +1430,40 @@ document.addEventListener("DOMContentLoaded", () => {
       }
       console.log("[Renderer]: Edit cancelled.",objOpts.edit.handleMove, objOpts.edit.handleClick);
       updateView();
+    }else if(clickResult == "editWorkspaceName"){
+      if(LCCore){
+        const askData = {
+          title:"Edit workspace name: ",
+          label:"",
+          value:LCCore.descriptions,
+          type:"text",
+        };
+        const response = await window.LCapi.inputdialog(askData);
+        if(response !== null){
+          const result = await window.LCapi.changeWorkspace("name",response);
+          if(result == true){
+            console.log("[Renderer]: Chnage workspace name.")
+            await loadModel();
+          }
+        }        
+      }
+    }else if(clickResult == "editWorkspaceDescriptions"){
+      if(LCCore){
+        const askData = {
+          title:"Edit workspace descriptions: ",
+          label:"",
+          value:LCCore.descriptions,
+          type:"textarea",
+        };
+        const response = await window.LCapi.inputdialog(askData);
+        if(response !== null){
+          const result = await window.LCapi.changeWorkspace("descriptions",response);
+          if(result == true){
+            console.log("[Renderer]: Chnage workspace descriptions.")
+            await loadModel();
+          }
+        }        
+      }
     }else{
       objOpts.edit.contextmenu_enable = true;
       objOpts.edit.hittest = null;
