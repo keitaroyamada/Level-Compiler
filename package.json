@@ -19,11 +19,14 @@
     "electron-prompt": "^1.7.0",
     "electron-updater": "^6.6.2",
     "jszip": "^3.10.1",
+    "license-checker": "^25.0.1",
     "sharp": "^0.34.2"
   },
   "build": {
     "appId": "io.github.ky_apps.Level-Compiler",
-    "npmArgs": ["--include=optional"],
+    "npmArgs": [
+      "--include=optional"
+    ],
     "publish": {
       "provider": "github",
       "owner": "keitaroyamada",
@@ -50,9 +53,9 @@
     ]
   },
   "devDependencies": {
+    "@emnapi/runtime": "^1.4.3",
     "electron": "^36.3.1",
     "electron-builder": "^25.1.8",
-    "electronmon": "^2.0.3",
-    "@emnapi/runtime": "^1.4.3"
+    "electronmon": "^2.0.3"
   }
 }
