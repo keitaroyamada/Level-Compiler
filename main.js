@@ -486,8 +486,9 @@ function createMainWIndow() {
           //calc new image size
           const coreLength = targetSectionData.markers[targetSectionData.markers.length-1].distance - targetSectionData.markers[0].distance;
           let new_height = Math.round(200 * 100, 0); //max
-          if(new_height > loadOptions.dpcm * coreLength){
-            new_height = Math.round(loadOptions.dpcm * coreLength);
+          console.log(loadOptions.dpcm[imBaseName])
+          if(new_height > loadOptions.dpcm[imBaseName] * coreLength){
+            new_height = Math.round(loadOptions.dpcm[imBaseName] * coreLength);
           }
           //calc resize        
           const new_size = { height: new_height, width: 1 };
@@ -1463,7 +1464,10 @@ function createMainWIndow() {
       }
        
       const menu = Menu.buildFromTemplate(template);
-      menu.popup({ window:BrowserWindow.fromWebContents(event.sender)});
+      menu.popup({ 
+        window:BrowserWindow.fromWebContents(event.sender),
+        callback: () => resolve(null)
+      });
     });
   });
   
@@ -2197,6 +2201,14 @@ function createMainWIndow() {
       if(result !== null){
         //for Undo image
         const changedSections = checkChanges(LCCore, result.LCCore);
+        let dcpms = {};
+        for (let i=0;i<changedSections.length;i++){
+          const idx = LCCore.search_idx_list[changedSections[i]];
+          const holeData = LCCore.projects[idx[0]].holes[idx[1]];
+          const sectionData = LCCore.projects[idx[0]].holes[idx[1]].sections[idx[2]];
+          dcpms[holeData.name+"-"+sectionData.name] = 30;
+        }
+        
 
         //Undo deep copy
         assignObject(LCCore, result.LCCore);
@@ -2210,7 +2222,7 @@ function createMainWIndow() {
           const coreImages = await loadCoreImages({
             targetIds:changedSections,
             operations:["drilling_depth","composite_depth","event_free_depth","age"],
-            dpcm:40,
+            dpcm:dcpms,
           },"core_images");
 
           if(coreImages!==null){

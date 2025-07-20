@@ -841,17 +841,23 @@ document.addEventListener("DOMContentLoaded", () => {
       clickResult = await window.LCapi.showContextMenu("normalContextMenu");  
     }
 
+    if(clickResult==null){
+      return;
+    }
     
     if(clickResult=="loadHighResolutionImage"){
-      const curDPCM = JSON.parse(JSON.stringify(objOpts.image.dpcm));
 
       const targetId = [objOpts.edit.hittest.project, objOpts.edit.hittest.hole,objOpts.edit.hittest.section,null];
       modelImages.load_target_ids = [targetId];//load target
-      objOpts.image.dpcm = objOpts.image.dpcm_high;
+      const targetIdx = getIdxById(LCCore, targetId);
+      const holeName = LCCore.projects[targetIdx[0]].holes[targetIdx[1]].name;
+      const sectionName = LCCore.projects[targetIdx[0]].holes[targetIdx[1]].sections[targetIdx[2]].name;
+
+      modelImages.image_resolution[holeName+"-"+sectionName] = objOpts.image.dpcm_high;
+
       modelImages = await loadCoreImages(modelImages, LCCore, objOpts, ["drilling_depth", "composite_depth","event_free_depth","age"]);
       
       updateView();
-      objOpts.image.dpcm = curDPCM;
     }else if(clickResult.includes("holeMoveTo")){
       const minHoleOrder = Math.min(...LCCore.projects.flatMap(p => p.holes.map(h => h.order)));
       const maxHoleOrder = Math.max(...LCCore.projects.flatMap(p => p.holes.map(h => h.order)));
@@ -1340,14 +1346,17 @@ document.addEventListener("DOMContentLoaded", () => {
       
     
     }else if(clickResult =="loadHighResolutionImage"){
-      const curDPCM = JSON.parse(JSON.stringify(objOpts.image.dpcm));
 
       const targetId = [objOpts.edit.hittest.project, objOpts.edit.hittest.hole,objOpts.edit.hittest.section,null];
-      modelImages.load_target_ids = [targetId];//load all
-      objOpts.image.dpcm = objOpts.image.dpcm_high;
+      modelImages.load_target_ids = [targetId];//load 
+      const targetIdx = getIdxById(LCCore, targetId);
+      const holeName = LCCore.projects[targetIdx[0]].holes[targetIdx[1]].name;
+      const sectionName = LCCore.projects[targetIdx[0]].holes[targetIdx[1]].sections[targetIdx[2]].name;
+
+      modelImages.image_resolution[holeName+"-"+sectionName] = objOpts.image.dpcm_high;
+
       modelImages = await loadCoreImages(modelImages, LCCore, objOpts, ["drilling_depth","composite_depth","event_free_depth", "age"]);
       updateView();
-      objOpts.image.dpcm = curDPCM;
     }else if(clickResult =="plotImageBrightness"){
       if(LCCore){
         if(objOpts.edit.hittest.section!==null){
@@ -1555,9 +1564,21 @@ document.addEventListener("DOMContentLoaded", () => {
           
           if(result==true){
             await loadModel();
+            const fromIdx = getIdxById(LCCore, fromId);
+            const fromMarkerData = LCCore.projects[fromIdx[0]].holes[fromIdx[1]].sections[fromIdx[2]].markers[fromIdx[3]];
+            const toIdx = getIdxById(LCCore, toId);
+            const toMarkerData = LCCore.projects[toIdx[0]].holes[toIdx[1]].sections[toIdx[2]].markers[toIdx[3]];
+            let targetIds = [];
 
-            const affectedSections = getConnectedSectionIds([fromId, toId]);
-            console.log(affectedSections)
+            if(fromMarkerData.depth_source[0]!=="master"){
+              targetIds.push(fromId);
+            }
+            if(toMarkerData.depth_source[0]!=="master"){
+              targetIds.push(toId);
+            } 
+
+            const affectedSections = getConnectedSectionIds(targetIds);
+
             if(affectedSections.length>0){
               modelImages.load_target_ids = affectedSections;
               modelImages = await loadCoreImages(modelImages, LCCore, objOpts, ["drilling_depth","composite_depth","event_free_depth", "age"]);
@@ -5573,7 +5594,7 @@ document.addEventListener("DOMContentLoaded", () => {
     
     return true;
   }
-  async function loadModel() {
+  async function loadModel(isUpdateView=true) {
     //load model into LCCore
     //now, LC is able to hold one project file, model_id is dummy
      const result = await window.LCapi.LoadModelFromLCCore();
@@ -5690,7 +5711,10 @@ document.addEventListener("DOMContentLoaded", () => {
           );
         })
   
-        updateView();
+        if(isUpdateView){
+          updateView();
+        }
+        
       }
 
      }    
@@ -6274,6 +6298,9 @@ async function getFooterInfo(LCCore, hittest, objOpts) {
   let age = "---)";
   if(hittest.section!==null){
     const targetId = [hittest.project, hittest.hole, hittest.section, null];
+    if(hittest == undefined){
+      return txt;
+    }
     const calcedData = await window.LCapi.depthConverter(["", hittest.y, targetId], objOpts.canvas.depth_scale, "linear");
     age = calcedData !== null ? calcedData.age_mid.toFixed(objOpts.canvas.age_precision) + " calBP)" : "---)";
   }
@@ -6504,7 +6531,11 @@ async function loadCoreImages(modelImages, LCCore, objOpts, operations) {
           LCCore.projects.forEach((p) => {
             p.holes.forEach((h) => {
               h.sections.forEach((s) => {
-                modelImages.load_target_ids.push(s.id);
+                results.load_target_ids.push(s.id);
+                if ((h.name+"-"+s.name) in modelImages.image_resolution){
+                }else{
+                  results.image_resolution[h.name+"-"+s.name] = objOpts.image.dpcm;
+                }
               });
             });
           });
@@ -6513,10 +6544,10 @@ async function loadCoreImages(modelImages, LCCore, objOpts, operations) {
           console.log("[Renderer]: Load selected images]")
         }
         
-        N = modelImages.load_target_ids.length;
+        N = results.load_target_ids.length;
       }else{
         N=0;
-        modelImages.load_target_ids=[];
+        results.load_target_ids=[];
       }
       
       if(N==0){
@@ -6527,9 +6558,9 @@ async function loadCoreImages(modelImages, LCCore, objOpts, operations) {
       }
 
       const loadOptions = {
-        targetIds:modelImages.load_target_ids, 
+        targetIds:results.load_target_ids, 
         operations:operations,
-        dpcm:objOpts.image.dpcm,
+        dpcm:results.image_resolution,//dpcm:objOpts.image.dpcm,
       };
 
       //main Progress   
@@ -6541,7 +6572,7 @@ async function loadCoreImages(modelImages, LCCore, objOpts, operations) {
             resolve(imBufferDict)
           }) 
 
-          results = await assignCoreImages(results, imageBuffers, objOpts);
+          results = await assignCoreImages(results, imageBuffers);
           results.load_target_ids = [];
           p5resolve();
         }catch(err){
@@ -6558,7 +6589,7 @@ async function loadCoreImages(modelImages, LCCore, objOpts, operations) {
   });
 
 }
-async function assignCoreImages(coreImages, imageBuffers, objOpts) {
+async function assignCoreImages(coreImages, imageBuffers) {
   const allowedScalses = ["drilling_depth", "composite_depth", "event_free_depth", "age"];
   let results = coreImages;
   let suc = 0; 
@@ -6605,7 +6636,7 @@ async function assignCoreImages(coreImages, imageBuffers, objOpts) {
                       resolveImage();
                     }
                   );
-                  results.image_resolution[imName] = objOpts.image.dpcm;
+                  //results.image_resolution[imName] = objOpts.image.dpcm;
                   results.plot_colour[imName] = false; 
                 } catch (err) {
                   console.log(err);
