@@ -4099,7 +4099,8 @@ document.addEventListener("DOMContentLoaded", () => {
             hole.name,
             // /(hole_x0 + shift_x + objOpts.hole.width * 0.3) * xMag + pad_x
             (hole_x0 + shift_x) * xMag + pad_x + objOpts.section.width * xMag /2 - sketch.textWidth(hole.name)/2,
-            (hole_top + shift_y) * yMag + pad_y - 20
+            scroller.scrollTop + pad_y - 20,
+            //(hole_top + shift_y) * yMag + pad_y - 20
           );
 
           //check position --------------------------------------------------
@@ -4520,7 +4521,8 @@ document.addEventListener("DOMContentLoaded", () => {
                 sketch.textSize(15);
                 let rank_name = "null";
                 if (marker.connection_rank != null){
-                  rank_name = marker.connection_rank.toString();
+                  //1111111111111111
+                  rank_name = marker.depth_source[0];//marker.connection_rank.toString();
                 }
                 sketch.text(
                   rank_name,

@@ -20,6 +20,7 @@
     "electron-updater": "^6.6.2",
     "jszip": "^3.10.1",
     "license-checker": "^25.0.1",
+    "mathjs": "^14.5.3",
     "sharp": "^0.34.2"
   },
   "build": {
