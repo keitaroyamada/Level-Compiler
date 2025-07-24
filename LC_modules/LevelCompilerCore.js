@@ -9,6 +9,7 @@ const { Trinity } = require("./Trinity.js");
 const { copyFileSync } = require("original-fs");
 const { setegid } = require("process");
 const { Console } = require("console");
+const math = require('mathjs');
 
 class LevelCompilerCore extends EventEmitter{
   constructor() {
@@ -17,7 +18,7 @@ class LevelCompilerCore extends EventEmitter{
     this.projects = [];
     this.search_idx_list = {};
     this.base_project_id = null;
-    this.reserved_project_ids = [0];
+    this._reserved_project_ids = [0];
     this.descriptions = "";
     this.state = {
       status: 'Initialise',
@@ -25,6 +26,10 @@ class LevelCompilerCore extends EventEmitter{
       hasError: false,    
       errorDetails: null,  
     };
+    //[_] properties are not exported.
+    this._performance = {},
+    this._pathCache = {};
+    this._measurePerformance = false; //for developper
     
     this.on('error', (err) => {
       console.error('LCCore:'+ err.statusDetails);
@@ -151,8 +156,8 @@ class LevelCompilerCore extends EventEmitter{
     }
 
     //add project data
-    const newProjectId = lcfnc.getUniqueId(this.reserved_project_ids);
-    this.reserved_project_ids.push(newProjectId);
+    const newProjectId = lcfnc.getUniqueId(this._reserved_project_ids);
+    this._reserved_project_ids.push(newProjectId);
     let p = this.projects.length;
     projectData.id = [newProjectId, null, null, null];
     projectData.name = model_info.name;
@@ -730,7 +735,7 @@ class LevelCompilerCore extends EventEmitter{
             this.projects[midx[0]].holes[midx[1]].sections[midx[2]].markers[midx[3]].depth_source = ["master",null,null];
           }else{
             //case pallarel section in the base master section(transfer)
-            this.projects[midx[0]].holes[midx[1]].sections[midx[2]].markers[midx[3]].connection_rank = 1;
+            this.projects[midx[0]].holes[midx[1]].sections[midx[2]].markers[midx[3]].connection_rank = 0;
             for (let i = 0; i < currentMarkerData.h_connection.length; i++){
               let transferMarkerData = this.getDataByIdx(this.search_idx_list[currentMarkerData.h_connection[i]]);
               //if connect master marker
@@ -749,14 +754,14 @@ class LevelCompilerCore extends EventEmitter{
               this.projects[midx[0]].holes[midx[1]].sections[midx[2]].markers[midx[3]].depth_source = ["master", null, null];    
             }else{
               //case duo master project
-              this.projects[midx[0]].holes[midx[1]].sections[midx[2]].markers[midx[3]].connection_rank = 1;
+              this.projects[midx[0]].holes[midx[1]].sections[midx[2]].markers[midx[3]].connection_rank = 0;
               this.projects[midx[0]].holes[midx[1]].sections[midx[2]].markers[midx[3]].depth_source = ["duo-master", null, null];    
             }
           } else{
             //case pallarel section in the base master section(transfer)
             if(currentMarkerData.id[0]==this.base_project_id[0]){
               //case base master project
-              this.projects[midx[0]].holes[midx[1]].sections[midx[2]].markers[midx[3]].connection_rank = 1;
+              this.projects[midx[0]].holes[midx[1]].sections[midx[2]].markers[midx[3]].connection_rank = 0;
               let transferMarkerData = null;
               for (let i = 0; i < currentMarkerData.h_connection.length; i++){
                 let tempMarkerData = this.getDataByIdx(this.search_idx_list[currentMarkerData.h_connection[i]]);
@@ -768,7 +773,7 @@ class LevelCompilerCore extends EventEmitter{
               }
             }else{
               //case duo master project
-              this.projects[midx[0]].holes[midx[1]].sections[midx[2]].markers[midx[3]].connection_rank = 1;
+              this.projects[midx[0]].holes[midx[1]].sections[midx[2]].markers[midx[3]].connection_rank = 0;
               let transferMarkerData = null;
               for (let i = 0; i < currentMarkerData.h_connection.length; i++){
                 let tempMarkerData = this.getDataByIdx(this.search_idx_list[currentMarkerData.h_connection[i]]);
@@ -1526,6 +1531,10 @@ class LevelCompilerCore extends EventEmitter{
         }
       }
     }
+
+    //initiarise cache
+    this._pathCache = {};
+
     console.log("LCCore: Initiarised CD & EFD");
     this.setStatus("completed","Initialised");
   }
@@ -2669,46 +2678,85 @@ class LevelCompilerCore extends EventEmitter{
     return output;
   }
   applyMarkerPolation(calcRange, calcType) {
+    const interpolationType = "rank_grid";
+
     this.setStatus("running","strat applyMarkerPolation");
     //get list of inter/extra polation in each project
     let skippedList = [];
- 
     for (let p = 0; p < this.projects.length; p++) {
-      
-      //apply interpolation    
-      let polationList = this.getPolationList(p, calcType);
-      let interpolationList = polationList.filter(item => item[0] == "interpolation");
-      let extrapolationList = polationList.filter(item => item[0] == "extrapolation");
-      skippedList = polationList.filter(item => item[0] == "floating");
-      this.polation(interpolationList, calcRange, calcType);
-      
-      
-      //apply extrapolation  
-      polationList = this.getPolationList(p, calcType);
-      interpolationList = polationList.filter(item => item[0] == "interpolation");
-      extrapolationList = polationList.filter(item => item[0] == "extrapolation");
-      skippedList = polationList.filter(item => item[0] == "floating");
-      this.polation(extrapolationList, calcRange, calcType);
+      if(interpolationType == "rank"){
+        //apply interpolation    
+        let polationList = this.getPolationList(p, calcType);
+        let interpolationList = polationList.filter(item => item[0] == "interpolation");
+        let extrapolationList = polationList.filter(item => item[0] == "extrapolation");
+        skippedList = polationList.filter(item => item[0] == "floating");
+        this.polation(interpolationList, calcRange, calcType, interpolationType);
+        
+        //apply extrapolation  
+        polationList = this.getPolationList(p, calcType);
+        interpolationList = polationList.filter(item => item[0] == "interpolation");
+        extrapolationList = polationList.filter(item => item[0] == "extrapolation");
+        skippedList = polationList.filter(item => item[0] == "floating");
+        this.polation(extrapolationList, calcRange, calcType, interpolationType);
 
-      //apply 2nd interpolation    
-      polationList = this.getPolationList(p, calcType);
+        //apply 2nd interpolation    
+        polationList = this.getPolationList(p, calcType);
+        
+        interpolationList = polationList.filter(item => item[0] == "interpolation");
+        extrapolationList = polationList.filter(item => item[0] == "extrapolation");
+        skippedList = polationList.filter(item => item[0] == "floating");
+        this.polation(interpolationList, calcRange, calcType, interpolationType);
+
+        //calc result
+        polationList = this.getPolationList(p, calcType);
+        interpolationList = polationList.filter(item => item[0] == "interpolation");
+        extrapolationList = polationList.filter(item => item[0] == "extrapolation");
+        skippedList = polationList.filter(item => item[0] == "floating");
+
+        if(interpolationList.length!==0){
+          this.setErrorAlert("","E033: The 3rd order interpolation exist. The 3rd order interpolation is not suportted."+interpolationList)
+          console.log("LCCore: E033: The 3rd order interpolation exist. The 3rd order interpolation is not suportted.", interpolationList);
+        }
       
-      interpolationList = polationList.filter(item => item[0] == "interpolation");
-      extrapolationList = polationList.filter(item => item[0] == "extrapolation");
-      skippedList = polationList.filter(item => item[0] == "floating");
-      this.polation(interpolationList, calcRange, calcType);
+      }else if(interpolationType == "rank_grid"){
+        let polationList;
+        let interpolationList;
+        let extrapolationList;
 
-      //calc result
-      polationList = this.getPolationList(p, calcType);
-      interpolationList = polationList.filter(item => item[0] == "interpolation");
-      extrapolationList = polationList.filter(item => item[0] == "extrapolation");
-      skippedList = polationList.filter(item => item[0] == "floating");
+        //interpolation
+        polationList = this.getPolationList(p, calcType);
+        interpolationList = polationList.filter(item => item[0] === "interpolation");
+        let iterationCount = 0;
+        const maxIterations = 5;
+        while (interpolationList.length > 0 && iterationCount < maxIterations) {
+            this.polation(interpolationList, calcRange, calcType, interpolationType);
 
-      if(interpolationList.length!==0){
-        this.setErrorAlert("","E033: The 3rd order interpolation exist. The 3rd order interpolation is not suportted."+interpolationList)
-        console.log("LCCore: E033: The 3rd order interpolation exist. The 3rd order interpolation is not suportted.", interpolationList);
+            iterationCount++; 
+            polationList = this.getPolationList(p, calcType);
+            interpolationList = polationList.filter(item => item[0] === "interpolation");
+        }
+        console.log("LCCore: "+iterationCount+" th interpolation was performed.")
+
+        //extrapolation using new interpolated markers
+        polationList = this.getPolationList(p, calcType);
+        interpolationList = polationList.filter(item => item[0] == "interpolation");
+        extrapolationList = polationList.filter(item => item[0] == "extrapolation");
+        skippedList = polationList.filter(item => item[0] == "floating");
+
+        this.polation(extrapolationList, calcRange, calcType);
+        
+        if(interpolationList.length!==0){          
+          this.setErrorAlert("","E033: The 3rd order interpolation exist. The 3rd order interpolation is not suportted."+interpolationList)
+          console.log("LCCore: E033: The 3rd order interpolation exist. The 3rd order interpolation is not suportted.", interpolationList);
+        }
+        
       }
-    }    
+    }
+        
+    console.log("LCCore: from applyMarkerPolation ")
+    console.log(this._performance)
+
+    
     this.setStatus("completed","");
     return skippedList;
   }
@@ -2726,8 +2774,8 @@ class LevelCompilerCore extends EventEmitter{
             let targetId = this.projects[p].holes[h].sections[s].markers[m].id;
 
             //find nearest CD/EFD
-            let nearestMarkers = this.searchNearestMarkers(this.projects[p].holes[h].sections[s].markers[m], calcType);
-
+            let nearestMarkers = this.measurePerformance(this.searchNearestMarkers,this.projects[p].holes[h].sections[s].markers[m], calcType);
+            
             //polation type
             let polationType = "";
             if (nearestMarkers.upperId ==null && nearestMarkers.lowerId == null){
@@ -2746,7 +2794,7 @@ class LevelCompilerCore extends EventEmitter{
     this.setStatus("completed","");
     return polationList;
   }
-  polation(polationList, calcRange, calcType){
+  polation(polationList, calcRange, calcType, interpolationType="rank"){
     this.setStatus("running","start polation");
     if(polationList.length==0){
       this.setError("","E054: Input polation list is empty.");
@@ -2754,135 +2802,377 @@ class LevelCompilerCore extends EventEmitter{
     }
 
     let skippedList = [];
+    const addRank = 1;
+
     //apply polation
-    for (let i=0; i < polationList.length; i++){
-      if (polationList[i][0] == "interpolation"){
-        const addRank = 1;
+    if(polationList[0][0] == "interpolation" && interpolationType == "rank_grid"){
+      //interpolation
+      //make group between the same markers
+        const groupedList = {};
 
-        //case of interpolation
-        let uIdx = this.search_idx_list[polationList[i][1].toString()];
-        let tIdx = this.search_idx_list[polationList[i][2].toString()];
-        let lIdx = this.search_idx_list[polationList[i][3].toString()];
-        let upperMarkerData   = this.projects[uIdx[0]].holes[uIdx[1]].sections[uIdx[2]].markers[uIdx[3]];
-        let targetMarkerData  = this.projects[tIdx[0]].holes[tIdx[1]].sections[tIdx[2]].markers[tIdx[3]];
-        let lowerMarkerData   = this.projects[lIdx[0]].holes[lIdx[1]].sections[lIdx[2]].markers[lIdx[3]];
-
-        //check connection rank
-        let maxRank = Math.max(upperMarkerData.connection_rank, lowerMarkerData.connection_rank);
-        if(targetMarkerData.connection_rank !== null){
-          if(targetMarkerData.connection_rank <= maxRank + addRank && targetMarkerData.depth_source[0] == "extrapolation" || 
-             targetMarkerData.connection_rank <= maxRank + addRank + addRank && targetMarkerData.depth_source[0] == "transfer" ||
-             targetMarkerData.connection_rank <= maxRank + addRank + addRank && targetMarkerData.depth_source[0] == "master-transfer"
-          ){
-            continue;
-          } 
+        for (const [type, upperId, targetId, lowerId] of polationList) {
+          const key = `${upperId.toString()}<->${lowerId.toString()}`;
+          if (!groupedList[key]){
+            groupedList[key] = [[type, upperId, targetId, lowerId]];
+          } else{
+            groupedList[key].push([type, upperId, targetId, lowerId]);
+          }          
         }
+        //calc by each group
+        for (const key in groupedList) {
+          //console.log(key)
+          const group = groupedList[key];
+          if(group.length == 0){
+            continue
+          }
 
-        //interpoilate
-        const D1 = parseFloat(upperMarkerData[calcType]);
-        const D3 = parseFloat(lowerMarkerData[calcType]);
-        const d2d1 = -1 * parseFloat(this.calcMarkerDistance(upperMarkerData, targetMarkerData, calcType));
-        const d3d1 = parseFloat(this.calcMarkerDistance(lowerMarkerData, targetMarkerData, calcType)) - parseFloat(this.calcMarkerDistance(upperMarkerData, targetMarkerData, calcType));
-        const depth = this.linearInterp(D1, D3, d2d1, d3d1);
-      
-        //set values
-        this.projects[tIdx[0]].holes[tIdx[1]].sections[tIdx[2]].markers[tIdx[3]][calcType] = depth;       
-        this.projects[tIdx[0]].holes[tIdx[1]].sections[tIdx[2]].markers[tIdx[3]].connection_rank = maxRank + addRank;
-        this.projects[tIdx[0]].holes[tIdx[1]].sections[tIdx[2]].markers[tIdx[3]].depth_source = ["interpolate",polationList[i][1], polationList[i][3]];
+          const upperId = group[0][1];
+          const lowerId = group[0][3];
 
-        //set values into hConnected markers
-        for(let h=0; h<targetMarkerData.h_connection.length; h++){
-          const hConnectedId = targetMarkerData.h_connection[h];
-          const hConnectedIdx = this.search_idx_list[hConnectedId.toString()];
-          const hConnectedRank = this.projects[hConnectedIdx[0]].holes[hConnectedIdx[1]].sections[hConnectedIdx[2]].markers[hConnectedIdx[3]].connection_rank;
-          const hConnectedIsMaster = this.projects[hConnectedIdx[0]].holes[hConnectedIdx[1]].sections[hConnectedIdx[2]].markers[hConnectedIdx[3]].isMaster;
-          
-          //check new data is loated bweteen upper and lower markers.
-          let upperMarkerDepth = null;
-          let lowerMarkerDepth = null;
-          for(let hi=0; hi<this.projects[hConnectedIdx[0]].holes[hConnectedIdx[1]].sections[hConnectedIdx[2]].markers[hConnectedIdx[3]].v_connection.length;hi++){
-            const vh = this.projects[hConnectedIdx[0]].holes[hConnectedIdx[1]].sections[hConnectedIdx[2]].markers[hConnectedIdx[3]].v_connection[hi];
-            const tempIdx = this.search_idx_list[vh.toString()];
-            const tempMarkerData = this.projects[tempIdx[0]].holes[tempIdx[1]].sections[tempIdx[2]].markers[tempIdx[3]];
-            
-            if(tempMarkerData.distance > this.projects[hConnectedIdx[0]].holes[hConnectedIdx[1]].sections[hConnectedIdx[2]].markers[hConnectedIdx[3]].distance){
-              lowerMarkerDepth = tempMarkerData[calcType];
-            }else if(tempMarkerData.distance < this.projects[hConnectedIdx[0]].holes[hConnectedIdx[1]].sections[hConnectedIdx[2]].markers[hConnectedIdx[3]].distance){
-              upperMarkerDepth = tempMarkerData[calcType];
-            }else{
-              upperMarkerDepth = tempMarkerData[calcType];
-              lowerMarkerDepth = tempMarkerData[calcType];
+          const upperIdx = this.search_idx_list[upperId.toString()];
+          const lowerIdx = this.search_idx_list[lowerId.toString()];
+          const upperMarkerData = this.projects[upperIdx[0]].holes[upperIdx[1]].sections[upperIdx[2]].markers[upperIdx[3]];
+          const lowerMarkerData = this.projects[lowerIdx[0]].holes[lowerIdx[1]].sections[lowerIdx[2]].markers[lowerIdx[3]];
+          let maxRank = Math.max(upperMarkerData.connection_rank, lowerMarkerData.connection_rank);
+
+          //1 interpolate the marker which has h_connections
+          let targetIds = [];
+          for(let i=0; i<group.length;i++){
+            const idx = this.search_idx_list[group[i][2].toString()];
+            if(this.projects[idx[0]].holes[idx[1]].sections[idx[2]].markers[idx[3]].h_connection.length>0){
+              targetIds.push(group[i][2]);
             }
           }
 
-          //if(this.projects[hConnectedIdx[0]].holes[hConnectedIdx[1]].sections[hConnectedIdx[2]].markers[hConnectedIdx[3]].id.toString()=="2,7,9,28"){
-          //  console.log(upperMarkerDepth,depth,lowerMarkerDepth)
-          //}
+          for(let i=0;i<targetIds.length;i++){
+            const tIdx= this.search_idx_list[targetIds[i]];
+            const targetMarkerData = this.projects[tIdx[0]].holes[tIdx[1]].sections[tIdx[2]].markers[tIdx[3]];
 
-          if(hConnectedIsMaster == false && (hConnectedRank == null || hConnectedRank >= maxRank + addRank) && (upperMarkerDepth == null || depth >= upperMarkerDepth) && (lowerMarkerDepth == null || depth <= lowerMarkerDepth)
-          ){
-            if(calcRange=="all"){
-              this.projects[hConnectedIdx[0]].holes[hConnectedIdx[1]].sections[hConnectedIdx[2]].markers[hConnectedIdx[3]][calcType] = depth;
-              this.projects[hConnectedIdx[0]].holes[hConnectedIdx[1]].sections[hConnectedIdx[2]].markers[hConnectedIdx[3]].connection_rank = maxRank + addRank + 1;
-              this.projects[hConnectedIdx[0]].holes[hConnectedIdx[1]].sections[hConnectedIdx[2]].markers[hConnectedIdx[3]].depth_source = ["transfer", targetMarkerData.id,null];
-            } else {
-              if(targetMarkerData.id[0]==hConnectedId[0]){
-                this.projects[hConnectedIdx[0]].holes[hConnectedIdx[1]].sections[hConnectedIdx[2]].markers[hConnectedIdx[3]][calcType] = depth;
-                this.projects[hConnectedIdx[0]].holes[hConnectedIdx[1]].sections[hConnectedIdx[2]].markers[hConnectedIdx[3]].connection_rank = maxRank + addRank + 1;
-                this.projects[hConnectedIdx[0]].holes[hConnectedIdx[1]].sections[hConnectedIdx[2]].markers[hConnectedIdx[3]].depth_source = ["transfer", targetMarkerData.id,null];
+            //interpoilate
+            const D1 = parseFloat(upperMarkerData[calcType]);
+            const D3 = parseFloat(lowerMarkerData[calcType]);
+            const d2d1 = -1 * parseFloat(this.calcMarkerDistance(upperMarkerData, targetMarkerData, calcType));
+            const d3d1 = parseFloat(this.calcMarkerDistance(lowerMarkerData, targetMarkerData, calcType)) - parseFloat(this.calcMarkerDistance(upperMarkerData, targetMarkerData, calcType));
+            const depth = this.linearInterp(D1, D3, d2d1, d3d1);
+
+            //check rank
+            if(targetMarkerData.connection_rank !== null){
+              if(
+                (targetMarkerData.depth_source[0] == "extrapolation" && targetMarkerData.connection_rank <= maxRank + addRank) || 
+                (targetMarkerData.depth_source[0] == "transfer"      && targetMarkerData.connection_rank <= maxRank + addRank) ||
+                (targetMarkerData.depth_source[0] == "master-transfer") ||
+                (targetMarkerData.depth_source[0] == "duo-master-transfer") 
+              ){
+                continue;
+              } 
+            }
+
+            //set values
+            this.projects[tIdx[0]].holes[tIdx[1]].sections[tIdx[2]].markers[tIdx[3]][calcType] = depth;       
+            this.projects[tIdx[0]].holes[tIdx[1]].sections[tIdx[2]].markers[tIdx[3]].connection_rank = maxRank + addRank;
+            this.projects[tIdx[0]].holes[tIdx[1]].sections[tIdx[2]].markers[tIdx[3]].depth_source = ["interpolate", group[0][1], group[0][3]];
+
+            //transfer to h_connected marker
+            for(let h=0; h<targetMarkerData.h_connection.length; h++){
+              const hcId  = targetMarkerData.h_connection[h];
+              const hcIdx = this.search_idx_list[hcId.toString()];
+              const hMarkerData = this.projects[hcIdx[0]].holes[hcIdx[1]].sections[hcIdx[2]].markers[hcIdx[3]];
+              if(hMarkerData[calcType] == null){
+                let isTransfer = false;
+                let nearestMarkers = this.measurePerformance(this.searchNearestMarkers,hMarkerData, calcType);
+
+                if(nearestMarkers.upperId!==null){
+                  //downward extrapolation
+                  const hcuIdx = this.search_idx_list[nearestMarkers.upperId.toString()];
+                  let hcuDepth = this.projects[hcuIdx[0]].holes[hcuIdx[1]].sections[hcuIdx[2]].markers[hcuIdx[3]][calcType];
+                  if(hcuDepth < depth){
+                    isTransfer = true;
+                  }else{
+                    isTransfer = false;
+                  }
+                }
+                if(nearestMarkers.lowerId!==null){
+                  //upward extrapolation
+                  const hclIdx = this.search_idx_list[nearestMarkers.lowerId.toString()];
+                  let hclDepth = this.projects[hclIdx[0]].holes[hclIdx[1]].sections[hclIdx[2]].markers[hclIdx[3]][calcType];
+                  if(hclDepth > depth){
+                    isTransfer = true;
+                  }else{
+                    isTransfer = false;
+                  }
+                }
+                
+                if(isTransfer){
+                  hMarkerData[calcType] = depth;
+                  hMarkerData.connection_rank = maxRank + addRank;
+                  hMarkerData.depth_source = ["transfer", targetIds[i], null];
+                }
+              }else{
+                //if depth data exist
+                if(
+                  (hMarkerData.depth_source[0] == "extrapolation" && hMarkerData.connection_rank <= maxRank + addRank) ||
+                  (hMarkerData.depth_source[0] == "transfer"      && hMarkerData.connection_rank <= maxRank + addRank) ||
+                  (hMarkerData.depth_source[0] == "master-transfer") ||
+                  (hMarkerData.depth_source[0] == "duo-master-transfer") || 
+                  (hMarkerData.depth_source[0] == "master") ||
+                  (hMarkerData.depth_source[0] == "duo-master")
+                ){
+                  continue
+                }
+                
+                // check length of EFD between upper/lower markers
+                if(hMarkerData.depth_source[0] == "transfer" ){
+                  hMarkerData[calcType] = depth;
+                  hMarkerData.connection_rank = maxRank + addRank;
+                  hMarkerData.depth_source = ["transfer", targetIds[i], null];
+                }else if(hMarkerData.depth_source[0] == "extrapolation" ){
+                  if(hMarkerData.depth_source[2]!==null){
+                    //upward extrapolation
+                    const hclIdx = this.search_idx_list[hMarkerData.depth_source[2].toString()];                   
+                    const hclEFD = this.projects[hclIdx[0]].holes[hclIdx[1]].sections[hclIdx[2]].markers[hclIdx[3]].event_free_depth;
+                    if(hclEFD > depth){
+                      hMarkerData[calcType] = depth;
+                      hMarkerData.connection_rank = maxRank + addRank;
+                      hMarkerData.depth_source = ["transfer", targetIds[i], null];
+                    }
+                  }
+                  if(hMarkerData.depth_source[1]!==null){
+                    //downward extrapolation
+                    const hcuIdx = this.search_idx_list[hMarkerData.depth_source[1].toString()];
+                    const hcuEFD = this.projects[hcuIdx[0]].holes[hcuIdx[1]].sections[hcuIdx[2]].markers[hcuIdx[3]].event_free_depth;
+                    if(hcuEFD < depth){
+                      hMarkerData[calcType] = depth;
+                      hMarkerData.connection_rank = maxRank + addRank;
+                      hMarkerData.depth_source = ["transfer", targetIds[i], null];
+                    }
+                  }
+
+                }else{
+                  //case interpolation
+                  const hcuIdx = this.search_idx_list[hMarkerData.depth_source[1].toString()];
+                  const hclIdx = this.search_idx_list[hMarkerData.depth_source[2].toString()];
+                  
+                  let hcuDepth = this.projects[hcuIdx[0]].holes[hcuIdx[1]].sections[hcuIdx[2]].markers[hcuIdx[3]][calcType];
+                  let hclDepth = this.projects[hclIdx[0]].holes[hclIdx[1]].sections[hclIdx[2]].markers[hclIdx[3]][calcType];
+                  let uDepth   = upperMarkerData[calcType];
+                  let lDepth   = lowerMarkerData[calcType];
+
+                  //out of case [uEFD lEFD hcuEFD hclEFD], [hcuEFD hclEFD uEFD lEFD], [uEFD hcuEFD hclEFD lEFD]
+                  //[hcuEFD > uEFD > lEFD > hclEFD]
+                  if(hcuDepth > uDepth && uDepth> lDepth && lDepth > hclDepth){
+                    hMarkerData[calcType] = depth;
+                    hMarkerData.connection_rank = maxRank + addRank;
+                    hMarkerData.depth_source = ["transfer", targetIds[i], null];
+                  }
+
+                  //[uEFD > hcuEFD > lEFD > hclEFD]                    
+                  if(uDepth > hcuDepth && hcuDepth > lDepth && lDepth > hclDepth){
+                    if(depth <= hcuDepth && depth >= lDepth){
+                      //depth is located between duplicate section
+                      //use shorter interpolation distance
+                      if(lDepth - uDepth <= hclDepth - hcuDepth){
+                        hMarkerData[calcType] = depth;
+                        hMarkerData.connection_rank = maxRank + addRank;
+                        hMarkerData.depth_source = ["transfer", targetIds[i], null];
+                      }else{
+                        //reimportation
+                        targetMarkerData[calcType] = hMarkerData[calcType];
+                        targetMarkerData.connection_rank = hMarkerData.connection_rank;
+                        targetMarkerData.depth_source = ["transfer", hMarkerData.id, null];
+                      }
+                    }
+                  }
+
+                  //[hcuEFD > uEFD > hclEFD > lEFD]
+                  if(hcuDepth > uDepth && uDepth > hclDepth && hclDepth > lDepth){
+                    if(depth <= uDepth && depth >= hclDepth){
+                      //depth is located between duplicate section
+                      //use shorter interpolation distance
+                      if(lDepth - uDepth <= hclDepth - hcuDepth){
+                        hMarkerData[calcType] = depth;
+                        hMarkerData.connection_rank = maxRank + addRank;
+                        hMarkerData.depth_source = ["transfer", targetIds[i], null];
+                      }else{
+                        //reimportation
+                        targetMarkerData[calcType] = hMarkerData[calcType];
+                        targetMarkerData.connection_rank = hMarkerData.connection_rank;
+                        targetMarkerData.depth_source = ["transfer", hMarkerData.id, null];
+                      }
+                    }
+                  }
+                }
               }
             }
-          }else{
 
+          }
+          targetIds = [];
+          //2 interpolate the makrer which has no h_connections
+          for(let i=0; i<group.length;i++){
+            const idx = this.search_idx_list[group[i][2].toString()];
+            if(
+              this.projects[idx[0]].holes[idx[1]].sections[idx[2]].markers[idx[3]].h_connection.length==0 &&
+              this.projects[idx[0]].holes[idx[1]].sections[idx[2]].markers[idx[3]].connection_rank == null
+            ){
+              targetIds.push(group[i][2]);
+            }
+          }
+
+          for(let i=0;i<targetIds.length;i++){
+            const tIdx = this.search_idx_list[targetIds[i].toString()];
+
+            const nearestMarkers = this.measurePerformance(this.searchNearestMarkers,this.projects[tIdx[0]].holes[tIdx[1]].sections[tIdx[2]].markers[tIdx[3]], calcType);
+            const uIdx = this.search_idx_list[nearestMarkers.upperId.toString()];
+            const lIdx = this.search_idx_list[nearestMarkers.lowerId.toString()];
+            const upperMarkerData  = this.projects[uIdx[0]].holes[uIdx[1]].sections[uIdx[2]].markers[uIdx[3]];
+            const lowerMarkerData  = this.projects[lIdx[0]].holes[lIdx[1]].sections[lIdx[2]].markers[lIdx[3]];
+            const targetMarkerData = this.projects[tIdx[0]].holes[tIdx[1]].sections[tIdx[2]].markers[tIdx[3]];
+            let maxRank = Math.max(upperMarkerData.connection_rank, lowerMarkerData.connection_rank);
+          
+            //interpoilate
+            const D1 = parseFloat(upperMarkerData[calcType]);
+            const D3 = parseFloat(lowerMarkerData[calcType]);
+            const d2d1 = -1 * parseFloat(this.calcMarkerDistance(upperMarkerData, targetMarkerData, calcType));
+            const d3d1 = parseFloat(this.calcMarkerDistance(lowerMarkerData, targetMarkerData, calcType)) - parseFloat(this.calcMarkerDistance(upperMarkerData, targetMarkerData, calcType));
+            const depth = this.linearInterp(D1, D3, d2d1, d3d1);
+
+            //apply
+            targetMarkerData[calcType] = depth;       
+            targetMarkerData.connection_rank = maxRank + addRank;
+            targetMarkerData.depth_source = ["interpolate", nearestMarkers.upperId, nearestMarkers.lowerId];
           }
 
         }
-
-      } else if (polationList[i][0] == "extrapolation"){
-        //
-        const addRank = 2;
-
-        //case of extrapolation
-        if (polationList[i][1] == null){
-          //case upward extrapolation
-          let tIdx = this.search_idx_list[polationList[i][2].toString()];
-          let lIdx = this.search_idx_list[polationList[i][3].toString()];
-          let targetMarkerData = this.projects[tIdx[0]].holes[tIdx[1]].sections[tIdx[2]].markers[tIdx[3]];
-          let lowerMarkerData  = this.projects[lIdx[0]].holes[lIdx[1]].sections[lIdx[2]].markers[lIdx[3]];
-          let exDistance = this.calcMarkerDistance(targetMarkerData, lowerMarkerData, calcType);
-
-          //check connection rank
-          if(targetMarkerData.connection_rank !== null || targetMarkerData.connection_rank <= lowerMarkerData + addRank){
-            continue;
-          }
-
-          //set values
-          this.projects[tIdx[0]].holes[tIdx[1]].sections[tIdx[2]].markers[tIdx[3]][calcType] = lowerMarkerData[calcType] + exDistance;
-          this.projects[tIdx[0]].holes[tIdx[1]].sections[tIdx[2]].markers[tIdx[3]].connection_rank = lowerMarkerData.connection_rank + addRank;
-          this.projects[tIdx[0]].holes[tIdx[1]].sections[tIdx[2]].markers[tIdx[3]].depth_source = ["extrapolate",null, polationList[i][3]];
-        } else if (polationList[i][3] == null){
-          // case downward extrapolation
+    }else{
+      for (let i=0; i < polationList.length; i++){
+        if (polationList[i][0] == "interpolation" && interpolationType == "rank"){
+          //case of interpolation
           let uIdx = this.search_idx_list[polationList[i][1].toString()];
           let tIdx = this.search_idx_list[polationList[i][2].toString()];
-          let upperMarkerData  = this.projects[uIdx[0]].holes[uIdx[1]].sections[uIdx[2]].markers[uIdx[3]];
-          let targetMarkerData = this.projects[tIdx[0]].holes[tIdx[1]].sections[tIdx[2]].markers[tIdx[3]];
-          let exDistance = this.calcMarkerDistance(targetMarkerData, upperMarkerData, calcType);
+          let lIdx = this.search_idx_list[polationList[i][3].toString()];
+          let upperMarkerData   = this.projects[uIdx[0]].holes[uIdx[1]].sections[uIdx[2]].markers[uIdx[3]];
+          let targetMarkerData  = this.projects[tIdx[0]].holes[tIdx[1]].sections[tIdx[2]].markers[tIdx[3]];
+          let lowerMarkerData   = this.projects[lIdx[0]].holes[lIdx[1]].sections[lIdx[2]].markers[lIdx[3]];
+
+          //interpoilate
+          const D1 = parseFloat(upperMarkerData[calcType]);
+          const D3 = parseFloat(lowerMarkerData[calcType]);
+          const d2d1 = -1 * parseFloat(this.calcMarkerDistance(upperMarkerData, targetMarkerData, calcType));
+          const d3d1 = parseFloat(this.calcMarkerDistance(lowerMarkerData, targetMarkerData, calcType)) - parseFloat(this.calcMarkerDistance(upperMarkerData, targetMarkerData, calcType));
+          const depth = this.linearInterp(D1, D3, d2d1, d3d1);
 
           //check connection rank
-          if(targetMarkerData[calcType] >= upperMarkerData[calcType] + exDistance  && (targetMarkerData.connection_rank !== null || targetMarkerData.connection_rank <= upperMarkerData + addRank)){
-            continue;
-          }          
+          let maxRank = Math.max(upperMarkerData.connection_rank, lowerMarkerData.connection_rank);
+          if(targetMarkerData.connection_rank !== null){
+            if(
+              (targetMarkerData.depth_source[0] == "extrapolation" && targetMarkerData.connection_rank <= maxRank + addRank) || 
+              (targetMarkerData.depth_source[0] == "transfer"      && targetMarkerData.connection_rank <= maxRank + addRank) ||
+              (targetMarkerData.depth_source[0] == "master-transfer") ||
+              (targetMarkerData.depth_source[0] == "duo-master-transfer")              
+            ){
+              //skip
+              continue;
+            } 
+          }
 
           //set values
-          this.projects[tIdx[0]].holes[tIdx[1]].sections[tIdx[2]].markers[tIdx[3]][calcType] = upperMarkerData[calcType] + exDistance;
-          this.projects[tIdx[0]].holes[tIdx[1]].sections[tIdx[2]].markers[tIdx[3]].connection_rank = upperMarkerData.connection_rank + addRank;
-          this.projects[tIdx[0]].holes[tIdx[1]].sections[tIdx[2]].markers[tIdx[3]].depth_source = ["extrapolate",polationList[i][1], null];
+          this.projects[tIdx[0]].holes[tIdx[1]].sections[tIdx[2]].markers[tIdx[3]][calcType] = depth;       
+          this.projects[tIdx[0]].holes[tIdx[1]].sections[tIdx[2]].markers[tIdx[3]].connection_rank = maxRank + addRank;
+          this.projects[tIdx[0]].holes[tIdx[1]].sections[tIdx[2]].markers[tIdx[3]].depth_source = ["interpolate", polationList[i][1], polationList[i][3]];
+
+          //set values into hConnected markers
+          for(let h=0; h<targetMarkerData.h_connection.length; h++){
+            const hConnectedId = targetMarkerData.h_connection[h];
+            const hConnectedIdx = this.search_idx_list[hConnectedId.toString()];
+            const hConnectedRank = this.projects[hConnectedIdx[0]].holes[hConnectedIdx[1]].sections[hConnectedIdx[2]].markers[hConnectedIdx[3]].connection_rank;
+            const hConnectedIsMaster = this.projects[hConnectedIdx[0]].holes[hConnectedIdx[1]].sections[hConnectedIdx[2]].markers[hConnectedIdx[3]].isMaster;
+            
+            //check new data is loated bweteen upper and lower markers.
+            let upperMarkerDepth = null;
+            let lowerMarkerDepth = null;
+            for(let hi=0; hi<this.projects[hConnectedIdx[0]].holes[hConnectedIdx[1]].sections[hConnectedIdx[2]].markers[hConnectedIdx[3]].v_connection.length;hi++){
+              const vh = this.projects[hConnectedIdx[0]].holes[hConnectedIdx[1]].sections[hConnectedIdx[2]].markers[hConnectedIdx[3]].v_connection[hi];
+              const tempIdx = this.search_idx_list[vh.toString()];
+              const tempMarkerData = this.projects[tempIdx[0]].holes[tempIdx[1]].sections[tempIdx[2]].markers[tempIdx[3]];
+              
+              if(tempMarkerData.distance > this.projects[hConnectedIdx[0]].holes[hConnectedIdx[1]].sections[hConnectedIdx[2]].markers[hConnectedIdx[3]].distance){
+                lowerMarkerDepth = tempMarkerData[calcType];
+              }else if(tempMarkerData.distance < this.projects[hConnectedIdx[0]].holes[hConnectedIdx[1]].sections[hConnectedIdx[2]].markers[hConnectedIdx[3]].distance){
+                upperMarkerDepth = tempMarkerData[calcType];
+              }else{
+                upperMarkerDepth = tempMarkerData[calcType];
+                lowerMarkerDepth = tempMarkerData[calcType];
+              }
+            }
+
+            //if(this.projects[hConnectedIdx[0]].holes[hConnectedIdx[1]].sections[hConnectedIdx[2]].markers[hConnectedIdx[3]].id.toString()=="2,7,9,28"){
+            //  console.log(upperMarkerDepth,depth,lowerMarkerDepth)
+            //}
+
+            if(hConnectedIsMaster == false && (hConnectedRank == null || hConnectedRank >= maxRank + addRank) && (upperMarkerDepth == null || depth >= upperMarkerDepth) && (lowerMarkerDepth == null || depth <= lowerMarkerDepth)
+            ){
+              if(calcRange=="all"){
+                this.projects[hConnectedIdx[0]].holes[hConnectedIdx[1]].sections[hConnectedIdx[2]].markers[hConnectedIdx[3]][calcType] = depth;
+                this.projects[hConnectedIdx[0]].holes[hConnectedIdx[1]].sections[hConnectedIdx[2]].markers[hConnectedIdx[3]].connection_rank = maxRank + addRank;
+                this.projects[hConnectedIdx[0]].holes[hConnectedIdx[1]].sections[hConnectedIdx[2]].markers[hConnectedIdx[3]].depth_source = ["transfer", targetMarkerData.id,null];
+              } else {
+                if(targetMarkerData.id[0]==hConnectedId[0]){
+                  this.projects[hConnectedIdx[0]].holes[hConnectedIdx[1]].sections[hConnectedIdx[2]].markers[hConnectedIdx[3]][calcType] = depth;
+                  this.projects[hConnectedIdx[0]].holes[hConnectedIdx[1]].sections[hConnectedIdx[2]].markers[hConnectedIdx[3]].connection_rank = maxRank + addRank;
+                  this.projects[hConnectedIdx[0]].holes[hConnectedIdx[1]].sections[hConnectedIdx[2]].markers[hConnectedIdx[3]].depth_source = ["transfer", targetMarkerData.id,null];
+                }
+              }
+            }else{
+
+            }
+
+          }
+        } else if (polationList[i][0] == "extrapolation"){
+          //
+          const addRank = 2;
+
+          //case of extrapolation
+          if (polationList[i][1] == null){
+            //case upward extrapolation
+            let tIdx = this.search_idx_list[polationList[i][2].toString()];
+            let lIdx = this.search_idx_list[polationList[i][3].toString()];
+            let targetMarkerData = this.projects[tIdx[0]].holes[tIdx[1]].sections[tIdx[2]].markers[tIdx[3]];
+            let lowerMarkerData  = this.projects[lIdx[0]].holes[lIdx[1]].sections[lIdx[2]].markers[lIdx[3]];
+            let exDistance = this.calcMarkerDistance(targetMarkerData, lowerMarkerData, calcType);
+
+            //check connection rank
+            if(targetMarkerData.connection_rank !== null || targetMarkerData.connection_rank <= lowerMarkerData + addRank){
+              continue;
+            }
+
+            //set values
+            this.projects[tIdx[0]].holes[tIdx[1]].sections[tIdx[2]].markers[tIdx[3]][calcType] = lowerMarkerData[calcType] + exDistance;
+            this.projects[tIdx[0]].holes[tIdx[1]].sections[tIdx[2]].markers[tIdx[3]].connection_rank = lowerMarkerData.connection_rank + addRank;
+            this.projects[tIdx[0]].holes[tIdx[1]].sections[tIdx[2]].markers[tIdx[3]].depth_source = ["extrapolate",null, polationList[i][3]];
+          } else if (polationList[i][3] == null){
+            // case downward extrapolation
+            let uIdx = this.search_idx_list[polationList[i][1].toString()];
+            let tIdx = this.search_idx_list[polationList[i][2].toString()];
+            let upperMarkerData  = this.projects[uIdx[0]].holes[uIdx[1]].sections[uIdx[2]].markers[uIdx[3]];
+            let targetMarkerData = this.projects[tIdx[0]].holes[tIdx[1]].sections[tIdx[2]].markers[tIdx[3]];
+            let exDistance = this.calcMarkerDistance(targetMarkerData, upperMarkerData, calcType);
+
+            //check connection rank
+            if(targetMarkerData[calcType] >= upperMarkerData[calcType] + exDistance  && (targetMarkerData.connection_rank !== null || targetMarkerData.connection_rank <= upperMarkerData + addRank)){
+              continue;
+            }          
+
+            //set values
+            this.projects[tIdx[0]].holes[tIdx[1]].sections[tIdx[2]].markers[tIdx[3]][calcType] = upperMarkerData[calcType] + exDistance;
+            this.projects[tIdx[0]].holes[tIdx[1]].sections[tIdx[2]].markers[tIdx[3]].connection_rank = upperMarkerData.connection_rank + addRank;
+            this.projects[tIdx[0]].holes[tIdx[1]].sections[tIdx[2]].markers[tIdx[3]].depth_source = ["extrapolate",polationList[i][1], null];
+          }
+        } else if (polationList[i][0] == "floating"){
+          //case of NO correlation points
+          skippedList.push(polationList[i]);
         }
-      } else if (polationList[i][0] == "floating"){
-        //case of NO correlation points
-        skippedList.push(polationList[i]);
       }
     }
+
     this.setStatus("completed","");
     return skippedList;
   }
@@ -2891,15 +3181,17 @@ class LevelCompilerCore extends EventEmitter{
     //calcType:"composite_depth", "event_free_depth"
     //search vertically connected markers
     let connectedIds = this.searchVconnection(startMarkerData.id);
-    let distances = [];
-    let distanceIds = [];
+    let distanceData = [];
     for (let i=0; i<connectedIds.length; i++){
       let connectedId = connectedIds[i];
-      let connectedMarkerData = this.getDataByIdx(this.search_idx_list[connectedId.toString()]);
+      let connectedMarkerData = this.measurePerformance(this.getDataByIdx,this.search_idx_list[connectedId.toString()]);
+
       if (connectedMarkerData[calcType] !== null){
         //check target is null?, calc distance by CD because of simplify
-        distances.push(this.calcMarkerDistance(connectedMarkerData, startMarkerData, "composite_depth"));
-        distanceIds.push(connectedMarkerData.id);
+        distanceData.push({
+          distance: this.measurePerformance(this.calcMarkerDistance,connectedMarkerData, startMarkerData, "composite_depth"),
+          id: connectedMarkerData.id
+        })
       }
 
     }
@@ -2912,24 +3204,25 @@ class LevelCompilerCore extends EventEmitter{
     let upperDistance = Infinity;
     let ownIdx = -1;
     let zeroIdx = -1;
-    for (let i=0; i<distances.length; i++){
+    for (let i=0; i<distanceData.length; i++){
+      const dist = distanceData[i];
       //lower case
-      if(distances[i] > 0){
-        if(Math.abs(distances[i]) < Math.abs(lowerDistance)){
-          lowerDistance = distances[i];
+      if(dist.distance > 0){
+        if(Math.abs(dist.distance) < Math.abs(lowerDistance)){
+          lowerDistance = dist.distance;
           lowerIdx = i;
         }        
       }
       //upper case
-      if(distances[i] < 0 ){
-        if(Math.abs(distances[i]) < Math.abs(upperDistance)){
-          upperDistance = distances[i];
+      if(dist.distance < 0 ){
+        if(Math.abs(dist.distance) < Math.abs(upperDistance)){
+          upperDistance = dist.distance;
           upperIdx = i;
         }        
       }
       //case interpolated marker distance is as same as upper/lower marker
-      if(distances[i] == 0 ){
-        if (distanceIds[i].toString() == startMarkerData.id.toString()){
+      if(dist.distance == 0 ){
+        if (dist.id.toString() == startMarkerData.id.toString()){
           //case target marker itself
           ownIdx = i;
         } else {
@@ -2951,10 +3244,10 @@ class LevelCompilerCore extends EventEmitter{
     let upperId = null;
     let lowerId = null;
     if (upperIdx !== -1){
-      upperId = distanceIds[upperIdx];
+      upperId = distanceData[upperIdx].id;
     }
     if (lowerIdx !== -1){
-      lowerId = distanceIds[lowerIdx];
+      lowerId = distanceData[lowerIdx].id;
     }
 
     /*
@@ -2966,6 +3259,7 @@ class LevelCompilerCore extends EventEmitter{
     }
     */
     this.setStatus("completed","");
+
     return {"upperId": upperId,"lowerId":lowerId};
 
   }
@@ -2981,7 +3275,18 @@ class LevelCompilerCore extends EventEmitter{
     }
 
     //get connected node idbetween both markers
-    let pathIds = this.searchShortestVerticalPath(currentMarkerData.id, neighborMarkerData.id);
+    const key = currentMarkerData.id + "->" + neighborMarkerData.id;
+    const revKey = neighborMarkerData.id + "->" +currentMarkerData.id;
+    let pathIds;
+    if(this._pathCache[key]===undefined && this._pathCache[revKey] === undefined){
+      this._pathCache[key]    = this.measurePerformance(this.searchShortestVerticalPath,currentMarkerData.id, neighborMarkerData.id);
+    }
+    pathIds = this._pathCache[key] ?? this._pathCache[revKey]?.slice().reverse();
+
+    if(pathIds===undefined){
+      return null;
+    }
+    
     
     if (pathIds == null){
       this.setErrorAlert("","E034: Connected path is not found between"+this.getMarkerNameFromId(currentMarkerData.id)+" and "+this.getMarkerNameFromId(neighborMarkerData.id))
@@ -4071,7 +4376,7 @@ class LevelCompilerCore extends EventEmitter{
 
     let newProject = new Project();
     newProject.name = name;
-    newProject.id = [Math.max(...this.reserved_project_ids)+1, null, null, null];
+    newProject.id = [Math.max(...this._reserved_project_ids)+1, null, null, null];
     newProject.order = this.projects.length+1;
     newProject.model_type = type;
     if(type == "correlation"){
@@ -4081,7 +4386,7 @@ class LevelCompilerCore extends EventEmitter{
     }
 
     this.projects.push(newProject);
-    this.reserved_project_ids.push(newProject.id[0]);
+    this._reserved_project_ids.push(newProject.id[0]);
 
     this.setStatus("completed","");
     return true;
@@ -4123,7 +4428,7 @@ class LevelCompilerCore extends EventEmitter{
     
     //delete project
     this.projects = this.projects.filter(project=>project.id.toString()!==projectId.toString());   
-    this.reserved_project_ids = this.reserved_project_ids.filter(pid=>pid!==projectId[0]);
+    this._reserved_project_ids = this._reserved_project_ids.filter(pid=>pid!==projectId[0]);
 
     this.updateSearchIdx();
     this.calcCompositeDepth();
@@ -4637,7 +4942,7 @@ class LevelCompilerCore extends EventEmitter{
                   //downward extrapolation
                   let sourceId = markerData.depth_source[1];
                   //count layers between target and source               
-                  const pathIds = this.searchShortestVerticalPath(sourceId,markerData.id);
+                  const pathIds = this.measurePerformance(this.searchShortestVerticalPath,sourceId,markerData.id);
                   let numIds = pathIds.length - 1;
                   pathIds.forEach((pid, n)=>{
                     if(visited.has(pid.toString())){
@@ -4663,7 +4968,7 @@ class LevelCompilerCore extends EventEmitter{
                   //upward extrapolation
                   let sourceId = markerData.depth_source[2];
                   //count layers between target and source               
-                  const pathIds = this.searchShortestVerticalPath(markerData.id, sourceId);
+                  const pathIds = this.measurePerformance(this.searchShortestVerticalPath,markerData.id, sourceId);
                   let numIds = pathIds.length - 1;
                   pathIds.forEach((pid, n)=>{
                     if(visited.has(pid.toString())==true){
@@ -4838,6 +5143,38 @@ class LevelCompilerCore extends EventEmitter{
   changeBaseProject(baseProjectId){
     this.base_project_id = baseProjectId;
   }
+
+  measurePerformance(func, ...args) {
+    if (this._measurePerformance === false) {
+      return func.apply(this, args); 
+    }
+
+    const label = func.name;
+    performance.mark(label + "-start");
+
+    const result = func.apply(this, args);
+    performance.mark(label + "-end");
+    performance.measure(label, label + "-start", label + "-end");
+
+    const entry = performance.getEntriesByName(label).pop();
+    if (!this._performance[label]) {
+      this._performance[label] = { time: 0, counts: 0 };
+    }
+    this._performance[label].time += entry?.duration || 0;
+    this._performance[label].counts += 1;
+
+    performance.clearMarks(label + "-start");
+    performance.clearMarks(label + "-end");
+    performance.clearMeasures(label);
+
+    return result;
+  }
+
+  exportSerialisedModel() {
+  return JSON.parse(JSON.stringify(this, (key, value) => {
+    return key.startsWith('_') ? undefined : value;
+  }));
+}
  
 }
 

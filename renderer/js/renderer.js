@@ -71,7 +71,7 @@ document.addEventListener("DOMContentLoaded", () => {
     objOpts.canvas.shift_x = 0; //[cm]
     objOpts.canvas.shift_y = 100; //[cm]
     objOpts.canvas.bottom_pad = 100; //[cm]
-    objOpts.canvas.buffer_depth = 0; //[cm]
+    objOpts.canvas.buffer_depth = 200; //[cm]
     objOpts.canvas.background_colour = "#f4f5f7";//"#f7f7f7"//"#f8fbff";//"#fffdfa";//""white
     objOpts.canvas.target_horizon = false;
     objOpts.canvas.is_grid = false;
@@ -4522,13 +4522,15 @@ document.addEventListener("DOMContentLoaded", () => {
                 let rank_name = "null";
                 if (marker.connection_rank != null){
                   //1111111111111111
-                  rank_name = marker.depth_source[0];//marker.connection_rank.toString();
+                 // rank_name = marker.depth_source[0];//marker.connection_rank.toString();
+                 rank_name = marker.connection_rank.toString();
                 }
                 sketch.text(
                   rank_name,
                   (hole_x0 + shift_x) * xMag + pad_x + 10,//- 23,
                   (marker_top + shift_y) * yMag + pad_y + 5
                 );
+
 
                 //connection rank
                 if (marker.connection_rank == null) {
@@ -4547,14 +4549,14 @@ document.addEventListener("DOMContentLoaded", () => {
                 );
 
                 //cd rank(unreliability)
-                if (marker.unreliability== 1) {
-                  sketch.fill("red");
-                  sketch.ellipse(
-                    (hole_x0 + shift_x) * xMag + pad_x,
-                    (marker_top + shift_y) * yMag + pad_y,
-                    4
-                  );
-                }
+                //if (marker.unreliability== 1) {
+                //  sketch.fill("red");
+                 // sketch.ellipse(
+                 //   (hole_x0 + shift_x) * xMag + pad_x,
+                 //   (marker_top + shift_y) * yMag + pad_y,
+                 //   4
+                 // );
+                //}
 
                 //master flag
                 if (marker.isMaster){

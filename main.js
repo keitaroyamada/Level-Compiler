@@ -135,7 +135,7 @@ function createMainWIndow() {
     LCCore = initialiseLCCore();
 
     console.log("MAIN: Project correlation data is initialised.");
-    return JSON.parse(JSON.stringify(LCCore));
+    return LCCore.exportSerialisedModel();
   });
   ipcMain.handle("InitialiseAgeModel", async (_e) => {
     //initialise
@@ -1780,7 +1780,7 @@ function createMainWIndow() {
    
     LCCore.calcCompositeDepth(LCCore.base_project_id);
 
-    return JSON.parse(JSON.stringify(LCCore));
+    return LCCore.exportSerialisedModel();
   });
 
   ipcMain.handle("CalcEventFreeDepth", async (_e) => {
@@ -1788,7 +1788,7 @@ function createMainWIndow() {
     console.log("MAIN: Calc event free depth");
     LCCore.calcEventFreeDepth(LCCore.base_project_id);
     //LCCore.getModelSummary();
-    return JSON.parse(JSON.stringify(LCCore));
+    return LCCore.exportSerialisedModel();
   });
 
 
@@ -3316,7 +3316,7 @@ function createMainWIndow() {
                   if(isEditMode){
                     //remove plot data
                     let outLCCore   = new LevelCompilerCore();
-                    Object.assign(outLCCore, JSON.parse(JSON.stringify(LCCore)));
+                    Object.assign(outLCCore, LCCore.exportSerialisedModel());
 
                     const outLCAge  = new LevelCompilerAge();
                     const outLCPlot = new LevelCompilerPlot();
@@ -3543,7 +3543,6 @@ function createMainWIndow() {
                 webPreferences: {preload: path.join(__dirname, "preload", "preload_plotter.js"),},
               });
               
-              //converterWindow.setAlwaysOnTop(true, "normal");
               plotWindow.on("closed", () => {
                 plotWindow = null;
                 mainWindow.webContents.send("PlotterClosed", "");
@@ -3554,7 +3553,7 @@ function createMainWIndow() {
           
               plotWindow.once("ready-to-show", () => {
                 plotWindow.show();
-                // plotWindow.setAlwaysOnTop(true, "normal");
+                plotWindow.setAlwaysOnTop(true, "normal");
                 //plotWindow.webContents.openDevTools();
                 plotWindow.webContents.send("PlotterMenuClicked");
               });
