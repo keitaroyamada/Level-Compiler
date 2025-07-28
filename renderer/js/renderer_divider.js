@@ -3,6 +3,7 @@ document.addEventListener("DOMContentLoaded", () => {
   let holeList = [];
   let sectionList = [];
   let interpolatedData = null;
+  let calcDirection = "actual2definition";
 
   //-------------------------------------------------------------------------------------------
   //initialise
@@ -55,7 +56,39 @@ document.addEventListener("DOMContentLoaded", () => {
     sortTable('depth_table', 1);
   });
  //-------------------------------------------------------------------------------------------
+document.getElementById("directionOptions").addEventListener("change", async (event) => {
 
+  //get data
+  let targetData = getTableData("target_table");
+
+  for(let i=0; i<targetData.length;i++){
+    updateTableCell("target_table", i, 0, "111"); //name
+    updateTableCell("target_table", i, 1, 999);//Math.round(result.target_distance_upper * 10) / 10); //actural upper
+    updateTableCell("target_table", i, 2, 999);//Math.round(result.target_distance_lower * 10) / 10); //actural lower
+    updateTableCell("target_table", i, 3, 999);//Math.round(result.definition_distance_upper * 10) / 10); //definition upper
+    updateTableCell("target_table", i, 4, 999,true);//Math.round(result.definition_distance_lower * 10) / 10); //definition lower
+    updateTableCell("target_table", i, 5, 999);//Math.round(result.age_mid_upper * 10) / 10); //age upper
+    updateTableCell("target_table", i, 6, 999);//Math.round(result.age_mid_lower * 10) / 10); //age lower
+    updateTableCell("target_table", i, 7, "");//result.calc_type_upper +"/"+ result.calc_type_lower); //polation type
+
+
+  }
+console.log(targetData)
+
+  
+  if(event.target.value=="actual2definition"){
+    //actual2definition
+
+  }else{
+    //definition2actual
+
+  }
+
+      console.log(`Direction: ${event.target.value}`);
+      //calc
+      //await updateMarkerTable();
+      //updatePlot();
+    });
 //-------------------------------------------------------------------------------------------
   document.getElementById("add_target").addEventListener("click", async (event) => {
     //add point data
@@ -314,13 +347,14 @@ document.addEventListener("DOMContentLoaded", () => {
     });
     return data;
 }
-function updateTableCell(tableId, rowIndex, colIndex, value) {
+function updateTableCell(tableId, rowIndex, colIndex, value, editable=false) {
   const table = document.getElementById(tableId);
   const tbody = table.querySelector("tbody");
   if (!tbody) return; 
   const cell = tbody.rows[rowIndex]?.cells[colIndex];
   if (cell) {
       cell.innerText = value;
+      cell.setAttribute("contenteditable", editable);
   }
 }
 document.getElementById("depth_name").addEventListener("click", () => {
@@ -373,7 +407,17 @@ document.getElementById("calcButton").addEventListener("click", () => {
   const secId  = sectionList[holeIdx][sectionIdx][1];
   
   //calc main
-  const resultList = window.DividerApi.dividerDefinitionFromActural([holeId, secId, depthData], targetData);
+  let resultList = null;
+  if(calcDirection == "actual2definition"){
+    resultList = window.DividerApi.dividerDefinitionFromActural([holeId, secId, depthData], targetData);
+  }else{
+    resultList = window.DividerApi.dividerActuralFromDefinition([holeId, secId, depthData], targetData);
+  }
+  
+  if(resultList==null){
+    return
+  }
+
   interpolatedData = resultList;
 
   //apply table

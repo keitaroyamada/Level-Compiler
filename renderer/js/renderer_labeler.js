@@ -265,7 +265,7 @@ document.addEventListener("DOMContentLoaded", () => {
       //add zoom level
       if(event.ctrlKey){
         zoom_rate[0] += 0.001 * deltaY;
-        zoom_rate[1] += 0.001 * deltaY;  
+        //zoom_rate[1] += 0.001 * deltaY;  
       }else{
         zoom_rate[1] += 0.001 * deltaY;
       }

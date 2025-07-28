@@ -29,6 +29,7 @@ class LevelCompilerCore extends EventEmitter{
     //[_] properties are not exported.
     this._performance = {},
     this._pathCache = {};
+    this._distanceCache = {};
     this._measurePerformance = false; //for developper
     
     this.on('error', (err) => {
@@ -1534,6 +1535,7 @@ class LevelCompilerCore extends EventEmitter{
 
     //initiarise cache
     this._pathCache = {};
+    this._distanceCache = {};
 
     console.log("LCCore: Initiarised CD & EFD");
     this.setStatus("completed","Initialised");
@@ -3188,10 +3190,20 @@ class LevelCompilerCore extends EventEmitter{
 
       if (connectedMarkerData[calcType] !== null){
         //check target is null?, calc distance by CD because of simplify
-        distanceData.push({
-          distance: this.measurePerformance(this.calcMarkerDistance,connectedMarkerData, startMarkerData, "composite_depth"),
-          id: connectedMarkerData.id
-        })
+        const key = startMarkerData.id + "->" + connectedMarkerData.id;
+        if(this._distanceCache[key]===undefined){
+          this._distanceCache[key] = {
+            distance: this.measurePerformance(this.calcMarkerDistance,connectedMarkerData, startMarkerData, "composite_depth"),
+            id: connectedMarkerData.id
+          };
+        }
+
+        distanceData.push(this._distanceCache[key]); 
+
+        //distanceData.push({
+        //  distance: this.measurePerformance(this.calcMarkerDistance,connectedMarkerData, startMarkerData, "composite_depth"),
+        //  id: connectedMarkerData.id
+        //})
       }
 
     }

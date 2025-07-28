@@ -39,6 +39,7 @@ document.addEventListener("DOMContentLoaded", () => {
   let isSVG = false;
   let isLoadedLCModel = false;
   let backup_hole_enable = {};
+  let isProcessing = false;
   //============================================================================================
 
   //--------------------------------------------------------------------------------------------
@@ -359,7 +360,7 @@ document.addEventListener("DOMContentLoaded", () => {
           await registerLCModel(droppedData.path);
           //load registered model from main to renderer with making up hole list view
           await loadModel();
-          updateView();
+          //updateView();
           const selected_age_model_id = document.getElementById("AgeModelSelect").value; 
           await loadAge(selected_age_model_id);//load age data included LCCore
 
@@ -375,7 +376,6 @@ document.addEventListener("DOMContentLoaded", () => {
             if(numModel==i+1){
               await loadModel();
             }
-            updateView();
           } else if(droppedData.name.includes("[age]")){
             //case age file
             console.log("[Renderer]: Age model file load from drop.");
@@ -395,7 +395,6 @@ document.addEventListener("DOMContentLoaded", () => {
           if(result==true){
             await loadModel();
             console.log(LCCore)
-            updateView();
           }else{
             console.log("[Renderer]: Failed to load section data"+result);
             alert("Failed to load lcsectoion because: "+result);
@@ -723,7 +722,7 @@ document.addEventListener("DOMContentLoaded", () => {
   //============================================================================================
   //load correlation model
   window.LCapi.receive("UpdateViewFromMain", async () => {
-    await loadModel();
+    await loadModel(false);
     const registeredAgeList = await window.LCapi.MirrorAgeList();
     setAgeList(registeredAgeList);
     const selected_age_model_id = document.getElementById("AgeModelSelect").value; 
@@ -750,7 +749,7 @@ document.addEventListener("DOMContentLoaded", () => {
     await registerAgeFromLCAge();
 
     console.time("Load model") 
-    await loadModel();//make up hole list view
+    await loadModel(false);//make up hole list view
     console.timeEnd("Load model")
 
     console.time("Load age")
@@ -1103,7 +1102,7 @@ document.addEventListener("DOMContentLoaded", () => {
             const result = await window.LCapi.changeMarker(targetId, "descriptions",response);
             if(result == true){
               console.log("[Renderer]: Chnage marker descriptions.")
-              await loadModel();
+              await loadModel(false);
             }
           }
         }
@@ -1166,7 +1165,7 @@ document.addEventListener("DOMContentLoaded", () => {
             const result = await window.LCapi.changeSection(targetId, "descriptions",response);
             if(result == true){
               console.log("[Renderer]: Chnage section descriptions.")
-              await loadModel();
+              await loadModel(false);
             }
           }
         }
@@ -1228,7 +1227,7 @@ document.addEventListener("DOMContentLoaded", () => {
             const result = await window.LCapi.changeHole(targetId, "descriptions",response);
             if(result == true){
               console.log("[Renderer]: Chnage hole descriptions.")
-              await loadModel();
+              await loadModel(false);
             }
           }
         }
@@ -1316,7 +1315,7 @@ document.addEventListener("DOMContentLoaded", () => {
             const result = await window.LCapi.changeProject(targetId, "descriptions",response);
             if(result == true){
               console.log("[Renderer]: Chnage project descriptions.")
-              await loadModel();
+              await loadModel(false);
             }
           }
         }
@@ -1329,7 +1328,7 @@ document.addEventListener("DOMContentLoaded", () => {
       if (response.response) {
         const result = await window.LCapi.mergeProjects();
         if(result == true){
-          await loadModel();
+          await loadModel(false);
           await registerModelFromLCCore()
           await registerAgeFromLCAge();
           const selected_age_model_id = document.getElementById("AgeModelSelect").value;
@@ -1452,7 +1451,7 @@ document.addEventListener("DOMContentLoaded", () => {
           const result = await window.LCapi.changeWorkspace("name",response);
           if(result == true){
             console.log("[Renderer]: Chnage workspace name.")
-            await loadModel();
+            await loadModel(false);
           }
         }        
       }
@@ -1469,7 +1468,7 @@ document.addEventListener("DOMContentLoaded", () => {
           const result = await window.LCapi.changeWorkspace("descriptions",response);
           if(result == true){
             console.log("[Renderer]: Chnage workspace descriptions.")
-            await loadModel();
+            await loadModel(false);
           }
         }        
       }
@@ -1532,6 +1531,7 @@ document.addEventListener("DOMContentLoaded", () => {
       if(objOpts.edit.mode == "connect_marker"){
         if(!(objOpts.edit.marker_from.project == ht.project && objOpts.edit.marker_from.hole == ht.hole)){
           objOpts.edit.marker_to = ht;
+          isProcessing = true;
         }  
       }else if(objOpts.edit.mode == "connect_section" || objOpts.edit.mode == "disconnect_section"){
         //case piston core
@@ -1547,12 +1547,14 @@ document.addEventListener("DOMContentLoaded", () => {
     
     if (objOpts.edit.marker_from !== null && objOpts.edit.marker_to !== null) {
       //if get both markers
+      
       if(objOpts.edit.mode == "connect_marker"){
         const response = await window.LCapi.askdialog(
           "Connect markers",
           "Do you want to CONNECT between selected markers?"
         );
         if (response.response) {
+          
           const fromId = [objOpts.edit.marker_from.project, objOpts.edit.marker_from.hole, objOpts.edit.marker_from.section, objOpts.edit.marker_from.nearest_marker];
           const toId   = [objOpts.edit.marker_to.project,   objOpts.edit.marker_to.hole,   objOpts.edit.marker_to.section,   objOpts.edit.marker_to.nearest_marker];
           
@@ -1563,7 +1565,7 @@ document.addEventListener("DOMContentLoaded", () => {
           
           
           if(result==true){
-            await loadModel();
+            await loadModel(false);
             const fromIdx = getIdxById(LCCore, fromId);
             const fromMarkerData = LCCore.projects[fromIdx[0]].holes[fromIdx[1]].sections[fromIdx[2]].markers[fromIdx[3]];
             const toIdx = getIdxById(LCCore, toId);
@@ -1576,14 +1578,12 @@ document.addEventListener("DOMContentLoaded", () => {
             if(toMarkerData.depth_source[0]!=="master"){
               targetIds.push(toId);
             } 
-
             const affectedSections = getConnectedSectionIds(targetIds);
-
             if(affectedSections.length>0){
               modelImages.load_target_ids = affectedSections;
               modelImages = await loadCoreImages(modelImages, LCCore, objOpts, ["drilling_depth","composite_depth","event_free_depth", "age"]);
             }
-            
+            isProcessing = false;
             updateView();
           }
          
@@ -1659,6 +1659,7 @@ document.addEventListener("DOMContentLoaded", () => {
       objOpts.edit.hittest = null;
       objOpts.edit.marker_from = null;
       objOpts.edit.marker_to = null;
+      isProcessing = false;
     }
   }
   //2 Marker move--------------------------------------------
@@ -1729,6 +1730,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
     
     if (objOpts.edit.marker_from !== null) {
+      isProcessing = true;
       //if get both markers
       if(["change_marker_name","change_marker_distance"].includes(objOpts.edit.mode)){
         let target = null;
@@ -1929,6 +1931,7 @@ document.addEventListener("DOMContentLoaded", () => {
     objOpts.edit.marker_to = null;
     objOpts.edit.handleClick = null;
     objOpts.edit.handleMove = null;
+    isProcessing = false;
     ///update scroller position
     let canvasPosY = null;
     let canvasPosX = (ht.x + objOpts.canvas.shift_y) * (objOpts.canvas.dpir * objOpts.canvas.zoom_level[1]) + objOpts.canvas.pad_y;
@@ -1981,6 +1984,7 @@ document.addEventListener("DOMContentLoaded", () => {
     
     if (objOpts.edit.marker_from !== null) {
       //if get both markers
+      isProcessing = true;
       if(objOpts.edit.mode == "delete_marker"){
         const response = await window.LCapi.askdialog(
           "Delete markers",
@@ -2005,6 +2009,7 @@ document.addEventListener("DOMContentLoaded", () => {
     objOpts.edit.marker_to = null;
     objOpts.edit.handleClick = null;
     objOpts.edit.handleMove = null;
+    isProcessing = false;
     updateView();
   }
   //2 Marker click--------------------------------------------
@@ -2026,6 +2031,7 @@ document.addEventListener("DOMContentLoaded", () => {
         "Do you want to ADD a new marker?"
       );
       if (response.response) {
+        isProcessing = true;
         const upperId   = [objOpts.edit.marker_from.project, objOpts.edit.marker_from.hole, objOpts.edit.marker_from.section, objOpts.edit.marker_from.upper_marker];
         const lowerId   = [objOpts.edit.marker_from.project, objOpts.edit.marker_from.hole, objOpts.edit.marker_from.section, objOpts.edit.marker_from.lower_marker];
         const sectionId = [objOpts.edit.marker_from.project, objOpts.edit.marker_from.hole, objOpts.edit.marker_from.section, null];
@@ -2046,6 +2052,7 @@ document.addEventListener("DOMContentLoaded", () => {
     document.removeEventListener("mousemove", objOpts.edit.handleMove);
     objOpts.edit.handleClick = null;
     objOpts.edit.handleMove = null;
+    isProcessing = false;
 
     ///update scroller position
     let canvasPosY = null;
@@ -2109,7 +2116,7 @@ document.addEventListener("DOMContentLoaded", () => {
       };
       
       const response1 = await window.LCapi.inputdialog(askData);
-
+      isProcessing = true;
       if (response1 !== null) {
         let response2 = null;
         if(["deposition","d","markup","m"].includes(response1.toLowerCase())){
@@ -2200,6 +2207,7 @@ document.addEventListener("DOMContentLoaded", () => {
     document.removeEventListener("mousemove", objOpts.edit.handleMove);
     objOpts.edit.handleClick = null;
     objOpts.edit.handleMove = null;
+    isProcessing = false;
 
     updateView();
   }
@@ -3363,6 +3371,7 @@ document.addEventListener("DOMContentLoaded", () => {
   //mouse move position event
   document.addEventListener("mousemove", async function (event) {
     if(!LCCore){return}
+
     //get mouse position
     let rect = document.getElementById("p5Canvas").getBoundingClientRect(); // Canvas position and size  
     var mouseX = event.clientX - rect.left;
@@ -3517,7 +3526,7 @@ document.addEventListener("DOMContentLoaded", () => {
       if(result == true){
         const selected_age_model_id = document.getElementById("AgeModelSelect").value;
 
-        await loadModel();
+        await loadModel(false);
         await loadAge(selected_age_model_id);
         await loadPlotData();
           
@@ -4294,6 +4303,7 @@ document.addEventListener("DOMContentLoaded", () => {
             }
 
             //add section name-------------------------------------------------
+            const secDispName = hole.name + "-" + section.name;
             sketch.fill(objOpts.section.font_colour);
             sketch.noStroke();
             sketch.textFont(objOpts.section.font);
@@ -4301,10 +4311,10 @@ document.addEventListener("DOMContentLoaded", () => {
             sketch.push();
             sketch.translate(
               (hole_x0 + shift_x) * xMag + pad_x + objOpts.section.font_pos_x, //-10
-              (section_mid + shift_y) * yMag + pad_y
+              (section_mid + shift_y) * yMag + pad_y + sketch.textWidth(secDispName)/2
             );
             sketch.rotate((objOpts.section.font_angle / 180) * Math.PI);
-            sketch.text(hole.name + "-" + section.name, 0, 0);
+            sketch.text(secDispName, 0, 0);
             sketch.pop();
 
             for (let m = 0; m < section.markers.length; m++) {
@@ -5625,7 +5635,7 @@ document.addEventListener("DOMContentLoaded", () => {
           const projListCheck = document.createElement("input");
           projListCheck.type = "checkbox";
           projListCheck.id = project.id;
-          projListCheck.checked = backup_hole_enable[project.id.toString()] !== undefined?  backup_hole_enable[project.id.toString()]:true;
+          projListCheck.checked = backup_hole_enable[project.id.toString()] !== undefined?  backup_hole_enable[project.id.toString()] : true;
           const projListlabel = document.createElement("label");
           projListlabel.htmlFor = projListCheck.id;
           projListlabel.textContent = project.name;
@@ -5663,7 +5673,6 @@ document.addEventListener("DOMContentLoaded", () => {
   
         //sort
         LCCore = sortHoleByOrder(LCCore);
-  
         //apply enable info
         for(let  project of LCCore.projects){
           let en = backup_hole_enable[project.id.toString()];
@@ -5711,7 +5720,7 @@ document.addEventListener("DOMContentLoaded", () => {
             "\nProject name: " + p.name,
             "\nVersion: " + p.correlation_version,
             "\nType: " + p.model_type,
-            "\nModel data: " , LCCore
+            "\nModel data: " , p
           );
         })
   
@@ -5937,6 +5946,7 @@ document.addEventListener("DOMContentLoaded", () => {
     await window.LCapi.InitialisePaths();
   }
   function updateView() {
+    if(isProcessing){return}
     if (LCCore) {
       //update
       if (vectorObjects == null) {
@@ -6309,6 +6319,11 @@ async function getFooterInfo(LCCore, hittest, objOpts) {
     age = calcedData !== null ? calcedData.age_mid.toFixed(objOpts.canvas.age_precision) + " calBP)" : "---)";
   }
 
+  let trinityData = "[]";
+  if(hittest.sectionName){
+    trinityData = " ["+hittest.holeName+"-"+hittest.sectionName+"]";
+  }
+   
   if (objOpts.canvas.depth_scale == "age") {
   txt = "Age: " + hittest.y.toFixed(objOpts.canvas.age_precision) + " calBP";
   }else if (objOpts.canvas.depth_scale == "composite_depth") {
@@ -6316,7 +6331,8 @@ async function getFooterInfo(LCCore, hittest, objOpts) {
       "Composite Depth: " +
       (hittest.y/100).toFixed(2) +
       " m (Age: " +
-      age
+      age + 
+      trinityData
   } else if (objOpts.canvas.depth_scale == "event_free_depth") {
     txt =
       "Event Free Depth: " +
