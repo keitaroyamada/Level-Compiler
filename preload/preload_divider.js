@@ -18,8 +18,9 @@ contextBridge.exposeInMainWorld("DividerApi", {
   toggleDevTools: (args1) => ipcRenderer.send('toggle-devtools',args1),
   writeCsv: (args1) => ipcRenderer.send('dividerExport',args1),
 
-  dividerDefinitionFromActural: (args1,args2) => ipcRenderer.sendSync("dividerDefinitionFromActural", args1,args2),
-  dividerActuralFromDefinition: (args1,args2) => ipcRenderer.sendSync("dividerActuralFromDefinition", args1,args2),
+  inputdialog: (args1) => ipcRenderer.invoke("inputdialog", args1),
+
+  dividerConverter: (args1,args2, args3) => ipcRenderer.sendSync("dividerConverter", args1,args2, args3),
 
   //main -> renderer
   receive: (channel, func) => {

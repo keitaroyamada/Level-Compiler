@@ -1,0 +1,49 @@
+const { execSync, execFileSync, writeFileSync, appendFileSync } = require("child_process");
+const fs = require("fs");
+
+// === 対象ファイル・フォルダを列挙（相対パス） ===
+const targets = [
+  "renderer",
+  "preloaded",
+  "LC_modules",
+  "main.js",
+];
+
+// === 出力ファイル初期化 ===
+const output = "history.csv";
+fs.writeFileSync(output, "Date,Commit,CodeLines\n");
+
+// === Gitコミット履歴取得（古い順） ===
+const logs = execSync(`git log --reverse --format="%h %ad" --date=short`, { encoding: "utf8" })
+  .trim()
+  .split("\n");
+
+for (const line of logs) {
+  const [hash, date] = line.split(" ");
+
+  try {
+    // チェックアウト
+    execSync(`git checkout -q ${hash}`);
+
+    // 対象ファイルリストを一時ファイルに書き出す
+    fs.writeFileSync("filelist.txt", targets.join("\n"));
+
+    // cloc 実行してSUM行だけ抽出
+    const clocOut = execSync(`cloc --list-file=filelist.txt --quiet --csv --exclude-dir=node_modules,dist,build`)
+      .toString()
+      .split("\n")
+      .find(line => line.startsWith("SUM,")); // SUM行を探す
+
+    if (clocOut) {
+      const codeLines = clocOut.split(",")[4]; // "SUM,files,blank,comment,code"
+      appendFileSync(output, `${date},${hash},${codeLines}\n`);
+      console.log(`${date} ${hash}: ${codeLines} lines`);
+    }
+
+  } catch (e) {
+    console.error(`Error at ${hash}: ${e.message}`);
+  }
+}
+
+// 最後に元のブランチに戻す（必要なら）
+execSync("git checkout main");

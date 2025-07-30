@@ -1821,11 +1821,15 @@ function createMainWIndow() {
       return age.age.mid;
     }
   });
-  ipcMain.on("dividerDefinitionFromActural", async (_e, depthData, targetData) => {
+  ipcMain.on("dividerConverter", async (_e, depthData, targetData, direction) => {
     //calc 
+    console.log("MAIN: Calc divider ["+direction+"]")
     //depthData: [holeId, secId, depthData], targetData
-    //targetData: [[name, data1...],[name, data2...]]
-    if (!LCCore) {
+    //targetData: [[name, actural lower, definition upper, definition lower, age upper, age lower, polation type],...]
+
+    
+    if (!LCCore || targetData.length==0) {
+      console.log("MAIN: There is no LCCore.")
       return null;
     }
 
@@ -1841,14 +1845,14 @@ function createMainWIndow() {
       return parseFloat(item1[1]) - parseFloat(item2[1]);
     });
     depthData[2].sort((item1, item2) => {
-      return parseFloat(item1[1]) - parseFloat(item2[1]);
+      return parseFloat(item1[2]) - parseFloat(item2[2]);
     });
 
     //make correlation list
     let depthList = [];
     for(let c=0; c<depthData[2].length;c++){
-      const defDist= parseFloat(depthData[2][c][1]); //correlation definition distance
-      const actDist= parseFloat(depthData[2][c][2]); //correlation actural distance 
+      const defDist= parseFloat(depthData[2][c][2]); //correlation definition distance
+      const actDist= parseFloat(depthData[2][c][3]); //correlation actural distance 
 
       let td_cr = new Trinity();
       td_cr.name         = depthData[2][0];
@@ -1857,25 +1861,20 @@ function createMainWIndow() {
       td_cr.section_name = LCCore.getDataByIdx(LCCore.search_idx_list[[crId[0], crId[1], crId[2], null].toString()]).name;
       td_cr.distance     = defDist;
 
-      //convert depth (listed for function)
-      const cd_list = LCCore.getDepthFromTrinity(crId, [td_cr], "composite_depth"); //output:[sec id, cd, rank]
-      const defCD = cd_list[0][1];
-
       if(!isNaN(defDist) && !isNaN(actDist)){
         depthList.push({
-          correlation_name: depthData[2][c][0],
-          section_id: depthData[1],
-          project_name: td_cr.project_name,
-          hole_name: td_cr.hole_name,
-          section_name: td_cr.section_name,
+          correlation_name:    depthData[2][c][1],
+          section_id:          depthData[1],
+          project_name:        td_cr.project_name,
+          hole_name:           td_cr.hole_name,
+          section_name:        td_cr.section_name,
           definition_distance: defDist,
-          actural_distance: actDist,
-          definition_cd: defCD,
+          actural_distance:    actDist,
         });
       }
     }
 
-    //console.log(depthList);
+    //main calc
     let resultList = [];
     for(let t=0; t<targetData.length;t++){
       //D1 <- d1
@@ -1885,41 +1884,60 @@ function createMainWIndow() {
       //initialise
       //each row data
       const targetRowData = targetData[t];
-      //results contains sampling point of upper/lower info
-      result = {
-        name:    targetRowData[0],
-        project: depthList[0].project_name,
-        hole:    depthList[0].hole_name,
-        section: depthList[0].section_name,
-        definition_distance_lower:null,
-        definition_distance_upper:null,
-        definition_cd_upper: null,
-        definition_cd_lower: null,
-        definition_efd_upper: null,
-        definition_efd_lower: null,
-        target_distance_lower: parseFloat(targetRowData[2]),
-        target_distance_upper: parseFloat(targetRowData[1]),
-        age_mid_lower:null,
-        age_mid_upper:null,
-        age_upper_lower:null,
-        age_upper_upper:null,
-        age_lower_lower:null,
-        age_lower_upper:null,
-        calc_type_upper: null,
-        calc_type_lower: null
-      }
 
       //calc upper/lower
-      for(let ul=1;ul<3;ul++){
+      let uIdx = null;
+      let lIdx   = null; 
+      if(direction == "act->def"){
+        uIdx = 2;
+        lIdx = 3;
+      }else if(direction == "def->act"){
+        uIdx = 4;
+        lIdx = 5;
+      }
+      //results contains sampling point of upper/lower info
+      result = {
+        direction: direction,
+        name:    targetRowData[1],
+        project: depthList[0].project_name,
+        hole:    depthList[0].hole_name,
+        section: depthList[0].section_name,        
+        definition_distance_upper: direction=="def->act" ? parseFloat(targetRowData[uIdx]) : null,
+        definition_distance_lower: direction=="def->act" ? parseFloat(targetRowData[lIdx]) : null,
+        definition_cd_upper:  null,
+        definition_cd_lower:  null,
+        definition_efd_upper: null,
+        definition_efd_lower: null,
+        actual_distance_upper: direction=="act->def" ? parseFloat(targetRowData[uIdx]) : null,
+        actual_distance_lower: direction=="act->def" ? parseFloat(targetRowData[lIdx]) : null,
+        age_mid_upper:   null,
+        age_mid_lower:   null,
+        age_upper_upper: null,
+        age_upper_lower: null,
+        age_lower_upper: null,
+        age_lower_lower: null,
+        calc_type_upper: null,
+        calc_type_lower: null,
+        descriptions:""
+      }
+
+      if(targetRowData[0]==false){
+        //not checked
+        resultList.push(result);
+        continue
+      }
+
+      for(let ul=uIdx; ul<lIdx+1; ul++){
         //search nearest index
-        const targetActuralDist = parseFloat(targetRowData[ul]);//uppder/lower actural
+        const targetDist = parseFloat(targetRowData[ul]);//uppder/lower actural
         let upperIdx = -Infinity;
         let lowerIdx = Infinity;
         for(let i=0;i<depthList.length;i++){
-          if(depthList[i].actural_distance - targetActuralDist <= 0 && i > upperIdx ){
+          const distCorrelation = (direction=="act->def") ? depthList[i].actural_distance : depthList[i].definition_distance;
+          if(distCorrelation - targetDist <= 0 && i > upperIdx ){
             upperIdx = i;
           }
-          if(depthList[i].actural_distance - targetActuralDist >= 0 && i < lowerIdx){
+          if(distCorrelation - targetDist >= 0 && i < lowerIdx){
             lowerIdx = i;
           }
         }
@@ -1951,59 +1969,106 @@ function createMainWIndow() {
             D3Idx = upperIdx - 1;
           }
 
-          if(D3Idx > depthList.length && D3Idx < 0){
+          if(D3Idx > depthList.length || D3Idx < 0){
+            //if out of section
             output.push(result);
             break;
           }
 
-          let D2     = depthList[D2Idx].definition_cd;
-          let D3     = depthList[D3Idx].definition_cd;
-          const d1   = targetActuralDist;
-          const d2   = depthList[D2Idx].actural_distance;
-          const d3   = depthList[D3Idx].actural_distance;
+          //extrapolation
+          let D2     = (direction == "act->def") ? depthList[D2Idx].definition_distance : depthList[D2Idx].actural_distance;
+          let D3     = (direction == "act->def") ? depthList[D3Idx].definition_distance : depthList[D3Idx].actural_distance;
+          const d1   = targetDist;
+          const d2   = (direction == "act->def") ? depthList[D2Idx].actural_distance : depthList[D2Idx].definition_distance;
+          const d3   = (direction == "act->def") ? depthList[D3Idx].actural_distance : depthList[D3Idx].definition_distance;
           const d3d2 = d3 - d2;
           const d3d1 = d3 - d1;
-          const D1cd = LCCore.linearExtrap(D2, D3, d3d2, d3d1, "nearest");
+          const D1   = LCCore.linearExtrap(D2, D3, d3d2, d3d1, "nearest");
 
-          D2 = depthList[D2Idx].definition_distance;
-          D3 = depthList[D3Idx].definition_distance;
-          const D1dist = LCCore.linearExtrap(D2, D3, d3d2, d3d1, "nearest");
+          //calc cd
+          let td_cr = new Trinity();
+          td_cr.name         = targetRowData[1];
+          td_cr.project_name = depthList[0].project_name;
+          td_cr.hole_name    = depthList[0].hole_name;
+          td_cr.section_name = depthList[0].section_name;
+          td_cr.distance     = (direction == "act->def") ? D1 : d1;
 
+          const cd_list = LCCore.getDepthFromTrinity(depthList[0].section_id, [td_cr], "composite_depth", true); //output:[sec id, cd, rank] fource calc extrapolation
+          const D1cd = cd_list[0][1];
 
-          if(ul == 1){
-            result.definition_distance_upper = D1dist;
+          const idx2 = LCCore.getIdxFromTrinity(depthList[0].section_id, [depthList[0].hole_name, depthList[0].section_name, (direction == "act->def") ? D2 : d2]);
+          const depthSource2 = LCCore.projects[idx2[0]].holes[idx2[1]].sections[idx2[2]].markers[idx2[3]].depth_source;
+
+          if(ul == uIdx){
+            //case upper data
+            result.definition_distance_upper = (direction == "act->def") ? D1 : d1;
+            result.actual_distance_upper     = (direction == "act->def") ? d1 : D1;
             result.definition_cd_upper       = D1cd
-            result.calc_type_upper           = "extrapolation";
+            result.calc_type_upper           = "extrapolation["+depthSource2[0]+"]";
           }else{
-            result.definition_distance_lower = D1dist;
+            //case lower data
+            result.definition_distance_lower = (direction == "act->def") ? D1 : d1;
+            result.actual_distance_lower     = (direction == "act->def") ? d1 : D1;
             result.definition_cd_lower       = D1cd
-            result.calc_type_lower           = "extrapolation";
+            result.calc_type_lower           = "extrapolation["+depthSource2[0]+"]";
           }
+          //----------------------------------------------------------
         } else {
           //case inter polation---------------------------------------
-          let D1 = depthList[upperIdx].definition_cd;
-          let D3 = depthList[lowerIdx].definition_cd;
-          const d1 = depthList[upperIdx].actural_distance;
-          const d2 = targetActuralDist;
-          const d3 = depthList[lowerIdx].actural_distance;
+          let D1   = (direction == "act->def") ? depthList[upperIdx].definition_distance : depthList[upperIdx].actural_distance;
+          let D3   = (direction == "act->def") ? depthList[lowerIdx].definition_distance : depthList[lowerIdx].actural_distance;
+          const d1 = (direction == "act->def") ? depthList[upperIdx].actural_distance : depthList[upperIdx].definition_distance;
+          const d2 = targetDist;
+          const d3 = (direction == "act->def") ? depthList[lowerIdx].actural_distance : depthList[upperIdx].definition_distance;
           const d2d1 = d2 - d1;
           const d3d1 = d3 - d1;
+          const D2   = LCCore.linearInterp(D1, D3, d2d1, d3d1);
 
-          const D2cd = LCCore.linearInterp(D1, D3, d2d1, d3d1);
+          //calc cd
+          let td_cr = new Trinity();
+          td_cr.name         = targetRowData[1];
+          td_cr.project_name = depthList[0].project_name;
+          td_cr.hole_name    = depthList[0].hole_name;
+          td_cr.section_name = depthList[0].section_name;
+          td_cr.distance     = (direction == "act->def") ? D2 : d2;
 
-          D1 = depthList[upperIdx].definition_distance;
-          D3 = depthList[lowerIdx].definition_distance;
-          const D2dist = LCCore.linearInterp(D1, D3, d2d1, d3d1);
+          const cd_list = LCCore.getDepthFromTrinity(depthList[0].section_id, [td_cr], "composite_depth"); //output:[sec id, cd, rank]
+          const D2cd = cd_list[0][1];
+          
+          const idx1 = LCCore.getIdxFromTrinity(depthList[0].section_id, [depthList[0].hole_name, depthList[0].section_name, (direction == "act->def") ? D1 : d1]);
+          const idx3 = LCCore.getIdxFromTrinity(depthList[0].section_id, [depthList[0].hole_name, depthList[0].section_name, (direction == "act->def") ? D3 : d3]);
+          const depthSource1 = LCCore.projects[idx1[0]].holes[idx1[1]].sections[idx1[2]].markers[idx1[3]].depth_source;
+          const depthSource3 = LCCore.projects[idx3[0]].holes[idx3[1]].sections[idx3[2]].markers[idx3[3]].depth_source;
 
-          if(ul == 1){
-            result.definition_distance_upper = D2dist;
+          if(ul == uIdx){
+            result.definition_distance_upper = (direction == "act->def") ? D2 : d2;
+            result.actual_distance_upper     = (direction == "act->def") ? d2 : D2;
             result.definition_cd_upper       = D2cd;
-            result.calc_type_upper           = "interpolation";
+            result.calc_type_upper           = "interpolation["+depthSource1[0]+"/"+depthSource3[0]+"]";
           }else{
-            result.definition_distance_lower = D2dist;
+            result.definition_distance_lower = (direction == "act->def") ? D2 : d2;
+            result.actual_distance_lower     = (direction == "act->def") ? d2 : D2;
             result.definition_cd_lower       = D2cd;
-            result.calc_type_lower           = "interpolation";
+            result.calc_type_lower           = "interpolation["+depthSource1[0]+"/"+depthSource3[0]+"]";
           }
+
+          //----------------------------------------------------------
+        }
+      }
+
+      //check markers
+      let descriptions="";
+      for(let c=0; c<depthData[2].length;c++){
+        const defDist= parseFloat(depthData[2][c][2]); //correlation definition distance
+        const actDist= parseFloat(depthData[2][c][3]); //correlation actural distance 
+
+        if(defDist >= result.definition_distance_upper && defDist <= result.definition_distance_lower){
+          const diffDefUpper = Math.round((defDist - result.definition_distance_upper)*10)/10;
+          const diffActUpper = Math.round((actDist - result.actual_distance_upper)*10)/10;
+          const diffDefLower = Math.round((result.definition_distance_lower - defDist)*10)/10;
+          const diffActLower = Math.round((result.actual_distance_lower - actDist)*10)/10;
+
+          descriptions += depthData[2][c][1] + " is " + diffDefUpper +" cm[definition] (" + diffActUpper + " cm[actual]) below the sample upper.";
         }
       }
 
@@ -2018,213 +2083,10 @@ function createMainWIndow() {
       result.age_mid_lower   = ageLower.age.mid;
       result.age_lower_upper = ageLower.age.upper;
       result.age_lower_lower = ageLower.age.lower;
+      result.descriptions    = descriptions;
 
       //
-      resultList.push(result);
-    }
-
-    _e.returnValue = resultList;    
-  });
-  ipcMain.on("dividerActuralFromDefinition", async (_e, depthData, targetData) => {
-    //111111111111111111111
-    //calc 
-    //depthData: [holeId, secId, depthData], targetData
-    //targetData: [[name, data1...],[name, data2...]]
-    if (!LCCore) {
-      return null;
-    }
-
-    let result = {};
-
-    //All hole id/section id are the same.
-    const crId = depthData[1]//get section id 
-
-    let output = [];
-
-    //sort data
-    targetData.sort((item1, item2) => {
-      return parseFloat(item1[1]) - parseFloat(item2[1]);
-    });
-    depthData[2].sort((item1, item2) => {
-      return parseFloat(item1[1]) - parseFloat(item2[1]);
-    });
-
-    //make correlation list
-    let depthList = [];
-    for(let c=0; c<depthData[2].length;c++){
-      const defDist= parseFloat(depthData[2][c][1]); //correlation definition distance
-      const actDist= parseFloat(depthData[2][c][2]); //correlation actural distance 
-
-      let td_cr = new Trinity();
-      td_cr.name         = depthData[2][0];
-      td_cr.project_name = LCCore.getDataByIdx(LCCore.search_idx_list[[crId[0], null,    null,    null].toString()]).name;
-      td_cr.hole_name    = LCCore.getDataByIdx(LCCore.search_idx_list[[crId[0], crId[1], null,    null].toString()]).name;
-      td_cr.section_name = LCCore.getDataByIdx(LCCore.search_idx_list[[crId[0], crId[1], crId[2], null].toString()]).name;
-      td_cr.distance     = defDist;
-
-      //convert depth (listed for function)
-      const cd_list = LCCore.getDepthFromTrinity(crId, [td_cr], "composite_depth"); //output:[sec id, cd, rank]
-      const defCD = cd_list[0][1];
-
-      if(!isNaN(defDist) && !isNaN(actDist)){
-        depthList.push({
-          correlation_name: depthData[2][c][0],
-          section_id: depthData[1],
-          project_name: td_cr.project_name,
-          hole_name: td_cr.hole_name,
-          section_name: td_cr.section_name,
-          definition_distance: defDist,
-          actural_distance: actDist,
-          definition_cd: defCD,
-        });
-      }
-    }
-
-    //console.log(depthList);
-    let resultList = [];
-    for(let t=0; t<targetData.length;t++){
-      //D1 <- d1
-      //D2    d2
-      //D3    d4
-      
-      //initialise
-      //each row data
-      const targetRowData = targetData[t];
-      //results contains sampling point of upper/lower info
-      result = {
-        name:    targetRowData[0],
-        project: depthList[0].project_name,
-        hole:    depthList[0].hole_name,
-        section: depthList[0].section_name,
-        definition_distance_lower:null,
-        definition_distance_upper:null,
-        definition_cd_upper: null,
-        definition_cd_lower: null,
-        definition_efd_upper: null,
-        definition_efd_lower: null,
-        target_distance_lower: parseFloat(targetRowData[2]),
-        target_distance_upper: parseFloat(targetRowData[1]),
-        age_mid_lower:null,
-        age_mid_upper:null,
-        age_upper_lower:null,
-        age_upper_upper:null,
-        age_lower_lower:null,
-        age_lower_upper:null,
-        calc_type_upper: null,
-        calc_type_lower: null
-      }
-
-      //calc upper/lower
-      for(let ul=1;ul<3;ul++){
-        //search nearest index
-        const targetActuralDist = parseFloat(targetRowData[ul]);//uppder/lower actural
-        let upperIdx = -Infinity;
-        let lowerIdx = Infinity;
-        for(let i=0;i<depthList.length;i++){
-          if(depthList[i].actural_distance - targetActuralDist <= 0 && i > upperIdx ){
-            upperIdx = i;
-          }
-          if(depthList[i].actural_distance - targetActuralDist >= 0 && i < lowerIdx){
-            lowerIdx = i;
-          }
-        }
-
-        if(upperIdx == -Infinity){
-          upperIdx = null;
-        }
-
-        if(lowerIdx == Infinity){
-          lowerIdx = null;
-        }
-
-        //check inter or extra polation using cd, because of out of section data
-        if(upperIdx == null || lowerIdx == null){
-          //case extra polation--------------------------------------
-          let D2Idx = null;
-          let D3Idx = null;
-          if(upperIdx == null && lowerIdx == null){
-            //case no polation base
-            output.push(result);
-            break;
-          } else if (upperIdx == null ){
-            //case extrapolate to upward
-            D2Idx = lowerIdx;
-            D3Idx = lowerIdx + 1;
-          } else if (lowerIdx == null){
-            //case extrapolate downward
-            D2Idx = upperIdx;
-            D3Idx = upperIdx - 1;
-          }
-
-          if(D3Idx > depthList.length && D3Idx < 0){
-            output.push(result);
-            break;
-          }
-
-          let D2     = depthList[D2Idx].definition_cd;
-          let D3     = depthList[D3Idx].definition_cd;
-          const d1   = targetActuralDist;
-          const d2   = depthList[D2Idx].actural_distance;
-          const d3   = depthList[D3Idx].actural_distance;
-          const d3d2 = d3 - d2;
-          const d3d1 = d3 - d1;
-          const D1cd = LCCore.linearExtrap(D2, D3, d3d2, d3d1, "nearest");
-
-          D2 = depthList[D2Idx].definition_distance;
-          D3 = depthList[D3Idx].definition_distance;
-          const D1dist = LCCore.linearExtrap(D2, D3, d3d2, d3d1, "nearest");
-
-
-          if(ul == 1){
-            result.definition_distance_upper = D1dist;
-            result.definition_cd_upper       = D1cd
-            result.calc_type_upper           = "extrapolation";
-          }else{
-            result.definition_distance_lower = D1dist;
-            result.definition_cd_lower       = D1cd
-            result.calc_type_lower           = "extrapolation";
-          }
-        } else {
-          //case inter polation---------------------------------------
-          let D1 = depthList[upperIdx].definition_cd;
-          let D3 = depthList[lowerIdx].definition_cd;
-          const d1 = depthList[upperIdx].actural_distance;
-          const d2 = targetActuralDist;
-          const d3 = depthList[lowerIdx].actural_distance;
-          const d2d1 = d2 - d1;
-          const d3d1 = d3 - d1;
-
-          const D2cd = LCCore.linearInterp(D1, D3, d2d1, d3d1);
-
-          D1 = depthList[upperIdx].definition_distance;
-          D3 = depthList[lowerIdx].definition_distance;
-          const D2dist = LCCore.linearInterp(D1, D3, d2d1, d3d1);
-
-          if(ul == 1){
-            result.definition_distance_upper = D2dist;
-            result.definition_cd_upper       = D2cd;
-            result.calc_type_upper           = "interpolation";
-          }else{
-            result.definition_distance_lower = D2dist;
-            result.definition_cd_lower       = D2cd;
-            result.calc_type_lower           = "interpolation";
-          }
-        }
-      }
-
-      //calc age, efd
-      result.definition_efd_upper = LCCore.getEFDfromCD(result.definition_cd_upper);
-      result.definition_efd_lower = LCCore.getEFDfromCD(result.definition_cd_lower);
-      const ageUpper = LCAge.getAgeFromEFD(result.definition_efd_upper, "linear");
-      const ageLower = LCAge.getAgeFromEFD(result.definition_efd_lower, "linear");
-      result.age_mid_upper   = ageUpper.age.mid;
-      result.age_upper_upper = ageUpper.age.upper;
-      result.age_upper_lower = ageUpper.age.lower;
-      result.age_mid_lower   = ageLower.age.mid;
-      result.age_lower_upper = ageLower.age.upper;
-      result.age_lower_lower = ageLower.age.lower;
-
-      //
+      //console.log(result)
       resultList.push(result);
     }
 

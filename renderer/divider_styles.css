@@ -46,7 +46,7 @@
   height: 645px;
   width: 400px;
   overflow-y: scroll;
-  overflow-x: hidden;
+  overflow-x: scroll;
 }
 #depth_table {
   border-collapse: collapse;
@@ -67,18 +67,24 @@ td {
   height: 645px;
   width: 750px;
   overflow-y: scroll;
-  overflow-x: hidden;
+  overflow-x: scroll;
   font-size: small;
+  z-index: 99;
 }
 
 #target_table {
   width: 100px;
 }
 
-#add_menu {
+#add_menu1 {
   display: flex;
-  flex-direction: row;
+  gap: 10px;
 }
+#add_menu2 {
+  display: flex;
+  gap: 10px;
+}
+
 
 #add_in_position {
   width: 50%;
@@ -91,4 +97,5 @@ td {
 }
 #plot_canvas {
   background-color: white;
+  pointer-events: none;
 }

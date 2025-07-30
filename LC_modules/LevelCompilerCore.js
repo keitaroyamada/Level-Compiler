@@ -1275,7 +1275,7 @@ class LevelCompilerCore extends EventEmitter{
       })
     })
   }
-  getDepthFromTrinity(targetId, trinityList, calcType) {
+  getDepthFromTrinity(targetId, trinityList, calcType, allowExtrapolation=false) {
     this.setStatus("running","start getDepthFromTrinity");
 
     let output = [];
@@ -1305,13 +1305,13 @@ class LevelCompilerCore extends EventEmitter{
                     //check name and distance
                     if (holeData.name === holeName) {
                       if (sectionData.name === sectionName) {
-                        if (distance >= sectionData.markers[m].distance) {
-                          if (distance <= sectionData.markers[m + 1].distance) {
+                        if (allowExtrapolation || distance >= sectionData.markers[m].distance) {
+                          if (allowExtrapolation || distance <= sectionData.markers[m + 1].distance) {
                             if (upperIdxs.length > 0) {
-                              if (lowerIdxs[lowerIdxs.length - 1].toString() == [p, h, s, m].toString()) {
+                              //if (lowerIdxs[lowerIdxs.length - 1].toString() == [p, h, s, m].toString()) {
                                 //case the target horizon located on the marker
                                 //none
-                              }
+                              //}
                             } else {
                               upperIdxs.push([p, h, s, m]);
                               lowerIdxs.push([p, h, s, m + 1]);
@@ -1329,33 +1329,7 @@ class LevelCompilerCore extends EventEmitter{
       }
 
       //check num of detection
-      if (upperIdxs.length == 0 || lowerIdxs.length == 0) {
-        this.setError(
-          "",
-          "E018: Nearest unique marker set does not exist. [" +
-            trinityList[t].name +
-            " : " +
-            trinityList[t].hole_name +
-            "-" +
-            trinityList[t].section_name +
-            "-" +
-            trinityList[t].distance +
-            " cm]. Point is probably out of section."
-          )
-        console.log(
-          "LCCore: Nearest unique marker set does not exist. [" +
-            trinityList[t].name +
-            " : " +
-            trinityList[t].hole_name +
-            "-" +
-            trinityList[t].section_name +
-            "-" +
-            trinityList[t].distance +
-            " cm]. Point is probably out of section."
-        );
-        output.push([null, null, null]);
-        continue;
-      } else if (upperIdxs.length > 1 || lowerIdxs.length > 1) {
+      if (upperIdxs.length > 1 || lowerIdxs.length > 1) {
         this.setError(
           "",
           "E019: Duplicate set detected. [" +
@@ -1382,6 +1356,65 @@ class LevelCompilerCore extends EventEmitter{
         output.push([null, null, null]);
       }
 
+      if(upperIdxs.length == 0 || lowerIdxs.length == 0){
+        if(!allowExtrapolation){
+          this.setError(
+            "",
+            "E018: Nearest unique marker set does not exist. [" +
+              trinityList[t].name +
+              " : " +
+              trinityList[t].hole_name +
+              "-" +
+              trinityList[t].section_name +
+              "-" +
+              trinityList[t].distance +
+              " cm]. Point is probably out of section."
+            )
+          console.log(
+            "LCCore: Nearest unique marker set does not exist. [" +
+              trinityList[t].name +
+              " : " +
+              trinityList[t].hole_name +
+              "-" +
+              trinityList[t].section_name +
+              "-" +
+              trinityList[t].distance +
+              " cm]. Point is probably out of section."
+          );
+          output.push([null, null, null]);
+          continue;
+        }else{
+          //extrapolation
+          let Idx = null;
+          if(Idx == null && upperIdxs.length == 0){
+            Idx = lowerIdxs[0];
+          }else if(Idx == null && lowerIdxs.length == 0){
+            Idx = upperIdxs[0];
+          }
+
+          if(!Idx){
+            output.push([null, null, null]);
+            continue;
+          }
+
+          const sectionId = this.projects[Idx[0]].holes[Idx[1]].sections[Idx[2]].id;
+
+          //calc
+          const D3   = this.projects[Idx[0]].holes[Idx[1]].sections[Idx[2]].markers[Idx[3]][calcType];
+          const d1   = distance;
+          const d3   = this.projects[Idx[0]].holes[Idx[1]].sections[Idx[2]].markers[Idx[3]].distance;
+          const d3d1 = d3 - d1;
+          const D3_rank = this.projects[Idx[0]].holes[Idx[1]].sections[Idx[2]].markers[Idx[3]].connection_rank;
+          const D1   = LCCore.linearExtrap(null, D3, null, d3d1, "linear");
+
+          const new_rank = D3_rank + 2;
+
+          output.push([sectionId, D1, new_rank]);
+          continue;
+        }
+
+      }
+
       //get section data
       let sectionId = this.projects[upperIdxs[0][0]].holes[upperIdxs[0][1]].sections[upperIdxs[0][2]].id;
 
@@ -1405,10 +1438,10 @@ class LevelCompilerCore extends EventEmitter{
       //calc interpolated depth between markers
       const d2d1 = distance - d1;
       const d3d1 = d3 - d1;
-      const interpolatedEFD = this.linearInterp(D1, D3, d2d1, d3d1);
+      const interpolatedDepth = this.linearInterp(D1, D3, d2d1, d3d1);
 
       const new_rank = Math.max(...[D1_rank, D3_rank]);
-      output.push([sectionId, interpolatedEFD, new_rank]);
+      output.push([sectionId, interpolatedDepth, new_rank]);
     }
     this.setStatus("completed","");
     return output;
@@ -2756,8 +2789,9 @@ class LevelCompilerCore extends EventEmitter{
     }
         
     console.log("LCCore: from applyMarkerPolation ")
-    console.log(this._performance)
-
+    if(this._measurePerformance ){
+      console.log(this._performance)
+    }
     
     this.setStatus("completed","");
     return skippedList;
@@ -3410,11 +3444,12 @@ class LevelCompilerCore extends EventEmitter{
         D1 = D3 - ((D3-D2)*(d3d1)/ (d3d2));
       }
   
-      if (!isNaN(D1) && D1 !== null) {
-        output = D1;
-      }
     } else if(method == "linear"){
       D1 = D3 - d3d1;
+    }
+
+    if (!isNaN(D1) && D1 !== null) {
+      output = D1;
     }
     this.setStatus("completed","");
     return output;

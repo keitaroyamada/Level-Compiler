@@ -40,6 +40,7 @@
         <table id="depth_table">
           <thead>
             <tr>
+              <th id="depth_check"><input type="checkbox" checked></th>
               <th id="depth_name">Marker name</th>
               <th id="depth_definition">Definition (cm)</th>
               <th id="depth_actural">Actual (cm)</th>
@@ -49,8 +50,9 @@
           </tbody>
         </table>
         <div id = "definition_buttons">
-          <div id="add_menu">
+          <div id="add_menu1">
             <button id="add_definition">Add</button>
+            <button id="remove_definition">Remove</button>
           </div>
         </div>
         
@@ -59,21 +61,24 @@
         <table id="target_table">
           <thead>
             <tr>
+              <th id="target_check"><input type="checkbox" checked></th>
               <th id="target_name">Target_name</th>
-              <th id="target_upper">Target Upper (cm)</th>
-              <th id="target_lower">Target Lower (cm)</th>
+              <th id="target_upper">Actual Upper (cm)</th>
+              <th id="target_lower">Actual Lower (cm)</th>
               <th id="definition_upper">Definition Upper (cm)</th>
               <th id="definition_lower">Definition Lower (cm)</th>
               <th id="age_upper">Age Upper (cm)</th>
               <th id="age_lower">Age Lower (cm)</th>
-              <th id="calc_type">Type</th>
+              <th id="calc_type">Calc Type</th>
             </tr>
           </thead>
           <tbody id="target_body">
           </tbody>
         </table>
-        <div id="add_menu">
+        <div id="add_menu2">
           <button id="add_target">Add</button>
+          <button id="add_batch_target">Add batch [Distance]</button>
+          <button id="remove_target">Remove</button>
         </div>
       </div>
       <div id="plot_canvas_div">
