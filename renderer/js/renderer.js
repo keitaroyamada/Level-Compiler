@@ -1728,6 +1728,13 @@ document.addEventListener("DOMContentLoaded", () => {
       objOpts.edit.marker_from = ht;
       objOpts.edit.marker_to = 999999;//dummy
     }
+
+    let isShift = false;
+      if (event.shiftKey) {
+        //Set continuous selection mode
+        isShift = true;
+        console.log("[Renderer: Set continuous selection mode.]")
+      }
     
     if (objOpts.edit.marker_from !== null) {
       isProcessing = true;
@@ -1823,6 +1830,7 @@ document.addEventListener("DOMContentLoaded", () => {
       }else if(objOpts.edit.mode == "disable_master"){
         //apply
         const targetId = [ht.project, ht.hole, ht.section, ht.nearest_marker];
+        console.log(targetId)
         await undo("save");//undo
         const result = await window.LCapi.SetMaster(targetId, "disable");
         if(result==true){
@@ -1922,43 +1930,53 @@ document.addEventListener("DOMContentLoaded", () => {
         }
 
     }
-
-    document.removeEventListener("click", objOpts.edit.handleClick);
-    document.removeEventListener("mousemove", objOpts.edit.handleMove);
-    objOpts.edit.contextmenu_enable = true;
-    objOpts.edit.hittest = null;
-    objOpts.edit.marker_from = null;
-    objOpts.edit.marker_to = null;
-    objOpts.edit.handleClick = null;
-    objOpts.edit.handleMove = null;
-    isProcessing = false;
-    ///update scroller position
-    let canvasPosY = null;
-    let canvasPosX = (ht.x + objOpts.canvas.shift_y) * (objOpts.canvas.dpir * objOpts.canvas.zoom_level[1]) + objOpts.canvas.pad_y;
-    if (objOpts.canvas.depth_scale == "age") {
-      canvasPosY = ((ht.y+ objOpts.canvas.shift_y) * (objOpts.canvas.dpir * objOpts.canvas.zoom_level[1]) + objOpts.canvas.pad_y + objOpts.canvas.age_zoom_correction[1])  * objOpts.canvas.age_zoom_correction[0];
-    } else {
-      canvasPosY = (ht.y + objOpts.canvas.shift_y) * (objOpts.canvas.dpir * objOpts.canvas.zoom_level[1]) + objOpts.canvas.pad_y;
-    }
-
-    //if move to centre
-    //scroller.scrollTop = canvasPosY - scroller.clientHeight / 2;
-    //scroller.moveTo(scroller.scrollLeft, pos_y);
-
-    //move canvas
-    let newPosY = canvasPosY - scroller.clientHeight / 2;
-    let newPosX = canvasPosX - scroller.clientWidth / 2;
-    if(newPosY <= 0){
-      newPosY = 0;
-    }
-    if(newPosX <= 0){
-      newPosX = 0;
-    }
-
-    //canvasPos[0] = newPosY;
-    //canvasPos[1] = newPosY;
     
-    //canvasPos[1] = newPosY;
+    if(isShift){
+      objOpts.edit.contextmenu_enable = true;
+      objOpts.edit.hittest = null;
+      objOpts.edit.marker_from = null;
+      objOpts.edit.marker_to = null;
+      objOpts.edit.handleClick = null;
+      objOpts.edit.handleMove = null;
+    }else{
+      document.removeEventListener("click", objOpts.edit.handleClick);
+      document.removeEventListener("mousemove", objOpts.edit.handleMove);      
+
+      objOpts.edit.contextmenu_enable = true;
+      objOpts.edit.hittest = null;
+      objOpts.edit.marker_from = null;
+      objOpts.edit.marker_to = null;
+      objOpts.edit.handleClick = null;
+      objOpts.edit.handleMove = null;
+
+      ///update scroller position
+      let canvasPosY = null;
+      let canvasPosX = (ht.x + objOpts.canvas.shift_y) * (objOpts.canvas.dpir * objOpts.canvas.zoom_level[1]) + objOpts.canvas.pad_y;
+      if (objOpts.canvas.depth_scale == "age") {
+        canvasPosY = ((ht.y+ objOpts.canvas.shift_y) * (objOpts.canvas.dpir * objOpts.canvas.zoom_level[1]) + objOpts.canvas.pad_y + objOpts.canvas.age_zoom_correction[1])  * objOpts.canvas.age_zoom_correction[0];
+      } else {
+        canvasPosY = (ht.y + objOpts.canvas.shift_y) * (objOpts.canvas.dpir * objOpts.canvas.zoom_level[1]) + objOpts.canvas.pad_y;
+      }
+
+      //if move to centre
+      //scroller.scrollTop = canvasPosY - scroller.clientHeight / 2;
+      //scroller.moveTo(scroller.scrollLeft, pos_y);
+
+      //move canvas
+      let newPosY = canvasPosY - scroller.clientHeight / 2;
+      let newPosX = canvasPosX - scroller.clientWidth / 2;
+      if(newPosY <= 0){
+        newPosY = 0;
+      }
+      if(newPosX <= 0){
+        newPosX = 0;
+      }
+    }
+
+    
+    
+
+    isProcessing = false;
     updateView();
   }
   //2 Marker click--------------------------------------------
@@ -6373,7 +6391,7 @@ function getEventPosiotion(LCCore, event, marker_top, objOpts) {
         );
       }
     } else if (event[0] == "erosion") {
-      if (objOpts.canvas.depth_scale == "event_free_depth" || objOpts.canvas.depth_scale == "age") {
+      if (objOpts.canvas.depth_scale == "drilling_depth" || objOpts.canvas.depth_scale == "composite_depth" || objOpts.canvas.depth_scale == "event_free_depth" || objOpts.canvas.depth_scale == "age") {
         const conIdx = this.getIdxById(LCCore, event[2]); //event layer connected MarkerId
         lowerDepth = LCCore.projects[conIdx[0]].holes[conIdx[1]].sections[conIdx[2]].markers[conIdx[3]][objOpts.canvas.depth_scale];
         eventThickness = marker_top - lowerDepth;

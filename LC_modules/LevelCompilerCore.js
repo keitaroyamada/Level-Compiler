@@ -4162,9 +4162,9 @@ class LevelCompilerCore extends EventEmitter{
     }
 
     //case erosion remove lower marker
-    if(targetTypes == "erosion"){
-      this.deleteMarker(lowerId);
-    }
+    //if(targetTypes.includes("erosion")){
+    //  this.deleteMarker(lowerId);
+    //}
 
     this.updateSearchIdx();
     this.calcCompositeDepth();
