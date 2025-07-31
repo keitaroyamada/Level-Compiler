@@ -190,7 +190,8 @@ document.addEventListener("DOMContentLoaded", () => {
             type:"number",
           };
       let start = parseFloat(await window.DividerApi.inputdialog(askData));
-      if(start == null){
+      console.log(start)
+      if(isNaN(start)){
         return;
       }
       askData = {
@@ -200,7 +201,7 @@ document.addEventListener("DOMContentLoaded", () => {
             type:"number",
           };
       let end = parseFloat(await window.DividerApi.inputdialog(askData));
-      if(end == null){
+      if(isNaN(end)){
         return;
       }
       askData = {
@@ -210,7 +211,7 @@ document.addEventListener("DOMContentLoaded", () => {
             type:"number",
           };
       let interval = parseFloat(await window.DividerApi.inputdialog(askData));
-      if(interval == null){
+      if(isNaN(interval)){
         return;
       }
 
@@ -386,11 +387,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
     //apply data into table
     //initialise table
-    for (var i = rows.length - 1; i >= 0; i--) {
-      table.deleteRow(i);
-    }
-
-    
+    while (table.rows.length > 0) { 
+      table.deleteRow(0);           
+    } 
 
     //add data
     for (let i = 0; i < markerList.length; i++) {
@@ -402,6 +401,7 @@ document.addEventListener("DOMContentLoaded", () => {
       checkbox.type = "checkbox";
       checkbox.checked = true;
       cell0.appendChild(checkbox);
+      
       var cell1 = row.insertCell();
       cell1.textContent = markerList[i].name;
       cell1.setAttribute("contenteditable", "true");
@@ -409,8 +409,10 @@ document.addEventListener("DOMContentLoaded", () => {
       cell2.textContent = Math.round(parseFloat(markerList[i].distance)*10)/10;
       var cell3 = row.insertCell();
       cell3.textContent = Math.round(parseFloat(markerList[i].distance)*10)/10;
-      makeCellNumericOnly(cell3);
+      makeCellNumericOnly(cell3);      
     }
+
+    await window.DividerApi.dividerReflow();
     
   }
   //-------------------------------------------------------------------------------------------
@@ -447,10 +449,18 @@ document.addEventListener("DOMContentLoaded", () => {
   }
   //-------------------------------------------------------------------------------------------
   function updatePlot() {
+    const div    = document.getElementById("plot_canvas_div");
     const canvas = document.getElementById("plot_canvas");
-    canvas.width = 200;
-    canvas.height = 630;
+    const graph  = document.getElementById("plot_graph");
+
+    const rect = canvas.getBoundingClientRect();
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = rect.width * dpr;
+    canvas.height = rect.height * dpr;
+    
     let ctx = canvas.getContext("2d");
+    let ctx2 = graph.getContext("2d");
+    
     const padding_left = 50;
     const padding_top = 50;
 
@@ -458,11 +468,11 @@ document.addEventListener("DOMContentLoaded", () => {
     var table = document.getElementById("depth_table");
     var rows = table.rows;
     //plot section
-    const section_height = parseFloat(rows[rows.length - 1].cells[1].innerText) - parseFloat(rows[1].cells[1].innerText);
+    const section_height = parseFloat(rows[rows.length - 1].cells[2].innerText) - parseFloat(rows[1].cells[2].innerText);
     const plot_height_rate = canvas.height / (section_height + padding_top * 2);
 
     //calc pos
-    const y0 = (parseFloat(rows[1].cells[1].innerText) + padding_top) * plot_height_rate;
+    const y0 = (parseFloat(rows[1].cells[2].innerText) + padding_top) * plot_height_rate;
     const h = section_height * plot_height_rate;
     const x0 = padding_left;
     const w = 100;
@@ -480,9 +490,9 @@ document.addEventListener("DOMContentLoaded", () => {
     //ctx.fillText(           );
 
     for (let r = 1; r < rows.length; r++) {
-      const marker_name = rows[r].cells[0].innerText;
-      const marker_def = Math.round(parseFloat(rows[r].cells[1].innerText) * 10)/10;
-      const marker_act = parseFloat(rows[r].cells[2].innerText);
+      const marker_name = rows[r].cells[1].innerText;
+      const marker_def = Math.round(parseFloat(rows[r].cells[2].innerText) * 10)/10;
+      const marker_act = parseFloat(rows[r].cells[3].innerText);
 
       let marker_act_exist = false;
 
@@ -529,6 +539,22 @@ document.addEventListener("DOMContentLoaded", () => {
         }
       }
     }
+
+
+    //plot praph
+    const pw = 10;
+    const ph = 10;
+    for (let i=0; i<rows.length; i++){
+      const def = parseFloat(rows[i].cells[2].innerText);
+      const act = parseFloat(rows[i].cells[3].innerText);
+      ctx2.beginPath();
+      ctx2.strokeRect(def-pw/2, act-ph/2, pw, ph);
+      //ctx.fillRect(x0, y0, w, h);
+      ctx2.stroke();
+
+    }
+    
+    ctx2
   }
   //-------------------------------------------------------------------------------------------
   function sortTable(tableId, columnIndex) {

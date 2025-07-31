@@ -1,101 +1,158 @@
+:root {
+  --main-bg: #f5f7fa;
+  --border-color: #d0d7de;
+  --accent-color: #2d8cf0;
+  --text-color: #333;
+  --table-header-bg: #e9eef3;
+}
+
+html, body {
+  height: 100%;
+  margin: 0;
+  font-family: 'Segoe UI', sans-serif;
+  font-size: 14px;
+  color: var(--text-color);
+  background-color: var(--main-bg);
+  display: flex;
+  flex-direction: column;
+}
+
+/* ─────────── Top option area ─────────── */
 #options {
+  height: 80px;
+  flex-shrink: 0;
   display: flex;
-  flex-direction: row;
+  align-items: center;
+  gap: 20px;
+  padding: 0 20px;
+  background-color: white;
+  border-bottom: 1px solid var(--border-color);
 }
 
-#holeDiv {
-  width: 120px;
+/* ─────────── Common button & select styles ─────────── */
+button {
+  background-color: var(--accent-color);
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 5px 10px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+button:hover {
+  background-color: #1c6dc1;
+}
+select {
+  padding: 4px 8px;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  background-color: white;
 }
 
-#sectionDiv {
-  width: 120px;
-}
-
-#directionDiv {
-  width: 150px;
-}
-
-#calcDiv {
-  width: 140px;
-  height: 20px;
-}
-
-#calcButton {
-  width: 100px;
-  height: 20px;
-}
-
-#exportButton {
-  width: 100px;
-  height: 20px;
-}
-
+/* ─────────── Main container below options ─────────── */
 #table_container {
+  flex: 1;
   display: flex;
   flex-direction: row;
-  padding-top: 20px;
-}
-/*--------------------------------------------------------------------------------------*/
-#definition_buttons {
-  display: flex;
-  flex-direction: row;
-  padding-top: 20px;
+  gap: 20px;
+  padding: 10px 20px;
+  box-sizing: border-box;
+  overflow: hidden;
 }
 
+/* ─────────── Depth table area ─────────── */
 #depth_table_div {
-  height: 645px;
   width: 400px;
-  overflow-y: scroll;
-  overflow-x: scroll;
+  flex-shrink: 0;
+  height: 100%;
+  overflow: auto;
+  background-color: white;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  padding: 10px;
+  box-sizing: border-box;
 }
+
 #depth_table {
   border-collapse: collapse;
-  width: 380px;
-  font-size: small;
+  width: 100%;
+  font-size: 13px;
+}
+#depth_table thead {
+  background-color: var(--table-header-bg);
+}
+#depth_table th,
+#depth_table td {
+  border: 1px solid var(--border-color);
+  padding: 6px;
+  text-align: left;
 }
 
-th,
-td {
-  border: 1px solid black;
-  padding: 8px;
-  user-select: auto;
-  height: 10px;
-}
-/*--------------------------------------------------------------------------------------*/
-#target_table_div {
-  padding-left: 20px;
-  height: 645px;
-  width: 750px;
-  overflow-y: scroll;
-  overflow-x: scroll;
-  font-size: small;
-  z-index: 99;
-}
-
-#target_table {
-  width: 100px;
-}
-
-#add_menu1 {
+/* ─────────── Definition buttons ─────────── */
+#definition_buttons {
   display: flex;
   gap: 10px;
+  padding-top: 10px;
 }
+
+/* ─────────── Target table area ─────────── */
+#target_table_div {
+  width: 750px;
+  flex-shrink: 0;
+  height: 100%;
+  overflow: auto;
+  font-size: 13px;
+  background-color: white;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  padding: 10px;
+  box-sizing: border-box;
+}
+#target_table {
+  width: 100%;
+  border-collapse: collapse;
+}
+#target_table thead {
+  background-color: var(--table-header-bg);
+}
+#target_table th,
+#target_table td {
+  border: 1px solid var(--border-color);
+  padding: 6px;
+  text-align: left;
+}
+
+/* ─────────── Target table button groups ─────────── */
+#add_menu1,
 #add_menu2 {
   display: flex;
   gap: 10px;
+  padding-top: 10px;
 }
 
-
-#add_in_position {
-  width: 50%;
-}
-/*--------------------------------------------------------------------------------------*/
+/* ─────────── Right-side canvas plot area ─────────── */
 #plot_canvas_div {
-  width:200px;
-  padding-left: 20px;
+  flex: 1; /* fills remaining horizontal space */
+  min-width: 200px;
   height: 100%;
+  display: flex;
+  flex-direction: column;
 }
+
+#plot_graph {
+  background-color: #e0e4e8;
+  pointer-events: none;
+  width: 100%;       
+  height: 250px;      
+  aspect-ratio: unset; 
+  border-radius: 4px 4px 0 0;
+}
+
 #plot_canvas {
   background-color: white;
   pointer-events: none;
+  flex: 1;
+  border-radius: 0 0 4px 4px;
+  border: 1px solid var(--border-color);
+  border-top: none;
 }

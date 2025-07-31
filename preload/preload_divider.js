@@ -22,6 +22,8 @@ contextBridge.exposeInMainWorld("DividerApi", {
 
   dividerConverter: (args1,args2, args3) => ipcRenderer.sendSync("dividerConverter", args1,args2, args3),
 
+  dividerReflow: () => ipcRenderer.invoke("dividerReflow", ),
+
   //main -> renderer
   receive: (channel, func) => {
     ipcRenderer.on(channel, (event, ...args) => func(...args));

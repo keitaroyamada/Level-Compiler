@@ -891,6 +891,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }
       })
       LCCore = sortHoleByOrder(LCCore);
+      
       updateView();
     }else if(clickResult=="showSectionProperties"){
       if(LCCore){
@@ -1387,12 +1388,18 @@ document.addEventListener("DOMContentLoaded", () => {
     }else if(clickResult.includes("holeMoveTo")){
       const minHoleOrder = Math.min(...LCCore.projects.flatMap(p => p.holes.map(h => h.order)));
       const maxHoleOrder = Math.max(...LCCore.projects.flatMap(p => p.holes.map(h => h.order)));
+      let newOrder;
+      let currentOrder;
+      let targetIds = [];
+      if(objOpts.edit.hittest.project == null || objOpts.edit.hittest.hole == null){
+        return
+      }
       LCCore.projects.forEach(p=>{
         if(p.id[0]==objOpts.edit.hittest.project){
           p.holes.forEach(h=>{
             if(h.id[1]==objOpts.edit.hittest.hole){
-              const currentOrder = h.order;
-              let newOrder = null;
+              currentOrder = h.order;
+              
               if(clickResult.includes("Right")){
                 newOrder = currentOrder+1;
               }else if(clickResult.includes("Left")){
@@ -1408,8 +1415,12 @@ document.addEventListener("DOMContentLoaded", () => {
 
               p.holes.forEach(h2=>{
                 if(h2.order == newOrder){
-                  h2.order = currentOrder;
-                  h.order = newOrder;
+                  targetIds.push(h.id);
+                  targetIds.push(h2.id);
+                  holeId = h.id;
+                  //apply
+                  //h2.order = currentOrder;
+                  //h.order = newOrder;
                 }
               })
               
@@ -1417,7 +1428,20 @@ document.addEventListener("DOMContentLoaded", () => {
           })
         }
       })
-      updateView();
+
+      //update model
+      if(targetIds.length == 2){
+        console.log("renderer: Change order "+ targetIds[0] +"<->"+targetIds[1]);
+        await undo("save");//undo
+
+        const result = await window.LCapi.changeHole(targetIds[0], "order", targetIds[1]);
+        if(result == true){
+          console.log("[Renderer]: Chnage hole order.")
+          await loadModel(false);
+        }
+        updateView();
+      }
+      
     }else if(clickResult == "cancel"){
       objOpts.edit.editable = true;
       objOpts.edit.contextmenu_enable = true;

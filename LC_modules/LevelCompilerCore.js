@@ -2365,13 +2365,9 @@ class LevelCompilerCore extends EventEmitter{
 
       for (let h = 0; h < this.projects[p].holes.length; h++) {
         //sort section by order
-        this.projects[p].holes[h].sections.sort((a, b) =>
-          a.order < b.order ? -1 : 1
-        );
+        this.projects[p].holes[h].sections.sort((a, b) => a.order < b.order ? -1 : 1);
         for (let s = 0; s < this.projects[p].holes[h].sections.length; s++) {
-          this.projects[p].holes[h].sections[s].markers.sort((a, b) =>
-            a.distance < b.distance ? -1 : 1
-          );
+          this.projects[p].holes[h].sections[s].markers.sort((a, b) => a.distance < b.distance ? -1 : 1);
         }
       }
     }
@@ -2400,9 +2396,7 @@ class LevelCompilerCore extends EventEmitter{
     for (let p = 0; p < this.projects.length; p++) {
       for (let h = 0; h < this.projects[p].holes.length; h++) {
         for (let s = 0; s < this.projects[p].holes[h].sections.length; s++) {
-          this.projects[p].holes[h].sections[s].markers.sort((a, b) => 
-            a.distance < b.distance ? -1 : 1
-          );
+          this.projects[p].holes[h].sections[s].markers.sort((a, b) => a.distance < b.distance ? -1 : 1);
           for (let m = 0; m < this.projects[p].holes[h].sections[s].markers.length; m++){
             this.projects[p].holes[h].sections[s].markers[m].order = m;
           }
@@ -2414,7 +2408,7 @@ class LevelCompilerCore extends EventEmitter{
     for (let p = 0; p < this.projects.length; p++) {
       for (let h = 0; h < this.projects[p].holes.length; h++) {      
         this.projects[p].holes[h].sections.sort((a, b) =>{
-          a.markers[0].drilling_depth < b.markers[0].drilling_depth ? -1 : 1
+          return a.markers[0].drilling_depth < b.markers[0].drilling_depth ? -1 : 1
         });
         for (let s = 0; s < this.projects[p].holes[h].sections.length; s++){
           this.projects[p].holes[h].sections[s].order = s;
@@ -2422,18 +2416,18 @@ class LevelCompilerCore extends EventEmitter{
       }
     }
 
-    //sort hole by name
+    //sort hole by order (name)
     for (let p = 0; p < this.projects.length; p++) {
-      for (let h = 0; h < this.projects[p].holes.length; h++) {
-        this.projects[p].holes.sort((a, b) => {
-          a.name.localeCompare(b.name);
-        });
-      }
+      this.projects[p].holes.sort((a, b) => {
+        return a.order < b.order ? -1 : 1;
+        //return a.name.localeCompare(b.name);
+      });
     }
 
-    //sort project by name
+    //sort project by order (name)
     this.projects.sort((a, b) => {
-      a.name.localeCompare(b.name);
+      return a.order < b.order ? -1 : 1;
+      //return a.name.localeCompare(b.name);
     });
 
     //add new order
@@ -4393,6 +4387,34 @@ class LevelCompilerCore extends EventEmitter{
 
     this.setStatus("completed","");
     return true;
+  }
+  changeHoleOrder(holeId1, holeId2){
+    this.setStatus("running","start changeHoleOrder");
+    this.updateSearchIdx()
+
+    if(holeId1[1]==null||holeId2[1]==null){
+      this.setErrorAlert("","E068: There is no hole to replace.")
+      return false
+    }
+
+    const Idx1 = this.search_idx_list[holeId1.toString()];
+    const Idx2 = this.search_idx_list[holeId2.toString()];
+    const hole1Data  = this.projects[Idx1[0]].holes[Idx1[1]];
+    const hole2Data  = this.projects[Idx2[0]].holes[Idx2[1]];
+    const hole1Order = hole1Data.order;
+    const hole2Order = hole2Data.order;
+    
+    if(hole1Order == hole2Order){
+      this.setErrorAlert("","E069: The new order is as same sa the old order.");
+      return false;
+    }
+    
+    //apply
+    hole1Data.order = hole2Order;
+    hole2Data.order = hole1Order;
+
+    return true;
+    
   }
   addProject(type, name){
     this.setStatus("running","start addProject");

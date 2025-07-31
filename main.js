@@ -2019,7 +2019,7 @@ function createMainWIndow() {
           let D3   = (direction == "act->def") ? depthList[lowerIdx].definition_distance : depthList[lowerIdx].actural_distance;
           const d1 = (direction == "act->def") ? depthList[upperIdx].actural_distance : depthList[upperIdx].definition_distance;
           const d2 = targetDist;
-          const d3 = (direction == "act->def") ? depthList[lowerIdx].actural_distance : depthList[upperIdx].definition_distance;
+          const d3 = (direction == "act->def") ? depthList[lowerIdx].actural_distance : depthList[lowerIdx].definition_distance;
           const d2d1 = d2 - d1;
           const d3d1 = d3 - d1;
           const D2   = LCCore.linearInterp(D1, D3, d2d1, d3d1);
@@ -2131,7 +2131,14 @@ function createMainWIndow() {
       return;
     }
   });
-
+  ipcMain.handle("dividerReflow", async (_e) => {
+    if (dividerWindow) {
+      dividerWindow.blur();
+      setTimeout(() => dividerWindow.focus(), 1); 
+      return true;
+    }
+    return false
+  })
   ipcMain.on("dividerExport", async (_e, data) => {
     putcsvfile(mainWindow, null, data);    
     console.log("MAIN: Exported Divided data.");
@@ -2964,8 +2971,11 @@ function createMainWIndow() {
     if(type=="name"){
       const result = LCCore.changeName(holeId, value);
       return result;
-    }else{
+    }else if(type=="descriptions"){
       const result = LCCore.changeDescriptions(holeId, value);
+      return result;
+    }else if(type=="order"){
+      const result = LCCore.changeHoleOrder(holeId, value);
       return result;
     }
   });
@@ -3869,6 +3879,13 @@ async function putcsvfile(mainWindow, filePath, data) {
       }
     })
     .catch((err) => {
+      const response = dialog.showMessageBoxSync(null, {
+        type: "error",
+        buttons: ["OK"],
+        title: "Info",
+        message: "Failed to save file.",
+        detail: err.message,
+      });
       console.log(err);
     });
 }
