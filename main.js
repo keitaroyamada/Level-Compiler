@@ -246,6 +246,7 @@ function createMainWIndow() {
 
     //load ages into LCCore
     LCCore.calcMarkerAges(LCAge);
+    
     //LCAge.checkAges();
     if(LCAge.unreliable_ids.length>0){
       let txt = "Age model contains inverted chronological order.";
@@ -3178,7 +3179,6 @@ function createMainWIndow() {
       LCPlot.initialiseAgeCollection();
       //register dage data from LCAge
       registerLCPlot();
-
       
       return true
     }catch(err){

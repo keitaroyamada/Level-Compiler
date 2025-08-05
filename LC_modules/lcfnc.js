@@ -1,5 +1,6 @@
 const { parse } = require("csv-parse/sync");
 const fs = require("fs");
+const { randomUUID: uuidv4 } = require("crypto");
 
 function readcsv(data_path) {
   try {
@@ -27,7 +28,7 @@ function writecsv(data_path, data) {
     console.error("Failed to write csv: " + data_path);
   }
 }
-function uuidv4() {
+function uuidv4original() {
   return "xxxxxxxxxxxx4xxxyxxxxxxxxxxxxxxx".replace(/[xy]/g, function (c) {
     var r = (Math.random() * 16) | 0,
       v = c == "x" ? r : (r & 0x3) | 0x8;
@@ -113,7 +114,17 @@ function makeMarkerIdBase(rn, cn) {
   return output;
 }
 function getUniqueId(reserved_idxs) {
-  return Math.max.apply(null, reserved_idxs) + 1;
+  let isDuplicate = true;
+  let id = null;
+  while(isDuplicate){
+    id = uuidv4().replace(/-/g, "");
+    if(!reserved_idxs.includes(id)){
+      isDuplicate = false;
+    }
+  }
+  return id
+  
+  //return Math.max.apply(null, reserved_idxs) + 1;
 }
 function zeroPadding(str) {
   if (/^\d+$/.test(str.toString()) == true) {

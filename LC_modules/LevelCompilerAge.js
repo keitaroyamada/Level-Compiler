@@ -80,11 +80,11 @@ class LevelCompilerAge {
     }
 
     //reconstruct age model
-    let ageDataSet = new AgeSet();
-    ageDataSet.id = num_age_dataset + 1;
-    ageDataSet.name = model.name;
+    let ageDataSet     = new AgeSet();
+    ageDataSet.id      = num_age_dataset + 1;
+    ageDataSet.name    = model.name;
     ageDataSet.version = model.version;
-    this.selected_id = num_age_dataset + 1;
+    this.selected_id   = num_age_dataset + 1;
 
     for (let r = 1; r < csv_data.length; r++) {
       //get age data
@@ -111,15 +111,14 @@ class LevelCompilerAge {
       //get position
       if (csv_data[r][1] !== "" || csv_data[r][2] !== "" || csv_data[r][3] !== "") {
         //case defined by trinity--------------------------------------------------------
-        ageData.original_depth_type = "trinity";
-        ageData.trinityData.name = csv_data[r][0];
-        ageData.trinityData.hole_name = lcfnc.zeroPadding(csv_data[r][1]); //hole
+        ageData.original_depth_type      = "trinity";
+        ageData.trinityData.name         = csv_data[r][0];
+        ageData.trinityData.hole_name    = lcfnc.zeroPadding(csv_data[r][1]); //hole
         ageData.trinityData.section_name = lcfnc.zeroPadding(csv_data[r][2]); //section
-        ageData.trinityData.distance = parseFloat(csv_data[r][3]); //distance
+        ageData.trinityData.distance     = parseFloat(csv_data[r][3]); //distance
 
         //calc EFD
         const [[sectionId, efd, rank]] = LCCore.getDepthFromTrinity(targetProjectId, [ageData.trinityData],"event_free_depth");
-
         if (isNaN(efd)) {
           console.log(csv_data[r][0] + ":" + csv_data[r][1] + "-" + csv_data[r][2] + "-" + csv_data[r][3] + "cm EFD:" + efd);
         }
@@ -172,7 +171,7 @@ class LevelCompilerAge {
 
     this.AgeModels.push(ageDataSet);
     this.sortAges();
-    this.checkAges();
+    //this.checkAges();
   }
   sortAges() {
     //sort age model by efd
@@ -197,12 +196,12 @@ class LevelCompilerAge {
     let total_errors = 0;
     let total_contradiction = 0;
     this.AgeModels.forEach((model) => {
-      let name = model.name;
-      let num_total_ages = 0;
-      let num_error_ages = 0;
-      let num_error_ages_u = 0;
-      let num_error_ages_l = 0;
-      let num_error_efds = 0;
+      let name              = model.name;
+      let num_total_ages    = 0;
+      let num_error_ages    = 0;
+      let num_error_ages_u  = 0;
+      let num_error_ages_l  = 0;
+      let num_error_efds    = 0;
       let num_contradiction = 0;
 
       for(let i=0; i<model.ages.length; i++){
@@ -266,9 +265,8 @@ class LevelCompilerAge {
     });
 
     //update unique id
-    const newId = lcfnc.getUniqueId(
-      this.AgeModels[targetAgeModelIdx].reserved_age_ids
-    );
+    const newId = Math.max.apply(null, this.AgeModels[targetAgeModelIdx].reserved_age_ids) + 1
+
     ageData.id = newId;
 
     //add
@@ -286,7 +284,7 @@ class LevelCompilerAge {
         const ageData = this.AgeModels[m].ages[a];
         if(ageData.original_depth_type == "trinity"){
 
-          const result = LCCore.getDepthFromTrinity([1,null,null,null], [ageData.trinityData],"event_free_depth");
+          const result = LCCore.getDepthFromTrinity([null,null,null,null], [ageData.trinityData], "event_free_depth");
           const [sectionId, efd, rank] = result[0];
           if (sectionId == null) {
             console.log("Could not determine the position of " + ageData.trinityData.name);

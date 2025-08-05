@@ -164,7 +164,7 @@ class LevelCompilerCore extends EventEmitter{
     projectData.id = [newProjectId, null, null, null];
     projectData.name = model_info.name;
     projectData.correlation_version = model_info.version;
-    projectData.order = newProjectId;
+    projectData.order = this.projects.length+1;
     //make brank marker id list
     const markerIdList = lcfnc.makeMarkerIdBase(
       projectData.model_data.length,
@@ -227,7 +227,7 @@ class LevelCompilerCore extends EventEmitter{
           );
           sectionData.reserved_marker_ids.push(newMarkerId);
           markerData.id = [
-            projectData.id[0],
+            newProjectId,
             newHoleId,
             newSectionId,
             newMarkerId,
@@ -483,8 +483,7 @@ class LevelCompilerCore extends EventEmitter{
               }
             }
           } else if (m == markerList[2].length - 1) {
-            let previousMarker =
-              this.projects[projectIdx[0]].holes[h].sections[s].markers[m - 1];
+            let previousMarker = this.projects[projectIdx[0]].holes[h].sections[s].markers[m - 1];
             //let currentMarker = this.projects[projectIdx[0]].holes[h].sections[s].markers[m];
             //let nextMarker = this.projects[projectIdx[0]].holes[h].sections[s].markers[m] + 1;
             this.projects[projectIdx[0]].holes[h].sections[s].markers[
@@ -501,8 +500,7 @@ class LevelCompilerCore extends EventEmitter{
             let previousMarker =
               this.projects[projectIdx[0]].holes[h].sections[s].markers[m - 1];
             //let currentMarker = this.projects[projectIdx[0]].holes[h].sections[s].markers[m];
-            let nextMarker =
-              this.projects[projectIdx[0]].holes[h].sections[s].markers[m + 1];
+            let nextMarker = this.projects[projectIdx[0]].holes[h].sections[s].markers[m + 1];
 
             this.projects[projectIdx[0]].holes[h].sections[s].markers[
               m
@@ -649,7 +647,7 @@ class LevelCompilerCore extends EventEmitter{
             //check connection
             if (connectedMarkerIdx.length == 0) {
               this.setError("","E012: There is no correlated marker in the previously loaded projects.");
-              //console.log( "LCCore: E012: There is no correlated marker in the previously loaded projects."  );
+              console.log( "LCCore: E012: There is no correlated marker in the previously loaded projects."  );
               continue;
             } else if (connectedMarkerIdx.length > 1) {
               this.setError("","E013: There are too many correlated marker in the previously loaded projects.")
@@ -777,7 +775,7 @@ class LevelCompilerCore extends EventEmitter{
             for (let i = 0; i < currentMarkerData.h_connection.length; i++){
               let transferMarkerData = this.getDataByIdx(this.search_idx_list[currentMarkerData.h_connection[i]]);
               //if connect master marker
-              if(transferMarkerData.isMaster && transferMarkerData.id[0]==1){
+              if(transferMarkerData.isMaster && transferMarkerData.id[0]==this.base_project_id[0]){
                 this.projects[midx[0]].holes[midx[1]].sections[midx[2]].markers[midx[3]].depth_source = ["master-transfer",transferMarkerData.id,null];
               }
             }
@@ -1448,6 +1446,7 @@ class LevelCompilerCore extends EventEmitter{
               trinityList[t].distance +
               " cm]. Point is probably out of section."
           );
+          
           output.push([null, null, null]);
           continue;
         }else{
@@ -1506,7 +1505,6 @@ class LevelCompilerCore extends EventEmitter{
       const d2d1 = distance - d1;
       const d3d1 = d3 - d1;
       const interpolatedDepth = this.linearInterp(D1, D3, d2d1, d3d1);
-
       const new_rank = Math.max(...[D1_rank, D3_rank]);
       output.push([sectionId, interpolatedDepth, new_rank]);
     }
@@ -2872,7 +2870,7 @@ class LevelCompilerCore extends EventEmitter{
 
             //find nearest CD/EFD
             let nearestMarkers = this.measurePerformance(this.searchNearestMarkers,this.projects[p].holes[h].sections[s].markers[m], calcType);
-            
+
             //polation type
             let polationType = "";
             if (nearestMarkers.upperId ==null && nearestMarkers.lowerId == null){
@@ -4512,7 +4510,7 @@ class LevelCompilerCore extends EventEmitter{
 
     let newProject = new Project();
     newProject.name = name;
-    newProject.id = [Math.max(...this._reserved_project_ids)+1, null, null, null];
+    newProject.id = [lcfnc.getUniqueId(this._reserved_project_ids), null, null, null];
     newProject.order = this.projects.length+1;
     newProject.model_type = type;
     if(type == "correlation"){
@@ -4520,7 +4518,6 @@ class LevelCompilerCore extends EventEmitter{
         this.base_project_id = newProject.id;
       }
     }
-    console.log(this._reserved_project_ids)
 
     this.projects.push(newProject);
     this._reserved_project_ids.push(newProject.id[0]);
@@ -4579,7 +4576,7 @@ class LevelCompilerCore extends EventEmitter{
     //Please use with caution, as it may corrupt the model.
     //under construction 11111111111111111111111111111111111111111111111111111111111111
     const currentId = projectData.id;
-    const newId = [Math.max(...this._reserved_project_ids) + 1, null, null, null]
+    const newId = [lcfnc.getUniqueId(this._reserved_project_ids), null, null, null]
 
     projectData.id = newId;
     projectData.holes.forEach(hole=>{
@@ -4824,12 +4821,7 @@ class LevelCompilerCore extends EventEmitter{
     let output = [];
     visitedId.forEach((v) => {
       const val = v.split(",");
-      output.push([
-        parseInt(val[0]) == NaN ? Null : parseInt(val[0]),
-        parseInt(val[1]) == NaN ? Null : parseInt(val[1]),
-        parseInt(val[2]) == NaN ? Null : parseInt(val[2]),
-        parseInt(val[3]) == NaN ? Null : parseInt(val[3]),
-      ]);
+      output.push([val[0], val[1], val[2], val[3]]);
     });
 
     this.setStatus("completed","");
@@ -4855,7 +4847,7 @@ class LevelCompilerCore extends EventEmitter{
       counts += 1;
       currentId = stack.pop();
       if (!visitedId.has(currentId.toString())) {
-        currentIdx = this.search_idx_list[currentId];
+        currentIdx = this.search_idx_list[currentId.toString()];
 
         visitedId.add(currentId.toString());
         this.projects[currentIdx[0]].holes[currentIdx[1]].sections[currentIdx[2]].markers[currentIdx[3]].v_connection.forEach((v) => {
@@ -4870,12 +4862,7 @@ class LevelCompilerCore extends EventEmitter{
     let output = [];
     visitedId.forEach((v) => {
       const val = v.split(",");
-      output.push([
-        parseInt(val[0]) == NaN ? Null : parseInt(val[0]),
-        parseInt(val[1]) == NaN ? Null : parseInt(val[1]),
-        parseInt(val[2]) == NaN ? Null : parseInt(val[2]),
-        parseInt(val[3]) == NaN ? Null : parseInt(val[3]),
-      ]);
+      output.push([val[0], val[1], val[2], val[3]]);
     });
 
     this.setStatus("completed","");
