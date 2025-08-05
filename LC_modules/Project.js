@@ -1,7 +1,10 @@
+const lcfnc = require("./lcfnc.js");
+
 class Project {
   constructor() {
     this.id = [null, null, null, null];
-    this.name = "";
+    this.uuid = lcfnc.uuidv4();
+    this.uuid_base = this.uuid;
     this.holes = [];
     this.correlation_version = [];
     this.reserved_hole_ids = [0];

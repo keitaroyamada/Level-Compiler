@@ -4,6 +4,7 @@ document.addEventListener("DOMContentLoaded", () => {
   let sectionList = [];
   let interpolatedData = null;
   let calcDirection = "act->def";
+  let   isDragging    = false;
 
   //-------------------------------------------------------------------------------------------
   //initialise
@@ -182,7 +183,22 @@ document.addEventListener("DOMContentLoaded", () => {
   });
   //-------------------------------------------------------------------------------------------
   document.getElementById("add_batch_target").addEventListener("click", async (event) => {
-    
+     //data: ["name","depth_data","target_id"] e.g. ["name",[projectName(no use),holeName, sectionName, distance],[null, null, null, null]]
+    //type: "trinity", "composite_depth", "event_free_depth","age"
+    //method(age): "linear"
+
+    //get hole/section data
+  const holeIdx = document.getElementById("holeOptions").value;
+  const sectionIdx = document.getElementById("sectionOptions").value;
+
+  const holeId = holeList[holeIdx][1];
+  const holeName = holeList[holeIdx][2];
+  const sectionId  = sectionList[holeIdx][sectionIdx][1];
+  const sectionName  = sectionList[holeIdx][sectionIdx][2];
+  
+  //calc main
+    let type = "Distance";
+
      let askData = {
             title:"Batch input",
             label:"Please input strat distance(cm).",
@@ -215,81 +231,123 @@ document.addEventListener("DOMContentLoaded", () => {
         return;
       }
 
-      console.log(start, interval, end)
+    //make target list
+    console.log(start, interval, end)
+    let targetLists = [];
+    let posUpper;
+    let distUpper;
+    let distLower;
+    if(type == "Distance"){
+      posUpper = start;
+      distUpper = start;
+      distLower = start + interval;
+    }else if(type == "Event free depth"){
+      const resultUpper = await window.DividerApi.depthConverter(["NoUse", ["NoUse", holeName, sectionName, start], sectionId], "trinity", "linear");
+      posUpper = resultUpper.efd;
+      const resultLower = await window.DividerApi.depthConverter(["NoUse", posUpper+interval, sectionId], "event_free_depth", "linear");
+      distUpper = resultUpper.distance;
+      distLower = resultLower.distance;
+    }else if(type == "Age"){
+      const result = await window.DividerApi.depthConverter(["NoUse", ["NoUse", holeName, sectionName, start], sectionId], "trinity", "linear");
+      posUpper = result.age_mid;
+      const resultLower = await window.DividerApi.depthConverter(["NoUse", posUpper+interval, sectionId], "age", "linear");
+      distUpper = resultUpper.distance;
+      distLower = resultLower.distance;
+    }
+
+    let i = 1;
+    while(distLower <= end){
+      var target = [];
+      if(calcDirection == "act->def"){
+        //Actural depth
+        target.push("S"+String(i).padStart(3, '0')); //target name
+        target.push(distUpper); //target upper
+        target.push(distLower); //target lower
+
+        //Definition depth
+        target.push(null); //definition depth of target upper
+        target.push(null); //definition depth of target lower
+        target.push(null); //definition age of target upper
+        target.push(null); //definition age of target lower
+        target.push(null); //polation type
+      }else{
+        //Actural depth
+        target.push("S"+String(i).padStart(3, '0')); //target name
+        target.push(null); //target upper
+        target.push(null); //target lower
+
+        //Definition depth
+        target.push(distUpper); //definition depth of target upper
+        target.push(distLower); //definition depth of target lower
+        target.push(null); //definition age of target upper
+        target.push(null); //definition age of target lower
+        target.push(null); //polation type
+      }
+      targetLists.push(target);
+
+      //for next interval
+      if(type == "Distance"){
+        posUpper  = distLower;
+        distUpper = distLower;
+        distLower = distLower + interval;
+      }else if(type == "Event free depth"){
+        posUpper += interval;
+        const resultLower = await window.DividerApi.depthConverter(["NoUse", posUpper, sectionId], "event_free_depth", "linear");
+        
+        distUpper = distLower;
+        distLower = resultLower.distance;
+      }else if(type == "Age"){
+        posUpper += interval;
+        const resultLower = await window.DividerApi.depthConverter(["NoUse", posUpper, sectionId], "age", "linear");
+        
+        distUpper = distLower;
+        distLower = resultLower.distance;
+      }
+      console.log(distUpper, distLower)
+      
+      i += 1;
+    }
 
     //add point data
     var table = document.getElementById("target_body");
     
     //make new row    
     console.log(calcDirection)
-
-    let dist = start;
-    let i = 1;
-    while(dist <= end-interval){
+    for (let i=0; i<targetLists.length;i++){
       var row = table.insertRow();
-      if(calcDirection == "act->def"){
-        var cell0 = row.insertCell();
-        var checkbox = document.createElement("input");
-        checkbox.type = "checkbox";
-        checkbox.checked = true;
-        cell0.appendChild(checkbox);
+      const target = targetLists[i];
 
-        //Actural depth
-        var cell1 = row.insertCell();
-        cell1.textContent = "S"+String(i).padStart(3, '0'); //target name
-        cell1.setAttribute("contenteditable", "true");
-        var cell2 = row.insertCell();
-        cell2.textContent = dist; //target upper
-        makeCellNumericOnly(cell2);
-        var cell3 = row.insertCell();
-        cell3.textContent = dist+interval; //target lower
-        makeCellNumericOnly(cell3);
-        //Definition depth
-        var cell4 = row.insertCell();
-        cell4.textContent = null; //definition depth of target upper
-        //cell4.setAttribute("contenteditable", "false");
-        var cell5 = row.insertCell();
-        cell5.textContent = null; //definition depth of target lower
-        //cell5.setAttribute("contenteditable", "false");
-        var cell6 = row.insertCell();
-        cell6.textContent = null; //definition age of target upper
-        var cell7 = row.insertCell();
-        cell7.textContent = null; //definition age of target lower
-        var cell8 = row.insertCell();
-        cell8.textContent = null; //polation type
-      }else{
-        var cell0 = row.insertCell();
-        var checkbox = document.createElement("input");
-        checkbox.type = "checkbox";
-        checkbox.checked = true;
-        cell0.appendChild(checkbox);
+      var cell0 = row.insertCell();
+      var checkbox = document.createElement("input");
+      checkbox.type = "checkbox";
+      checkbox.checked = true;
+      cell0.appendChild(checkbox);
 
-        //Actural depth
-        var cell1 = row.insertCell();
-        cell1.textContent = "S"+String(i).padStart(3, '0'); //target name
-        cell1.setAttribute("contenteditable", "true");
-        var cell2 = row.insertCell();
-        cell2.textContent = null; //target upper
-        var cell3 = row.insertCell();
-        cell3.textContent = null; //target lower
-        //Definition depth
-        var cell4 = row.insertCell();
-        cell4.textContent = dist; //definition depth of target upper
-        makeCellNumericOnly(cell4);
-        var cell5 = row.insertCell();
-        cell5.textContent = dist+interval; //definition depth of target lower
-        makeCellNumericOnly(cell5);
-        var cell6 = row.insertCell();
-        cell6.textContent = null; //definition age of target upper
-        var cell7 = row.insertCell();
-        cell7.textContent = null; //definition age of target lower
-        var cell8 = row.insertCell();
-        cell8.textContent = null; //polation type
-      }
-
-      dist += interval;
-      i += 1;
+      //Actural depth
+      var cell1 = row.insertCell();
+      cell1.textContent = target[0]; //target name
+      cell1.setAttribute("contenteditable", "true");
+      var cell2 = row.insertCell();
+      cell2.textContent = target[1]; //target upper
+      makeCellNumericOnly(cell2);
+      var cell3 = row.insertCell();
+      cell3.textContent = target[2]; //target lower
+      makeCellNumericOnly(cell3);
+      //Definition depth
+      var cell4 = row.insertCell();
+      cell4.textContent = target[3]; //definition depth of target upper
+      //cell4.setAttribute("contenteditable", "false");
+      var cell5 = row.insertCell();
+      cell5.textContent = target[4]; //definition depth of target lower
+      //cell5.setAttribute("contenteditable", "false");
+      var cell6 = row.insertCell();
+      cell6.textContent = target[5]; //definition age of target upper
+      var cell7 = row.insertCell();
+      cell7.textContent = target[6]; //definition age of target lower
+      var cell8 = row.insertCell();
+      cell8.textContent = target[7]; //polation type
     }
+    
     
     sortTable('target_table', 1);
   });
@@ -303,6 +361,7 @@ document.addEventListener("DOMContentLoaded", () => {
         row.remove();
       }
     });
+    updatePlot();
   });
  //-------------------------------------------------------------------------------------------
   document.getElementById("target_check").addEventListener("change", e => {
@@ -320,6 +379,79 @@ document.addEventListener("DOMContentLoaded", () => {
       .forEach(cb => cb.checked = checked);
   });
   //-------------------------------------------------------------------------------------------
+  document.getElementById('divider1').addEventListener('mousedown', ()=>{ isDragging = "div1"; });
+  document.addEventListener('mouseup',  ()=>{ isDragging = false; });
+  document.addEventListener('mousemove', e=>{
+    if (isDragging !== "div1") return;
+
+    const container = document.getElementById('table_container');
+    const depthDiv  = document.getElementById('depth_table_div');
+    const divider1  = document.getElementById('divider1');
+    const targetDiv = document.getElementById('target_table_div');
+    const divider2  = document.getElementById('divider2');
+    const canvasDiv = document.getElementById('plot_canvas_div');
+    const pgraphDiv = document.getElementById('plot_graph');
+    const divider3  = document.getElementById('divider3');
+    const plotDiv   = document.getElementById('plot_canvas');
+
+    const parentWidth   = container.parentElement.getBoundingClientRect().width;
+    const plotWidth     = plotDiv.getBoundingClientRect().width;
+    const targetWidth   = targetDiv.offsetWidth;
+    const divider1Width = divider1.offsetWidth;
+    const divider2Width = divider2.offsetWidth;
+        
+    let offset = e.clientX - container.getBoundingClientRect().left; 
+    offset = Math.max(offset, 100);
+    offset = Math.min(offset, parentWidth - plotWidth - targetWidth - divider1Width - divider2Width - 10);
+      
+    depthDiv.style.width  = offset + 'px';
+
+    updatePlot();
+  });
+  //-------------------------------------------------------------------------------------------
+  document.getElementById('divider2').addEventListener('mousedown', ()=>{ isDragging = "div2"; });
+  document.addEventListener('mouseup',  ()=>{ isDragging = false; });
+  document.addEventListener('mousemove', e=>{
+    if (isDragging !== "div2") return;
+    
+    const container = document.getElementById('table_container');
+    const depthDiv  = document.getElementById('depth_table_div');
+    const divider1  = document.getElementById('divider1');
+    const targetDiv = document.getElementById('target_table_div');
+    const divider2  = document.getElementById('divider2');
+    const canvasDiv = document.getElementById('plot_canvas_div');
+    const pgraphDiv = document.getElementById('plot_graph');
+    const divider3  = document.getElementById('divider3');
+    const plotDiv   = document.getElementById('plot_canvas');
+
+    const parentWidth   = container.parentElement.getBoundingClientRect().width;
+    const plotWidth     = plotDiv.getBoundingClientRect().width;
+    const depthWidth    = depthDiv.offsetWidth;;
+    const targetWidth   = targetDiv.offsetWidth;
+    const divider1Width = divider1.offsetWidth;
+    const divider2Width = divider2.offsetWidth;
+        
+    let offset = e.clientX - targetDiv.getBoundingClientRect().left; 
+    offset = Math.max(offset, 100);
+    offset = Math.min(offset, parentWidth - plotWidth - depthWidth - divider1Width - divider2Width - 10);
+      
+    targetDiv.style.width  = offset + 'px';
+
+    updatePlot();
+  });
+  //-------------------------------------------------------------------------------------------
+  document.getElementById('divider3').addEventListener('mousedown', ()=>{ isDragging = "div3"; });
+  document.addEventListener('mouseup',  ()=>{ isDragging = false; });
+  document.addEventListener('mousemove', e=>{
+    if (isDragging !== "div3") return;
+    const rect   = document.getElementById('plot_canvas_div').getBoundingClientRect();
+    let offset = e.clientY - rect.top; 
+    offset = Math.max(offset, 50);
+    offset = Math.min(offset, rect.width - 50);
+    document.getElementById('plot_graph').style.height = offset + 'px';
+    document.getElementById('plot_canvas').style.height = (rect.height - offset - document.getElementById('divider3').offsetHeight) + 'px';
+    updatePlot();
+  });
   //-------------------------------------------------------------------------------------------
 
   //-------------------------------------------------------------------------------------------
@@ -449,18 +581,16 @@ document.addEventListener("DOMContentLoaded", () => {
   }
   //-------------------------------------------------------------------------------------------
   function updatePlot() {
-    const div    = document.getElementById("plot_canvas_div");
+    //show model-------------------------------------------------------------------------------
     const canvas = document.getElementById("plot_canvas");
-    const graph  = document.getElementById("plot_graph");
 
-    const rect = canvas.getBoundingClientRect();
+    const rectCanvas = canvas.getBoundingClientRect();
     const dpr = window.devicePixelRatio || 1;
-    canvas.width = rect.width * dpr;
-    canvas.height = rect.height * dpr;
+    canvas.width = rectCanvas.width * dpr;
+    canvas.height = rectCanvas.height * dpr;
     
     let ctx = canvas.getContext("2d");
-    let ctx2 = graph.getContext("2d");
-    
+
     const padding_left = 50;
     const padding_top = 50;
 
@@ -477,7 +607,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const x0 = padding_left;
     const w = 100;
 
-    //plot
+    //plot target
     ctx.lineWidth = 1;
     ctx.strokeStyle = "black";
     ctx.fillStyle = "lightgray";
@@ -541,18 +671,183 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
 
-    //plot praph
-    const pw = 10;
-    const ph = 10;
-    for (let i=0; i<rows.length; i++){
-      const def = parseFloat(rows[i].cells[2].innerText);
-      const act = parseFloat(rows[i].cells[3].innerText);
-      ctx2.beginPath();
-      ctx2.strokeRect(def-pw/2, act-ph/2, pw, ph);
-      //ctx.fillRect(x0, y0, w, h);
-      ctx2.stroke();
+    //plot graph-----------------------------------------------------------------------
+    const graph  = document.getElementById("plot_graph");
+    const rectGraph = graph.getBoundingClientRect();
+    graph.width  = rectGraph.width * dpr;
+    graph.height = rectGraph.width * dpr;
 
+    let ctx2 = graph.getContext("2d");
+    
+    // --- clear plot area ---
+    ctx2.clearRect(0, 0, graph.width, graph.height);
+    const rowsData = Array.from(rows);
+
+    const margin = { left: 70, right: 20, top: 70, bottom: 20 };
+    const graphH   = graph.height - margin.top  - margin.bottom;
+    const graphW   = graphH;
+
+    // --- extract data and compute ranges ---
+    const defs = rowsData.map(r => parseFloat(r.cells[2].innerText)).filter(v => !isNaN(v));
+    const acts = rowsData.map(r => parseFloat(r.cells[3].innerText)).filter(v => !isNaN(v));
+    const targetTable = document.getElementById("target_table");
+    const targetRows  = Array.from(targetTable.tBodies[0].rows);
+    const targetActsUpper = targetRows.map(r => parseFloat(r.cells[2].innerText)).filter(v => !isNaN(v));
+    const targetActsLower = targetRows.map(r => parseFloat(r.cells[3].innerText)).filter(v => !isNaN(v));
+    const targetDefsUpper = targetRows.map(r => parseFloat(r.cells[4].innerText)).filter(v => !isNaN(v));
+    const targetDefsLower = targetRows.map(r => parseFloat(r.cells[5].innerText)).filter(v => !isNaN(v));
+    const allDefs = defs.concat(targetDefsUpper, targetDefsLower);
+    const allActs = acts.concat(targetActsUpper, targetActsLower);
+    const xMin = Math.min(...allDefs), xMax = Math.max(...allDefs);
+    const yMin = Math.min(...allActs), yMax = Math.max(...allActs);
+
+    // --- draw axes ---
+    ctx2.strokeStyle = 'black';
+    ctx2.lineWidth = 2;
+    // X axis
+    const zeroY = margin.top + ((0 - yMin) / (yMax - yMin)) * graphH;
+    // X axis at bottom
+    //ctx2.beginPath();
+    //ctx2.moveTo(margin.left,             margin.top + graphH);
+    //ctx2.lineTo(margin.left + graphW,    margin.top + graphH);
+    //ctx2.stroke();
+    ctx2.beginPath();
+    ctx2.moveTo(margin.left, zeroY);
+    ctx2.lineTo(margin.left + graphW, zeroY);
+    ctx2.stroke();
+
+    // Y axis
+    ctx2.beginPath();
+    ctx2.moveTo(margin.left,             margin.top);
+    ctx2.lineTo(margin.left,             margin.top + graphH);
+    ctx2.stroke();
+
+    // --- draw X ticks and labels ---
+    ctx2.fillStyle = 'black';
+    ctx2.textAlign = 'center';
+    ctx2.textBaseline = 'top';
+    const xTicks = 5;
+    const tickStepX = Math.ceil((xMax - xMin) / xTicks / 10) * 10;
+    const niceMinX = Math.floor(xMin / tickStepX) * tickStepX;
+    const niceMaxX = Math.ceil(xMax / tickStepX) * tickStepX;
+    for (let i = 0; i <= xTicks; i++) {
+      const v = niceMinX + i * ((niceMaxX - niceMinX) / xTicks);
+      const x = margin.left + ((v - niceMinX) / (niceMaxX - niceMinX)) * graphW;
+      ctx2.beginPath();
+      //ctx2.moveTo(x, margin.top + graphH);
+      //ctx2.lineTo(x, margin.top + graphH + 5);
+      ctx2.moveTo(x, zeroY);
+      ctx2.lineTo(x, zeroY - 5);
+      ctx2.stroke();
+      //ctx2.fillText(v, x, margin.top + graphH + 8);
+      ctx2.font = "20px Arial"
+      ctx2.fillText(v, x, zeroY - 25);
     }
+
+    // --- draw Y ticks and labels ---
+    ctx2.textAlign = 'right';
+    ctx2.textBaseline = 'middle';
+    const yTicks = 5;
+    const tickStep = Math.ceil((yMax - yMin) / yTicks / 10) * 10;
+    const niceMin = Math.floor(yMin / tickStep) * tickStep;
+    const niceMax = Math.ceil(yMax / tickStep) * tickStep;
+    for (let i = 0; i <= yTicks; i++) {
+      
+      const v = niceMin + i * ((niceMax - niceMin) / yTicks);
+      const y = margin.top + ((v - niceMin) / (niceMax - niceMin)) * graphH;
+
+      ctx2.beginPath();
+      ctx2.moveTo(margin.left, y);
+      ctx2.lineTo(margin.left - 5, y);
+      ctx2.stroke();
+      ctx2.fillText(v, margin.left - 8, y);
+    }
+
+    // --- axis titles ---
+    ctx2.textAlign = 'center';
+    ctx2.textBaseline = 'bottom';
+    //ctx2.fillText('Definition (cm)', margin.left + graphW / 2, margin.top + graphH + 40);
+    ctx2.fillText('Definition (cm)', margin.left + graphW / 2, zeroY - 30);
+
+    ctx2.save();
+    ctx2.translate(margin.left - 40, margin.top + graphH / 2);
+    ctx2.rotate(-Math.PI / 2);
+    ctx2.textAlign = 'center';
+    ctx2.textBaseline = 'middle';
+    ctx2.fillText('Actual (cm)', 0, -10);
+    ctx2.restore();
+
+    //legends
+    const ledx = margin.left  + (xMax  / (xMax - xMin) * graphW) * 0.1;
+    const ledy = margin.top + (yMax  / (xMax - xMin) * graphH) * 0.8;
+    ctx2.strokeStyle = 'blue';
+    ctx2.lineWidth = 2;
+    ctx2.beginPath();
+    ctx2.moveTo(ledx, ledy);
+    ctx2.lineTo(ledx+20, ledy+10)
+    ctx2.stroke();
+    ctx2.textAlign = "left";
+    ctx2.textBaseline = "middle";
+    ctx2.fillText('model', ledx+30, ledy+5);
+    ctx2.beginPath();
+    ctx2.fillStyle = 'blue';
+    ctx2.arc(ledx+5, ledy+30, 5, 0, 2 * Math.PI);
+    ctx2.fill();
+    ctx2.fillStyle = 'black';
+    ctx2.fillText('Control point', ledx+30, ledy+35);
+    ctx2.strokeStyle = 'red';
+    ctx2.strokeRect(ledx, ledy+60,10,10);
+    ctx2.fillStyle = 'black';
+    ctx2.fillText('Sampling point', ledx+30, ledy+65);
+
+
+    // --- prepare points ---
+    const points = defs.map((d, i) => {
+      const a = acts[i];
+      return {
+        x: margin.left + ((d - xMin) / (xMax - xMin)) * graphW,
+        y: margin.top  + ((a - yMin) / (yMax - yMin)) * graphH
+      };
+    });
+
+    // --- draw line ---
+    ctx2.strokeStyle = 'blue';
+    ctx2.lineWidth = 2;
+    ctx2.beginPath();
+    points.forEach((p, i) => {
+      if (i === 0) ctx2.moveTo(p.x, p.y);
+      else         ctx2.lineTo(p.x, p.y);
+    });
+    ctx2.stroke();
+
+    // --- draw circles ---
+    ctx2.fillStyle = 'blue';
+    points.forEach(p => {
+      ctx2.beginPath();
+      ctx2.arc(p.x, p.y, 5, 0, 2 * Math.PI);
+      ctx2.fill();
+    });
+
+    // --- plot targettable data as red squares
+    const targetPoints = targetRows.map(r => {
+      const au = parseFloat(r.cells[2].innerText);
+      const al = parseFloat(r.cells[3].innerText);
+      const du = parseFloat(r.cells[4].innerText);
+      const dl = parseFloat(r.cells[5].innerText);
+
+      if (isNaN(au) || isNaN(al) || isNaN(du) || isNaN(dl)) return null;
+      return {
+        x: margin.left + ((du - xMin) / (xMax - xMin)) * graphW,
+        y: margin.top  + ((au - yMin) / (yMax - yMin)) * graphH,
+        w: ((dl - du) / (xMax - xMin)) * graphW,
+        h: ((al - au) / (yMax - yMin)) * graphH,
+      };
+    }).filter(p => p);
+    ctx2.strokeStyle = 'red';
+    targetPoints.forEach(p => {
+      ctx2.strokeRect(p.x, p.y, p.w, p.h);
+    });
+
     
     ctx2
   }
@@ -598,6 +893,9 @@ document.addEventListener("DOMContentLoaded", () => {
         cell.setAttribute("contenteditable", editable);
     }
   }
+document.getElementById("depth_table").addEventListener("input", (e) => {
+  updatePlot();
+});
 document.getElementById("depth_name").addEventListener("click", () => {
   sortTable('depth_table', 1);
   console.group("[Divider]: Definition table is Sorted by name.");
@@ -647,6 +945,8 @@ document.getElementById("calcButton").addEventListener("click", () => {
   let targetData = getTableData("target_table");
   //const filteredTargetData = targetData.filter(row => row[0]===true);
   let depthData  = getTableData("depth_table");
+
+  if(targetData.length==0 || depthData.length==0) return;
 
   //sort data
   targetData.sort((item1, item2) => {

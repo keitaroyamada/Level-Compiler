@@ -16,6 +16,13 @@ document.addEventListener("DOMContentLoaded", () => {
     const isGrid = true;
     let canvasBaseSize = [100,100]; 
     let depthScale = "composite_depth";
+
+    //-------------------------------------------------------------------------------------------
+    //initialise
+    window.PlotterApi.receive("PlotterMenuClicked", async (data) => {
+        console.log(data)
+    })    
+    //-------------------------------------------------------------------------------------------
     document.addEventListener("mousemove", async function (event) {     
         const rect = document.getElementById("p5Canvas").getBoundingClientRect(); // Canvas position and size   
         var mouseX = event.clientX - rect.left;
@@ -75,27 +82,32 @@ document.addEventListener("DOMContentLoaded", () => {
             const container = document.getElementById("plot_list");
             const seriesDiv = document.createElement("div");
 
+            //is plot
             const seriesCheck = document.createElement("input");
             seriesDiv.style.paddingLeft = "0px";
             seriesCheck.type = "checkbox";
             seriesCheck.id = numSeries;
             seriesCheck.checked = true;            
 
+            //data No
             const Nolabel = document.createElement("label");
             Nolabel.htmlFor = numSeries;
             Nolabel.textContent = numSeries.toString().padStart(2, "0");
             Nolabel.style.marginRight = "5px";
             Nolabel.title = "Source: " + LCPlot.data_collections[selectedIdx].name;
 
+            //data name
             const serieslabel = document.createElement("label");
             serieslabel.htmlFor = numSeries;
             serieslabel.dataset.value = LCPlot.data_collections[selectedIdx].id;
             serieslabel.style.marginRight = "5px";
 
+            //separator
             const separatorlabel = document.createElement("label");
             separatorlabel.htmlFor = 0;
             separatorlabel.textContent = "/";
             
+            //numerator
             const numeratorDropdown = document.createElement("select");
             numeratorDropdown.style.width = "80px";
             numeratorDropdown.style.marginRight = "5px";
@@ -114,6 +126,7 @@ document.addEventListener("DOMContentLoaded", () => {
             })
             numeratorDropdown.selectedIndex = 1; 
 
+            //denominator
             const denominatorDropdown = document.createElement("select");
             denominatorDropdown.style.width = "80px";
             denominatorDropdown.style.marginLeft = "5px";
@@ -131,15 +144,20 @@ document.addEventListener("DOMContentLoaded", () => {
                 denominatorDropdown.appendChild(option);
             })
 
+            //plot colour options
             const plotColour = document.createElement("input");
-            plotColour.type = "text";
+            plotColour.type = "color";
+            //plotColour.type = "text";
             plotColour.id = numSeries;
-            plotColour.placeholder = "red";
-            plotColour.value = "red";
+            plotColour.value = "#ff0000";
+            plotColour.placeholder = "#ff0000";
+            //plotColour.className = "color-picker";                        
+            //plotColour.value = "red";
             plotColour.style.width = "40px";
             plotColour.style.marginLeft= "40px";
             plotColour.title = "Plot colour";
 
+            //amplification options
             const amplification = document.createElement("input");
             amplification.type = "number";
             amplification.id = numSeries;
@@ -149,6 +167,7 @@ document.addEventListener("DOMContentLoaded", () => {
             amplification.title = "Amplitude gain";
             amplification.style.marginLeft = "5px";
 
+            //plot type options
             const plotTypeDropdown = document.createElement("select");
             plotTypeDropdown.style.width = "70px";
             plotTypeDropdown.style.marginLeft = "5px";
@@ -156,7 +175,7 @@ document.addEventListener("DOMContentLoaded", () => {
             plotTypeDropdown.title = "Plot type";
 
             //const plotType = ["line", "scatter","bar"];
-            const plotType = ["line", "scatter","bar"];
+            const plotType = ["line", "scatter", "bar"];
             plotType.forEach(p=>{
                 const opt = document.createElement("option");
                 opt.value = p;
@@ -164,16 +183,35 @@ document.addEventListener("DOMContentLoaded", () => {
                 plotTypeDropdown.appendChild(opt);
             })
             
+            //delete button
+            const deleteBtn = document.createElement("button");
+            deleteBtn.textContent = "×";
+            deleteBtn.title = "delete";
+            deleteBtn.style.marginLeft = "10px";
+            deleteBtn.addEventListener("click", () => {
+                const parentElement = document.getElementById("plot_list");
+                const grandChild = seriesDiv.querySelector("input[type='checkbox']");
+                if (grandChild) {
+                    grandChild.checked = false;
+                    parentElement.dispatchEvent(new Event('change'));
+                }
+                seriesDiv.remove();
+                updateView();
+                });
+            
+
             //stack
-            seriesDiv.appendChild(seriesCheck);
+            seriesDiv.appendChild(deleteBtn);
             seriesDiv.appendChild(Nolabel);
             seriesDiv.appendChild(numeratorDropdown);
             seriesDiv.appendChild(separatorlabel);
             seriesDiv.appendChild(denominatorDropdown);
+            seriesDiv.appendChild(seriesCheck);
             seriesDiv.appendChild(plotColour);
             seriesDiv.appendChild(serieslabel);
             seriesDiv.appendChild(amplification);
             seriesDiv.appendChild(plotTypeDropdown);
+
             container.appendChild(seriesDiv);
 
             updateView();
@@ -184,24 +222,6 @@ document.addEventListener("DOMContentLoaded", () => {
             }else{
                 sendToRenderer("add")
             }
-        }    
-    });
-    document.getElementById('bt_remove').addEventListener("click", async (e) => {
-        if(LCPlot !== null ){ 
-            
-            const parentElement = document.getElementById("plot_list");
-            Array.from(parentElement.children).forEach((child) => {
-                const grandChild = child.querySelector("input[type='checkbox']");
-                let isRemove = false;
-                if (grandChild.checked == false) {
-                  isRemove = true;
-                }
-                if(isRemove==true){
-                    child.remove();
-                }
-              });
-            getSelectedData();
-            updateView();
         }    
     });
     scroller.addEventListener("scroll",async function (event) {
@@ -219,62 +239,72 @@ document.addEventListener("DOMContentLoaded", () => {
       { passive: false }
     );
     document.addEventListener( "wheel",  function (event) {
-        const rect = document.getElementById("p5Canvas").getBoundingClientRect(); // Canvas position and size   
-        //event.preventDefault();
-        //wheel event
-        var deltaX = event.deltaX;
+        event.preventDefault();
         var deltaY = event.deltaY;
 
         if (event.shiftKey) {
             zoom_rate[2] += 0.01 * deltaY;
-            console.log(zoom_rate)
         }
 
-        if (event.altKey) {      
-          //add zoom level
-          if(event.ctrlKey){
-            zoom_rate[0] += 0.001 * deltaY;  
-          }else{
-            zoom_rate[1] += 0.001 * deltaY;
-          }
-    
-          //limit of smaller
-          if (zoom_rate[1] < 0.1) {
-            zoom_rate[1] = 0.1;
-          }
-          if (zoom_rate[0] < 0.1) {
-            zoom_rate[0] = 0.1;
-          }
-    
-          //mouse position
-          const relativeX = (scroller.scrollLeft + rect.width / 2 - rect.left) / canvasBaseSize[0];
-          const relativeY = (scroller.scrollTop + rect.height / 2 - rect.top) / canvasBaseSize[1];
-          console.log(canvasBaseSize)
+        if (event.altKey) {
+            // store zoom rate
+            const oldCanvasBaseWidth = canvasBaseSize[0];
+            const oldCanvasBaseHeight = canvasBaseSize[1];
 
-          //calc new canvas size
-          makeP5CanvasBase();
-          const canvasBaseHeight = parseInt(canvasBase.style.height.match(/\d+/)[0], 10);
-          const canvasBaseWidth  = parseInt(canvasBase.style.width.match(/\d+/)[0], 10);
+            // calc centre of vartual area
+            const viewCenterX = scroller.scrollLeft + scroller.clientWidth / 2;
+            const viewCenterY = scroller.scrollTop + scroller.clientHeight / 2;
 
-          const newScrollLeft = relativeX * canvasBaseWidth - rect.width / 2 + rect.left;
-          const newScrollTop  = relativeY * canvasBaseHeight - rect.height / 2 + rect.top;
+            // update zoom rate
+            if(event.ctrlKey){
+                zoom_rate[0] += 0.001 * deltaY;
+            }else{
+                zoom_rate[1] += 0.001 * deltaY;
+            }
 
-          scroller.scrollTo(newScrollLeft, newScrollTop); //move scroll position
-          
+            // limit zoom rate
+            if (zoom_rate[1] < 0.1) {
+                zoom_rate[1] = 0.1;
+            }
+            if (zoom_rate[0] < 0.1) {
+                zoom_rate[0] = 0.1;
+            }
+
+            // get new canvas size
+            makeP5CanvasBase();
+            const newCanvasBaseWidth = canvasBaseSize[0];
+            const newCanvasBaseHeight = canvasBaseSize[1];
+
+            // calc new scrolled position
+            const scaleX = newCanvasBaseWidth / oldCanvasBaseWidth;
+            const scaleY = newCanvasBaseHeight / oldCanvasBaseHeight;
+
+            const newScrollLeft = viewCenterX * scaleX - scroller.clientWidth / 2;
+            const newScrollTop = viewCenterY * scaleY - scroller.clientHeight / 2;
+
+            // move to new position
+            scroller.scrollTo(newScrollLeft, newScrollTop);
+
+            updateView();
         }
-
-        updateView();
     },
-    { passive: false });  
-    document.getElementById('bt_export').addEventListener("click", async (e) => {
+    { passive: false });
+    window.PlotterApi.receive("PlotterImport", async (data) => {
         if(LCPlot !== null ){ 
+            console.log("Plotter: Importing...")
+
+        }  
+    })
+    window.PlotterApi.receive("PlotterExport", async (data) => {
+        if(LCPlot !== null ){ 
+            console.log("Plotter: Exporting...")
             isSVG = true;
             const targetCanvas = new p5(p5Sketch);
             targetCanvas.save("plot.svg");
             isSVG = false;
-        }    
-    });
-    document.getElementById('bt_load').style.display = "none";
+            console.log("Done.")
+        }
+    })
     window.PlotterApi.receive("importedData", async (data) => {
         document.body.style.cursor = "wait"; 
         console.log("[Plotter]: Imported data recieved.");
@@ -321,15 +351,15 @@ document.addEventListener("DOMContentLoaded", () => {
                 plotType:"line",
             };
 
-            const checkbox = child.querySelector("input[type='checkbox']");
-            const numeratorDropdown = child.querySelector("select:nth-of-type(1)");
+            const checkbox            = child.querySelector("input[type='checkbox']");
+            const numeratorDropdown   = child.querySelector("select:nth-of-type(1)");
             const denominatorDropdown = child.querySelector("select:nth-of-type(2)");
-            const parentCollection = child.querySelector("label[data-value]");
-            const plotColour = child.querySelector("input[type='text']");
-            const amplification = child.querySelector("input[type='number']");
-            const plotTypeDropdown = child.querySelector("select:nth-of-type(3)");
-            const noLabel = child.querySelector("label:nth-of-type(1)");
-            const splitLabel = child.querySelector("label:nth-of-type(2)");
+            const parentCollection    = child.querySelector("label[data-value]");
+            const plotColour          = child.querySelector("input[type='color']");
+            const amplification       = child.querySelector("input[type='number']");
+            const plotTypeDropdown    = child.querySelector("select:nth-of-type(3)");
+            const noLabel             = child.querySelector("label:nth-of-type(1)");
+            const splitLabel          = child.querySelector("label:nth-of-type(2)");
           
             const checkboxValue = checkbox ? checkbox.checked : null;
             const numeratorId   = numeratorDropdown ? numeratorDropdown.value : null;
@@ -340,14 +370,14 @@ document.addEventListener("DOMContentLoaded", () => {
             const plotType = plotTypeDropdown ? plotTypeDropdown.value : "line";
 
             //set colour value
-            numeratorDropdown.style.color = colourValue;
+            numeratorDropdown.style.color   = colourValue;
             denominatorDropdown.style.color = colourValue;
-            noLabel.style.color = colourValue;
-            splitLabel.style.color = colourValue;
-            parentCollection.style.color = colourValue;
-            plotTypeDropdown.style.color = colourValue;
-            amplification.style.color = colourValue;
-            plotColour.style.color = colourValue;
+            noLabel.style.color             = colourValue;
+            splitLabel.style.color          = colourValue;
+            parentCollection.style.color    = colourValue;
+            plotTypeDropdown.style.color    = colourValue;
+            amplification.style.color       = colourValue;
+            //plotColour.style.color = colourValue;
 
             result.isDraw = checkboxValue;
             result.collectionId = parseInt(collectionId);
@@ -368,6 +398,21 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     
       });
+    window.PlotterApi.receive("PlotterCleared", async (data) => {
+        if(LCPlot !== null ){ 
+            //remove all sended data
+            const parentElement = document.getElementById("plot_list");
+            Array.from(parentElement.children).forEach((child) => {
+                const grandChild = child.querySelector("input[type='checkbox']");
+                grandChild.checked = false;                
+                parentElement.dispatchEvent(new Event('change'));
+                child.remove();
+              });
+            getSelectedData();
+            updateView();
+        } 
+
+    })
     //============================================================================
     function updateView() {
         if (vectorObjects == null) {
@@ -483,7 +528,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
                 //plot
                 for(let t=0; t< selectedList.length;t++){
-                    const target = selectedList[t];           
+                    const target = selectedList[t];          
                     
                     //check draw
                     if(target.isDraw == false){
@@ -498,6 +543,7 @@ document.addEventListener("DOMContentLoaded", () => {
                             colIdx = i;
                         }
                     })
+
                     if(colIdx==null){
                         continue
                     }
@@ -513,7 +559,7 @@ document.addEventListener("DOMContentLoaded", () => {
                             dIdx = i;
                         }
                     })
-                    
+
                     if(nIdx==null && dIdx==null){
                         continue
                     }
@@ -596,12 +642,18 @@ document.addEventListener("DOMContentLoaded", () => {
                         sketch.strokeWeight(1);
                         sketch.stroke(target.colour);        
                         for(let i=0; i<x.length-1;i++){
-                            sketch.line(
-                                pad[0] + ((x[i] -xmin)  * zoom_rate[0] * mod[0] * target.amplification) + seriesDistance * zoom_rate[2] * target.order,
-                                pad[1] + (y[i]   * zoom_rate[1]),
-                                pad[0] + ((x[i+1] - xmin) * zoom_rate[0] * mod[0] * target.amplification) + seriesDistance * zoom_rate[2] * target.order,
-                                pad[1] + (y[i+1] * zoom_rate[1]),
-                            )
+                            const x1 = pad[0] + ((x[i] -xmin)  * zoom_rate[0] * mod[0] * target.amplification) + seriesDistance * zoom_rate[2] * target.order;
+                            const y1 = pad[1] + (y[i]   * zoom_rate[1]);
+                            const x2 = pad[0] + ((x[i+1] - xmin) * zoom_rate[0] * mod[0] * target.amplification) + seriesDistance * zoom_rate[2] * target.order;
+                            const y2 = pad[1] + (y[i+1] * zoom_rate[1]);
+                            if(
+                                typeof x1 === 'number' && !isNaN(x1) &&
+                                typeof y1 === 'number' && !isNaN(y1) &&
+                                typeof x2 === 'number' && !isNaN(x2) &&
+                                typeof y2 === 'number' && !isNaN(y2)
+                            ){
+                                sketch.line(x1,y1,x2,y2)
+                            }                            
                         }
                     }else if(target.plotType == "scatter"){
                         //sketch.strokeWeight(1);

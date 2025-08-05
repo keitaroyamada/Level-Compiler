@@ -78,7 +78,7 @@ document.addEventListener("DOMContentLoaded", () => {
           const key = {
             Name:["name"],
             Hole:["hole"],
-            Section:["sec"],
+            Section:["sec","core number"],
             Distance:["dist","psp","position"],
           }
           for (let n = 0; n < 4; n++) {

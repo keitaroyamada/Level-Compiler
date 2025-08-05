@@ -385,6 +385,7 @@ class LevelCompilerCore extends EventEmitter{
         [this.projects[0], this.projects[this.projects.length-1]] = [this.projects[this.projects.length-1], this.projects[0]];
         this.updateSearchIdx();
         this.base_project_id = projectData.id;
+        this.projects[0].uuid_base = projectData.uuid;
         [this.projects[0].order, this.projects[this.projects.length-1].order] = [this.projects[this.projects.length-1].order, this.projects[0].order];
       }
     }
@@ -542,6 +543,43 @@ class LevelCompilerCore extends EventEmitter{
     return true;
 
   }
+  loadModelFromLcmodel(lcdata){
+    //under construction 11111111111111111111111111111111111111111111111111111111111111
+    //check base projects
+    let numBaseProject = 0;
+    this.projects.forEach(p1=>{
+      if(p1.type=="correlation"){
+        numBaseProject++;
+      }
+    })
+
+    lcdata.projects.forEach(p2=>{
+      if(p2.type=="correlation"){
+        numBaseProject++;
+      }
+    })
+    if(numBaseProject>1) return false;
+
+    //load
+    for(let i=0;i<lcdata.projects.length;i++){
+      const project = lcdata.projects[i];
+
+      //load base correlation
+      if(this._reserved_project_ids.includes(project.id[0])){
+        //if id already exist
+      }
+
+      if(project.type == "correlation"){
+        this.projects.push(project);
+        this._reserved_project_ids = project.id;
+        //[Math.max(...this._reserved_project_ids)+1, null, null, null];
+      }
+
+    }
+    
+
+    
+  }
   connectDuoModel() {
     console.time("        Connect duo")
     this.setStatus("running","Start connectDuoModel")
@@ -626,6 +664,10 @@ class LevelCompilerCore extends EventEmitter{
             //connect master and duo
             this.connectMarkers(duoId, msId, "horizontal");
 
+            //update connected master uuid
+            if(this.projects[p].uuid_base == this.projects[p].uuid){
+              this.projects[p].uuid_base = this.projects[connectedMarkerIdx[0][0]].uuid;
+            }
             //this.projects[p].holes[h].sections[s].markers[m].h_connection
           }
         }
@@ -1132,6 +1174,8 @@ class LevelCompilerCore extends EventEmitter{
       return;
     }
 
+    this.updateSearchIdx();
+
     let results = [];
     
     this.projects.forEach((project) => {
@@ -1145,11 +1189,24 @@ class LevelCompilerCore extends EventEmitter{
         rank_error_counts:0,
         age_error_counts:0,
         max_rank:-1,  
+        hole_counts: 0,
+        section_counts: 0,
+        marker_counts: 0,
+        connection_counts: {},
+        connection_duo_counts: 0,
       };
+
+      for(let p=0;p<this.projects.length;p++){
+        result.connection_counts[this.projects[p].name] = 0;
+      }
+      
   
       project.holes.forEach((hole) => {
+        result.hole_counts += 1;
         hole.sections.forEach((section) => {
+          result.section_counts += 1;
           section.markers.forEach((marker) => {
+            result.marker_counts += 1;
             if (marker.composite_depth == null) {
               if (project.model_type !== "duo") {
                 //console.log("ERROR: CD is null. " + this.getMarkerNameFromId(marker.id));
@@ -1179,6 +1236,20 @@ class LevelCompilerCore extends EventEmitter{
               }
               result.age_error_counts += 1;
             }
+
+            marker.h_connection.forEach(hconnect=>{
+              const pIdx = this.search_idx_list[hconnect.toString()];
+              if(hconnect[0] == project.id[0]){
+                //case own
+                result.connection_counts[this.projects[pIdx[0]].name] += 1/2;
+              }else{
+                //case duo
+                result.connection_counts[this.projects[pIdx[0]].name] += 1;
+              }
+              
+            })
+            
+            
           });
         });
       });
@@ -1233,13 +1304,9 @@ class LevelCompilerCore extends EventEmitter{
     return results;
   }
   validateProperties(){
-    const newProject = new Project;
-    const newHole    = new Hole;
-    const newSection = new Section;
-    const newMarker  = new Marker;
-
-
+    //add new properties for previous version model
     this.projects.forEach(p=>{
+      const newProject = new Project;
       for(const key in newProject){
         if(!(key in p)){
           p[key] = newProject[key];
@@ -1248,6 +1315,7 @@ class LevelCompilerCore extends EventEmitter{
       }
 
       p.holes.forEach(h=>{
+        const newHole    = new Hole;
         for(const key in newHole){
           if(!(key in h)){
             h[key] = newHole[key];
@@ -1256,6 +1324,7 @@ class LevelCompilerCore extends EventEmitter{
         }
 
         h.sections.forEach(s=>{
+          const newSection = new Section;
           for(const key in newSection){
             if(!(key in s)){
               s[key] = newSection[key];
@@ -1264,6 +1333,7 @@ class LevelCompilerCore extends EventEmitter{
           }
 
           s.markers.forEach(m=>{
+            const newMarker  = new Marker;
             for(const key in newMarker){
               if(!(key in m)){
                 m[key] = newMarker[key];
@@ -1274,6 +1344,21 @@ class LevelCompilerCore extends EventEmitter{
         })
       })
     })
+    
+    //update duo uuid for previous model version(<beta.22)
+    this.updateSearchIdx();    
+    
+    this.projects.forEach(project=>{
+      if(project.model_type=="duo"){
+        if(project.uuid_base == project.uuid){
+          const baseIdx = this.search_idx_list[this.base_project_id.toString()];
+          project.uuid_base = this.projects[baseIdx[0]].uuid;
+          console.log("LCCore: Fixed project uuid & uuid_base.");
+          //this.descriptions = "This workspace was saved with a version earlier than beta.22. Please save it again using the latest version."
+        }
+      }
+    })
+
   }
   getDepthFromTrinity(targetId, trinityList, calcType, allowExtrapolation=false) {
     this.setStatus("running","start getDepthFromTrinity");
@@ -4452,7 +4537,13 @@ class LevelCompilerCore extends EventEmitter{
       if(this.base_project_id==null){
         this.base_project_id = newProject.id;
       }
+    }else if(type == "duo"){
+      if(this.base_project_id!==null){
+        const baseIdx = this.search_idx_list[this.base_project_id.toString()];
+        newProject.uuid_base = this.projects[baseIdx[0]].uuid;
+      }
     }
+    console.log(this._reserved_project_ids)
 
     this.projects.push(newProject);
     this._reserved_project_ids.push(newProject.id[0]);
@@ -4506,6 +4597,19 @@ class LevelCompilerCore extends EventEmitter{
     this.setStatus("completed","");
     return true;
     
+  }
+  updateProjectId(projectData){
+    //Please use with caution, as it may corrupt the model.
+    //under construction 11111111111111111111111111111111111111111111111111111111111111
+    const currentId = projectData.id;
+    const newId = [Math.max(...this._reserved_project_ids) + 1, null, null, null]
+
+    projectData.id = newId;
+    projectData.holes.forEach(hole=>{
+      hole.id[0] = newId[0];
+    })
+
+    return projectData
   }
   mergeProjects(){
     this.setStatus("completed","start mergeProject");
@@ -5240,11 +5344,12 @@ class LevelCompilerCore extends EventEmitter{
   }
 
   exportSerialisedModel() {
-  return JSON.parse(JSON.stringify(this, (key, value) => {
-    return key.startsWith('_') ? undefined : value;
-  }));
-}
- 
+    //export
+    return JSON.parse(JSON.stringify(this, (key, value) => {
+      return key.startsWith('_') ? undefined : value;
+    }));
+  }
+  
 }
 
 

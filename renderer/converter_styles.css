@@ -14,17 +14,21 @@
   width: 400px;
 }
 
-.bt{
+.bt {
   margin-top: 20px;
-  background-image: linear-gradient(to right, #25aae1, #4481eb, #04befe, #3f86ed);
-  /*box-shadow: 0 4px 15px 0 rgba(49, 196, 190, 0.75);*/
-  border-radius: 8px;
-  pointer-events: auto;
+  background-color: #09244B;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  padding: 6px 12px;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+  font-size: 14px;
 }
-.bt:hover{
-  background-image: linear-gradient(to right, #25aae1, #40e495, #30dd8a, #2bb673);
-  background-position: 100% 0;
+.bt:hover {
+  background-color: #1c6dc1;
 }
+
 #cvt_bt_import {
   width: 100px;
   height: 25px;

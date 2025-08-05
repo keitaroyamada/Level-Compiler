@@ -3364,7 +3364,10 @@ document.addEventListener("DOMContentLoaded", () => {
     console.log("[RENDERER]: Setting is updated.",data)
     updateView();
   });
-  
+
+  window.LCapi.receive("DividerMenuClicked", async () => {
+    document.getElementById("bt_divider").click();
+  });
   //============================================================================================
   //============================================================================================
   //FInder send event (move to)
@@ -5173,8 +5176,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
             }
 
-            drawPositions.pos_max_x = Math.max(...Object.values(drawPositions.data).flatMap(item=>item.hole_max_x).filter(value => !isNaN(value)));
-            drawPositions.pos_min_x = Math.min(...Object.values(drawPositions.data).flatMap(item=>item.hole_min_x).filter(value => !isNaN(value)));
+            drawPositions.pos_max_x = Math.max(...Object.values(drawPositions.data).map(item=>item.hole_max_x).filter(value => !isNaN(value)));
+            drawPositions.pos_min_x = Math.min(...Object.values(drawPositions.data).map(item=>item.hole_min_x).filter(value => !isNaN(value)));
 
             //draw plot
             if(target.plotType =="line"){
@@ -5247,7 +5250,8 @@ document.addEventListener("DOMContentLoaded", () => {
               const binWidth = 4;
 
               for(let holeKey in drawPositions.data){
-                const posData = drawPositions.data[holeKey].data;
+                const posHoleData = drawPositions.data[holeKey];
+                const posData = posHoleData.data;
                 if(posData.length==0){
                   continue
                 }
@@ -5260,25 +5264,29 @@ document.addEventListener("DOMContentLoaded", () => {
                   const data_rect = {
                     x: posData[i].pos_canvas_x,
                     y: posData[i].pos_canvas_y,
-                    width: posData.hole_max_x = posData.hole_min_x,
+                    width: posHoleData.hole_max_x - posHoleData.hole_min_x,
                     height: binWidth,
                   };
+
                   if (!isInside(view_rect, data_rect, objOpts.canvas.buffer_depth * yMag)) {
                     continue;
                   } 
 
-
                   let rectX0 = drawPositions.data[holeKey].hole_zero_x;//hole_min_x
+
                   if(drawPositions.max_x < 0){
-                    rectX0 = drawPositions.pos_max_x;
+                    rectX0 = drawPositions.data[holeKey].hole_max_x;
                   }
+                  /*
                   if(drawPositions.min_x > 0){
-                    rectX0 = drawPositions.pos_min_x;
+                    rectX0 = drawPositions.data[holeKey].hole_min_x;
                   }
+                    */
+
                   let rectX1 = posData[i].pos_canvas_x;
                   let rectY0 = posData[i].pos_canvas_y - binWidth/2;
                   let rectY1 = posData[i].pos_canvas_y + binWidth/2;
-                  
+
                   //draw
                   sketch.rect(
                     rectX0,
@@ -6522,7 +6530,7 @@ async function updateImageRegistration(modelImages, LCCore){
           //console.log(modelImages.image_dir, h.name+"-"+s.name+".jpg")
           if(Object.keys(modelImages.drilling_depth).length > 0){
             const isImExist = await window.LCapi.CheckImagesInDir(h.name+"-"+s.name+".jpg");
-            console.log(h.name+"-"+s.name,  isImExist)
+            //console.log(h.name+"-"+s.name,  isImExist)
 
             // /im_in_dir
             if(im_in_array==undefined){

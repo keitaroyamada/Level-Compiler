@@ -2102,7 +2102,7 @@ function createMainWIndow() {
     //create finder window
     dividerWindow = new BrowserWindow({
       title: "Divider",
-      width: 1500,
+      width: 1300,
       height: 800,
       webPreferences: {
         preload: path.join(__dirname, "preload", "preload_divider.js"),
@@ -3457,18 +3457,44 @@ function createMainWIndow() {
               {
                 label: "Export model as csv",
                 click: () => {
-                  console.log(2222222222222)
                   mainWindow.webContents.send("ExportCorrelationAsCsvMenuClicked");
                 },
               },
             ],
-          },
-          { type: "separator" },
+          },                    
+          // for Windows--------------------
+          ...(!isMac
+            ? [
+                {
+                  label: "Exit",
+                  click: (menuItem, browserWindow, event) => {
+                    const options = {
+                      type: "question",
+                      buttons: ["No", "Yes"],
+                      defaultId: 0,
+                      title: "Confirm",
+                      message: "Are you sure you want to exit?",
+                    };
+  
+                    const response = dialog.showMessageBoxSync(null, options);
+  
+                    if (response === 1) {
+                      app.quit(); 
+                    }
+                  },
+                },              
+              ]
+            : []),
+        ],
+      },
+      {
+        label:"Edit",
+        submenu:[
           {
-            label: "Unload all models",
-            accelerator: "CmdOrCtrl+U",
-            click: () => {
-              mainWindow.webContents.send("UnLoadModelsMenuClicked");
+            label: "Edit mode",
+            accelerator: "CmdOrCtrl+E",
+            click: () =>{
+              mainWindow.webContents.send("EditCorrelation");
             },
           },
           { type: "separator" },
@@ -3511,44 +3537,98 @@ function createMainWIndow() {
               });
             },
           },
-          // for Windows--------------------
-          ...(!isMac
-            ? [
-                {
-                  label: "Exit",
-                  click: (menuItem, browserWindow, event) => {
-                    const options = {
-                      type: "question",
-                      buttons: ["No", "Yes"],
-                      defaultId: 0,
-                      title: "Confirm",
-                      message: "Are you sure you want to exit?",
-                    };
-  
-                    const response = dialog.showMessageBoxSync(null, options);
-  
-                    if (response === 1) {
-                      app.quit(); 
-                    }
-                  },
-                },              
-              ]
-            : []),
-        ],
-      },
-      {
-        label:"Edit",
-        submenu:[
-          {
-            label: "Edit mode",
-            accelerator: "CmdOrCtrl+E",
-            click: () =>{
-              mainWindow.webContents.send("EditCorrelation");
-            },
-          },
           
         ],
       },
+      {
+        label: "Model",
+        submenu:[
+          {
+            label: "Model info",
+            click: () => {
+              let text = null;
+              if(LCCore !== null){
+                text ="<Workspace>\n";
+                text += "  [Name]:  " + LCCore.name + "\n" +
+                        "  [Descriptions]:  " + LCCore.descriptions + "\n\n";
+
+                LCCore.projects.forEach(project=>{
+                  text += "<Correlation model>\n" +
+                          "  [Name]: " + project.name + "\n" +
+                          "    -[Version]: " + project.correlation_version + "\n" +
+                          "    -[Type]: " + project.model_type + "\n" +
+                          "    -[Descriptions]: " + project.descriptions + "\n\n"
+                })
+              };
+              if(LCAge !== null){
+                if(text == null){
+                  text = "  <Age model>\n";
+                }else{
+                  text += "  <Age model>\n";
+                }
+                
+                const ageModelId = LCAge.selected_id;
+                LCAge.AgeModels.forEach(am=>{
+                  if(am.id.toString() == ageModelId.toString()){
+                    text += "    -[Name]: " + am.name + "\n" +
+                            "    -[Version]: " + am.version + "\n";
+                  }
+                })
+              }
+               
+              if(text !== null){
+                dialog.showMessageBox({
+                  type: 'info',
+                  title: 'Model versions',
+                  message: text,
+                  buttons: ['OK']
+                });
+              }              
+            }
+          },
+          {
+            label: "Model statistics",
+            click: () => {
+              if(LCCore !== null){
+                results = LCCore.checkModel();
+
+                const text = results.map((item, i) => {
+                  const conn = Object.entries(item.connection_counts)
+                    .map(([key, val]) => `  ${"     "+item.name +"->"+key}: ${val}`)
+                    .join('\n');
+
+                  return `<Name>: ${item.name}\n` +
+                         `  -[Type]: ${item.type}\n` +
+                         `  -[Hole]: ${item.hole_counts}\n` +
+                         `  -[Section]: ${item.section_counts}\n` +
+                         `  -[Marker]: ${item.marker_counts}\n` +
+                         `  -[Connection]: \n${conn}\n` +
+
+                         `  -[CD errors]: ${item.cd_error_counts}\n` +
+                         `  -[EFD errors]: ${item.efd_error_counts}\n` +
+                         `  -[Age errors]: ${item.age_error_counts}\n` +
+                         `  -[Max Rank]: ${item.max_rank}\n`
+                }).join('\n');
+
+                dialog.showMessageBox({
+                  type: 'info',
+                  title: 'Model statistics',
+                  message: text,
+                  buttons: ['OK']
+                });
+              }
+            }
+          },
+          { type: "separator" },
+          {
+            label: "Unload all models",
+            accelerator: "CmdOrCtrl+U",
+            click: () => {
+              mainWindow.webContents.send("UnLoadModelsMenuClicked");
+            },
+          }
+        ],
+      },      
       {
         label: "Tools",
         submenu: [
@@ -3578,6 +3658,7 @@ function createMainWIndow() {
                 converterWindow = null;
                 mainWindow.webContents.send("ConverterClosed", "");
               });
+
               converterWindow.setMenu(null);
           
               converterWindow.loadFile(path.join(__dirname, "./renderer/converter.html"));
@@ -3597,42 +3678,20 @@ function createMainWIndow() {
             },
           },
           {
-            label: "Plotter",
-            accelerator: "CmdOrCtrl+P",
-            click: () => {
+            label:"Divider",
+            click: () =>{
               if (isDev == false){
                 if(LCCore.base_project_id==null){
                   return
                 }
               }
-              if (plotWindow) {
-                plotWindow.focus();
+              if (dividerWindow) {
+                dividerWindow.focus();
                 return;
               }
-          
-              //create finder window
-              plotWindow = new BrowserWindow({
-                title: "Converter",
-                width: 280,//full: 900
-                height: 600,
-                webPreferences: {preload: path.join(__dirname, "preload", "preload_plotter.js"),},
-              });
-              
-              plotWindow.on("closed", () => {
-                plotWindow = null;
-                mainWindow.webContents.send("PlotterClosed", "");
-              });
-              plotWindow.setMenu(null);
-          
-              plotWindow.loadFile(path.join(__dirname, "./renderer/plotter.html"));
-          
-              plotWindow.once("ready-to-show", () => {
-                plotWindow.show();
-                plotWindow.setAlwaysOnTop(true, "normal");
-                //plotWindow.webContents.openDevTools();
-                plotWindow.webContents.send("PlotterMenuClicked");
-              });
-            },
+
+              mainWindow.webContents.send("DividerMenuClicked", null);
+            }
           },
           {
             label: "Labeler",
@@ -3674,6 +3733,90 @@ function createMainWIndow() {
               });
             },
           },
+          {
+            label: "Plotter",
+            accelerator: "CmdOrCtrl+P",
+            click: () => {
+              if (isDev == false){
+                if(LCCore.base_project_id==null){
+                  return
+                }
+              }
+              if (plotWindow) {
+                plotWindow.show();
+                plotWindow.focus();
+                return;
+              }
+          
+              //create finder window
+              plotWindow = new BrowserWindow({
+                title: "Plotter",
+                width: 340,//full: 900
+                height: 600,
+                webPreferences: {preload: path.join(__dirname, "preload", "preload_plotter.js"),},
+              });
+              
+              plotWindow.on("close", (e) => {
+                e.preventDefault(); 
+                plotWindow.hide();
+                //plotWindow = null;
+                mainWindow.webContents.send("PlotterHide", "");
+              });
+
+              const customMenu = Menu.buildFromTemplate([
+                {
+                  label: "File",
+                  submenu: [
+                    {
+                      label: "Close & Release data",
+                      click: () => {
+                        plotWindow.webContents.send("PlotterCleared", "");    
+
+                        //plotWindow.removeAllListeners("close");
+                        //plotWindow.close();
+                        //plotWindow = null;
+                        //LCPlot.data_collections = [];
+                        //LCPlot.data_selected_id = null;
+                        //mainWindow.webContents.send("PlotterCleared", "");                        
+                      },
+                    },
+                    { type: "separator" },
+                    /*
+                    {
+                      label:"Import",
+                      click: ()=>{
+                        plotWindow.webContents.send("PlotterImport", "");
+                      }
+                    },
+                    */
+                    {
+                      label:"Export",
+                      click: ()=>{
+                        plotWindow.webContents.send("PlotterExport", "");
+                      }
+                    }
+                  ],
+                }]);
+
+              plotWindow.setMenu(customMenu);
+          
+              plotWindow.loadFile(path.join(__dirname, "./renderer/plotter.html"));
+
+              let isData = false;
+              if(LCPlot.data_collections.length>0){
+                //plot data exost
+                isData = true;
+              }
+          
+              plotWindow.once("ready-to-show", () => {
+                plotWindow.show();
+                plotWindow.setAlwaysOnTop(true, "normal");
+                //plotWindow.webContents.openDevTools();
+                plotWindow.webContents.send("PlotterMenuClicked", isData);
+              });
+            },
+          },
+          
           { type: "separator" },
           {
             label: "Developer tool",

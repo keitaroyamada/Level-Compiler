@@ -1,7 +1,7 @@
 :root {
   --main-bg: #f5f7fa;
   --border-color: #d0d7de;
-  --accent-color: #2d8cf0;
+  --accent-color: #09244B;
   --text-color: #333;
   --table-header-bg: #e9eef3;
 }
@@ -54,7 +54,7 @@ select {
   flex: 1;
   display: flex;
   flex-direction: row;
-  gap: 20px;
+  position: relative;
   padding: 10px 20px;
   box-sizing: border-box;
   overflow: hidden;
@@ -97,7 +97,7 @@ select {
 
 /* ─────────── Target table area ─────────── */
 #target_table_div {
-  width: 750px;
+  width: 400px;
   flex-shrink: 0;
   height: 100%;
   overflow: auto;
@@ -133,6 +133,7 @@ select {
 /* ─────────── Right-side canvas plot area ─────────── */
 #plot_canvas_div {
   flex: 1; /* fills remaining horizontal space */
+  width: 400px;
   min-width: 200px;
   height: 100%;
   display: flex;
@@ -143,9 +144,10 @@ select {
   background-color: #e0e4e8;
   pointer-events: none;
   width: 100%;       
-  height: 250px;      
+  height: 400px;      
   aspect-ratio: unset; 
   border-radius: 4px 4px 0 0;
+  overflow-y: auto;
 }
 
 #plot_canvas {
@@ -155,4 +157,20 @@ select {
   border-radius: 0 0 4px 4px;
   border: 1px solid var(--border-color);
   border-top: none;
+  overflow-y: auto;
+}
+
+#divider1,
+#divider2 {
+  height: auto;
+  width: 2px;
+  cursor: col-resize;
+  background: #ccc;
+  flex-shrink: 0;
+}
+
+#divider3 {
+  height: 2px;
+  cursor: row-resize;
+  background: #ccc;
 }
