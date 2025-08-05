@@ -9,6 +9,7 @@ const { Trinity } = require("./Trinity.js");
 const { copyFileSync } = require("original-fs");
 const { setegid } = require("process");
 const { Console } = require("console");
+const { randomUUID: uuidv4 } = require("crypto");
 const math = require('mathjs');
 
 class LevelCompilerCore extends EventEmitter{
@@ -385,7 +386,6 @@ class LevelCompilerCore extends EventEmitter{
         [this.projects[0], this.projects[this.projects.length-1]] = [this.projects[this.projects.length-1], this.projects[0]];
         this.updateSearchIdx();
         this.base_project_id = projectData.id;
-        this.projects[0].uuid_base = projectData.uuid;
         [this.projects[0].order, this.projects[this.projects.length-1].order] = [this.projects[this.projects.length-1].order, this.projects[0].order];
       }
     }
@@ -663,11 +663,6 @@ class LevelCompilerCore extends EventEmitter{
 
             //connect master and duo
             this.connectMarkers(duoId, msId, "horizontal");
-
-            //update connected master uuid
-            if(this.projects[p].uuid_base == this.projects[p].uuid){
-              this.projects[p].uuid_base = this.projects[connectedMarkerIdx[0][0]].uuid;
-            }
             //this.projects[p].holes[h].sections[s].markers[m].h_connection
           }
         }
@@ -1345,19 +1340,6 @@ class LevelCompilerCore extends EventEmitter{
       })
     })
     
-    //update duo uuid for previous model version(<beta.22)
-    this.updateSearchIdx();    
-    
-    this.projects.forEach(project=>{
-      if(project.model_type=="duo"){
-        if(project.uuid_base == project.uuid){
-          const baseIdx = this.search_idx_list[this.base_project_id.toString()];
-          project.uuid_base = this.projects[baseIdx[0]].uuid;
-          console.log("LCCore: Fixed project uuid & uuid_base.");
-          //this.descriptions = "This workspace was saved with a version earlier than beta.22. Please save it again using the latest version."
-        }
-      }
-    })
 
   }
   getDepthFromTrinity(targetId, trinityList, calcType, allowExtrapolation=false) {
@@ -4536,11 +4518,6 @@ class LevelCompilerCore extends EventEmitter{
     if(type == "correlation"){
       if(this.base_project_id==null){
         this.base_project_id = newProject.id;
-      }
-    }else if(type == "duo"){
-      if(this.base_project_id!==null){
-        const baseIdx = this.search_idx_list[this.base_project_id.toString()];
-        newProject.uuid_base = this.projects[baseIdx[0]].uuid;
       }
     }
     console.log(this._reserved_project_ids)
