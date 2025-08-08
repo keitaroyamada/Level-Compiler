@@ -40,6 +40,7 @@ document.addEventListener("DOMContentLoaded", () => {
   let isLoadedLCModel = false;
   let backup_hole_enable = {};
   let isProcessing = false;
+  let isHoleMenuDragging = false;
   //============================================================================================
 
   //--------------------------------------------------------------------------------------------
@@ -66,18 +67,18 @@ document.addEventListener("DOMContentLoaded", () => {
     objOpts.canvas.zoom_level = [4, 3]; //[x, y](300pix/1m)
     objOpts.canvas.age_zoom_correction = [1/10, 100];//[zoom level, pad level]
     objOpts.canvas.dpir = 1; //window.devicePixelRatio || 1;
-    objOpts.canvas.mouse_over_colour = "red";
+    objOpts.canvas.mouse_over_colour = "#ff0000";
     objOpts.canvas.pad_x = 200; //[px]
     objOpts.canvas.pad_y = 100; //[px]
     objOpts.canvas.shift_x = 0; //[cm]
     objOpts.canvas.shift_y = 100; //[cm]
     objOpts.canvas.bottom_pad = 100; //[cm]
     objOpts.canvas.buffer_depth = 200; //[cm]
-    objOpts.canvas.background_colour = "#f4f5f7";//"#f7f7f7"//"#f8fbff";//"#fffdfa";//""white
+    objOpts.canvas.background_colour = "#ffffff";//"#f4f5f7";//"#f7f7f7"//"#f8fbff";//"#fffdfa";//""white
     objOpts.canvas.target_horizon = false;
     objOpts.canvas.is_grid = false;
     objOpts.canvas.grid_width = 0.5;
-    objOpts.canvas.grid_colour = "lightgray";
+    objOpts.canvas.grid_colour = "#565656";
     objOpts.canvas.is_target = false;//mouse target
     objOpts.canvas.is_event = true;
     objOpts.canvas.is_connection = true;
@@ -88,11 +89,14 @@ document.addEventListener("DOMContentLoaded", () => {
     objOpts.canvas.age_precision = 0;
     objOpts.canvas.display_height = 20.2;
   
-    objOpts.project.interval = 0;
+    objOpts.project.interval = 1;
     objOpts.project.font = "Arial";
     objOpts.project.font_size = 25;
     objOpts.project.font_colour = "black";
-  
+    objOpts.project.is_show_area = true;
+    objOpts.project.area_colour = "#EBEBEB";
+    objOpts.project.area_colour_disconnected = "#FFE5E5";
+
     objOpts.hole.distance = 20;
     objOpts.hole.width = 20;
     objOpts.hole.line_colour = "lightgreen";
@@ -269,10 +273,12 @@ document.addEventListener("DOMContentLoaded", () => {
         }
       })
 
+      /*
       if(order.length>1){
         alert("Multiple [correlation] model detected. Please load base [correlation] model first.");
         return;
       }
+      */
 
       dataList.forEach((data,i)=>{
         if(data.name.includes("[duo]")){
@@ -349,12 +355,12 @@ document.addEventListener("DOMContentLoaded", () => {
         const droppedData = dataList[order[i]];//type,name,path
         if(droppedData.type == "lcmodel"){
           console.log("[Renderer]: LCmodel load from drop..");
-          await initialiseCorrelationModel();
-          await initialiseAgeModel();
+          //await initialiseCorrelationModel();
+          //await initialiseAgeModel();
           await initialiseCanvas();
-          await initialisePlot();
-          modelImages = initialiseImages();
-          await initialisePaths();
+          //await initialisePlot();
+          //modelImages = initialiseImages();
+          //await initialisePaths();
 
           //load into LCCore (load process is in receive("RegisteredLCModel")
           await registerLCModel(droppedData.path);
@@ -827,9 +833,14 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     }
   });
+  //============================================================================================
+
+  //============================================================================================
   async function handleNormalContextmenu(event) {
     event.preventDefault();
     let clickResult = null;
+
+    if(objOpts.edit.hittest==null) return
     if(objOpts.edit.hittest.hole!==null){
       if(objOpts.edit.hittest.section!==null){
         clickResult = await window.LCapi.showContextMenu("sectionContextMenu");
@@ -954,6 +965,7 @@ document.addEventListener("DOMContentLoaded", () => {
     event.preventDefault();
 
     const clickResult = await window.LCapi.showContextMenu("editContextMenu");
+    if(clickResult==null) return
 
     if(clickResult == "connectMarkers"){
       objOpts.edit.contextmenu_enable = false;
@@ -965,7 +977,7 @@ document.addEventListener("DOMContentLoaded", () => {
       objOpts.edit.handleClick = null;
       document.addEventListener("mousemove", objOpts.edit.handleMove);
       console.log(objOpts.edit);
-    } else if(clickResult == "disconnectMarkers"){
+    }else if(clickResult == "disconnectMarkers"){
       objOpts.edit.contextmenu_enable = false;
       objOpts.edit.hittest = null;
       objOpts.edit.marker_from = null;
@@ -1340,12 +1352,8 @@ document.addEventListener("DOMContentLoaded", () => {
         }else if (result == "duplicate_holes"){
           alert("There are duplicate hole names. Please rename to unique hole name first.")
         }
-      }
-      
-
-      
-    
-    }else if(clickResult =="loadHighResolutionImage"){
+      }    
+    }else if(clickResult == "loadHighResolutionImage"){
 
       const targetId = [objOpts.edit.hittest.project, objOpts.edit.hittest.hole,objOpts.edit.hittest.section,null];
       modelImages.load_target_ids = [targetId];//load 
@@ -1357,7 +1365,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
       modelImages = await loadCoreImages(modelImages, LCCore, objOpts, ["drilling_depth","composite_depth","event_free_depth", "age"]);
       updateView();
-    }else if(clickResult =="plotImageBrightness"){
+    }else if(clickResult == "plotImageBrightness"){
       if(LCCore){
         if(objOpts.edit.hittest.section!==null){
           const ht = objOpts.edit.hittest;
@@ -1379,7 +1387,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }
       }
       updateView();      
-    }else if(clickResult =="showFloatingImage"){
+    }else if(clickResult == "showFloatingImage"){
       const targetId = [objOpts.edit.hittest.project, objOpts.edit.hittest.hole,objOpts.edit.hittest.section,null];
       if(Object.keys(modelImages["drilling_depth"]).length>0){
         console.log("Renderer: openfloating image viewer");
@@ -1496,6 +1504,18 @@ document.addEventListener("DOMContentLoaded", () => {
           }
         }        
       }
+    }else if(clickResult == "reload"){
+      document.getElementById("bt_reload").click();
+    }else if(clickResult == "finder"){
+      document.getElementById("bt_finder").click();
+    }else if(clickResult == "zoomin"){
+      document.getElementById("bt_zoomin").click();
+    }else if(clickResult == "zoomout"){
+      document.getElementById("bt_zoomout").click();
+    }else if(clickResult == "zoom0"){
+      document.getElementById("bt_zoom0").click();
+    }else if(clickResult == "zoomactual"){
+      document.getElementById("bt_zoomactual").click();
     }else{
       objOpts.edit.contextmenu_enable = true;
       objOpts.edit.hittest = null;
@@ -1701,7 +1721,7 @@ document.addEventListener("DOMContentLoaded", () => {
         //console.log(ht.hole+"-"+ht.section+"-"+ht.nearest_marker)
         objOpts.edit.handleClick = handleMarkerAddClick;
         document.addEventListener('click', objOpts.edit.handleClick);
-      }else{
+      }else if(objOpts.edit.handleClick !== null){
         document.removeEventListener('click', objOpts.edit.handleClick);
         objOpts.edit.handleClick = null;
       }
@@ -1754,11 +1774,11 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     let isShift = false;
-      if (event.shiftKey) {
-        //Set continuous selection mode
-        isShift = true;
-        console.log("[Renderer: Set continuous selection mode.]")
-      }
+    if (event.shiftKey) {
+      //Set continuous selection mode
+      isShift = true;
+      console.log("[Renderer: Set continuous selection mode.]")
+    }
     
     if (objOpts.edit.marker_from !== null) {
       isProcessing = true;
@@ -1903,7 +1923,7 @@ document.addEventListener("DOMContentLoaded", () => {
         response = await window.LCapi.inputdialog(askData);
         if(response !== null){
           const targetId = [ht.project, ht.hole, ht.section, ht.nearest_marker];
-          console.log(targetId,response)
+          //console.log(targetId,response)
           await undo("save");//undo
           const result = await window.LCapi.SetZeroPoint(targetId, response);
           if(result==true){
@@ -1972,6 +1992,7 @@ document.addEventListener("DOMContentLoaded", () => {
       objOpts.edit.marker_to = null;
       objOpts.edit.handleClick = null;
       objOpts.edit.handleMove = null;
+      //objOpts.edit.mode=null; // if enable, continuous mode need shift.
 
       ///update scroller position
       let canvasPosY = null;
@@ -1996,10 +2017,6 @@ document.addEventListener("DOMContentLoaded", () => {
         newPosX = 0;
       }
     }
-
-    
-    
-
     isProcessing = false;
     updateView();
   }
@@ -2061,10 +2078,27 @@ document.addEventListener("DOMContentLoaded", () => {
     const mouseX = event.clientX - rect.left;
     const mouseY = event.clientY - rect.top;
     const ht = JSON.parse(JSON.stringify(getClickedItemIdx(mouseX, mouseY, LCCore, objOpts)));
+    event.preventDefault();
 
     //initialise
-    objOpts.edit.marker_from = ht;
-    objOpts.edit.marker_to = 999999;//dummy
+    if(objOpts.edit.marker_from !== null ){
+      objOpts.edit.marker_from = null;
+      objOpts.edit.marker_to = 999999;//dummy
+      objOpts.edit.mode = null;
+      return;
+    }
+
+    if(objOpts.edit.marker_from == null){
+      objOpts.edit.marker_from = ht;
+      objOpts.edit.marker_to = 999999;//dummy
+    }
+
+    let isShift = false;
+    if (event.shiftKey) {
+      //Set continuous selection mode
+      isShift = true;
+      console.log("[Renderer: Set continuous selection mode.]")
+    }
 
     //if get both markers
     if(objOpts.edit.mode == "add_marker"){
@@ -2085,43 +2119,55 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     }
 
-    objOpts.edit.mode=null;
-    objOpts.edit.contextmenu_enable = true;
-    objOpts.edit.hittest = null;
-    objOpts.edit.marker_from = null;
-    objOpts.edit.marker_to = null;
-    document.removeEventListener("click", objOpts.edit.handleClick);
-    document.removeEventListener("mousemove", objOpts.edit.handleMove);
-    objOpts.edit.handleClick = null;
-    objOpts.edit.handleMove = null;
+    if(isShift){
+      objOpts.edit.contextmenu_enable = true;
+      objOpts.edit.hittest = null;
+      objOpts.edit.marker_from = null;
+      objOpts.edit.marker_to = null;
+
+      objOpts.edit.handleClick = null;
+      objOpts.edit.handleMove = null;
+    }else{
+      document.removeEventListener("click", objOpts.edit.handleClick);
+      document.removeEventListener("mousemove", objOpts.edit.handleMove);
+
+      //objOpts.edit.mode=null; // if enable, continuous mode need shift.
+      objOpts.edit.contextmenu_enable = true;
+      objOpts.edit.hittest = null;
+      objOpts.edit.marker_from = null;
+      objOpts.edit.marker_to = null;
+
+      objOpts.edit.handleClick = null;
+      objOpts.edit.handleMove = null;      
+
+      ///update scroller position
+      let canvasPosY = null;
+      let canvasPosX = (ht.x + objOpts.canvas.shift_y) * (objOpts.canvas.dpir * objOpts.canvas.zoom_level[1]) + objOpts.canvas.pad_y;
+      if (objOpts.canvas.depth_scale == "age") {
+        canvasPosY = ((ht.y+ objOpts.canvas.shift_y) * (objOpts.canvas.dpir * objOpts.canvas.zoom_level[1]) + objOpts.canvas.pad_y + objOpts.canvas.age_zoom_correction[1])  * objOpts.canvas.age_zoom_correction[0];
+      } else {
+        canvasPosY = (ht.y + objOpts.canvas.shift_y) * (objOpts.canvas.dpir * objOpts.canvas.zoom_level[1]) + objOpts.canvas.pad_y;
+      }
+
+      //if move to centre
+      //scroller.scrollTop = canvasPosY - scroller.clientHeight / 2;
+      //scroller.moveTo(scroller.scrollLeft, pos_y);
+
+      //move canvas
+      let newPosY = canvasPosY - scroller.clientHeight / 2;
+      let newPosX = canvasPosX - scroller.clientWidth / 2;
+      if(newPosY <= 0){
+        newPosY = 0;
+      }
+      if(newPosX <= 0){
+        newPosX = 0;
+      }
+
+      //canvasPos[0] = newPosX;
+      //canvasPos[1] = objOpts.canvas.shift_y;////newPosY;
+    }
+        
     isProcessing = false;
-
-    ///update scroller position
-    let canvasPosY = null;
-    let canvasPosX = (ht.x + objOpts.canvas.shift_y) * (objOpts.canvas.dpir * objOpts.canvas.zoom_level[1]) + objOpts.canvas.pad_y;
-    if (objOpts.canvas.depth_scale == "age") {
-      canvasPosY = ((ht.y+ objOpts.canvas.shift_y) * (objOpts.canvas.dpir * objOpts.canvas.zoom_level[1]) + objOpts.canvas.pad_y + objOpts.canvas.age_zoom_correction[1])  * objOpts.canvas.age_zoom_correction[0];
-    } else {
-      canvasPosY = (ht.y + objOpts.canvas.shift_y) * (objOpts.canvas.dpir * objOpts.canvas.zoom_level[1]) + objOpts.canvas.pad_y;
-    }
-
-    //if move to centre
-    //scroller.scrollTop = canvasPosY - scroller.clientHeight / 2;
-    //scroller.moveTo(scroller.scrollLeft, pos_y);
-
-    //move canvas
-    let newPosY = canvasPosY - scroller.clientHeight / 2;
-    let newPosX = canvasPosX - scroller.clientWidth / 2;
-    if(newPosY <= 0){
-      newPosY = 0;
-    }
-    if(newPosX <= 0){
-      newPosX = 0;
-    }
-
-    //canvasPos[0] = newPosX;
-    //canvasPos[1] = objOpts.canvas.shift_y;////newPosY;
-
     updateView();
   }
   //2 Marker click--------------------------------------------
@@ -2905,9 +2951,7 @@ document.addEventListener("DOMContentLoaded", () => {
   //load correlation model
   window.LCapi.receive("ExportCorrelationAsCsvMenuClicked", async () => {
     console.log(LCCore.projects.length)
-    for (let i=0; i<LCCore.projects.length; i++){
-      await window.LCapi.ExportCorrelationAsCsv(LCCore, LCCore.projects[i].id);
-    }
+    await window.LCapi.ExportCorrelationAsCsv();
   });
   window.LCapi.receive("ExportCorrelationAsLFMenuClicked", async () => {
     await window.LCapi.ExportCorrelationAsLF(LCCore);
@@ -2989,8 +3033,7 @@ document.addEventListener("DOMContentLoaded", () => {
         //update plot
         updateView();
       }
-    });
-    
+    });    
   //============================================================================================
   //reload
   document.getElementById("bt_reload").addEventListener("click", async (event) => {
@@ -3435,13 +3478,40 @@ document.addEventListener("DOMContentLoaded", () => {
     const txt = await getFooterInfo(LCCore, objOpts.edit.hittest, options);
     document.getElementById("footerLeftText").innerText = txt;
 
-    //update mouse position
-    mousePos = [mouseX, mouseY];
-
     //target line
     var target_line = document.getElementById("horizontal_target");
     target_line.style.top = event.clientY + "px";
 
+    //move hole menu
+    if(isHoleMenuDragging){
+      const rectScroller = document.getElementById("scroller").getBoundingClientRect();
+      const footerHeight = document.querySelector('footer').offsetHeight || 0;
+      const holeMenu = document.querySelector('.hole_menu');
+      const dx = mouseX - mousePos[0];
+      const dy = mouseY - mousePos[1];
+
+      const currentRight = parseFloat(getComputedStyle(holeMenu).right);
+      const currentBottom = parseFloat(getComputedStyle(holeMenu).bottom);
+      const newRight = currentRight - dx;
+      const newBottom = currentBottom - dy;
+
+      const menuRect = holeMenu.getBoundingClientRect();
+      const maxRight = rectScroller.width - menuRect.width;
+      const maxBottom = rectScroller.height - menuRect.height + footerHeight;
+
+      holeMenu.style.right = `${Math.min(Math.max(newRight, 0), maxRight)}px`;
+      holeMenu.style.bottom = `${Math.min(Math.max(newBottom, 0), maxBottom)}px`;
+    }
+
+    //update mouse position
+    mousePos = [mouseX, mouseY];
+
+  });
+  document.querySelector('.hole_menu').addEventListener('mousedown', (e) => {
+    isHoleMenuDragging = true;
+  });
+  document.addEventListener('mouseup', () => {
+    isHoleMenuDragging = false;
   });
   //============================================================================================
   //scroll event
@@ -4058,72 +4128,95 @@ document.addEventListener("DOMContentLoaded", () => {
       }
 
       //main
+      let isBbaseProjectMaster = false;
+      const baseProjectIdx = getIdxById(LCCore, LCCore.base_project_id);
+      if(LCCore.projects[baseProjectIdx[0]].model_type == "correlation"){
+        isBbaseProjectMaster = true;
+      }      
+
       let num_disable = {total: 0, hole: 0};
       for (let p = 0; p < LCCore.projects.length; p++) {
         //make project objects===================================================================================
         const project = LCCore.projects[p];
-        //show project name
+        
+        //get position
+        let prj_num_enable_right = 0;
+              
+        project.holes.forEach(hc=>{
+          if(hc.enable){
+            prj_num_enable_right++;
+          }
+        })
+        
+        let prj_num_enable_left = 0;
+        LCCore.projects.filter(p=>p.order<project.order).forEach(p=>p.holes.forEach(h=>{if(h.enable){prj_num_enable_left++;}}))
+        prj_num_enable_left += objOpts.project.interval * project.order;
+
+        const prj_padx = 80;//objOpts.hole.distance * xMag;
+        const prj_pady = 200;
+        const project_x0 = -prj_padx + ((objOpts.section.width + objOpts.hole.distance) * prj_num_enable_left + shift_x) * xMag + pad_x;
+        const project_y0 = -prj_pady + (shift_y) * yMag + pad_y;
+        let project_w  = prj_padx/2 + (objOpts.section.width + objOpts.hole.distance) * (prj_num_enable_right-1) * xMag + pad_x;
+        if(project_w<=0){
+          project_w = 100;
+        }
+        let project_h = 1000;
+        if(project.composite_depth_bottom !== null &&  project.composite_depth_top !== null){
+          project_h = 2*prj_pady + (project.composite_depth_bottom - project.composite_depth_top) * yMag;
+        }        
+                
         if(project.enable == true){
-          let num_enable_left = 0;
-          LCCore.projects.filter(p=>p.order<project.order).forEach(p=>p.holes.forEach(h=>{if(h.enable){num_enable_left++;}}))
-          const project_x0 = ((objOpts.section.width + objOpts.hole.distance) * num_enable_left + shift_x) * xMag + pad_x;
-          let project_y0 = (shift_y) * yMag + pad_y;;//pad_y;
-          if(project.composite_depth_top !== null){
-            project_y0 = (project.composite_depth_top + shift_y) * yMag + pad_y;
-          }     
+          //show project name
           sketch.drawingContext.setLineDash([]);
           sketch.fill(objOpts.project.font_colour);
           sketch.stroke(objOpts.project.font_colour);
+          sketch.strokeWeight(2);
           sketch.textFont(objOpts.project.font);
           sketch.textSize(objOpts.project.font_size);
           sketch.text(
             project.name,
-            project_x0,
-            project_y0 - 70,
+            project_x0 + 40,
+            project_y0 + 40,
           );
-        }
-        
 
-        //live hittest
-        if(objOpts.edit.hittest){
-          //console.log(objOpts.edit.hittest.project, objOpts.edit.hittest.hole)
-          if(["add_hole","delete_project","change_project_name"].includes(objOpts.edit.mode)){
-            if(objOpts.edit.hittest.project == project.id[0]){
-              
-              let num_enable_right = 0;
-              
-              project.holes.forEach(hc=>{
-                if(hc.enable){
-                  num_enable_right++;
-                }
-              })
-              
-              let num_enable_left = 0;
-              LCCore.projects.filter(p=>p.order<project.order).forEach(p=>p.holes.forEach(h=>{if(h.enable){num_enable_left++;}}))
+          //show project area
+          if(objOpts.project.is_show_area){
+            sketch.push();//save
+            //check connection to base correlation model
+            if(isBbaseProjectMaster && includesString(project, LCCore.base_project_id[0])){
+              //connected master model
+              sketch.fill(objOpts.project.area_colour+"50");//HEX+alpha rate                            
+            }else{
+              //disconnected master model
+              sketch.fill(objOpts.project.area_colour_disconnected+"50");//HEX+alpha rate
+            }            
+            sketch.noStroke();
+            
+            sketch.rect(project_x0, project_y0, project_w, project_h, 5, 5, 5, 5); //rounded
+            sketch.pop();
+          }          
 
-              sketch.push();//save
-              sketch.fill(0,0,0,0);
-              sketch.strokeWeight(3);
-              sketch.stroke("Red");
-              
-              const project_ht_x0 = ((objOpts.section.width + objOpts.hole.distance) * num_enable_left + shift_x) * xMag + pad_x - 3;
-              const project_ht_y0 = (project.composite_depth_top + shift_y) * yMag + pad_y - 3;
-              let project_ht_w  = (objOpts.section.width + objOpts.hole.distance) * num_enable_right * xMag - objOpts.hole.distance/2;
-              if(project_ht_w<=0){
-                project_ht_w = 100;
+
+
+
+          //live hittest
+          if(objOpts.edit.hittest){
+            //console.log(objOpts.edit.hittest.project, objOpts.edit.hittest.hole)
+            if(["add_hole","delete_project","change_project_name"].includes(objOpts.edit.mode)){
+              if(objOpts.edit.hittest.project == project.id[0]){
+                
+                sketch.push();//save
+                sketch.fill(0,0,0,0);
+                sketch.strokeWeight(3);
+                sketch.stroke("Red");
+                
+                sketch.rect(project_x0, project_y0, project_w, project_h, 3, 3, 3, 3); //rounded
+                sketch.pop();
               }
-              let project_ht_h = 1000;
-              if(project.composite_depth_bottom !== null &&  project.composite_depth_top !== null){
-                project_ht_h = (project.composite_depth_bottom - project.composite_depth_top) * yMag + 6;
-              }
-
-              sketch.rect(project_ht_x0, project_ht_y0, project_ht_w, project_ht_h, 3, 3, 3, 3); //rounded
-              sketch.pop();
-
             }
           }
         }
-        
+                
         for (let h = 0; h < LCCore.projects[p].holes.length; h++) {
           //make hole objects===================================================================================
           //load hole data
@@ -4146,7 +4239,7 @@ document.addEventListener("DOMContentLoaded", () => {
           let hole_x0 = (objOpts.hole.distance + objOpts.hole.width) * (num_disable.total + hole.order - num_disable.hole);
           //add  hole name---------------------------------------------------
           sketch.fill(objOpts.hole.font_colour);
-          sketch.stroke(objOpts.hole.font_colour);
+          sketch.noStroke();
           sketch.textFont(objOpts.hole.font);
           sketch.textSize(objOpts.hole.font_size);
           sketch.text(
@@ -5673,6 +5766,16 @@ document.addEventListener("DOMContentLoaded", () => {
       LCCore = JSON.parse(decompressed);
 
       if (LCCore) {
+        //calc composite depth
+        LCCore = await window.LCapi.CalcCompositeDepth();
+  
+        //calc event free depth
+        LCCore = await window.LCapi.CalcEventFreeDepth();
+  
+        //sort
+        LCCore = sortProjectByOrder(LCCore);
+        LCCore = sortHoleByOrder(LCCore);
+
         //initialise hole list
         while (document.getElementById("hole_list").firstChild) {
           document.getElementById("hole_list").removeChild(document.getElementById("hole_list").firstChild);
@@ -5715,14 +5818,7 @@ document.addEventListener("DOMContentLoaded", () => {
           container.appendChild(projItemDiv);
         });
   
-        //calc composite depth
-        LCCore = await window.LCapi.CalcCompositeDepth();
-  
-        //calc event free depth
-        LCCore = await window.LCapi.CalcEventFreeDepth();
-  
-        //sort
-        LCCore = sortHoleByOrder(LCCore);
+        
         //apply enable info
         for(let  project of LCCore.projects){
           let en = backup_hole_enable[project.id.toString()];
@@ -5764,6 +5860,12 @@ document.addEventListener("DOMContentLoaded", () => {
   
         //shwo model summary
         console.log("[Renderer]: Correlation Model has been loaded into the renderer.");
+        console.log(
+          "Name: " + LCCore.name,
+          "\nDescriptions: " + LCCore.descriptions,
+          "\nModel data: " , LCCore
+        );
+        /*
         LCCore.projects.forEach(p=>{
           console.log(
             "Project ID: " + p.id[0],
@@ -5773,6 +5875,7 @@ document.addEventListener("DOMContentLoaded", () => {
             "\nModel data: " , p
           );
         })
+        */
   
         if(isUpdateView){
           updateView();
@@ -5918,8 +6021,6 @@ document.addEventListener("DOMContentLoaded", () => {
   }
   //-------------------------------------------------------------------------------------------
 
-
-
   async function initialiseCorrelationModel() {
     //canvas initialise
     const parentElement = document.getElementById("hole_list");
@@ -6048,6 +6149,23 @@ document.addEventListener("DOMContentLoaded", () => {
 //subfunctions
 //============================================================================================
 //============================================================================================
+function includesString(obj, target) {
+  if (obj === null || obj === undefined) return false;
+
+  if (typeof obj === "string") {
+    return obj.includes(target);
+  }
+
+  if (Array.isArray(obj)) {
+    return obj.some(item => includesString(item, target));
+  }
+
+  if (typeof obj === "object") {
+    return Object.values(obj).some(value => includesString(value, target));
+  }
+
+  return false;
+}
 
 function rotateText(ctx, txt, degree, center, objOpts) {
   const textWidth = ctx.measureText(txt).width;
@@ -6360,11 +6478,12 @@ async function getFooterInfo(LCCore, hittest, objOpts) {
 
   //get age
   let age = "---)";
-  if(hittest.section!==null){
+  if(hittest.project!==null && hittest.hole!==null && hittest.section!==null){
     const targetId = [hittest.project, hittest.hole, hittest.section, null];
     if(hittest == undefined){
       return txt;
     }
+
     const calcedData = await window.LCapi.depthConverter(["", hittest.y, targetId], objOpts.canvas.depth_scale, "linear");
     age = calcedData !== null ? calcedData.age_mid.toFixed(objOpts.canvas.age_precision) + " calBP)" : "---)";
   }
@@ -6466,6 +6585,13 @@ async function loadPlotIcons(agePlotIcons, objOpts) {
       );
     }
   });
+}
+
+function sortProjectByOrder(LCCore) {
+  LCCore.projects.sort((a, b) => {
+      return a.order - b.order;
+  });
+  return LCCore;
 }
 
 function sortHoleByOrder(LCCore) {

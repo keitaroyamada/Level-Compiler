@@ -49,6 +49,7 @@ const { resolveObjectURL } = require("buffer");
 const isMac = process.platform === "darwin";
 const isDev = false;//process.env.NODE_ENV !== "development"; //const isDev = false;
 let isEditMode = false;
+const isShowMinorError = false;
 
 //main properties
 let LCCore = new LevelCompilerCore();
@@ -246,7 +247,7 @@ function createMainWIndow() {
 
     //load ages into LCCore
     LCCore.calcMarkerAges(LCAge);
-    
+
     //LCAge.checkAges();
     if(LCAge.unreliable_ids.length>0){
       let txt = "Age model contains inverted chronological order.";
@@ -512,9 +513,9 @@ function createMainWIndow() {
       }
       //submit
       //make worker
-      numTotalTasks =tasks.length;
-      progressBar = progressDialog(mainWindow, "Load modeled section images", "Now converting...", false);
-      progressBar = await updateProgress(progressBar, 0, numTotalTasks);
+      numTotalTasks = tasks.length;
+      progressBar   = progressDialog(mainWindow, "Load modeled section images", "Now converting...", false);
+      progressBar   = await updateProgress(progressBar, 0, numTotalTasks);
       const workers = await initialiseWorkerPool(NUM_WORKERS, tasks, idleWorkers, coreImages);
 
       while (tasks.length > 0 && idleWorkers.length > 0) {
@@ -1472,20 +1473,24 @@ function createMainWIndow() {
   });
   
 
-  ipcMain.handle("ExportCorrelationAsCsvFromRenderer", async (_e, MD, baseProjectID) => {
+  ipcMain.handle("ExportCorrelationAsCsvFromRenderer", async (_e) => {
     console.log("MAIN: Start contructing CSV data.");
+    LCCore.updateVersionInfo();
+    const MD = LCCore.exportSerialisedModel();
     let exportLCCore = initialiseLCCore();
     
     //exportLCCore <- MD
-    assignObject(exportLCCore, MD);
+    exportLCCore.loadModelFromLcmodel(MD);
 
     //make export array
     let dataMap = exportLCCore.constructModelMap()
-    let outputArray = exportLCCore.constructCSVdata(dataMap, baseProjectID);
-    const idx = exportLCCore.search_idx_list[baseProjectID.toString()];
-    const saveName = "[correlation]"+exportLCCore.projects[idx[0]].name+"("+exportLCCore.projects[0].correlation_version+").csv"; 
-    
-    putcsvfile(mainWindow, saveName, outputArray);
+    for(let i=0; i<exportLCCore.projects.length;i++){
+      const exportProjectId = exportLCCore.projects[i].id;
+      let outputArray = exportLCCore.constructCSVdata(dataMap, exportProjectId);
+      const idx = exportLCCore.search_idx_list[exportProjectId.toString()];
+      const saveName = "[correlation]"+exportLCCore.projects[idx[0]].name+"("+exportLCCore.projects[0].correlation_version+").csv"; 
+      putcsvfile(mainWindow, saveName, outputArray);
+    }
     
     console.log("MAIN: Export ", saveName);
   });
@@ -1494,7 +1499,7 @@ function createMainWIndow() {
     labelerHistory = new UndoManager();
     tempCore = initialiseLCCore();
     tempCore.addProject("correlation","temp");
-    tempCore.addHole([1,null,null,null],"temp");
+    tempCore.addHole(tempCore.projects[0].id, "temp");
 
     globalPath.dataPaths = globalPath.dataPaths.filter(data => data.type !== "labeler");
 
@@ -1510,7 +1515,7 @@ function createMainWIndow() {
 
   ipcMain.handle("LabelerAddSectionData", async (_e, holeName, sectionName) => {
     //change temp hole name
-    tempCore.changeName([1,1,null,null],holeName);
+    tempCore.changeName(tempCore.projects[0].holes[0].id, holeName);
 
     //add section
     let inData = {
@@ -1525,14 +1530,14 @@ function createMainWIndow() {
     inData.distance_bottom = 100;
     inData.dd_top = 0;
     inData.dd_bottom = 100;
-    tempCore.addSection([1,1,null,null], inData);
+    tempCore.addSection(tempCore.projects[0].holes[0].id, inData);
 
     return JSON.parse(JSON.stringify(tempCore));
   });
   ipcMain.handle("LabelerAddMarkerData", async (_e, name, depth, relative_x) => {
     //add marker
-    tempCore.addMarker([1,1,1,null],depth,"distance",relative_x);
-    const nearMarkers = tempCore.getMarkerIdsByDistance([1,1,1,null],depth);
+    tempCore.addMarker(tempCore.projects[0].holes[0].sections[0].id,depth,"distance",relative_x);
+    const nearMarkers = tempCore.getMarkerIdsByDistance(tempCore.projects[0].holes[0].sections[0].id,depth);
 
     if(nearMarkers[2]==0){
       tempCore.changeName(nearMarkers[0], name);
@@ -1676,7 +1681,7 @@ function createMainWIndow() {
 
   });
   ipcMain.handle("LabelerLoadModel", (_e) => {
-    return JSON.parse(JSON.stringify(tempCore));
+    return tempCore.exportSerialisedModel();
   });
   ipcMain.handle("ChangeDepthScale", async (_e, newId) => {
     LCCore.changeBaseProject(newId);
@@ -2281,7 +2286,6 @@ function createMainWIndow() {
           const sectionData = LCCore.projects[idx[0]].holes[idx[1]].sections[idx[2]];
           dcpms[holeData.name+"-"+sectionData.name] = 30;
         }
-        
 
         //Undo deep copy
         assignObject(LCCore, result.LCCore);
@@ -2339,6 +2343,7 @@ function createMainWIndow() {
       if(result !== null){
         //Undo deep copy
         assignObject(tempCore, result.tempCore);
+
         console.log("MAIN: Redo loaded.");
         return true;
       }else{
@@ -2545,6 +2550,7 @@ function createMainWIndow() {
       td.hole_name    = data[1][1];
       td.section_name = data[1][2];
       td.distance     = parseFloat(data[1][3]);
+      if(td.hole_name==null||td.section_name==null||td.distance==null) return null;
       send_data.push(td);
       let targetId    = data[2];
 
@@ -3121,15 +3127,24 @@ function createMainWIndow() {
     let newLCCore = new LevelCompilerCore();
 
     //minor error
-    newLCCore.on('error', (err) => {      
-      console.error('LCCore => '+ err.statusDetails);
-      //window.webContents.send("AlertRenderer", err);
+    newLCCore.on('error_minor', (err) => {   
+      if(isShowMinorError){
+        console.error('LCCore => '+ err.statusDetails);
+        //window.webContents.send("AlertRenderer", err);
+      }       
     });
 
     //alert error
     newLCCore.on('error_alert', (err) => {
       console.error('LCCore => '+ err.statusDetails);
       mainWindow.webContents.send("AlertRenderer", err);
+    });
+
+    //fatal error
+    newLCCore.on('error_fatal', (err) => {
+      console.error('LCCore => '+ err.statusDetails);
+      mainWindow.webContents.send("AlertRenderer", err);
+      throw new Error('LCCore fatal error: ' + err.statusDetails); 
     });
 
     //depth update event
@@ -3149,6 +3164,13 @@ function createMainWIndow() {
     try {
       //register model
       const isLoad = LCCore.loadModelFromCsv(fullpath);
+      //register path
+      globalPath.dataPaths.push({type:"csvmodel", path:fullpath});
+
+      console.log('MAIN: Registered correlation model from "' + fullpath + '"' );
+      return true
+
+      /*
       if(isLoad == true){
         //register path
         globalPath.dataPaths.push({type:"csvmodel", path:fullpath});
@@ -3158,6 +3180,7 @@ function createMainWIndow() {
       }else{
         return null;
       }
+      */
       
     } catch (error) {
       console.log(error);
@@ -3193,15 +3216,9 @@ function createMainWIndow() {
 
     //register
     if(inData!==null){
-        //initialise
-        LCCore = initialiseLCCore(mainWindow);
-        LCAge  = new LevelCompilerAge(); 
-        LCPlot.initialiseAgeCollection();
-
       //register
       if(inData.LCCore!==null){
-        assignObject(LCCore, inData.LCCore);
-        LCCore.validateProperties();
+        LCCore.loadModelFromLcmodel(inData.LCCore);
       } 
       if(inData.LCAge!==null){
         assignObject(LCAge, inData.LCAge);
@@ -3390,13 +3407,15 @@ function createMainWIndow() {
                 click: async () => {
                   if(isEditMode){
                     //remove plot data
+                    LCCore.updateVersionInfo();
                     let outLCCore   = new LevelCompilerCore();
                     Object.assign(outLCCore, LCCore.exportSerialisedModel());
+                    outLCCore.updateVersionInfo();
 
                     const outLCAge  = new LevelCompilerAge();
                     const outLCPlot = new LevelCompilerPlot();
                     
-                    outLCCore.calcMarkerAges(outLCAge);
+                    outLCCore.calcMarkerAges(outLCAge);//remove ages
   
                     const outData = {LCCore:outLCCore, LCAge:outLCAge, LCPlotAge:outLCPlot};
   
@@ -3418,8 +3437,12 @@ function createMainWIndow() {
                     let out_LCPlot = JSON.parse(JSON.stringify(LCPlot));
                     out_LCPlot.data_collections = [];
                     out_LCPlot.data_selected_id = null;
+
+                    LCCore.updateVersionInfo();
+                    let outLCCore   = new LevelCompilerCore();
+                    Object.assign(outLCCore, LCCore.exportSerialisedModel());
   
-                    const outData = {LCCore:LCCore, LCAge:LCAge, LCPlotAge:out_LCPlot};
+                    const outData = {LCCore:outLCCore, LCAge:LCAge, LCPlotAge:out_LCPlot};
   
                     if(globalPath.saveModelPath == null){
                       //save as new file
@@ -3439,8 +3462,12 @@ function createMainWIndow() {
                     let out_LCPlot = JSON.parse(JSON.stringify(LCPlot));
                     out_LCPlot.data_collections = [];
                     out_LCPlot.data_selected_id = null;
+
+                    LCCore.updateVersionInfo();
+                    let outLCCore   = new LevelCompilerCore();
+                    Object.assign(outLCCore, LCCore.exportSerialisedModel());
   
-                    const outData = {LCCore:LCCore, LCAge:LCAge, LCPlotAge:out_LCPlot};
+                    const outData = {LCCore:outLCCore, LCAge:LCAge, LCPlotAge:out_LCPlot};
   
                     //save as new file
                     globalPath.saveModelPath = await putmodelfile(outData, null);
@@ -3599,14 +3626,18 @@ function createMainWIndow() {
 
                   return `<Name>: ${item.name}\n` +
                          `  -[Type]: ${item.type}\n` +
+                         `  -[Master connection]: ${item.is_connected_master}\n` +
                          `  -[Hole]: ${item.hole_counts}\n` +
                          `  -[Section]: ${item.section_counts}\n` +
                          `  -[Marker]: ${item.marker_counts}\n` +
                          `  -[Connection]: \n${conn}\n` +
 
                          `  -[CD errors]: ${item.cd_error_counts}\n` +
+                         `  -[CD conflictions]: ${item.cd_confliction_counts}\n` +
                          `  -[EFD errors]: ${item.efd_error_counts}\n` +
+                         `  -[EFD conflictions]: ${item.efd_confliction_counts}\n` +
                          `  -[Age errors]: ${item.age_error_counts}\n` +
+                         `  -[Age conflictions]: ${item.age_confliction_counts}\n` +
                          `  -[Max Rank]: ${item.max_rank}\n`
                 }).join('\n');
 
@@ -3622,7 +3653,7 @@ function createMainWIndow() {
           { type: "separator" },
           {
             label: "Unload all models",
-            accelerator: "CmdOrCtrl+U",
+            accelerator: "CmdOrCtrl+W",
             click: () => {
               mainWindow.webContents.send("UnLoadModelsMenuClicked");
             },
@@ -3704,7 +3735,7 @@ function createMainWIndow() {
           
               tempCore = initialiseLCCore();
               tempCore.addProject("correlation","temp");
-              tempCore.addHole([1,null,null,null],"temp");
+              tempCore.addHole(tempCore.projects[0].id,"temp");
   
               //create finder window
               labelerWindow = new BrowserWindow({

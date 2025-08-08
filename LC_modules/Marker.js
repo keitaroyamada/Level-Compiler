@@ -21,6 +21,38 @@ class Marker {
     this.definition_relative_x = 0; //[0~1]: definitoin position on the photo
     this.descriptions = "";
   }
+
+  clone(){
+    const newMarker  = new Marker();
+    const markerData = structuredClone(this);
+    Object.assign(newMarker, markerData);
+    return newMarker;
+  }
+
+  load(obj) {
+    const tmpl = new Marker();
+
+    // update data & add new data
+    for (const k of Object.keys(tmpl)) {
+      if (obj && k in obj) {
+        this[k] = obj[k]; //if property exist in in data.
+      } else {
+        this[k] = tmpl[k];   //new property
+      }
+    }
+
+    // delete old properties
+    for (const k of Object.keys(this)) {
+      if (!(k in tmpl)) {
+        delete this[k];
+      }
+    }
+    return this;
+  }
+
+  static fromObject(obj) {
+    return new Marker().load(obj || {});
+  }
 }
 
 module.exports = { Marker };

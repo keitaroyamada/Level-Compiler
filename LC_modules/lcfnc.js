@@ -113,18 +113,13 @@ function makeMarkerIdBase(rn, cn) {
   }
   return output;
 }
-function getUniqueId(reserved_idxs) {
-  let isDuplicate = true;
-  let id = null;
-  while(isDuplicate){
-    id = uuidv4().replace(/-/g, "");
-    if(!reserved_idxs.includes(id)){
-      isDuplicate = false;
-    }
-  }
-  return id
-  
-  //return Math.max.apply(null, reserved_idxs) + 1;
+function getUniqueId(reserved_idxs=[]) {
+  let id;
+  do{
+    const uuid = uuidv4().replace(/-/g, "");
+    id = Buffer.from(uuid, "hex").toString("base64url");
+  } while(reserved_idxs.includes(id));
+  return id;
 }
 function zeroPadding(str) {
   if (/^\d+$/.test(str.toString()) == true) {
@@ -150,6 +145,7 @@ function randNormal(mean, std, n) {
 
   return output;
 }
+
 
 module.exports = {
   readcsv,

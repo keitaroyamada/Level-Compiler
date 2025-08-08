@@ -16,11 +16,11 @@ class LevelCompilerCore extends EventEmitter{
   constructor() {
     super();
     this.name = "";
+    this.id = lcfnc.getUniqueId();;
+    this.descriptions = "";
     this.projects = [];
     this.search_idx_list = {};
     this.base_project_id = null;
-    this._reserved_project_ids = [0];
-    this.descriptions = "";
     this.state = {
       status: 'Initialise',
       statusDetails: null,      
@@ -54,7 +54,7 @@ class LevelCompilerCore extends EventEmitter{
     this.state.statusDetails = statusDetails;
     this.state.hasError = true; 
     this.state.errorDetails = errorMessage;
-    this.emit('error', this.state);
+    this.emit('error_minor', this.state);
   }
   setErrorAlert(errorMessage,statusDetails) {
     this.state.status = 'error_alert';
@@ -62,6 +62,13 @@ class LevelCompilerCore extends EventEmitter{
     this.state.hasError = true; 
     this.state.errorDetails = errorMessage;
     this.emit('error_alert', this.state);
+  }
+  setErrorFatal(errorMessage,statusDetails) {
+    this.state.status = 'error_fatal';
+    this.state.statusDetails = statusDetails;
+    this.state.hasError = true; 
+    this.state.errorDetails = errorMessage;
+    this.emit('error_fatal', this.state);
   }
   setUpdateDepth() {
     //set update event for LCAge, LCPlot
@@ -84,7 +91,7 @@ class LevelCompilerCore extends EventEmitter{
     const projectData = new Project();
 
     //load model
-    projectData.model_data = lcfnc.readcsv(model_path);
+    projectData._model_data = lcfnc.readcsv(model_path);
     var fileName = model_path.split(/[/\\]/).pop();
     const patern = /\[?(.*?)\]?([^\[\]()]*)(?:\((.*?)\))?\.csv$/; // ^(.*?)\((.*?)\)\.csv$/)
     var match = fileName.match(patern);
@@ -158,17 +165,16 @@ class LevelCompilerCore extends EventEmitter{
     }
 
     //add project data
-    const newProjectId = lcfnc.getUniqueId(this._reserved_project_ids);
-    this._reserved_project_ids.push(newProjectId);
+    const newProjectId = lcfnc.getUniqueId();
     let p = this.projects.length;
     projectData.id = [newProjectId, null, null, null];
     projectData.name = model_info.name;
     projectData.correlation_version = model_info.version;
-    projectData.order = this.projects.length+1;
+    projectData.order = this.projects.length;
     //make brank marker id list
     const markerIdList = lcfnc.makeMarkerIdBase(
-      projectData.model_data.length,
-      projectData.model_data[0].length
+      projectData._model_data.length,
+      projectData._model_data[0].length
     );
     if (this.base_project_id == null) {
       this.base_project_id = projectData.id;
@@ -188,8 +194,7 @@ class LevelCompilerCore extends EventEmitter{
       let holeData = new Hole();
 
       //add info
-      const newHoleId = lcfnc.getUniqueId(projectData.reserved_hole_ids);
-      projectData.reserved_hole_ids.push(newHoleId);
+      const newHoleId = lcfnc.getUniqueId();
 
       holeData.id = [newProjectId, newHoleId, null, null];
       holeData.name = lcfnc.zeroPadding(holeList[h][1]);
@@ -204,8 +209,7 @@ class LevelCompilerCore extends EventEmitter{
         let sectionData = new Section();
 
         //add info
-        const newSectionId = lcfnc.getUniqueId(holeData.reserved_section_ids);
-        holeData.reserved_section_ids.push(newSectionId); //reserve id
+        const newSectionId = lcfnc.getUniqueId();
         sectionData.id = [newProjectId, newHoleId, newSectionId, null];
         sectionData.name = lcfnc.zeroPadding(sectionList[s][2]);
         sectionData.order = s;
@@ -222,10 +226,7 @@ class LevelCompilerCore extends EventEmitter{
           let markerData = new Marker();
 
           //add marker info
-          const newMarkerId = lcfnc.getUniqueId(
-            sectionData.reserved_marker_ids
-          );
-          sectionData.reserved_marker_ids.push(newMarkerId);
+          const newMarkerId = lcfnc.getUniqueId();
           markerData.id = [
             newProjectId,
             newHoleId,
@@ -240,17 +241,17 @@ class LevelCompilerCore extends EventEmitter{
           markerIdList[marker_r][marker_c] = markerData.id; //add marker list
 
           markerData.name = lcfnc.zeroPadding(
-            projectData.model_data[marker_r][marker_c].toString()
+            projectData._model_data[marker_r][marker_c].toString()
           );
           markerData.distance = parseFloat(
-            projectData.model_data[marker_r][marker_c + 1]
+            projectData._model_data[marker_r][marker_c + 1]
           );
           markerData.drilling_depth = parseFloat(
-            projectData.model_data[marker_r][marker_c + 2]
+            projectData._model_data[marker_r][marker_c + 2]
           );
 
           //check master section
-          const masterHole = projectData.model_data[marker_r][0]
+          const masterHole = projectData._model_data[marker_r][0]
             .replace(/\([^)]*\)/, "") //replace (num)
             .split("/");
 
@@ -263,9 +264,9 @@ class LevelCompilerCore extends EventEmitter{
                 //if master, check is zero point
                 //check zero point
                 if (
-                  projectData.model_data[marker_r][0].match( /\((-?\d+(\.\d+)?)\)/ ) !== null
+                  projectData._model_data[marker_r][0].match( /\((-?\d+(\.\d+)?)\)/ ) !== null
                 ) {
-                  markerData.isZeroPoint = projectData.model_data[marker_r][0].match( /\((-?\d+(\.\d+)?)\)/ )[1];
+                  markerData.isZeroPoint = projectData._model_data[marker_r][0].match( /\((-?\d+(\.\d+)?)\)/ )[1];
                 }
               //}
             }
@@ -273,7 +274,7 @@ class LevelCompilerCore extends EventEmitter{
 
           //load event data
           const events =
-            projectData.model_data[marker_r][marker_c + 3].split("/");
+            projectData._model_data[marker_r][marker_c + 3].split("/");
           let eventData = [];
           const split_pattern = /(\w+)-+(\w+)(?:\(([^)]*)\))?(?:\[(.*?)\])?/;
           for (let e = 0; e < events.length; e++) {
@@ -383,10 +384,11 @@ class LevelCompilerCore extends EventEmitter{
     this.search_idx_list[projectData.id.toString()] = [p, null, null, null];
     if (this.projects[0].model_type == "duo"){
       if(projectData.model_type== "correlation"){
-        [this.projects[0], this.projects[this.projects.length-1]] = [this.projects[this.projects.length-1], this.projects[0]];
+        //if master is loaded after duo
+        [this.projects[0], this.projects[this.projects.length-1]] = [this.projects[this.projects.length-1], this.projects[0]];//swap
         this.updateSearchIdx();
         this.base_project_id = projectData.id;
-        [this.projects[0].order, this.projects[this.projects.length-1].order] = [this.projects[this.projects.length-1].order, this.projects[0].order];
+        [this.projects[0].order, this.projects[this.projects.length-1].order] = [this.projects[this.projects.length-1].order, this.projects[0].order];//swap
       }
     }
     
@@ -417,13 +419,13 @@ class LevelCompilerCore extends EventEmitter{
           const marker_c = markerList[0]; //id is defied at marker Name col
 
           //add horizontal correlation
-          let row_data = projectData.model_data[marker_r];
+          let row_data = projectData._model_data[marker_r];
           let start_k;
           if (projectData.model_type == "correlation") {
             start_k = 2;
             for (let k = start_k; k < row_data.length; k += 4) {
               //check distance data col
-              const val = projectData.model_data[marker_r][k];
+              const val = projectData._model_data[marker_r][k];
               if (val != "" && !isNaN(parseFloat(val))) {
                 const correlated_marker_id = markerIdList[marker_r][k - 1];
                 if(correlated_marker_id == null){
@@ -443,7 +445,7 @@ class LevelCompilerCore extends EventEmitter{
             start_k = 2 + 4;
             for (let k = start_k; k < row_data.length; k += 4) {
               //check distance data col
-              const val = projectData.model_data[marker_r][k];
+              const val = projectData._model_data[marker_r][k];
               if (val != "" && !isNaN(parseFloat(val))) {
                 const correlated_marker_id = markerIdList[marker_r][k - 1];
 
@@ -453,12 +455,12 @@ class LevelCompilerCore extends EventEmitter{
                 }
 
                 //add duo connection object
-                const model_r = projectData.model_data[marker_r];
+                const model_r = projectData._model_data[marker_r];
                 if (model_r[1] !== "") {
                   const duo_connected_hole = lcfnc.zeroPadding(model_r[1]);
                   const duo_connected_sec = lcfnc.zeroPadding(model_r[2]);
                   const duo_connected_dist = Math.round(parseFloat(model_r[3]) * 10) / 10;
-                  this.projects[projectIdx[0]].duo_connection[correlated_marker_id.toString()] = [
+                  this.projects[projectIdx[0]]._duo_connection[correlated_marker_id.toString()] = [
                     duo_connected_hole,
                     duo_connected_sec,
                     duo_connected_dist,
@@ -542,43 +544,160 @@ class LevelCompilerCore extends EventEmitter{
 
   }
   loadModelFromLcmodel(lcdata){
-    //under construction 11111111111111111111111111111111111111111111111111111111111111
-    //check base projects
-    let numBaseProject = 0;
-    this.projects.forEach(p1=>{
-      if(p1.type=="correlation"){
-        numBaseProject++;
+    //check load model type
+    let isBaseInOld = false;
+    let isBaseInNew = false;
+    let loadedProjectIds = [];
+
+    for(const project of this.projects){
+      loadedProjectIds.push(project.id[0]);
+      if(project.model_type == "correlation"){
+        isBaseInOld = true;
       }
-    })
-
-    lcdata.projects.forEach(p2=>{
-      if(p2.type=="correlation"){
-        numBaseProject++;
-      }
-    })
-    if(numBaseProject>1) return false;
-
-    //load
-    for(let i=0;i<lcdata.projects.length;i++){
-      const project = lcdata.projects[i];
-
-      //load base correlation
-      if(this._reserved_project_ids.includes(project.id[0])){
-        //if id already exist
-      }
-
-      if(project.type == "correlation"){
-        this.projects.push(project);
-        this._reserved_project_ids = project.id;
-        //[Math.max(...this._reserved_project_ids)+1, null, null, null];
-      }
-
     }
-    
 
-    
+    for(const project of lcdata.projects){
+      if(project.model_type == "correlation"){        
+        isBaseInNew = true;
+      }
+    }
+
+    if(isBaseInOld && isBaseInNew){
+      //duplication of base correlation models
+      return false
+    }
+
+    //assign workspace data
+    if(this.projects.length == 0 || isBaseInNew){
+      //base model or first model
+      this.name = lcdata.name;
+      this.id = lcdata.id ?? this.id;
+      this.descriptions = lcdata.descriptions;
+    }
+
+    //assign model data
+    lcdata.projects.forEach(project=>{
+      if(loadedProjectIds.includes(project.id[0])){
+        return; //skip this loop
+      }
+
+      const newProject = new Project().load(project);
+      newProject.order = this.projects.length+1;
+
+      if(this.base_project_id == null || project.model_type=="correlation"){
+        //update base id
+        this.base_project_id = project.id;
+      }
+
+      if(project.model_type=="correlation"){
+        //update order
+        newProject.order = 0;
+        this.projects.forEach((p,i)=>{
+          p.order = i+1;
+        })
+      }
+
+      //add
+      this.projects.push(newProject);
+      loadedProjectIds.push(project.id[0]);
+    })
+
+    //if old id, update to new id
+    this.replaceNewId();
+          
+  }
+  
+  replaceNewId(){
+    //register
+    let newIds = {};
+    let hasError = false;
+    this.projects.forEach(p => {
+      if (p.id[0] != null && p.id[0].length !== 22){
+        newIds[p.id.toString()] = [lcfnc.getUniqueId(), null, null, null];
+      }
+      p.holes.forEach(h=>{
+        if (h.id[1] != null && h.id[1].length !== 22){
+          const newParentId = newIds[[h.id[0], null, null, null].toString()];
+          if (!newParentId) {
+            this.setErrorAlert("error_alert", "LCCore: E071: Missing parent ID for hole");
+            hasError = true;
+            return;
+          }
+          newIds[h.id.toString()] = [newParentId[0], lcfnc.getUniqueId(), null, null];
+        }
+        h.sections.forEach(s=>{
+          if (s.id[2] != null && s.id[2].length !== 22){
+            const newParentId = newIds[[s.id[0], s.id[1], null, null].toString()];
+            if (!newParentId) {
+              this.setErrorAlert("error_alert", "LCCore: E071: Missing parent ID for section");
+              hasError = true;
+              return;
+            }
+            newIds[s.id.toString()] = [newParentId[0], newParentId[1], lcfnc.getUniqueId(), null];
+          }
+          s.markers.forEach(m=>{
+            if (m.id[3] != null && m.id[3].length !== 22){
+              const newParentId = newIds[[m.id[0], m.id[1], m.id[2], null].toString()];
+              if (!newParentId) {
+                this.setErrorAlert("error_alert", "LCCore: E071: Missing parent ID for marker");
+                hasError = true;
+                return;
+              }
+              newIds[m.id.toString()] = [newParentId[0], newParentId[1], newParentId[2], lcfnc.getUniqueId()];
+            }
+          })
+        })
+      })
+    })
+    if (hasError) return false;
+
+    //apply
+    this.base_project_id = newIds[this.base_project_id.toString()] || this.base_project_id;
+
+    this.projects.forEach(p => {
+      p.id = newIds[p.id.toString()] || p.id;
+      p.holes.forEach(h=>{
+        h.id = newIds[h.id.toString()] || h.id;
+        h.sections.forEach(s=>{
+          s.id = newIds[s.id.toString()] || s.id;
+          s.markers.forEach(m=>{
+            m.id = newIds[m.id.toString()] || m.id;
+            
+            // v_connection
+            for (let i = 0; i < m.v_connection.length; i++) {
+              const key = m.v_connection[i].toString();
+              m.v_connection[i] = newIds[key] || m.v_connection[i];
+            }
+
+            // h_connection
+            for (let i = 0; i < m.h_connection.length; i++) {
+              const key = m.h_connection[i].toString();
+              m.h_connection[i] = newIds[key] || m.h_connection[i];
+            }
+
+            // event
+            for (let i = 0; i < m.event.length; i++) {
+              const key = m.event[i][2].toString();
+              m.event[i][2] = newIds[key] || m.event[i][2];
+            }
+
+            // depth_source
+            if (m.depth_source[1]) {
+              const key = m.depth_source[1].toString();
+              m.depth_source[1] = newIds[key] || m.depth_source[1] ;
+            }
+            if (m.depth_source[2]) {
+              const key = m.depth_source[2].toString();
+              m.depth_source[2] = newIds[key] || m.depth_source[2] ;
+            }
+          })
+        })
+      })
+    })
+
   }
   connectDuoModel() {
+    //function for model loaded from csv 
     console.time("        Connect duo")
     this.setStatus("running","Start connectDuoModel")
     //if no connected markers in the master project, create a new marker.
@@ -598,7 +717,7 @@ class LevelCompilerCore extends EventEmitter{
           for (let m = 0; m < this.projects[p].holes[h].sections[s].markers.length; m++) {
             const markerData = this.projects[p].holes[h].sections[s].markers[m];
             //get master connection
-            const masterTrinity = this.projects[p].duo_connection[markerData.id.toString()];
+            const masterTrinity = this.projects[p]._duo_connection[markerData.id.toString()];
             if (masterTrinity == undefined) {
               continue;
             }
@@ -1177,10 +1296,14 @@ class LevelCompilerCore extends EventEmitter{
         name:project.name,
         type:project.model_type,
         evaluation:false,
+        is_connected_master: false,
         cd_error_counts:0,
+        cd_confliction_counts:0,
         efd_error_counts:0,
+        efd_confliction_counts:0,
         rank_error_counts:0,
         age_error_counts:0,
+        age_confliction_counts:0,
         max_rank:-1,  
         hole_counts: 0,
         section_counts: 0,
@@ -1189,60 +1312,101 @@ class LevelCompilerCore extends EventEmitter{
         connection_duo_counts: 0,
       };
 
+      //initialise
       for(let p=0;p<this.projects.length;p++){
         result.connection_counts[this.projects[p].name] = 0;
       }
       
-  
+      if(project.model_type=="correlation"){
+        result.is_connected_master = true;
+      }
+      //counts
       project.holes.forEach((hole) => {
+        //counts holes
         result.hole_counts += 1;
         hole.sections.forEach((section) => {
+          //counts sections
           result.section_counts += 1;
           section.markers.forEach((marker) => {
+            //counts markers
             result.marker_counts += 1;
-            if (marker.composite_depth == null) {
-              if (project.model_type !== "duo") {
-                //console.log("ERROR: CD is null. " + this.getMarkerNameFromId(marker.id));
-              }
 
+            if (marker.composite_depth == null) {
+              //counts CD error
               result.cd_error_counts += 1;
+            }else{
+              marker.h_connection.forEach(hc=>{
+                const hidx = this.search_idx_list[hc.toString()];
+                const connected_cd = this.projects[hidx[0]].holes[hidx[1]].sections[hidx[2]].markers[hidx[3]].composite_depth;
+
+                if(marker.composite_depth !== connected_cd){
+                  //counts CD confliction
+                  result.cd_confliction_counts+=1;
+                }                
+              })
             }
+
+            if (marker.event_free_depth == null) {
+              //counts EFD
+              result.efd_error_counts += 1;
+            }else{
+              marker.h_connection.forEach(hc=>{
+                const hidx = this.search_idx_list[hc.toString()];
+                const connected_efd = this.projects[hidx[0]].holes[hidx[1]].sections[hidx[2]].markers[hidx[3]].event_free_depth;
+
+                if(marker.event_free_depth !== connected_efd){
+                  //counts EFD confliction
+                  result.efd_confliction_counts+=1;
+                }                
+              })
+            }
+
+            if (marker.age == null) {
+              //counst age error
+              result.age_error_counts += 1;
+            }else{
+              marker.h_connection.forEach(hc=>{
+                const hidx = this.search_idx_list[hc.toString()];
+                const connected_age = this.projects[hidx[0]].holes[hidx[1]].sections[hidx[2]].markers[hidx[3]].age;
+
+                if(marker.age !== connected_age){
+                  //counts age confliction
+                  result.age_confliction_counts+=1;
+                }                
+              })
+            }
+
             if (marker.connection_rank == null) {
-              if (project.model_type !== "duo") {
-                //console.log("ERROR: Rank is null. " + this.getMarkerNameFromId(marker.id));
-              }
+              //counts rank error
               result.rank_error_counts += 1;
             } else {
+              //get max rank
               if (marker.connection_rank > result.max_rank) {
                 result.max_rank = marker.connection_rank;
-              }
-            }
-            if (marker.event_free_depth == null) {
-              if (project.model_type !== "duo") {
-                //console.log("ERROR: EFD is null. " + this.getMarkerNameFromId(marker.id));
-              }
-              result.efd_error_counts += 1;
-            }
-            if (marker.age == null) {
-              if (project.model_type !== "duo") {
-                //console.log("ERROR: EFD is null. " + this.getMarkerNameFromId(marker.id));
-              }
-              result.age_error_counts += 1;
+              }              
             }
 
-            marker.h_connection.forEach(hconnect=>{
-              const pIdx = this.search_idx_list[hconnect.toString()];
-              if(hconnect[0] == project.id[0]){
-                //case own
-                result.connection_counts[this.projects[pIdx[0]].name] += 1/2;
-              }else{
-                //case duo
-                result.connection_counts[this.projects[pIdx[0]].name] += 1;
-              }
-              
+            marker.h_connection.forEach(hc=>{
+              //check connections
+              const cIdx = this.search_idx_list[hc.toString()];
+              this.projects[cIdx[0]].holes[cIdx[1]].sections[cIdx[2]].markers[cIdx[3]].h_connection.forEach(hc2=>{
+                if(hc2.toString() == marker.id.toString()){
+                  //if bidirectionary connected
+                  if(hc[0] == project.id[0]){
+                    //counts own project
+                    result.connection_counts[this.projects[cIdx[0]].name] += 1/2;
+                  }else{
+                    //counts other project
+                    result.connection_counts[this.projects[cIdx[0]].name] += 1;
+                  }
+
+                  //check master connection
+                  if(this.projects[cIdx[0]].model_type == "correlation"){
+                    result.is_connected_master = true;
+                  }
+                }
+              })
             })
-            
-            
           });
         });
       });
@@ -1296,41 +1460,74 @@ class LevelCompilerCore extends EventEmitter{
     this.setStatus("completed","Checked model.")
     return results;
   }
-  validateProperties(){
+
+  upgradeToLatestMembers(){
     //add new properties for previous version model
     this.projects.forEach(p=>{
+      //add
       const newProject = new Project;
       for(const key in newProject){
         if(!(key in p)){
           p[key] = newProject[key];
-          console.log("LCCore: Fixed project properties");
+          console.log("LCCore: Add new project properties", key);
+        }
+      }
+      //remove
+      for (const key in p) {
+        if (!(key in newProject)) {
+          delete p[key];
+          console.log("LCCore: Removed extra project property:", key);
         }
       }
 
       p.holes.forEach(h=>{
+        //add
         const newHole    = new Hole;
         for(const key in newHole){
           if(!(key in h)){
             h[key] = newHole[key];
-            console.log("LCCore: Fixed hole properties");
+            console.log("LCCore: Add new hole properties", key);
+          }
+        }
+        //remove
+        for (const key in h) {
+          if (!(key in newHole)) {
+            delete h[key];
+            console.log("LCCore: Removed extra hole property:", key);
           }
         }
 
         h.sections.forEach(s=>{
+          //add
           const newSection = new Section;
           for(const key in newSection){
             if(!(key in s)){
               s[key] = newSection[key];
-              console.log("LCCore: Fixed section properties");
+              console.log("LCCore: Fixed section properties", key);
+            }
+          }
+          //remove
+          for (const key in s) {
+            if (!(key in newSection)) {
+              delete s[key];
+              console.log("LCCore: Removed extra section property:", key);
             }
           }
 
           s.markers.forEach(m=>{
+            //add
             const newMarker  = new Marker;
             for(const key in newMarker){
               if(!(key in m)){
                 m[key] = newMarker[key];
-                console.log("LCCore: Fixed marker properties");
+                console.log("LCCore: Fixed marker properties",key);
+              }
+            }
+            //remove
+            for (const key in m) {
+              if (!(key in newMarker)) {
+                delete m[key];
+                console.log("LCCore: Removed extra marker property:", key);
               }
             }
           })
@@ -1350,6 +1547,10 @@ class LevelCompilerCore extends EventEmitter{
       let upperIdxs = [];
       let lowerIdxs = [];
 
+      if(trinityList[t].hole_name==null || trinityList[t].section_name==null || trinityList[t].distance==null){
+        output.push([null, null, null]);
+        continue;
+      } 
       const holeName    = lcfnc.zeroPadding(trinityList[t].hole_name);
       const sectionName = lcfnc.zeroPadding(trinityList[t].section_name);
       const distance    = parseFloat(trinityList[t].distance);
@@ -1493,7 +1694,7 @@ class LevelCompilerCore extends EventEmitter{
       const D3_rank = this.projects[lowerIdxs[0][0]].holes[lowerIdxs[0][1]].sections[lowerIdxs[0][2]].markers[lowerIdxs[0][3]].connection_rank;
 
       if (D1 == null || D3 == null) {
-        this.setError("","E020: "+ calcType + " of value is empty.");
+        this.setError("","E020: "+ calcType + " is empty.");
         //console.log("ERROR: " + calcType + " of value is empty.");
         //console.log("D1:" + D1 + "/D3:" + D3 + "/d1:" + d1 + "/d3:" + d3);
 
@@ -1730,7 +1931,7 @@ class LevelCompilerCore extends EventEmitter{
   getHoleListFromCsv(projectData) {
     this.setStatus("running","start getHoleListFromCsv");
     //get model data
-    const model_data = projectData.model_data;
+    const model_data = projectData._model_data;
     let start_col;
     if (projectData.model_type == "correlation") {
       start_col = 1;
@@ -1767,7 +1968,7 @@ class LevelCompilerCore extends EventEmitter{
   getSectionListFromCsv(projectData, holeIdx) {
     this.setStatus("running","start getSectionListFromCsv")
     //get model data
-    const model_data = projectData.model_data;
+    const model_data = projectData._model_data;
 
     //holeIdx: retrurned from "getHoleListFromCsv"
     let sectionList = [];
@@ -1848,7 +2049,7 @@ class LevelCompilerCore extends EventEmitter{
   getMarkerListFromCsv(projectData, sectionIdx) {
     this.setStatus("running","start getMarkerListFromCsv")
     //get model data
-    const model_data = projectData.model_data;
+    const model_data = projectData._model_data;
 
     //sectionIdx: returned from "getSectionListFromCsv"
     let markerList = [];
@@ -2233,7 +2434,7 @@ class LevelCompilerCore extends EventEmitter{
                   //make new marker
                   //no marker at the event border
                   const newMarkerData = new Marker();
-                  const newid = lcfnc.getUniqueId(this.projects[projectIdx[0]].holes[startIdx[1]].sections[startIdx[2]].reserved_marker_ids);
+                  const newid = lcfnc.getUniqueId();
                   newMarkerData.id = [
                     targetSectionData.id[0],
                     targetSectionData.id[1],
@@ -2241,8 +2442,6 @@ class LevelCompilerCore extends EventEmitter{
                     newid,
                   ];
 
-                  //update reserved ids
-                  this.projects[projectIdx[0]].holes[startIdx[1]].sections[startIdx[2]].reserved_marker_ids.push(newid);
                   newMarkerData.distance = newDistance;
                   newMarkerData.name = name;
                   newMarkerData.drilling_depth = event_border_drilling_depth;
@@ -2401,6 +2600,8 @@ class LevelCompilerCore extends EventEmitter{
   getDataByIdx(idxs) {
     this.setStatus("running","start getDataByIdx")
     let output;
+
+    if(idxs==undefined) return output;
 
     if (idxs.filter(item => item !== null).length == 1) {
       //case project data
@@ -3421,7 +3622,7 @@ class LevelCompilerCore extends EventEmitter{
             eventThickness += 0;
             for (let e =0; e < currentMarkerData.event.length; e++){
               if (currentMarkerData.event[e][2] == null){
-                this.setErrorAlert("","E035: Event connection is not correct at "+this.getMarkerNameFromId(currentMarkerData.id));
+                this.setErrorFatal("","E035: Event connection is not correct at "+this.getMarkerNameFromId(currentMarkerData.id));
                 console.log("E035: Event connection is not correct at "+this.getMarkerNameFromId(currentMarkerData.id));
                 return null;
               }
@@ -3801,7 +4002,6 @@ class LevelCompilerCore extends EventEmitter{
       this.connectMarkers(upperMarkerId, lowerMarkerId, "vertical");
     }
     
-    this.projects[targetMarkerIdx[0]].holes[targetMarkerIdx[1]].sections[targetMarkerIdx[2]].reserved_marker_ids = targetSectionData.reserved_marker_ids.filter(num => num !== targetId[3]);
     const newMarkers = targetSectionData.markers.filter(m=> m.id.toString() !== targetId.toString());
     this.projects[targetMarkerIdx[0]].holes[targetMarkerIdx[1]].sections[targetMarkerIdx[2]].markers = newMarkers;
     
@@ -3829,7 +4029,7 @@ class LevelCompilerCore extends EventEmitter{
     const sectionIdx  = this.search_idx_list[sectionId.toString()];
     const sectionData = this.getDataByIdx(sectionIdx);
 
-    let newId = Math.max(...sectionData.reserved_marker_ids) + 1;
+    let newId = lcfnc.getUniqueId();
     const newMarkerId = [sectionId[0], sectionId[1], sectionId[2], newId];
 
     const results = this.getNearestTrinity(sectionId, depth, depthScale);
@@ -3893,7 +4093,7 @@ class LevelCompilerCore extends EventEmitter{
     this.disconnectMarkers(upperId, lowerId, "vertical");
     this.connectMarkers(upperId, newMarkerId, "vertical");
     this.connectMarkers(newMarkerId, lowerId, "vertical");
-    this.projects[sectionIdx[0]].holes[sectionIdx[1]].sections[sectionIdx[2]].reserved_marker_ids.push(newId);
+
     this.sortModel();
 
     this.setStatus("completed","");
@@ -4190,7 +4390,7 @@ class LevelCompilerCore extends EventEmitter{
         this.projects[upperIdx[0]].holes[upperIdx[1]].sections[upperIdx[2]].markers[upperIdx[3]].distance, 
         "distance",
       )
-      const lowerId = [upperId[0],upperId[1],upperId[2],Math.max(...this.projects[upperIdx[0]].holes[upperIdx[1]].sections[upperIdx[2]].reserved_marker_ids)];
+      const lowerId = [upperId[0],upperId[1],upperId[2], lcfnc.getUniqueId()];
       const lowerIdx = this.search_idx_list[lowerId.toString()];
 
       //make event data
@@ -4297,10 +4497,7 @@ class LevelCompilerCore extends EventEmitter{
     }
     
     //delete section
-    this.projects[sectionIdx[0]].holes[sectionIdx[1]].sections 
-      = this.projects[sectionIdx[0]].holes[sectionIdx[1]].sections.filter(sec=>sec.id[2].toString()!==sectionId[2].toString());
-    this.projects[sectionIdx[0]].holes[sectionIdx[1]].reserved_section_ids
-      = this.projects[sectionIdx[0]].holes[sectionIdx[1]].reserved_section_ids.filter(sid=>sid!==sectionId[2]);
+    this.projects[sectionIdx[0]].holes[sectionIdx[1]].sections = this.projects[sectionIdx[0]].holes[sectionIdx[1]].sections.filter(sec=>sec.id[2].toString()!==sectionId[2].toString());
     
     
     this.calcCompositeDepth();
@@ -4319,26 +4516,23 @@ class LevelCompilerCore extends EventEmitter{
     let topMarkerData     = new Marker();
     let bottomMarkerData  = new Marker();
 
-    const newSectionId = [holeId[0], holeId[1], Math.max(...this.projects[holeIdx[0]].holes[holeIdx[1]].reserved_section_ids)+1,null];
+    const newSectionId = [holeId[0], holeId[1], lcfnc.getUniqueId(),null];
     newSectionData.name = lcfnc.zeroPadding(inData.name);
     newSectionData.id = newSectionId;
 
     topMarkerData.name = holeData.name+"-"+inData.name+"-top";
     topMarkerData.distance = inData.distance_top;
     topMarkerData.drilling_depth = inData.dd_top;
-    topMarkerData.id = [newSectionId[0],newSectionId[1],newSectionId[2],1];
+    topMarkerData.id = [newSectionId[0],newSectionId[1],newSectionId[2],lcfnc.getUniqueId()];
     bottomMarkerData.name = holeData.name+"-"+inData.name+"-bottom";
     bottomMarkerData.distance =inData.distance_bottom;
     bottomMarkerData.drilling_depth =inData.dd_bottom;
-    bottomMarkerData.id = [newSectionId[0],newSectionId[1],newSectionId[2],2];
+    bottomMarkerData.id = [newSectionId[0],newSectionId[1],newSectionId[2],lcfnc.getUniqueId()];
 
     newSectionData.markers.push(topMarkerData);
     newSectionData.markers.push(bottomMarkerData);
-    newSectionData.reserved_marker_ids.push(1);
-    newSectionData.reserved_marker_ids.push(2);
 
     this.projects[holeIdx[0]].holes[holeIdx[1]].sections.push(newSectionData);
-    this.projects[holeIdx[0]].holes[holeIdx[1]].reserved_section_ids.push(newSectionId[2]);
 
     this.sortModel();
 
@@ -4363,7 +4557,7 @@ class LevelCompilerCore extends EventEmitter{
   
       //make sectiondata
       let sectionData = sectionModel;
-      const newId = Math.max(...holeData.reserved_section_ids)+1;
+      const newId = lcfnc.getUniqueId();
       sectionData.id = [holeData.id[0], holeData.id[1], newId, null];
 
       //upodate marker id & connections
@@ -4374,8 +4568,6 @@ class LevelCompilerCore extends EventEmitter{
         }
       }
 
-  
-      holeData.reserved_section_ids.push(newId);
       holeData.sections.push(sectionData);
       this.updateSearchIdx();
       this.setStatus("completed","");
@@ -4420,7 +4612,6 @@ class LevelCompilerCore extends EventEmitter{
     
     //delete hole
     this.projects[holeIdx[0]].holes = this.projects[holeIdx[0]].holes.filter(hole=>hole.id[1].toString()!==holeId[1].toString());      
-    this.projects[holeIdx[0]].reserved_hole_ids = this.projects[holeIdx[0]].reserved_hole_ids.filter(hid=>hid!==holeId[1]);
     
     this.calcCompositeDepth();
     this.calcEventFreeDepth();
@@ -4434,8 +4625,10 @@ class LevelCompilerCore extends EventEmitter{
     this.setStatus("running","start addHole");
     this.updateSearchIdx()
     const projectIdx = this.search_idx_list[projectId.toString()];
+    if(!projectIdx) return false
     let newHole = new Hole();
-    const newHoleId = [projectId[0], Math.max(...this.projects[projectIdx[0]].reserved_hole_ids) + 1, null, null];
+
+    const newHoleId = [projectId[0], lcfnc.getUniqueId(), null, null];
     newHole.id = newHoleId;
     newHole.order = this.projects[projectIdx[0]].holes.length;
     if(this.projects[projectIdx[0]].holes.filter(h=>h.name == name).length !== 0){
@@ -4447,7 +4640,6 @@ class LevelCompilerCore extends EventEmitter{
     
     //set hole data
     this.projects[projectIdx[0]].holes.push(newHole);
-    this.projects[projectIdx[0]].reserved_hole_ids.push(newHole.id[1]);
     this.sortModel();
 
     this.setStatus("completed","");
@@ -4510,8 +4702,8 @@ class LevelCompilerCore extends EventEmitter{
 
     let newProject = new Project();
     newProject.name = name;
-    newProject.id = [lcfnc.getUniqueId(this._reserved_project_ids), null, null, null];
-    newProject.order = this.projects.length+1;
+    newProject.id = [lcfnc.getUniqueId(), null, null, null];
+    newProject.order = this.projects.length;
     newProject.model_type = type;
     if(type == "correlation"){
       if(this.base_project_id==null){
@@ -4520,7 +4712,6 @@ class LevelCompilerCore extends EventEmitter{
     }
 
     this.projects.push(newProject);
-    this._reserved_project_ids.push(newProject.id[0]);
 
     this.setStatus("completed","");
     return true;
@@ -4562,7 +4753,6 @@ class LevelCompilerCore extends EventEmitter{
     
     //delete project
     this.projects = this.projects.filter(project=>project.id.toString()!==projectId.toString());   
-    this._reserved_project_ids = this._reserved_project_ids.filter(pid=>pid!==projectId[0]);
 
     this.updateSearchIdx();
     this.calcCompositeDepth();
@@ -4572,136 +4762,64 @@ class LevelCompilerCore extends EventEmitter{
     return true;
     
   }
-  updateProjectId(projectData){
-    //Please use with caution, as it may corrupt the model.
-    //under construction 11111111111111111111111111111111111111111111111111111111111111
-    const currentId = projectData.id;
-    const newId = [lcfnc.getUniqueId(this._reserved_project_ids), null, null, null]
 
-    projectData.id = newId;
-    projectData.holes.forEach(hole=>{
-      hole.id[0] = newId[0];
-    })
+  replaceProjectId(fromId, toId, replaceBaseId=false){
+    //update base correlation id
+    if(replaceBaseId){
+      this.base_project_id = toId;
+    }
 
-    return projectData
+    //make local function
+    const replaceIn = (data) => {
+      if (Array.isArray(data)) {
+        data.forEach((v, i) => {
+          if (v === fromId) data[i] = toId;
+          else replaceIn(v);
+        });
+      } else if (data && typeof data === 'object') {
+        Object.keys(data).forEach(k => replaceIn(data[k]));
+      }
+    };
+
+    // replace projects
+    replaceIn(this.projects);
   }
   mergeProjects(){
-    this.setStatus("completed","start mergeProject");
-    let holeNames = new Set();
-    for(let p=0; p<this.projects.length; p++){
-      for(let h=0; h<this.projects[p].holes.length;h++){
-        if(!holeNames.has(this.projects[p].holes[h].name)){
-          holeNames.add(this.projects[p].holes[h].names)
-        }else{
-          this.setErrorAlert("","E062: Inupt name has been already used.")
-          return "duplicate_holes"
-        }
+    //This function changes IDs and carries a risk of corrupting the model. Use with caution.
+
+    //get changed id list & move holes
+    const toProjectId  = this.base_project_id;
+    const baseIdx      = this.search_idx_list[this.base_project_id.toString()]; 
+    let fromProjectIds = new Set();
+
+    this.projects.forEach(project=>{
+      if(project.id[0] !== toProjectId){
+        fromProjectIds.add(project.id[0]);
+        project.holes.forEach(hole=>{
+          //deep copy
+          const newHole = hole.clone();
+
+          //hole move from duo -> base
+          this.projects[baseIdx[0]].holes.push(newHole);
+        })
+        fromProjectIds.add(project.id[0]);
       }
-    }
+    })
 
-    //get changed id list
-    let fromToIds = {};
-    const newProjectId = this.base_project_id;
-    let newHoleId = 0;//Math.max(...this.projects[0].reserved_hole_ids);
-    for(let p=0; p<this.projects.length; p++){
-      for(let h=0; h<this.projects[p].holes.length;h++){
-        newHoleId += 1;
-        let newHoleIds = JSON.parse(JSON.stringify(this.projects[p].holes[h].id));
-        newHoleIds[0] = newProjectId[0];
-        newHoleIds[1] = newHoleId;
-        if(p==0){
-          fromToIds[this.projects[p].holes[h].id.toString()] = this.projects[p].holes[h].id;
-        }else{
-          fromToIds[this.projects[p].holes[h].id.toString()] = newHoleIds;   
-        }
-        
-        for(let s=0;s<this.projects[p].holes[h].sections.length;s++){
-          let newSecIds = JSON.parse(JSON.stringify(this.projects[p].holes[h].sections[s].id));
-          newSecIds[0] = newProjectId[0];
-          newSecIds[1] = newHoleId;
-          if(p==0){
-            fromToIds[this.projects[p].holes[h].sections[s].id.toString()] = this.projects[p].holes[h].sections[s].id; 
-          }else{
-            fromToIds[this.projects[p].holes[h].sections[s].id.toString()] = newSecIds; 
-          }
-          
-          for(let m=0; m<this.projects[p].holes[h].sections[s].markers.length;m++){
-            let newMarkerIds = JSON.parse(JSON.stringify(this.projects[p].holes[h].sections[s].markers[m].id));
-            newMarkerIds[0] = newProjectId[0];
-            newMarkerIds[1] = newHoleId;
-            if(p==0){
-              fromToIds[this.projects[p].holes[h].sections[s].markers[m].id.toString()] = this.projects[p].holes[h].sections[s].markers[m].id; 
-            }else{
-              fromToIds[this.projects[p].holes[h].sections[s].markers[m].id.toString()] = newMarkerIds; 
-            }
-            
-          }
-        }
-      }
-    }
-
-
-    //mark
-    for(let p=0; p<this.projects.length; p++){
-      for(let h=0; h<this.projects[p].holes.length;h++){
-        let newHoleData = new Hole();
-        let prevHoleData = JSON.parse(JSON.stringify(this.projects[p].holes[h]));
-        prevHoleData.id = fromToIds[prevHoleData.id.toString()];
-        if(p!==0){
-          prevHoleData.order = this.projects[0].holes.length;
-        }
-        
-        //change to new id
-        for(let s=0; s<prevHoleData.sections.length;s++){
-          prevHoleData.sections[s].id = fromToIds[prevHoleData.sections[s].id.toString()];
-          for(let m=0;m<prevHoleData.sections[s].markers.length;m++){
-            prevHoleData.sections[s].markers[m].id = fromToIds[prevHoleData.sections[s].markers[m].id.toString()];
-            //h_connection
-            for(let c=0;c<prevHoleData.sections[s].markers[m].h_connection.length;c++){
-              prevHoleData.sections[s].markers[m].h_connection[c] = fromToIds[prevHoleData.sections[s].markers[m].h_connection[c].toString()];
-            }
-            //v_connection
-            for(let c=0;c<prevHoleData.sections[s].markers[m].v_connection.length;c++){
-              prevHoleData.sections[s].markers[m].v_connection[c] = fromToIds[prevHoleData.sections[s].markers[m].v_connection[c].toString()];
-            }
-            //event connection
-            for(let c=0;c<prevHoleData.sections[s].markers[m].event.length;c++){
-              if(prevHoleData.sections[s].markers[m].event[c][2] !== null){
-                prevHoleData.sections[s].markers[m].event[c][2] = fromToIds[prevHoleData.sections[s].markers[m].event[c][2].toString()];
-              }              
-            }
-            //data source connection
-            for(let c=1;c<prevHoleData.sections[s].markers[m].depth_source.length;c++){
-              if(prevHoleData.sections[s].markers[m].depth_source[c] !== null){
-                prevHoleData.sections[s].markers[m].depth_source[c] = fromToIds[prevHoleData.sections[s].markers[m].depth_source[c].toString()];
-              }              
-            }
-            if(p!==0){
-              //remove master flag
-              prevHoleData.sections[s].markers[m].isMaster = false;
-              prevHoleData.sections[s].markers[m].isZeroPoint = false;
-            }
-            
-          }
-        }
-  
-        //set
-        Object.assign(newHoleData, prevHoleData);
-        if(p==0){
-          this.projects[0].holes[h] = newHoleData;
-        }else{
-          this.projects[0].holes.push(newHoleData);
-          this.projects[0].reserved_hole_ids.push(newHoleData.id[1]);
-        }
-      }
-    }
-
-    //delete
-    for(let p=1;p<this.projects.length;p++){
-      this.deleteProject(this.projects[p].id);
-    }
-
+    //replace project id
+    fromProjectIds = [...fromProjectIds];
+    fromProjectIds.forEach(fromProjectId=>{
+      this.replaceProjectId(fromProjectId, toProjectId);
+    })
     
+    //delete source duo projects
+    this.projects.forEach(project=>{
+      if(project.id[0] !== toProjectId){
+        this.deleteProject(project.id);
+      }
+    })
+
+    //update model    
     this.updateSearchIdx()
     this.calcCompositeDepth();
     this.calcEventFreeDepth();
@@ -5312,6 +5430,31 @@ class LevelCompilerCore extends EventEmitter{
     return JSON.parse(JSON.stringify(this, (key, value) => {
       return key.startsWith('_') ? undefined : value;
     }));
+  }
+
+  updateVersionInfo(date=null){
+    let version = "";
+    if(date){
+      version = date;
+    }else{
+      const now = new Date();
+      const year = now.getFullYear();
+      const month = String(now.getMonth() + 1).padStart(2, '0');
+      const day = String(now.getDate()).padStart(2, '0');
+      const hour = String(now.getHours()).padStart(2, '0');
+      const min = String(now.getMinutes()).padStart(2, '0');
+      const sec = String(now.getSeconds()).padStart(2, '0');
+
+
+      version = `${year}-${month}-${day} ${hour}:${min}:${sec}`;
+    }
+    
+    for(let i=0;i<this.projects.length;i++){
+      if(this.projects[i].correlation_version !== version){
+        console.log("LCCore: Update version [" + this.projects[i].name + "] " + this.projects[i].correlation_version + " => " + version);
+        this.projects[i].correlation_version = version;
+      }      
+    }    
   }
   
 }

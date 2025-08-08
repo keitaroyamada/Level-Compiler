@@ -2,6 +2,7 @@ const { parentPort } = require("worker_threads");
 const fs = require("fs");
 const sharp = require("sharp");
 const JSZip = require("jszip");
+const path = require('path');
 
 parentPort.on("message", async(task) => {
   if(task.type=="exit"){
@@ -39,6 +40,9 @@ parentPort.on("message", async(task) => {
             const file = zip.file(task.imagePath.innerPath);
             if (!file) throw new Error("File not found in zip: " + task.imagePath.innerPath);
             imageBufferDD = await file.async("nodebuffer");
+            //imageBufferDD = extractFileByPath(basePath, innerPath);
+
+
           } else {
             throw new Error("Invalid imagePath: " + JSON.stringify(task.imagePath));
           }
@@ -200,3 +204,54 @@ parentPort.on("message", async(task) => {
 
   }
 });
+
+
+async function extractFileByPath(basePath, innerPath) {
+  const segments = innerPath.split('/');
+  let current = basePath;
+  let zip = null;
+
+  for (let i = 0; i < segments.length; i++) {
+    const segment = segments[i];
+
+    if (zip) {
+      const nextPath = segments.slice(0, i + 1).join('/');
+      const file = zip.file(nextPath);
+      if (!file) throw new Error(`Not found in zip: ${nextPath}`);
+
+      const isLast = i === segments.length - 1;
+
+      if (segment.endsWith('.zip')) {
+        const buf = await file.async('nodebuffer');
+        zip = await JSZip.loadAsync(buf);
+      } else if (isLast) {
+        return await file.async('nodebuffer');
+      }
+    } else {
+      current = path.join(current, segment);
+
+      const stat = fs.existsSync(current) ? fs.statSync(current) : null;
+      const isLast = i === segments.length - 1;
+
+      if (!stat) throw new Error(`Path not found: ${current}`);
+
+      if (stat.isFile()) {
+        if (segment.endsWith('.zip')) {
+          const zipBuffer = fs.readFileSync(current);
+          zip = await JSZip.loadAsync(zipBuffer);
+        } else if (isLast) {
+          return fs.readFileSync(current);
+        } else {
+          throw new Error(`Unexpected file: ${current}`);
+        }
+      } else if (stat.isDirectory()) {
+        if (isLast) throw new Error(`Expected file, found folder: ${current}`);
+        // if directory, go to next
+      }
+    }
+  }
+
+  throw new Error('Could not resolve path to file.');
+}
+
+
