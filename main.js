@@ -1094,6 +1094,12 @@ function createMainWIndow() {
                   resolve("holeMoveToLeft");                      
                 } 
               },
+              { 
+                label: 'Move to other project', 
+                click: () => {
+                  resolve("holeMoveToOtherProject");                      
+                } 
+              },
               { type: 'separator' },
               { 
                 label: 'Delete Hole', 
@@ -1536,7 +1542,7 @@ function createMainWIndow() {
   });
   ipcMain.handle("LabelerAddMarkerData", async (_e, name, depth, relative_x) => {
     //add marker
-    tempCore.addMarker(tempCore.projects[0].holes[0].sections[0].id,depth,"distance",relative_x);
+    tempCore.addMarker(tempCore.projects[0].holes[0].sections[0].id, depth, "distance",relative_x);
     const nearMarkers = tempCore.getMarkerIdsByDistance(tempCore.projects[0].holes[0].sections[0].id,depth);
 
     if(nearMarkers[2]==0){
@@ -2277,8 +2283,17 @@ function createMainWIndow() {
     if(type=="main"){
       const result = await history.undo({LCCore:LCCore, LCAge:LCAge, LCPlot:LCPlot});   
       if(result !== null){
+        //Undo deep copy
+        //assignObject(LCCore, result.LCCore);
+        LCCore = initialiseLCCore();
+        LCCore.loadModelFromLcmodel(result.LCCore)
+        LCCore.updateSearchIdx();
+        assignObject(LCAge, result.LCAge);
+        assignObject(LCPlot, result.LCPlot);
+
         //for Undo image
         const changedSections = checkChanges(LCCore, result.LCCore);
+
         let dcpms = {};
         for (let i=0;i<changedSections.length;i++){
           const idx = LCCore.search_idx_list[changedSections[i]];
@@ -2286,12 +2301,6 @@ function createMainWIndow() {
           const sectionData = LCCore.projects[idx[0]].holes[idx[1]].sections[idx[2]];
           dcpms[holeData.name+"-"+sectionData.name] = 30;
         }
-
-        //Undo deep copy
-        assignObject(LCCore, result.LCCore);
-        LCCore.updateSearchIdx();
-        assignObject(LCAge, result.LCAge);
-        assignObject(LCPlot, result.LCPlot);
 
         //Undo images
         let imagePaths = globalPath.dataPaths.filter(item=>item.type=="core_images");
@@ -2556,6 +2565,7 @@ function createMainWIndow() {
 
       //convert depth (listed for function)
       const cd_list = LCCore.getDepthFromTrinity(targetId, send_data, "composite_depth"); //output:[sec id, cd, rank]
+
       const cd = [];
       cd.push(cd_list[0][1]);
       let calcedId = cd_list[0][0];
@@ -2957,6 +2967,18 @@ function createMainWIndow() {
       return result
     }
   });
+  ipcMain.handle("moveHoleToProject", async(_e, holeId, projectId) => {
+    
+    const result = LCCore.moveHoleToProject(holeId, projectId);
+
+    if (result == true) {
+      console.log("MAIN: Move hole completed.");
+      return result;
+    } else {
+      console.log("MAIN: Failed to move this hole.");
+      return result
+    }
+  });
   ipcMain.handle("deleteHole", async(_e, holeId) => {
     
     const result = LCCore.deleteHole(holeId);
@@ -3111,10 +3133,14 @@ function createMainWIndow() {
         hole.sections.forEach((section,s)=>{
           const beforeId = section.id;
           const aidx = currentLCCore.search_idx_list[beforeId.toString()];
-
-          const beforeHash = JSON.stringify(section);
-          const currentHash = JSON.stringify(currentLCCore.projects[aidx[0]].holes[aidx[1]].sections[aidx[2]]);
-          if(beforeHash !== currentHash){
+          if(aidx){
+            const beforeHash  = JSON.stringify(section);
+            const currentHash = JSON.stringify(currentLCCore.projects[aidx[0]].holes[aidx[1]].sections[aidx[2]]);
+            if(beforeHash !== currentHash){
+              changedIds.push(beforeId);
+            }
+          }else{
+            //if undo delete
             changedIds.push(beforeId);
           }
         })
@@ -3407,7 +3433,6 @@ function createMainWIndow() {
                 click: async () => {
                   if(isEditMode){
                     //remove plot data
-                    LCCore.updateVersionInfo();
                     let outLCCore   = new LevelCompilerCore();
                     Object.assign(outLCCore, LCCore.exportSerialisedModel());
                     outLCCore.updateVersionInfo();
@@ -3421,10 +3446,19 @@ function createMainWIndow() {
   
                     if(globalPath.saveModelPath == null){
                       //save as new file
-                      globalPath.saveModelPath = await putmodelfile(outData, null);
+                      const result = await putmodelfile(outData, null);
+                      if(result){
+                        globalPath.saveModelPath = result;
+                        LCCore.updateVersionInfo();
+                      }                      
                     }else{
                       //save orverwrite
-                      globalPath.saveModelPath = await putmodelfile(outData, globalPath.saveModelPath);
+                      const result = await putmodelfile(outData, globalPath.saveModelPath);
+                      if(result){
+                        globalPath.saveModelPath = result;
+                        LCCore.updateVersionInfo();
+                      }
+                      
                     }
                   }                
                 },
@@ -4075,8 +4109,11 @@ async function putmodelfile(data, path) {
         buttonLabel: "Save",
         filters: [{ name: "Level Compiler model", extensions: ["lcmodel"] }],
       })
+
       if (!file.canceled && file.filePath) {
         filePath = file.filePath;
+      }else{
+        return false
       }
     }else{
       filePath = path;

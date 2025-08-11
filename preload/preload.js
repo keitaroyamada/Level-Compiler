@@ -76,6 +76,7 @@ contextBridge.exposeInMainWorld("LCapi", {
   changeHole: (args1,args2,args3) => ipcRenderer.invoke("changeHole", args1,args2,args3),
   deleteHole: (args1) => ipcRenderer.invoke("deleteHole", args1),
   addHole: (args1,args2) => ipcRenderer.invoke("addHole", args1,args2),
+  moveHoleToProject: (args1,args2) => ipcRenderer.invoke("moveHoleToProject", args1,args2),  
   addProject: (args1,args2) => ipcRenderer.invoke("addProject", args1,args2),
   deleteProject: (args1) => ipcRenderer.invoke("deleteProject", args1),
   changeProject: (args1,args2,args3) => ipcRenderer.invoke("changeProject", args1,args2,args3),

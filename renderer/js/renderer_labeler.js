@@ -304,7 +304,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
       //console.log(scroller.clientHeight, zoom_rate, objOpts.disp_dpcm)
     }
-  });  
+  },
+  { passive: false }
+  );  
   scroller.addEventListener("scroll",async function (event) {
     ///scroller position
     canvasPos[0] = scroller.scrollLeft;//* xMag;
@@ -677,7 +679,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }
          
         if (response !== null) {
-          const targetId = [1, ht.hole, ht.section, ht.nearest_marker];
+          const targetId = [ht.project, ht.hole, ht.section, ht.nearest_marker];
 
           await undo("save");//undo
           tempCore = await window.LabelerApi.changeMarker(targetId, target, response);
@@ -711,7 +713,7 @@ document.addEventListener("DOMContentLoaded", () => {
           "Do you want to DELETE the selected marker?"
         );
         if (response.response) {
-          const fromId = [1, objOpts.marker_from.hole, objOpts.marker_from.section, objOpts.marker_from.nearest_marker];
+          const fromId = [objOpts.marker_from.project, objOpts.marker_from.hole, objOpts.marker_from.section, objOpts.marker_from.nearest_marker];
           
           console.log("[Editor]: Delete marker: " + fromId);
 
@@ -752,8 +754,9 @@ document.addEventListener("DOMContentLoaded", () => {
         const upperId   = [objOpts.marker_from.project, objOpts.marker_from.hole, objOpts.marker_from.section, objOpts.marker_from.upper_marker];
         const lowerId   = [objOpts.marker_from.project, objOpts.marker_from.hole, objOpts.marker_from.section, objOpts.marker_from.lower_marker];
         const sectionId = [objOpts.marker_from.project, objOpts.marker_from.hole, objOpts.marker_from.section, null];
-        console.log("[Labeler]: Add marker between " + upperId +" and "+lowerId);
-
+        //console.log("[Labeler]: Add marker between " + upperId +" and "+lowerId);
+        console.log("[Labeler]: Add marker");
+        
         await undo("save");//undo
 
         tempCore = await addMarkerData(response, ht.distance, ht.relative_x);
@@ -1129,6 +1132,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const sectionBottomDistance = LCCore.projects[0].holes[0].sections[0].markers[LCCore.projects[0].holes[0].sections[0].markers.length-1].distance;
     
     //search
+    results.project = LCCore.projects[0].id[0];
     if(x >= sectionLeft && x <= sectionRight){
       results.hole    = LCCore.projects[0].holes[0].id[1];
       results.relative_x = (x-sectionLeft)/(sectionRight-sectionLeft);

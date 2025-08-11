@@ -96,6 +96,8 @@ document.addEventListener("DOMContentLoaded", () => {
     objOpts.project.is_show_area = true;
     objOpts.project.area_colour = "#EBEBEB";
     objOpts.project.area_colour_disconnected = "#FFE5E5";
+    objOpts.project.pad_x = 80;
+    objOpts.project.pad_y = 200;
 
     objOpts.hole.distance = 20;
     objOpts.hole.width = 20;
@@ -751,8 +753,8 @@ document.addEventListener("DOMContentLoaded", () => {
     isLoadedLCModel = true; //initialise
     
     //load
-    await registerModelFromLCCore()
-    await registerAgeFromLCAge();
+    //await registerModelFromLCCore()
+    //await registerAgeFromLCAge();
 
     console.time("Load model") 
     await loadModel(false);//make up hole list view
@@ -1269,6 +1271,18 @@ document.addEventListener("DOMContentLoaded", () => {
         objOpts.edit.handleClick = null;
       }
       document.addEventListener("mousemove", objOpts.edit.handleMove);
+    }else if(clickResult == "holeMoveToOtherProject"){
+      objOpts.edit.contextmenu_enable = false;
+      objOpts.edit.marker_from = JSON.parse(JSON.stringify(objOpts.edit.hittest));
+      objOpts.edit.hittest = null;
+      objOpts.edit.marker_to = null;
+      objOpts.edit.mode = "move_hole_to_project";
+      objOpts.edit.handleMove = handleProjectMouseMove;
+      if(objOpts.edit.handleClick !== null){
+        document.removeEventListener('click', objOpts.edit.handleClick);
+        objOpts.edit.handleClick = null;
+      }
+      document.addEventListener("mousemove", objOpts.edit.handleMove);
     }else if(clickResult == "addProject"){
       if(LCCore){
         if(LCCore.projects[LCCore.projects.length-1].holes.length  <= 0){
@@ -1339,11 +1353,13 @@ document.addEventListener("DOMContentLoaded", () => {
         "Are you sure you want to merge all the projects?"
       );
       if (response.response) {
+        await undo("save");//undo
         const result = await window.LCapi.mergeProjects();
+
         if(result == true){
           await loadModel(false);
-          await registerModelFromLCCore()
-          await registerAgeFromLCAge();
+          //await registerModelFromLCCore()
+          //await registerAgeFromLCAge();
           const selected_age_model_id = document.getElementById("AgeModelSelect").value;
           await loadAge(selected_age_model_id)
           await loadPlotData();
@@ -1486,6 +1502,8 @@ document.addEventListener("DOMContentLoaded", () => {
             await loadModel(false);
           }
         }        
+      }else{
+        alert("Please create a project first.");
       }
     }else if(clickResult == "editWorkspaceDescriptions"){
       if(LCCore){
@@ -1503,6 +1521,8 @@ document.addEventListener("DOMContentLoaded", () => {
             await loadModel(false);
           }
         }        
+      }else{
+        alert("Please create a project first.");
       }
     }else if(clickResult == "reload"){
       document.getElementById("bt_reload").click();
@@ -2138,7 +2158,7 @@ document.addEventListener("DOMContentLoaded", () => {
       objOpts.edit.marker_to = null;
 
       objOpts.edit.handleClick = null;
-      objOpts.edit.handleMove = null;      
+      objOpts.edit.handleMove = null;   
 
       ///update scroller position
       let canvasPosY = null;
@@ -2429,27 +2449,27 @@ document.addEventListener("DOMContentLoaded", () => {
         askData = {
           title:"Add a new section",
           label:"Section TOP distance (cm)?",
-          value:0.0,
+          value:"0.0",
           type:"number",
         };
         inData.distance_top    = parseFloat(await window.LCapi.inputdialog(askData));
-        if(inData.distance_top!==NaN){
+        if(!isNaN(inData.distance_top)){
           askData = {
             title:"Add a new section",
             label:"Section BOTTOM distance (cm)?",
-            value:100.0,
+            value:"100.0",
             type:"number",
           };
           inData.distance_bottom = parseFloat(await window.LCapi.inputdialog(askData));
-          if(inData.distance_bottom!==NaN){
+          if(!isNaN(inData.distance_bottom)){
             askData = {
               title:"Add a new section",
               label:"Section TOP drilling depth (cm)?",
-              value:0.0,
+              value:"0.0",
               type:"number",
             };
             inData.dd_top = parseFloat(await window.LCapi.inputdialog(askData));
-            if(inData.dd_top!==NaN){
+            if(!isNaN(inData.dd_top)){
               askData = {
                 title:"Add a new section",
                 label:"Section BOTTOM drilling depth (cm)?",
@@ -2492,6 +2512,7 @@ document.addEventListener("DOMContentLoaded", () => {
     objOpts.edit.marker_to = null;
     objOpts.edit.handleClick = null;
     objOpts.edit.handleMove = null;
+    objOpts.edit.mode = "";
     updateView();
   }
   //3 Connect move--------------------------------------------
@@ -2798,6 +2819,7 @@ document.addEventListener("DOMContentLoaded", () => {
     objOpts.edit.marker_to = null;
     objOpts.edit.handleClick = null;
     objOpts.edit.handleMove = null;
+    objOpts.edit.mode = "";
     updateView();
   }
   //5 Project Move--------------------------------------------
@@ -2819,6 +2841,9 @@ document.addEventListener("DOMContentLoaded", () => {
         objOpts.edit.handleClick = handleProjectSelectClick;
         document.addEventListener('click', objOpts.edit.handleClick);
       }else if(objOpts.edit.mode == "change_project_name"){
+        objOpts.edit.handleClick = handleProjectSelectClick;
+        document.addEventListener('click', objOpts.edit.handleClick);
+      }else if(objOpts.edit.mode == "move_hole_to_project"){
         objOpts.edit.handleClick = handleProjectSelectClick;
         document.addEventListener('click', objOpts.edit.handleClick);
       }else{
@@ -2884,6 +2909,7 @@ document.addEventListener("DOMContentLoaded", () => {
     objOpts.edit.marker_to = null;
     objOpts.edit.handleClick = null;
     objOpts.edit.handleMove = null;
+    objOpts.edit.mode = "";
   }
   //5 Project click--------------------------------------------
   async function handleProjectSelectClick(event) {
@@ -2934,6 +2960,32 @@ document.addEventListener("DOMContentLoaded", () => {
           alert("[ "+response+" ] has already been used. Please input a unique name that has not been used.");
         }
       }
+    }else if(objOpts.edit.mode == "move_hole_to_project"){
+      const response = await window.LCapi.askdialog(
+        "Move hole to project",
+        "Are you sure to move the hole to this selected project?",
+      );
+
+      if(response.response){
+        const holeHt = objOpts.edit.marker_from;
+
+        const toProjectId = [ht.project, null, null, null];
+        const holeId      = [holeHt.project, holeHt.hole, null, null];
+
+        await undo("save");//undo
+        const result = await window.LCapi.moveHoleToProject(holeId, toProjectId);
+
+        if(result == true){
+          console.log("[Renderer]: Move the selected hole to this project.")
+          await loadModel();
+          await loadAge(document.getElementById("AgeModelSelect").value);
+          await loadPlotData();
+          updateView();
+        }else if(result==false){
+          console.log("[Renderer]: Failed to move hole to this project.");
+          //alert("[ "+response+" ] has already been used. Please input a unique name that has not been used.");
+        }
+      }
     }
 
     document.removeEventListener("click", objOpts.edit.handleClick);
@@ -2944,6 +2996,7 @@ document.addEventListener("DOMContentLoaded", () => {
     objOpts.edit.marker_to = null;
     objOpts.edit.handleClick = null;
     objOpts.edit.handleMove = null;
+    objOpts.edit.mode = "";
     updateView();
   }
   
@@ -3866,8 +3919,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const bottom_padding = 100;
 
-    let canvasBaseWidth  = parseInt((objOpts.hole.distance + objOpts.hole.width + shift_x) * (num_total_holes + 1) * xMag + pad_x);
-    let canvasBaseHeight = parseInt((holes_bottom + bottom_padding - holes_top + shift_y + objOpts.canvas.bottom_pad) * yMag + pad_y);
+    let canvasBaseWidth  = parseInt(objOpts.project.pad_x*3+(objOpts.hole.distance + objOpts.hole.width + shift_x) * (num_total_holes + 1) * xMag + pad_x);
+    let canvasBaseHeight = parseInt(objOpts.project.pad_y*3+(holes_bottom + bottom_padding - holes_top + shift_y + objOpts.canvas.bottom_pad) * yMag + pad_y);
 
     //case base is too small
     if (canvasBaseWidth < scroller.clientWidth) {
@@ -4152,8 +4205,8 @@ document.addEventListener("DOMContentLoaded", () => {
         LCCore.projects.filter(p=>p.order<project.order).forEach(p=>p.holes.forEach(h=>{if(h.enable){prj_num_enable_left++;}}))
         prj_num_enable_left += objOpts.project.interval * project.order;
 
-        const prj_padx = 80;//objOpts.hole.distance * xMag;
-        const prj_pady = 200;
+        const prj_padx = objOpts.project.pad_x;//objOpts.hole.distance * xMag;
+        const prj_pady = objOpts.project.pad_y;
         const project_x0 = -prj_padx + ((objOpts.section.width + objOpts.hole.distance) * prj_num_enable_left + shift_x) * xMag + pad_x;
         const project_y0 = -prj_pady + (shift_y) * yMag + pad_y;
         let project_w  = prj_padx/2 + (objOpts.section.width + objOpts.hole.distance) * (prj_num_enable_right-1) * xMag + pad_x;
@@ -4167,6 +4220,11 @@ document.addEventListener("DOMContentLoaded", () => {
                 
         if(project.enable == true){
           //show project name
+          let projectDispName = project.name; 
+          if(developerMode){
+            projectDispName = project.id[0].slice(0,5);
+          }
+          
           sketch.drawingContext.setLineDash([]);
           sketch.fill(objOpts.project.font_colour);
           sketch.stroke(objOpts.project.font_colour);
@@ -4174,7 +4232,7 @@ document.addEventListener("DOMContentLoaded", () => {
           sketch.textFont(objOpts.project.font);
           sketch.textSize(objOpts.project.font_size);
           sketch.text(
-            project.name,
+            projectDispName,
             project_x0 + 40,
             project_y0 + 40,
           );
@@ -4202,7 +4260,7 @@ document.addEventListener("DOMContentLoaded", () => {
           //live hittest
           if(objOpts.edit.hittest){
             //console.log(objOpts.edit.hittest.project, objOpts.edit.hittest.hole)
-            if(["add_hole","delete_project","change_project_name"].includes(objOpts.edit.mode)){
+            if(["add_hole","delete_project","change_project_name","move_hole_to_project"].includes(objOpts.edit.mode)){
               if(objOpts.edit.hittest.project == project.id[0]){
                 
                 sketch.push();//save
@@ -4238,12 +4296,16 @@ document.addEventListener("DOMContentLoaded", () => {
           }
           let hole_x0 = (objOpts.hole.distance + objOpts.hole.width) * (num_disable.total + hole.order - num_disable.hole);
           //add  hole name---------------------------------------------------
+          let holeDispName = hole.name; 
+          if(developerMode){
+            holeDispName = hole.id[1].slice(0,5);
+          }
           sketch.fill(objOpts.hole.font_colour);
           sketch.noStroke();
           sketch.textFont(objOpts.hole.font);
           sketch.textSize(objOpts.hole.font_size);
           sketch.text(
-            hole.name,
+            holeDispName,
             // /(hole_x0 + shift_x + objOpts.hole.width * 0.3) * xMag + pad_x
             (hole_x0 + shift_x) * xMag + pad_x + objOpts.section.width * xMag /2 - sketch.textWidth(hole.name)/2,
             scroller.scrollTop + pad_y - 20,
@@ -4441,7 +4503,11 @@ document.addEventListener("DOMContentLoaded", () => {
             }
 
             //add section name-------------------------------------------------
-            const secDispName = hole.name + "-" + section.name;
+            let secDispName = hole.name + "-" + section.name; 
+            if(developerMode){
+              secDispName = section.id[2].slice(0,5);
+            }
+
             sketch.fill(objOpts.section.font_colour);
             sketch.noStroke();
             sketch.textFont(objOpts.section.font);
@@ -4724,12 +4790,16 @@ document.addEventListener("DOMContentLoaded", () => {
               if(objOpts.marker.show_name_labels){
                 //add marker name--------------------------------------------
                 if (m !== 0 && m !== section.markers.length - 1) {
+                  let markerDispName = marker.name;
+                  if(developerMode){
+                    markerDispName = marker.id[3].slice(0,5);
+                  }
                   sketch.fill(objOpts.marker.font_colour);
                   sketch.noStroke();
                   sketch.textFont(objOpts.marker.font);
                   sketch.textSize(objOpts.marker.font_size);
                   sketch.text(
-                    marker.name,
+                    markerDispName,
                     (hole_x0 + shift_x) * xMag + pad_x - sketch.textWidth(marker.name) - 5,//+ 10,
                     (marker_top + shift_y) * yMag + pad_y - 2
                   );
@@ -4755,6 +4825,72 @@ document.addEventListener("DOMContentLoaded", () => {
               //make connection objects=================================================================================
               //add connection
               if( objOpts.canvas.is_connection){
+                let connection_colour = objOpts.connection.line_colour;
+                let connection_line_width = objOpts.connection.line_width;
+
+                //v_connection--------------------------------------------
+                if(m == 0){
+                  sketch.strokeWeight(connection_line_width);
+                  sketch.stroke(connection_colour);
+                  //case top
+                  marker.v_connection.forEach(c=>{
+                    if(c[2]!==marker.id[2]){
+                      //if connect other section
+                      const arrowSize=[8,8,20];
+                      sketch.line(
+                        marker_x0+marker_w/2,
+                        marker_y0 -arrowSize[2],
+                        marker_x0+marker_w/2,
+                        marker_y0 +arrowSize[2]
+                      )
+                      sketch.line(
+                        marker_x0+marker_w/2,
+                        marker_y0 +arrowSize[2],
+                        marker_x0+marker_w/2-arrowSize[0],
+                        marker_y0 +arrowSize[2] - arrowSize[1]
+                      )
+                      sketch.line(
+                        marker_x0+marker_w/2,
+                        marker_y0 +arrowSize[2],
+                        marker_x0+marker_w/2+arrowSize[0],
+                        marker_y0 +arrowSize[2] - arrowSize[1]
+                      )
+                    }
+                    return;
+                  })
+                }
+                if(m == section.markers.length - 1){
+                  sketch.strokeWeight(connection_line_width);
+                  sketch.stroke(connection_colour);
+                  //case top
+                  marker.v_connection.forEach(c=>{
+                    if(c[2]!==marker.id[2]){
+                      //if connect other section
+                      const arrowSize=[8,8,20];
+                      sketch.line(
+                        marker_x0+marker_w/2,
+                        marker_y0 -arrowSize[2],
+                        marker_x0+marker_w/2,
+                        marker_y0 +arrowSize[2]
+                      )
+                      sketch.line(
+                        marker_x0+marker_w/2,
+                        marker_y0 -arrowSize[2],
+                        marker_x0+marker_w/2-arrowSize[0],
+                        marker_y0 -arrowSize[2] + arrowSize[1]
+                      )
+                      sketch.line(
+                        marker_x0+marker_w/2,
+                        marker_y0 -arrowSize[2],
+                        marker_x0+marker_w/2+arrowSize[0],
+                        marker_y0 -arrowSize[2] + arrowSize[1]
+                      )
+                      return;
+                    }
+                  })
+                }
+
+                //h_connection--------------------------------------------
                 const connectionData = this.getNearestConnectedMarkerIdx( LCCore, marker.id, objOpts);
 
                 //check connection
@@ -4784,8 +4920,6 @@ document.addEventListener("DOMContentLoaded", () => {
                 const cn_y3 = (connectedMarker_top + shift_y) * yMag + pad_y;
                 const cn_x2 = cn_x3 - objOpts.connection.indexWidth;
                 const cn_y2 = cn_y3;
-                let connection_colour = objOpts.connection.line_colour;
-                let connection_line_width = objOpts.connection.line_width;
 
                 //get style
                 if (cn_y0 !== cn_y3) {
@@ -4841,8 +4975,6 @@ document.addEventListener("DOMContentLoaded", () => {
                   }
                 }
 
-                
-
                 //draw connection---------------------------------------------
                 sketch.strokeWeight(connection_line_width);
                 sketch.stroke(connection_colour);
@@ -4850,6 +4982,8 @@ document.addEventListener("DOMContentLoaded", () => {
                 sketch.line(cn_x0, cn_y0, cn_x1, cn_y1); //start point
                 sketch.line(cn_x1, cn_y1, cn_x2, cn_y2); //index left
                 sketch.line(cn_x2, cn_y2, cn_x3, cn_y3); //index right
+
+                //------------------------------------------------------------                
               } 
               
               //=====================================================================================================
@@ -6889,10 +7023,10 @@ function loadToolIcons(objOpts) {
 //--------------------------------------------------------------------------------------------------
 function getClickedItemIdx(mouseX, mouseY, LCCore, objOpts){
   
-  const xMag = objOpts.canvas.zoom_level[0] * objOpts.canvas.dpir;
-  let yMag = objOpts.canvas.zoom_level[1] * objOpts.canvas.dpir;
+  const xMag  = objOpts.canvas.zoom_level[0] * objOpts.canvas.dpir;
+  let yMag    = objOpts.canvas.zoom_level[1] * objOpts.canvas.dpir;
   const pad_x = objOpts.canvas.pad_x;
-  let pad_y = objOpts.canvas.pad_y;
+  let pad_y   = objOpts.canvas.pad_y;
   if (objOpts.canvas.depth_scale == "age") {
     yMag = yMag * objOpts.canvas.age_zoom_correction[0];
     pad_y = pad_y + objOpts.canvas.age_zoom_correction[1];
@@ -6947,8 +7081,12 @@ function getClickedItemIdx(mouseX, mouseY, LCCore, objOpts){
       
     //const project_x0 = ((objOpts.section.width + objOpts.hole.distance) * num_enable_left + shift_x) * xMag + pad_x - 3;
     //const project_w  = (objOpts.section.width + objOpts.hole.distance) * num_enable_right * xMag - objOpts.hole.distance/2;
-    const project_x0 = (objOpts.section.width + objOpts.hole.distance) * num_enable_left  + 1;
-    let project_w    = (objOpts.section.width + objOpts.hole.distance) * num_enable_right + 1;
+    //const project_x0 = -objOpts.project.pad_x + ((objOpts.section.width + objOpts.hole.distance) * prj_num_enable_left + shift_x) * xMag + pad_x
+    const project_x0 = -objOpts.project.pad_x/xMag + (objOpts.section.width + objOpts.hole.distance) * (num_enable_left + objOpts.project.interval*p);//  + 1;
+    let project_w    = -objOpts.project.pad_x/xMag + (objOpts.section.width + objOpts.hole.distance)  * (num_enable_right + 1);
+    
+    
+    
     if(num_enable_right == 0){
       project_w = (objOpts.hole.distance + objOpts.hole.width);
     }

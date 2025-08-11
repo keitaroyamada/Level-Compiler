@@ -1277,7 +1277,7 @@ class LevelCompilerCore extends EventEmitter{
 
     console.log("==================================");
     this.setStatus("completed","Checked model summary");
-  }
+  }力
   checkModel(...args) {
     this.setStatus("running","start checkModel");
     if (this.projects.length == 0) {
@@ -1537,7 +1537,7 @@ class LevelCompilerCore extends EventEmitter{
     
 
   }
-  getDepthFromTrinity(targetId, trinityList, calcType, allowExtrapolation=false) {
+  getDepthFromTrinity(targetId, trinityList, calcType, allowExtrapolation=false, isForce=false) {
     this.setStatus("running","start getDepthFromTrinity");
 
     let output = [];
@@ -1555,6 +1555,7 @@ class LevelCompilerCore extends EventEmitter{
       const sectionName = lcfnc.zeroPadding(trinityList[t].section_name);
       const distance    = parseFloat(trinityList[t].distance);
 
+      //search upper/lower idex
       for(let p=0;p<this.projects.length;p++){
         if(targetId[0] == null || targetId[0] == this.projects[p].id[0]){
 
@@ -1684,30 +1685,68 @@ class LevelCompilerCore extends EventEmitter{
 
       //get section data
       let sectionId = this.projects[upperIdxs[0][0]].holes[upperIdxs[0][1]].sections[upperIdxs[0][2]].id;
+      const masterIdx = this.search_idx_list[this.base_project_id.toString()];
 
-      //get nearest cd/efd data
-      const D1      = this.projects[upperIdxs[0][0]].holes[upperIdxs[0][1]].sections[upperIdxs[0][2]].markers[upperIdxs[0][3]][calcType];
-      const D3      = this.projects[lowerIdxs[0][0]].holes[lowerIdxs[0][1]].sections[lowerIdxs[0][2]].markers[lowerIdxs[0][3]][calcType];
-      const d1      = this.projects[upperIdxs[0][0]].holes[upperIdxs[0][1]].sections[upperIdxs[0][2]].markers[upperIdxs[0][3]].distance;
-      const d3      = this.projects[lowerIdxs[0][0]].holes[lowerIdxs[0][1]].sections[lowerIdxs[0][2]].markers[lowerIdxs[0][3]].distance;
-      const D1_rank = this.projects[upperIdxs[0][0]].holes[upperIdxs[0][1]].sections[upperIdxs[0][2]].markers[upperIdxs[0][3]].connection_rank;
-      const D3_rank = this.projects[lowerIdxs[0][0]].holes[lowerIdxs[0][1]].sections[lowerIdxs[0][2]].markers[lowerIdxs[0][3]].connection_rank;
-
-      if (D1 == null || D3 == null) {
-        this.setError("","E020: "+ calcType + " is empty.");
-        //console.log("ERROR: " + calcType + " of value is empty.");
-        //console.log("D1:" + D1 + "/D3:" + D3 + "/d1:" + d1 + "/d3:" + d3);
-
-        output.push([null, null, null]);
-        continue;
+      //check duo connection
+      let isMasterExist = false;
+      let isConnectedMaster = false;
+      if(this.projects[masterIdx[0]].model_type == "correlation"){
+        isMasterExist = true;
+      }
+      if(this.projects[upperIdxs[0][0]].model_type == "duo"){
+        outer: for(let h=0; h< this.projects[upperIdxs[0][0]].holes.length;h++){
+            for(let s=0; s< this.projects[upperIdxs[0][0]].holes[h].sections.length;s++){
+              for(let m=0; m< this.projects[upperIdxs[0][0]].holes[h].sections[s].markers.length;m++){
+                for(let c=0; c< this.projects[upperIdxs[0][0]].holes[h].sections[s].markers[m].h_connection.length;c++){
+                  const hc = this.projects[upperIdxs[0][0]].holes[h].sections[s].markers[m].h_connection[c];
+                  if(hc[0]==this.base_project_id[0]){
+                    isConnectedMaster = true;
+                    break outer;
+                  }
+                }          
+              }
+            }
+          }  
+         
+      }else{
+        isMasterExist = true;
+        isConnectedMaster = true;
       }
 
-      //calc interpolated depth between markers
-      const d2d1 = distance - d1;
-      const d3d1 = d3 - d1;
-      const interpolatedDepth = this.linearInterp(D1, D3, d2d1, d3d1);
-      const new_rank = Math.max(...[D1_rank, D3_rank]);
-      output.push([sectionId, interpolatedDepth, new_rank]);
+      //calc duo depth
+      isForce = true;
+      if(isForce || (isMasterExist && isConnectedMaster)){
+        //calc depth
+        //get nearest cd/efd data
+        const D1      = this.projects[upperIdxs[0][0]].holes[upperIdxs[0][1]].sections[upperIdxs[0][2]].markers[upperIdxs[0][3]][calcType];
+        const D3      = this.projects[lowerIdxs[0][0]].holes[lowerIdxs[0][1]].sections[lowerIdxs[0][2]].markers[lowerIdxs[0][3]][calcType];
+        const d1      = this.projects[upperIdxs[0][0]].holes[upperIdxs[0][1]].sections[upperIdxs[0][2]].markers[upperIdxs[0][3]].distance;
+        const d3      = this.projects[lowerIdxs[0][0]].holes[lowerIdxs[0][1]].sections[lowerIdxs[0][2]].markers[lowerIdxs[0][3]].distance;
+        const D1_rank = this.projects[upperIdxs[0][0]].holes[upperIdxs[0][1]].sections[upperIdxs[0][2]].markers[upperIdxs[0][3]].connection_rank;
+        const D3_rank = this.projects[lowerIdxs[0][0]].holes[lowerIdxs[0][1]].sections[lowerIdxs[0][2]].markers[lowerIdxs[0][3]].connection_rank;
+
+        if (D1 == null || D3 == null) {
+          this.setError("","E020: "+ calcType + " is empty.");
+          //console.log("ERROR: " + calcType + " of value is empty.");
+          //console.log("D1:" + D1 + "/D3:" + D3 + "/d1:" + d1 + "/d3:" + d3);
+
+          output.push([null, null, null]);
+          continue;
+        }
+
+        //calc interpolated depth between markers
+        const d2d1 = distance - d1;
+        const d3d1 = d3 - d1;
+        const interpolatedDepth = this.linearInterp(D1, D3, d2d1, d3d1);
+        const new_rank = Math.max(...[D1_rank, D3_rank]);
+        output.push([sectionId, interpolatedDepth, new_rank]);
+      }else{
+        //case not calc depth
+        output.push([null, null, null]);
+      }
+
+
+      
     }
     this.setStatus("completed","");
     return output;
@@ -2913,7 +2952,7 @@ class LevelCompilerCore extends EventEmitter{
     for (let h = 0; h < hNeighborMarkerIds.length; h++) {
       //get marker data
       //console.log(currentMarkerId+"=>"+hNeighborMarkerIds[h])
-      const neighborMarkerIdx = this.search_idx_list[hNeighborMarkerIds[h].toString()];
+      const neighborMarkerIdx  = this.search_idx_list[hNeighborMarkerIds[h].toString()];
       const neighborMarkerData = this.projects[neighborMarkerIdx[0]].holes[neighborMarkerIdx[1]].sections[neighborMarkerIdx[2]].markers[neighborMarkerIdx[3]];
      
       //get master connection
@@ -3722,6 +3761,7 @@ class LevelCompilerCore extends EventEmitter{
     //this.updateSearchIdx();
     const fromIdx = this.search_idx_list[fromId.toString()];
     const toIdx = this.search_idx_list[toId.toString()];
+    if(!fromIdx && !toIdx) return;
 
     if (direction == "vertical") {
       let connectionIdxFrom = null;
@@ -4533,6 +4573,8 @@ class LevelCompilerCore extends EventEmitter{
     newSectionData.markers.push(bottomMarkerData);
 
     this.projects[holeIdx[0]].holes[holeIdx[1]].sections.push(newSectionData);
+    this.updateSearchIdx();
+    this.connectMarkers(topMarkerData.id, bottomMarkerData.id, "vertical");
 
     this.sortModel();
 
@@ -4578,7 +4620,7 @@ class LevelCompilerCore extends EventEmitter{
       return false
     }   
   }
-  deleteHole(holeId){
+  deleteHole(holeId, deleteConnections=true){
     this.setStatus("running","start deleteHole");
     this.updateSearchIdx();
     const holeIdx = this.search_idx_list[holeId.toString()];
@@ -4592,29 +4634,33 @@ class LevelCompilerCore extends EventEmitter{
     }
     
     //delete connection
-    for(let p=0; p<this.projects.length;p++){
-      for(let h=0;h<this.projects[p].holes.length;h++){
-        for(let s=0;s<this.projects[p].holes[h].sections.length;s++){
-          for(let m=0;m<this.projects[p].holes[h].sections[s].markers.length;m++){
-            //remove deleted h_connection
-            this.projects[p].holes[h].sections[s].markers[m].h_connection
-              = this.projects[p].holes[h].sections[s].markers[m].h_connection.filter(hc=>!deleteList.has(hc.toString()));
-            //remove deleted v_connection
-            this.projects[p].holes[h].sections[s].markers[m].v_connection
-              = this.projects[p].holes[h].sections[s].markers[m].v_connection.filter(vc=>!deleteList.has(vc.toString()));
-            //Initialise
-            this.projects[p].holes[h].sections[s].markers[m].composite_depth = null;
-            this.projects[p].holes[h].sections[s].markers[m].event_free_depth = null;
+    if(deleteConnections){
+      for(let p=0; p<this.projects.length;p++){
+        for(let h=0;h<this.projects[p].holes.length;h++){
+          for(let s=0;s<this.projects[p].holes[h].sections.length;s++){
+            for(let m=0;m<this.projects[p].holes[h].sections[s].markers.length;m++){
+              //remove deleted h_connection
+              this.projects[p].holes[h].sections[s].markers[m].h_connection
+                = this.projects[p].holes[h].sections[s].markers[m].h_connection.filter(hc=>!deleteList.has(hc.toString()));
+              //remove deleted v_connection
+              this.projects[p].holes[h].sections[s].markers[m].v_connection
+                = this.projects[p].holes[h].sections[s].markers[m].v_connection.filter(vc=>!deleteList.has(vc.toString()));
+              //Initialise
+              this.projects[p].holes[h].sections[s].markers[m].composite_depth = null;
+              this.projects[p].holes[h].sections[s].markers[m].event_free_depth = null;
+            }
           }
         }
       }
-    }
+    }    
     
     //delete hole
     this.projects[holeIdx[0]].holes = this.projects[holeIdx[0]].holes.filter(hole=>hole.id[1].toString()!==holeId[1].toString());      
-    
-    this.calcCompositeDepth();
-    this.calcEventFreeDepth();
+    if(deleteConnections){
+      this.calcCompositeDepth();
+      this.calcEventFreeDepth();
+    }
+
     this.updateSearchIdx();
 
     this.setStatus("completed","");
@@ -4644,6 +4690,102 @@ class LevelCompilerCore extends EventEmitter{
 
     this.setStatus("completed","");
     return true;
+  }
+  moveHoleToProject(holeId, toProjectId, updateModel=true){
+    if(holeId[0]==toProjectId[0]) return false;
+
+    this.setStatus("running","start moveHoleToProject");
+    this.updateSearchIdx();
+    const projectIdx = this.search_idx_list[toProjectId.toString()];
+    const holeIdx    = this.search_idx_list[holeId.toString()];
+
+    //change ids
+    for(let p=0; p<this.projects.length; p++){
+      const project = this.projects[p];
+      for(let h=0; h<project.holes.length; h++){
+        const hole = project.holes[h];
+        if(hole.id[1] === holeId[1]){
+          //if target hole          
+          for(let s=0; s<hole.sections.length; s++){
+            const section = hole.sections[s];
+            section.id[0] = toProjectId[0];
+            for(let m=0; m<section.markers.length; m++){
+              const marker = section.markers[m];
+              marker.id[0] = toProjectId[0];              
+              marker.isMaster = false;
+              marker.isZeroPoint = false;
+              marker.composite_depth = null;
+              marker.event_free_depth = null;
+              marker.connection_rank = null;
+
+              //v_connection
+              for(let i=0; i<marker.v_connection.length; i++){
+                const vcId = marker.v_connection[i];
+                if(vcId.slice(0, 2).join(',') == holeId.slice(0, 2).join(',')){
+                  vcId[0] = toProjectId[0];
+                }
+              }              
+
+              //evet
+              for(let i=0; i<marker.event.length; i++){
+                const event = marker.event[i];
+                if(event[2] !== null && event[2].slice(0, 2).join(',') == holeId.slice(0, 2).join(',')){
+                  event[2][0] = toProjectId[0];
+                }                
+              }
+
+              //depth_source 
+              const source = marker.depth_source;
+              for(let i=1; i<source.length; i++){
+                if(source[i] !== null && source[i].slice(0, 2).join(',') == holeId.slice(0, 2).join(',')){
+                  source[i][0] = toProjectId[0];
+                }
+              }
+            }
+          }
+          hole.id[0] = toProjectId[0];
+        }else{
+          //if other holes
+          for(let s=0; s<hole.sections.length; s++){
+            const section = hole.sections[s];
+            for(let m=0; m<section.markers.length; m++){
+              const marker = section.markers[m];
+              //h_connection(if connected to target hole)
+              for(let i=0; i<marker.h_connection.length; i++){
+                const connectedId = marker.h_connection[i];
+                if(connectedId[1] === holeId[1]){
+                  //if move target hole
+                  connectedId[0] = toProjectId[0];
+                }
+              }
+            }
+          }
+        }
+        
+      }
+    }
+
+    //move hole
+    const fromHole = this.projects[holeIdx[0]].holes[holeIdx[1]].clone();
+    fromHole.order = this.projects[projectIdx[0]].holes.length + 1;
+    this.projects[projectIdx[0]].holes.push(fromHole);
+
+    //delete moved hole
+    this.projects[holeIdx[0]].holes = this.projects[holeIdx[0]].holes.filter(hole => hole.id[1].toString()!==holeId[1].toString());
+    console.log(this.projects[0].holes[this.projects[0].holes.length-1].sections[0].markers[1].distance)
+    console.log(this.projects[0].holes[this.projects[0].holes.length-1].sections[0].markers[1].h_connection)
+    
+
+    //update model
+    this.sortModelByOrder();    
+    this.updateSearchIdx()
+    if(updateModel){
+      this.calcCompositeDepth();
+      this.calcEventFreeDepth();
+    }
+
+    this.setStatus("completed","");
+    return true;    
   }
   changeHoleOrder(holeId1, holeId2){
     this.setStatus("running","start changeHoleOrder");
@@ -4763,71 +4905,50 @@ class LevelCompilerCore extends EventEmitter{
     
   }
 
-  replaceProjectId(fromId, toId, replaceBaseId=false){
-    //update base correlation id
-    if(replaceBaseId){
-      this.base_project_id = toId;
+  mergeProjects(){
+    this.setStatus("completed","start mergeProject");
+
+    //move holes
+    let moveList = [];
+    for(let p=0; p<this.projects.length; p++){
+      const project = this.projects[p];
+      if(project.id.toString() !== this.base_project_id.toString()){
+        //if target project, move hole
+        for (let h=0; h<project.holes.length; h++) {
+          moveList.push(project.holes[h].id);
+        }
+      }
+    }
+    for(let i=0; i<moveList.length; i++) {
+       console.log(moveList[i])
+
+      this.moveHoleToProject(moveList[i], this.base_project_id); //delete hole function included
+    }
+    console.log(this.projects)
+
+    //delete projects
+    let deleteList = [];
+    for(let p=0; p<this.projects.length; p++){
+      const project = this.projects[p];
+      if(project.id.toString() !== this.base_project_id.toString()){
+        deleteList.push(JSON.parse(JSON.stringify(project.id)));
+      }
+    }
+    for(let p=0; p<deleteList.length; p++){
+      console.log(deleteList[p])
+      this.deleteProject(deleteList[p]);
     }
 
-    //make local function
-    const replaceIn = (data) => {
-      if (Array.isArray(data)) {
-        data.forEach((v, i) => {
-          if (v === fromId) data[i] = toId;
-          else replaceIn(v);
-        });
-      } else if (data && typeof data === 'object') {
-        Object.keys(data).forEach(k => replaceIn(data[k]));
-      }
-    };
-
-    // replace projects
-    replaceIn(this.projects);
-  }
-  mergeProjects(){
-    //This function changes IDs and carries a risk of corrupting the model. Use with caution.
-
-    //get changed id list & move holes
-    const toProjectId  = this.base_project_id;
-    const baseIdx      = this.search_idx_list[this.base_project_id.toString()]; 
-    let fromProjectIds = new Set();
-
-    this.projects.forEach(project=>{
-      if(project.id[0] !== toProjectId){
-        fromProjectIds.add(project.id[0]);
-        project.holes.forEach(hole=>{
-          //deep copy
-          const newHole = hole.clone();
-
-          //hole move from duo -> base
-          this.projects[baseIdx[0]].holes.push(newHole);
-        })
-        fromProjectIds.add(project.id[0]);
-      }
-    })
-
-    //replace project id
-    fromProjectIds = [...fromProjectIds];
-    fromProjectIds.forEach(fromProjectId=>{
-      this.replaceProjectId(fromProjectId, toProjectId);
-    })
-    
-    //delete source duo projects
-    this.projects.forEach(project=>{
-      if(project.id[0] !== toProjectId){
-        this.deleteProject(project.id);
-      }
-    })
-
-    //update model    
-    this.updateSearchIdx()
+    //update model
+    this.sortModelByOrder();  
+    this.updateSearchIdx();
     this.calcCompositeDepth();
     this.calcEventFreeDepth();
 
     this.setStatus("completed","");
     return true;
-    
   }
+
   changeName(targetId, value){
     this.setStatus("running","start changeName");
     this.updateSearchIdx();
@@ -4966,6 +5087,7 @@ class LevelCompilerCore extends EventEmitter{
       currentId = stack.pop();
       if (!visitedId.has(currentId.toString())) {
         currentIdx = this.search_idx_list[currentId.toString()];
+        if(!currentIdx) continue;
 
         visitedId.add(currentId.toString());
         this.projects[currentIdx[0]].holes[currentIdx[1]].sections[currentIdx[2]].markers[currentIdx[3]].v_connection.forEach((v) => {
@@ -5446,7 +5568,7 @@ class LevelCompilerCore extends EventEmitter{
       const sec = String(now.getSeconds()).padStart(2, '0');
 
 
-      version = `${year}-${month}-${day} ${hour}:${min}:${sec}`;
+      version = `${year}-${month}-${day} (${hour}:${min}:${sec})`;
     }
     
     for(let i=0;i<this.projects.length;i++){
