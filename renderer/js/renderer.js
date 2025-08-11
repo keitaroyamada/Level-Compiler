@@ -4182,7 +4182,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
       //main
       let isBbaseProjectMaster = false;
-      const baseProjectIdx = getIdxById(LCCore, LCCore.base_project_id);
+      const baseProjectIdx = getIdxById(LCCore, LCCore.base_project_id); 
       if(LCCore.projects[baseProjectIdx[0]].model_type == "correlation"){
         isBbaseProjectMaster = true;
       }      

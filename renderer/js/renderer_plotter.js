@@ -1,6 +1,4 @@
-
 document.addEventListener("DOMContentLoaded", () => {
-    initialiseLCPlotDataCollection();
     const scroller = document.getElementById("scroller");
     
     let LCPlot = null;
@@ -20,7 +18,12 @@ document.addEventListener("DOMContentLoaded", () => {
     //-------------------------------------------------------------------------------------------
     //initialise
     window.PlotterApi.receive("PlotterMenuClicked", async (data) => {
-        console.log(data)
+        if(data){
+            //data already loaded
+        }else{
+            //
+            await initialiseLCPlotDataCollection();
+        }        
     })    
     //-------------------------------------------------------------------------------------------
     document.addEventListener("mousemove", async function (event) {     
@@ -292,7 +295,6 @@ document.addEventListener("DOMContentLoaded", () => {
     window.PlotterApi.receive("PlotterImport", async (data) => {
         if(LCPlot !== null ){ 
             console.log("Plotter: Importing...")
-
         }  
     })
     window.PlotterApi.receive("PlotterExport", async (data) => {
@@ -408,6 +410,12 @@ document.addEventListener("DOMContentLoaded", () => {
                 parentElement.dispatchEvent(new Event('change'));
                 child.remove();
               });
+
+            //clear loaded plot data
+            console.log(LCPlot)
+            await initialiseLCPlotDataCollection();
+            console.log(LCPlot)
+
             getSelectedData();
             updateView();
         } 
@@ -428,7 +436,7 @@ document.addEventListener("DOMContentLoaded", () => {
         } 
     }
     async function initialiseLCPlotDataCollection(){
-        await window.PlotterApi.initialiseLCPlot_data_collection();
+        await window.PlotterApi.initialisePlotDataCollection();
     }
     function makeP5CanvasBase() {        //case base is too small
         let ymin = 0;

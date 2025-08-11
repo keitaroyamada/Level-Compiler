@@ -152,10 +152,20 @@ function createMainWIndow() {
     console.log("MAIN: Project age plot data is initialised.");
     return;
   });
-  ipcMain.handle("InitialisePlotDataCollection", async (_e) => {
+  ipcMain.handle("initialisePlotDataCollection", async (_e) => {
     //import modeln
     LCPlot.data_collections = [];
     LCPlot.data_selected_id = null;
+
+    zipData(LCPlot)
+      .then((zipped) => {
+        plotWindow.webContents.send("importedData", zipped);
+        mainWindow.webContents.send("importedData", zipped);
+      })
+      .catch((err) => {
+        console.error("MAIN: Failed to zip: ", err);
+      });
+
     console.log("MAIN: Project plot data collection is initialised.");
     return;
   });
@@ -3833,16 +3843,14 @@ function createMainWIndow() {
                   label: "File",
                   submenu: [
                     {
-                      label: "Close & Release data",
+                      label: "Release and close",
                       click: () => {
                         plotWindow.webContents.send("PlotterCleared", "");    
 
-                        //plotWindow.removeAllListeners("close");
-                        //plotWindow.close();
-                        //plotWindow = null;
-                        //LCPlot.data_collections = [];
-                        //LCPlot.data_selected_id = null;
-                        //mainWindow.webContents.send("PlotterCleared", "");                        
+                        plotWindow.removeAllListeners("close");
+                        plotWindow.close();
+                        plotWindow = null;
+                        mainWindow.webContents.send("PlotterCleared", "");                        
                       },
                     },
                     { type: "separator" },
