@@ -1733,6 +1733,13 @@ function createMainWIndow() {
       converterWindow.webContents.send("ConverterMenuClicked", data);
     });   
   });
+
+  ipcMain.handle("PlotterClosed", (_e, data) => {
+    plotWindow.removeAllListeners("close");
+    plotWindow.close();
+    plotWindow = null;
+    mainWindow.webContents.send("PlotterClosed", "");
+  })
   ipcMain.handle("OpenImporter", async (_e) => {
     if (importerWindow) {
       importerWindow.focus();
@@ -3846,11 +3853,6 @@ function createMainWIndow() {
                       label: "Release and close",
                       click: () => {
                         plotWindow.webContents.send("PlotterCleared", "");    
-
-                        plotWindow.removeAllListeners("close");
-                        plotWindow.close();
-                        plotWindow = null;
-                        mainWindow.webContents.send("PlotterCleared", "");                        
                       },
                     },
                     { type: "separator" },

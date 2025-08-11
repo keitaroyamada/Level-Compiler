@@ -17,6 +17,7 @@ contextBridge.exposeInMainWorld("PlotterApi", {
   initialisePlotDataCollection: () => ipcRenderer.invoke("initialisePlotDataCollection"),
   sendPlotOptions:(args1,args2) => ipcRenderer.invoke("sendPlotOptions",args1,args2),
   clearProgressbar:() => ipcRenderer.invoke("clearProgressbar"),
+  PlotterClosed:() => ipcRenderer.invoke("PlotterClosed"),
   
   //main -> renderer
   receive: (channel, func) => {

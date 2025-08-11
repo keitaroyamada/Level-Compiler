@@ -412,15 +412,13 @@ document.addEventListener("DOMContentLoaded", () => {
               });
 
             //clear loaded plot data
-            console.log(LCPlot)
             await initialiseLCPlotDataCollection();
-            console.log(LCPlot)
-
             getSelectedData();
             updateView();
+            await window.PlotterApi.PlotterClosed();
         } 
 
-    })
+    })    
     //============================================================================
     function updateView() {
         if (vectorObjects == null) {
