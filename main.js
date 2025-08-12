@@ -3387,7 +3387,7 @@ function createMainWIndow() {
                 
                     settingsWindow.once("ready-to-show", () => {
                       settingsWindow.show();
-                      converterWindow.setAlwaysOnTop(true, "floating");
+                      settingsWindow.setAlwaysOnTop(true, "floating");
                     //settingsWindow.webContents.openDevTools();
                       //converterWindow.setAlwaysOnTop(true, "normal");
                       const data = {
@@ -3646,7 +3646,7 @@ function createMainWIndow() {
                 
                     settingsWindow.once("ready-to-show", () => {
                       settingsWindow.show();
-                      converterWindow.setAlwaysOnTop(true, "floating");
+                      settingsWindow.setAlwaysOnTop(true, "floating");
                     //settingsWindow.webContents.openDevTools();
                       //converterWindow.setAlwaysOnTop(true, "normal");
                       const data = {
