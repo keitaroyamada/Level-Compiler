@@ -3842,7 +3842,9 @@ function createMainWIndow() {
                 e.preventDefault(); 
                 plotWindow.hide();
                 //plotWindow = null;
-                mainWindow.webContents.send("PlotterHide", "");
+                if(mainWindow && !mainWindow.isDestroyed()){
+                  mainWindow.webContents.send("PlotterHide", ""); 
+                }
               });
 
               const customMenu = Menu.buildFromTemplate([
