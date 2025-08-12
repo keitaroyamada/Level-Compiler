@@ -11,7 +11,7 @@ Level Compiler (LC) is an integrated stratigraphic management software capable o
   
 ### 2.2. Windows
 1. Download installer (*.exe) from the right panel ["Releases"](https://github.com/keitaroyamada/Level-Compiler/releases).
-2. Run downloaded exe file.
+2. Run downloaded exe file. If Windows displays a “Windows protected your PC” or “Unknown publisher” message, click More info and then Run anyway to proceed with installation.
 
 ### 2.3. Mac(Apple silicon)
 1. Download installer (*.dmg) from the right panel ["Releases"](https://github.com/keitaroyamada/Level-Compiler/releases).
