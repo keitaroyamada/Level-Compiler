@@ -17,6 +17,7 @@ class LevelCompilerCore extends EventEmitter{
     super();
     this.name = "";
     this.id = lcfnc.getUniqueId();;
+    this.model_format_version = "1.0.0";
     this.descriptions = "";
     this.projects = [];
     this.search_idx_list = {};

@@ -3640,6 +3640,7 @@ function createMainWIndow() {
               if(LCCore !== null){
                 text ="<Workspace>\n";
                 text += "  [Name]:  " + LCCore.name + "\n" +
+                        "  [Format]: " + LCCore.model_format_version + "\n" +
                         "  [Descriptions]:  " + LCCore.descriptions + "\n\n";
 
                 LCCore.projects.forEach(project=>{
@@ -3679,7 +3680,7 @@ function createMainWIndow() {
           {
             label: "Model statistics",
             click: () => {
-              if(LCCore !== null){
+              if(LCCore !== null && LCCore.projects.length>0){
                 results = LCCore.checkModel();
 
                 const text = results.map((item, i) => {
@@ -3935,7 +3936,7 @@ function createMainWIndow() {
               submenu: [
                 { label: "About", click: createAboutWindow },
                 { label: "Check update", click: async()=>{await checkUpdate("button")}},
-                { label: "Usage", click: ()=>{shell.openExternal('https://github.com/keitaroyamada/Level-Compiler/')} },
+                { label: "Usage", click: ()=>{shell.openExternal('https://www.youtube.com/playlist?list=PLraahvJ2B_L7ClUMTZNnz7Fs3swqovV4y')} },
               ],
             },
           ]
