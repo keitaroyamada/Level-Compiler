@@ -50,6 +50,7 @@ const isMac = process.platform === "darwin";
 const isDev = false;//process.env.NODE_ENV !== "development"; //const isDev = false;
 let isEditMode = false;
 const isShowMinorError = false;
+let isPlotterClose = true; //because plotter is hide by close button
 
 //main properties
 let LCCore = new LevelCompilerCore();
@@ -798,7 +799,7 @@ function createMainWIndow() {
 
     imageViewerWindow.once("ready-to-show", () => {
       imageViewerWindow.show();
-      imageViewerWindow.setAlwaysOnTop(true, "normal");
+      imageViewerWindow.setAlwaysOnTop(true, "floating");
       //imageViewerWindow.webContents.openDevTools();
       //converterWindow.setAlwaysOnTop(true, "normal");
       imageViewerWindow.webContents.send("ImageViewerMenuClicked", sectionImage);
@@ -1727,18 +1728,27 @@ function createMainWIndow() {
 
     converterWindow.once("ready-to-show", () => {
       converterWindow.show();
-      converterWindow.setAlwaysOnTop(true, "normal");
+      converterWindow.setAlwaysOnTop(true, "floating");
       //converterWindow.webContents.openDevTools();
       //converterWindow.setAlwaysOnTop(true, "normal");
       converterWindow.webContents.send("ConverterMenuClicked", data);
     });   
   });
 
-  ipcMain.handle("PlotterClosed", (_e, data) => {
+  ipcMain.handle("PlotterClose", (_e, data) => {
+    isPlotterClose = true;
     plotWindow.removeAllListeners("close");
     plotWindow.close();
     plotWindow = null;
     mainWindow.webContents.send("PlotterClosed", "");
+  })
+  ipcMain.on("windowCloseButton", (_e) => {
+    isPlotterClose = false;
+    plotWindow.removeAllListeners("close");
+    plotWindow.close();
+    plotWindow = null;
+    mainWindow.webContents.send("PlotterClosed", "");
+    isPlotterClose = true;
   })
   ipcMain.handle("OpenImporter", async (_e) => {
     if (importerWindow) {
@@ -1768,7 +1778,7 @@ function createMainWIndow() {
     importerWindow.once("ready-to-show", () => {
       importerWindow.show();
       //importerWindow.webContents.openDevTools();
-      //importerWindow.setAlwaysOnTop(true, "normal");
+      importerWindow.setAlwaysOnTop(true, "floating");
       importerWindow.webContents.send("ImporterToolClicked", "");
     });
   });
@@ -2149,7 +2159,7 @@ function createMainWIndow() {
     dividerWindow.once("ready-to-show", () => {
       dividerWindow.show();
       //dividerWindow.webContents.openDevTools();
-      // /dividerWindow.setAlwaysOnTop(true, "normal");
+      dividerWindow.setAlwaysOnTop(true, "floating");
       dividerWindow.webContents.send("DividerToolClicked", "");
     });
   });
@@ -2485,7 +2495,7 @@ function createMainWIndow() {
   });
   ipcMain.handle("changeFix", async (_e, isFix) => {
     if (isFix) {
-      finderWindow.setAlwaysOnTop(true, "normal");
+      finderWindow.setAlwaysOnTop(true, "floating");
     } else {
       finderWindow.setAlwaysOnTop(false);
     }
@@ -3116,7 +3126,7 @@ function createMainWIndow() {
           settingsWindow.show();
          // converterWindow.setAlwaysOnTop(true, "normal");
          //settingsWindow.webContents.openDevTools();
-          settingsWindow.setAlwaysOnTop(true, "normal");
+          settingsWindow.setAlwaysOnTop(true, "floating");
           settingsWindow.webContents.send("SettingsData", data);
         });
       }else{
@@ -3595,7 +3605,9 @@ function createMainWIndow() {
               //converterWindow.setAlwaysOnTop(true, "normal");
               settingsWindow.on("closed", () => {
                 settingsWindow = null;
-                mainWindow.webContents.send("SettingsClosed", "");
+                if (mainWindow && !mainWindow.isDestroyed()){
+                  mainWindow.webContents.send("SettingsClosed", "");
+                }
               });
               settingsWindow.setMenu(null);
           
@@ -3603,7 +3615,7 @@ function createMainWIndow() {
           
               settingsWindow.once("ready-to-show", () => {
                 settingsWindow.show();
-               // converterWindow.setAlwaysOnTop(true, "normal");
+                converterWindow.setAlwaysOnTop(true, "floating");
                //settingsWindow.webContents.openDevTools();
                 //converterWindow.setAlwaysOnTop(true, "normal");
                 const data = {
@@ -3738,7 +3750,9 @@ function createMainWIndow() {
               //converterWindow.setAlwaysOnTop(true, "normal");
               converterWindow.on("closed", () => {
                 converterWindow = null;
-                mainWindow.webContents.send("ConverterClosed", "");
+                if (mainWindow && !mainWindow.isDestroyed()){
+                  mainWindow.webContents.send("ConverterClosed", "");
+                }
               });
 
               converterWindow.setMenu(null);
@@ -3747,7 +3761,7 @@ function createMainWIndow() {
           
               converterWindow.once("ready-to-show", () => {
                 converterWindow.show();
-               // converterWindow.setAlwaysOnTop(true, "normal");
+                converterWindow.setAlwaysOnTop(true, "floating");
                 //converterWindow.webContents.openDevTools();
                 //converterWindow.setAlwaysOnTop(true, "normal");
                 const data = {
@@ -3800,7 +3814,9 @@ function createMainWIndow() {
               labelerWindow.on("closed", () => {
                 labelerWindow = null;
                 tempCore = null;
-                mainWindow.webContents.send("LabelerClosed", "");
+                if (mainWindow && !mainWindow.isDestroyed()){
+                  mainWindow.webContents.send("LabelerClosed", "");
+                }
               });
               labelerWindow.setMenu(null);
           
@@ -3839,48 +3855,46 @@ function createMainWIndow() {
               });
               
               plotWindow.on("close", (e) => {
+                if(isPlotterClose){
+                  return;
+                }
+                
                 e.preventDefault(); 
                 plotWindow.hide();
                 //plotWindow = null;
                 if(mainWindow && !mainWindow.isDestroyed()){
                   mainWindow.webContents.send("PlotterHide", ""); 
                 }
-                
               });
               plotWindow.on("closed", () => {
                 plotWindow = null; 
-                mainWindow.webContents.send("LabelerClosed", "");
+                if (mainWindow && !mainWindow.isDestroyed()){
+                  mainWindow.webContents.send("LabelerClosed", "");
+                }
+                isPlotterClose = true;
               });
 
               const customMenu = Menu.buildFromTemplate([
-                {
-                  label: "File",
-                  submenu: [
-                    {
-                      label: "Release and close",
-                      click: () => {
-                        plotWindow.webContents.send("PlotterCleared", "");    
-                      },
+                  {
+                    label: "Release and close",
+                    click: () => {
+                      plotWindow.webContents.send("PlotterCleared", "");    
                     },
-                    { type: "separator" },
-                    /*
-                    {
-                      label:"Import",
-                      click: ()=>{
-                        plotWindow.webContents.send("PlotterImport", "");
-                      }
-                    },
-                    */
-                    {
-                      label:"Export",
-                      click: ()=>{
-                        plotWindow.webContents.send("PlotterExport", "");
-                      }
+                  },
+                  { type: "separator" },
+                  {
+                    label:"Export",
+                    click: ()=>{
+                      plotWindow.webContents.send("PlotterExport", "");
                     }
-                  ],
-                }]);
+                  }
+                ]);
 
-              plotWindow.setMenu(customMenu);
+              //plotWindow.setMenu(customMenu);
+              plotWindow.setMenu(null);
+              plotWindow.webContents.on('context-menu', (_event, params) => {
+                customMenu.popup({ window: plotWindow, x: params.x, y: params.y });
+              });
           
               plotWindow.loadFile(path.join(__dirname, "./renderer/plotter.html"));
 
@@ -3892,7 +3906,7 @@ function createMainWIndow() {
           
               plotWindow.once("ready-to-show", () => {
                 plotWindow.show();
-                plotWindow.setAlwaysOnTop(true, "normal");
+                plotWindow.setAlwaysOnTop(true, "floating");
                 //plotWindow.webContents.openDevTools();
                 plotWindow.webContents.send("PlotterMenuClicked", isData);
               });
@@ -3930,7 +3944,7 @@ function createMainWIndow() {
     ];
   }
   function menuRebuild() {
-    const lcmenu = buildMainMenu(mainWindow);
+    const lcmenu = buildMainMenu();
     let mainMenu = Menu.buildFromTemplate(lcmenu);
     Menu.setApplicationMenu(mainMenu);
   }
@@ -4281,7 +4295,7 @@ function createAboutWindow() {
 
   aboutWindow.once("ready-to-show", () => {
     aboutWindow.show();
-   // converterWindow.setAlwaysOnTop(true, "normal");
+    aboutWindow.setAlwaysOnTop(true, "floating");
    //aboutWindow.webContents.openDevTools();
     //converterWindow.setAlwaysOnTop(true, "normal");
     aboutWindow.webContents.send("Version", app.getVersion());

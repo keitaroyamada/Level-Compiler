@@ -25,6 +25,9 @@ document.addEventListener("DOMContentLoaded", () => {
             await initialiseLCPlotDataCollection();
         }        
     })    
+    window.onbeforeunload = () => {
+        window.PlotterAPI.send('windowCloseButton');
+    };
     //-------------------------------------------------------------------------------------------
     document.addEventListener("mousemove", async function (event) {     
         const rect = document.getElementById("p5Canvas").getBoundingClientRect(); // Canvas position and size   
@@ -415,7 +418,7 @@ document.addEventListener("DOMContentLoaded", () => {
             await initialiseLCPlotDataCollection();
             getSelectedData();
             updateView();
-            await window.PlotterApi.PlotterClosed();
+            await window.PlotterApi.PlotterClose();
         } 
 
     })    
