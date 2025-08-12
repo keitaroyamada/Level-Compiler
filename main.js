@@ -3845,6 +3845,11 @@ function createMainWIndow() {
                 if(mainWindow && !mainWindow.isDestroyed()){
                   mainWindow.webContents.send("PlotterHide", ""); 
                 }
+                
+              });
+              plotWindow.on("closed", () => {
+                plotWindow = null; 
+                mainWindow.webContents.send("LabelerClosed", "");
               });
 
               const customMenu = Menu.buildFromTemplate([
