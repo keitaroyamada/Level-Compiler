@@ -3359,15 +3359,44 @@ function createMainWIndow() {
                 { role: "hideOthers" },
                 { role: "unhide" },
                 { type: "separator" },
-                {
-                  label: "Developer tool",
+                { label: "Preferences",
                   click: () => {
-                    if (mainWindow.webContents.isDevToolsOpened()) {
-                      mainWindow.webContents.closeDevTools();
-                    } else {
-                      mainWindow.webContents.openDevTools();
+                    if (settingsWindow) {
+                      settingsWindow.focus();
+                      return;
                     }
-                    //mainWindow.webContents.openDevTools();
+                
+                    //create finder window
+                    settingsWindow = new BrowserWindow({
+                      title: "Settings",
+                      width: 700,
+                      height: 700,
+                      webPreferences: {preload: path.join(__dirname, "preload", "preload_settings.js"),},
+                    });
+                    
+                    //converterWindow.setAlwaysOnTop(true, "normal");
+                    settingsWindow.on("closed", () => {
+                      settingsWindow = null;
+                      if (mainWindow && !mainWindow.isDestroyed()){
+                        mainWindow.webContents.send("SettingsClosed", "");
+                      }
+                    });
+                    settingsWindow.setMenu(null);
+                
+                    settingsWindow.loadFile(path.join(__dirname, "./renderer/settings.html"));
+                
+                    settingsWindow.once("ready-to-show", () => {
+                      settingsWindow.show();
+                      converterWindow.setAlwaysOnTop(true, "floating");
+                    //settingsWindow.webContents.openDevTools();
+                      //converterWindow.setAlwaysOnTop(true, "normal");
+                      const data = {
+                        output_type:"export",
+                        called_from:"main",
+                        path:null,
+                      }; 
+                      mainWindow.webContents.send("SettingsMenuClicked", data);
+                    });
                   },
                 },
                 { type: "separator" },
@@ -3575,61 +3604,79 @@ function createMainWIndow() {
             : []),
         ],
       },
-      {
-        label:"Edit",
-        submenu:[
-          {
-            label: "Edit mode",
-            accelerator: "CmdOrCtrl+E",
-            click: () =>{
-              mainWindow.webContents.send("EditCorrelation");
-            },
-          },
-          { type: "separator" },
-          {
-            label: "Preferences",
-            click: () => {
-              if (settingsWindow) {
-                settingsWindow.focus();
-                return;
-              }
-          
-              //create finder window
-              settingsWindow = new BrowserWindow({
-                title: "Settings",
-                width: 700,
-                height: 700,
-                webPreferences: {preload: path.join(__dirname, "preload", "preload_settings.js"),},
-              });
-              
-              //converterWindow.setAlwaysOnTop(true, "normal");
-              settingsWindow.on("closed", () => {
-                settingsWindow = null;
-                if (mainWindow && !mainWindow.isDestroyed()){
-                  mainWindow.webContents.send("SettingsClosed", "");
-                }
-              });
-              settingsWindow.setMenu(null);
-          
-              settingsWindow.loadFile(path.join(__dirname, "./renderer/settings.html"));
-          
-              settingsWindow.once("ready-to-show", () => {
-                settingsWindow.show();
-                converterWindow.setAlwaysOnTop(true, "floating");
-               //settingsWindow.webContents.openDevTools();
-                //converterWindow.setAlwaysOnTop(true, "normal");
-                const data = {
-                  output_type:"export",
-                  called_from:"main",
-                  path:null,
-                }; 
-                mainWindow.webContents.send("SettingsMenuClicked", data);
-              });
-            },
-          },
-          
-        ],
-      },
+      ...(!isMac
+        ? [
+            {
+              label:"Edit",
+              submenu:[
+                {
+                  label: "Edit mode",
+                  accelerator: "CmdOrCtrl+E",
+                  click: () =>{
+                    mainWindow.webContents.send("EditCorrelation");
+                  },
+                },
+                { type: "separator" },
+                {
+                  label: "Preferences",
+                  click: () => {
+                    if (settingsWindow) {
+                      settingsWindow.focus();
+                      return;
+                    }
+                
+                    //create finder window
+                    settingsWindow = new BrowserWindow({
+                      title: "Settings",
+                      width: 700,
+                      height: 700,
+                      webPreferences: {preload: path.join(__dirname, "preload", "preload_settings.js"),},
+                    });
+                    
+                    //converterWindow.setAlwaysOnTop(true, "normal");
+                    settingsWindow.on("closed", () => {
+                      settingsWindow = null;
+                      if (mainWindow && !mainWindow.isDestroyed()){
+                        mainWindow.webContents.send("SettingsClosed", "");
+                      }
+                    });
+                    settingsWindow.setMenu(null);
+                
+                    settingsWindow.loadFile(path.join(__dirname, "./renderer/settings.html"));
+                
+                    settingsWindow.once("ready-to-show", () => {
+                      settingsWindow.show();
+                      converterWindow.setAlwaysOnTop(true, "floating");
+                    //settingsWindow.webContents.openDevTools();
+                      //converterWindow.setAlwaysOnTop(true, "normal");
+                      const data = {
+                        output_type:"export",
+                        called_from:"main",
+                        path:null,
+                      }; 
+                      mainWindow.webContents.send("SettingsMenuClicked", data);
+                    });
+                  },
+                },
+                
+              ],
+            }
+          ]
+        : [
+           {
+              label:"Edit",
+              submenu:[
+                {
+                  label: "Edit mode",
+                  accelerator: "CmdOrCtrl+E",
+                  click: () =>{
+                    mainWindow.webContents.send("EditCorrelation");
+                  },
+                },
+              ]
+            }
+          ]
+      ),
       {
         label: "Model",
         submenu:[
@@ -3940,7 +3987,15 @@ function createMainWIndow() {
               ],
             },
           ]
-        : []),
+        : [
+            {
+              label: "Help",
+              submenu: [
+                { label: "Check update", click: async()=>{await checkUpdate("button")}},
+                { label: "Usage", click: ()=>{shell.openExternal('https://www.youtube.com/playlist?list=PLraahvJ2B_L7ClUMTZNnz7Fs3swqovV4y')} },
+              ],
+            },
+          ]),
       // others
     ];
   }
