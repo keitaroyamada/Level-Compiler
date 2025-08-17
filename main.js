@@ -1503,14 +1503,44 @@ function createMainWIndow() {
     let dataMap = exportLCCore.constructModelMap()
     for(let i=0; i<exportLCCore.projects.length;i++){
       const exportProjectId = exportLCCore.projects[i].id;
-      let outputArray = exportLCCore.constructCSVdata(dataMap, exportProjectId);
+      let outputArray = exportLCCore.constructCSVforLC(dataMap, exportProjectId);
       const idx = exportLCCore.search_idx_list[exportProjectId.toString()];
-      const saveName = "[correlation]"+exportLCCore.projects[idx[0]].name+"("+exportLCCore.projects[0].correlation_version+").csv"; 
+      const version = exportLCCore.projects[0].correlation_version.replace(/\(\d{2}:\d{2}:\d{2}\)/, "");
+      const saveName = "[correlation]"+exportLCCore.projects[idx[0]].name+"("+version+").csv"; 
       putcsvfile(mainWindow, saveName, outputArray);
+      console.log("MAIN: Export ", saveName);
     }
-    
-    console.log("MAIN: Export ", saveName);
+        
   });
+
+  ipcMain.handle("ExportCorrelationAsLFFromRenderer", async (_e) => {
+    console.log("MAIN: Start contructing Legacy LF data.");
+    LCCore.updateVersionInfo();
+    const MD = LCCore.exportSerialisedModel();
+    let exportLCCore = initialiseLCCore();
+    
+    //exportLCCore <- MD
+    exportLCCore.loadModelFromLcmodel(MD);
+
+    //make export array
+    let dataMap = exportLCCore.constructModelMap()
+    for(let i=0; i<exportLCCore.projects.length;i++){
+      const exportProjectId = exportLCCore.projects[i].id;
+      let outputArray = exportLCCore.constructCSVforLF(dataMap, exportProjectId);
+      if(outputArray === false){
+        return false;
+      };
+      const idx = exportLCCore.search_idx_list[exportProjectId.toString()];
+      const version = exportLCCore.projects[0].correlation_version.replace(/\(\d{2}:\d{2}:\d{2}\)/, "");
+      const saveModelName = exportLCCore.projects[idx[0]].name+"Correlation model ("+version+").csv"; 
+      const saveEventName = exportLCCore.projects[idx[0]].name+"List of Event Layers ("+version+").csv"; 
+
+      putcsvfile(mainWindow, saveModelName, outputArray.model);
+      putcsvfile(mainWindow, saveEventName, outputArray.event);
+      console.log("MAIN: Export ", saveModelName, saveEventName);
+    }
+  });
+
   ipcMain.handle("InitialiseTempCore", async (_e) => {
     //import modeln
     labelerHistory = new UndoManager();
@@ -3577,6 +3607,12 @@ function createMainWIndow() {
                   mainWindow.webContents.send("ExportCorrelationAsCsvMenuClicked");
                 },
               },
+              {
+                label: "Export model for Level Finder Format",
+                click: () => {
+                  mainWindow.webContents.send("ExportCorrelationAsLFMenuClicked");
+                },
+              },
             ],
           },                    
           // for Windows--------------------
@@ -4169,7 +4205,8 @@ async function putcsvfile(mainWindow, filePath, data) {
     .then((file) => {
       if (!file.canceled && file.filePath) {
         //convert array --> csv
-        const csv = stringify(data);
+        const csv = stringify(data,{ record_delimiter: '\r\n' });
+        //const csvCRLF = csv.replace(/\r?\n/g, "\r\n");
         fs.writeFileSync(file.filePath, csv);
       }
     })

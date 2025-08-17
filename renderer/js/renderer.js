@@ -1,7 +1,7 @@
 document.addEventListener("DOMContentLoaded", () => {
  
   //============================================================================================xxxxxxxxxx
-  let developerMode = false;
+  let developerMode = true;
   //base properties
   const scroller = document.getElementById("scroller");
   let canvasBase = document.getElementById("canvasBase");
@@ -2285,7 +2285,9 @@ document.addEventListener("DOMContentLoaded", () => {
       if(response.response){
         const upperId   = [ht.project, ht.hole, ht.section, ht.upper_marker];
         const lowerId   = [ht.project, ht.hole, ht.section, ht.lower_marker];
-        console.log("[Editor]: Add event between " + upperId +" and "+lowerId);
+        
+        console.log("[Renderer]: Deleting event between ",upperId,lowerId);
+
         await undo("save");//undo
         result = await window.LCapi.DeleteEvent(upperId, lowerId,[]);
         if(result == true){
@@ -2298,7 +2300,7 @@ document.addEventListener("DOMContentLoaded", () => {
             modelImages = await loadCoreImages(modelImages, LCCore, objOpts, ["drilling_depth","event_free_depth", "age"]);
           }
           updateView();
-          console.log("[Renderer]: Delete event")
+          console.log("[Renderer]: Deleted selected event.")
         }
 
       }
@@ -3007,7 +3009,8 @@ document.addEventListener("DOMContentLoaded", () => {
     await window.LCapi.ExportCorrelationAsCsv();
   });
   window.LCapi.receive("ExportCorrelationAsLFMenuClicked", async () => {
-    await window.LCapi.ExportCorrelationAsLF(LCCore);
+    console.log(LCCore.projects.length)
+    const result = await window.LCapi.ExportCorrelationAsLF();
   });
   //============================================================================================
   document.getElementById("bt_chart").addEventListener("click", async () => {
@@ -7122,15 +7125,18 @@ function getClickedItemIdx(mouseX, mouseY, LCCore, objOpts){
 
             for(let m=0; m<LCCore.projects[p].holes[h].sections[s].markers.length; m++){
               const marker_y0 = LCCore.projects[p].holes[h].sections[s].markers[m][objOpts.canvas.depth_scale];
-              if(marker_y0 - y > 0 && Math.abs(lowerDistance) >= Math.abs(marker_y0 - y)){
-                lowerDistance = marker_y0 - y;
-                lowerIdx = m;
-              }
 
               if(marker_y0 - y <= 0 && Math.abs(upperDistance) >= Math.abs(marker_y0 - y)){
                 upperDistance = marker_y0 - y;
                 upperIdx = m;
               }
+
+              if(marker_y0 - y > 0 && Math.abs(lowerDistance) >= Math.abs(marker_y0 - y) && upperIdx+1==m){
+                //if erosion, some layers with same distance exist 
+                lowerDistance = marker_y0 - y;
+                lowerIdx = m;
+              }
+
             } 
     
             //Distance calculation is not recommended because the interpolation is in charge of LCCroe module.

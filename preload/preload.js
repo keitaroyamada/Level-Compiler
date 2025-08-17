@@ -28,7 +28,7 @@ contextBridge.exposeInMainWorld("LCapi", {
 
   //export
   ExportCorrelationAsCsv: () => ipcRenderer.invoke("ExportCorrelationAsCsvFromRenderer"),
-  ExportCorrelationAsLF: (args1, args2) => ipcRenderer.invoke("ExportCorrelationAsLFFromRenderer",args1, args2),
+  ExportCorrelationAsLF: () => ipcRenderer.invoke("ExportCorrelationAsLFFromRenderer"),
 
 
   //calcs

@@ -522,7 +522,7 @@ class LevelCompilerCore extends EventEmitter{
     }
 
     //connect event
-    const isMakeNewMarker = this.connectEventPairs(projectIdx);
+    const isMakeNewMarker = this.connectEventPairs(projectData.id);
 
     //connect duo
     if(this.projects.length>1){
@@ -2105,7 +2105,8 @@ class LevelCompilerCore extends EventEmitter{
     this.setStatus("completed","");
     return output;
   }
-  connectEventPairs(projectIdx) {
+  connectEventPairs(projectId) {
+    const projectIdx = this.search_idx_list[projectId.toString()];
     this.setStatus("running","start connectEventPairs")
     let isMakeNewMarker = false;
     const holeList = this.getHoleListFromCsv(this.projects[projectIdx[0]]);
@@ -3783,9 +3784,10 @@ class LevelCompilerCore extends EventEmitter{
 
       //connect
       if (connectionIdxFrom == null && connectionIdxTo == null) {
+        //connect markers
         this.projects[fromIdx[0]].holes[fromIdx[1]].sections[fromIdx[2]].markers[fromIdx[3]].v_connection.push(toId);
-
         this.projects[toIdx[0]].holes[toIdx[1]].sections[toIdx[2]].markers[toIdx[3]].v_connection.push(fromId);
+        
         /*
         console.log(
           "Connected between " +
@@ -3908,12 +3910,11 @@ class LevelCompilerCore extends EventEmitter{
 
       //disconnect
       if (connectionIdxFrom !== null && connectionIdxTo !== null) {
-        this.projects[fromIdx[0]].holes[fromIdx[1]].sections[
-          fromIdx[2]
-        ].markers[fromIdx[3]].v_connection.splice(connectionIdxFrom, 1);
-        this.projects[toIdx[0]].holes[fromIdx[1]].sections[toIdx[2]].markers[
-          toIdx[3]
-        ].v_connection.splice(connectionIdxTo, 1);
+        //disconnect markers
+        this.projects[fromIdx[0]].holes[fromIdx[1]].sections[fromIdx[2]].markers[fromIdx[3]].v_connection.splice(connectionIdxFrom, 1);
+        this.projects[toIdx[0]].holes[toIdx[1]].sections[toIdx[2]].markers[toIdx[3]].v_connection.splice(connectionIdxTo, 1);
+
+
         /*
         console.log(
           "Disconnected between " +
@@ -3965,6 +3966,57 @@ class LevelCompilerCore extends EventEmitter{
     this.setStatus("completed","");
   }
 
+  checkEventConnection(fromId, toId){
+    let results = {
+      result: false,
+      from: fromId,
+      to: toId,
+      connection:[fromId]
+    };
+    
+    const markerConnections = this.searchShortestVerticalPath(fromId, toId);
+    if(!markerConnections){
+      //marker is not connected
+      return results
+    }
+    if(markerConnections.length==1){
+      results.result = true;
+      return results;
+    }
+
+    let visitedId = new Set();
+    visitedId.add(fromId);
+    let prevId = fromId;
+
+    outer: for(let i=1; i<markerConnections.length; i++){
+      const prevMarkerData = this.getDataByIdx(this.search_idx_list[markerConnections[i-1].toString()]);
+      const nextMarkerData = this.getDataByIdx(this.search_idx_list[markerConnections[i].toString()]);
+
+      for(let ep = 0; ep<prevMarkerData.event.length; ep++){
+        if(prevMarkerData.event[ep][2].toString() == nextMarkerData.id.toString()){
+          for(let en = 0; en<nextMarkerData.event.length; en++){
+            if(nextMarkerData.event[en][2].toString() == prevMarkerData.id.toString()){
+              //if event connected
+              results.connection.push(nextMarkerData.id);
+              if(nextMarkerData.event[en][1].includes("through")){
+                //if connect, goto next
+                break;
+              }else{
+                break outer;
+              }
+            }
+          }
+        }        
+      }
+    }
+
+    //check
+    if(results.connection[results.connection.length-1].toString() == toId.toString()){
+      results.result = true;
+    }
+    
+    return results;
+  }
   deleteMarker(targetId){
     this.setStatus("running","start deleteMarker");
     this.updateSearchIdx();
@@ -3978,59 +4030,35 @@ class LevelCompilerCore extends EventEmitter{
       upperMarkerId = targetMarkerData.v_connection[0];
       lowerMarkerId = targetMarkerData.v_connection[1];
     } 
-
-    //remove event layers
-    if(targetMarkerData.event !== 0){
-      for(let e of targetMarkerData.event){
-        //["deposition", "upward", connected_marker_id, [label], (value))]
-        if(e[1] == "through-up"){
-          if(targetMarkerData.v_connection.length==2){
-            const upperMarkerId = targetMarkerData.v_connection[0];
-            const lowerMarkerId = targetMarkerData.v_connection[1];
-            const upperMarkerIdx = this.search_idx_list[upperMarkerId.toString()];
-            const lowerMarkerIdx = this.search_idx_list[lowerMarkerId.toString()];
-            const connectedMarkerIdx = this.search_idx_list[e[2].toString()];
-            const upperMarkerData = JSON.parse(JSON.stringify(this.getDataByIdx(upperMarkerIdx)));
-            const lowerMarkerData = JSON.parse(JSON.stringify(this.getDataByIdx(lowerMarkerIdx)));
-            const connectedMarkerData = JSON.parse(JSON.stringify(this.getDataByIdx(connectedMarkerIdx)));
-
-            this.projects[upperMarkerIdx[0]].holes[upperMarkerIdx[1]].sections[upperMarkerIdx[2]].markers[upperMarkerIdx[3]].event 
-                = connectedMarkerData.event.filter(e2=> e2[2].toString() !== targetId.toString());
-            let newEvent = lowerMarkerData.event.filter(e2=>e2[2].toString() !== targetId.toString());
-            newEvent = newEvent[0];
-            this.projects[upperMarkerIdx[0]].holes[upperMarkerIdx[1]].sections[upperMarkerIdx[2]].markers[upperMarkerIdx[3]].event.push(newEvent);
-          }
-        } else if(e[1] == "upward"){
-          const connectedMarkerIdx = this.search_idx_list[e[2].toString()];
-          const connectedMarkerData = JSON.parse(JSON.stringify(this.getDataByIdx(connectedMarkerIdx)));
-          //if downward, remove
-          this.projects[connectedMarkerIdx[0]].holes[connectedMarkerIdx[1]].sections[connectedMarkerIdx[2]].markers[connectedMarkerIdx[3]].event 
-              = connectedMarkerData.event.filter(e2=>!(e2[0] == e[0] && e2[1] == "downward" || e2[1] == "through-down" || e2[1] == "through-up"));
-
-          //if through, replace
-          let newEvent = connectedMarkerData.event.filter(e2=>(e2[0] == e[0] && e2[1] == "through-up"));
-          if(newEvent.length !== 0){
-            newEvent[0][1] = e[1];
-            newEvent = newEvent[0];
-          }          
-          this.projects[connectedMarkerIdx[0]].holes[connectedMarkerIdx[1]].sections[connectedMarkerIdx[2]].markers[connectedMarkerIdx[3]].event.push(newEvent);        
-        } else if(e[1] == "downward"){
-          const connectedMarkerIdx = this.search_idx_list[e[2].toString()];
-          const connectedMarkerData = JSON.parse(JSON.stringify(this.getDataByIdx(connectedMarkerIdx)));
-          //if upward, remove
-          this.projects[connectedMarkerIdx[0]].holes[connectedMarkerIdx[1]].sections[connectedMarkerIdx[2]].markers[connectedMarkerIdx[3]].event 
-              = connectedMarkerData.event.filter(e2=>!(e[0] == e2[0] && e2[1] == "upward" || e2[1] == "through-down" || e2[1] == "through-up"));
-          //if through, replace
-          let newEvent = connectedMarkerData.event.filter(e2=>(e[0] == e2[0] && e2[1] == "through-down"));          
-          if(newEvent.length !== 0){
-            newEvent[0][1] = e[1];
-            newEvent = newEvent[0];
-          }   
-          this.projects[connectedMarkerIdx[0]].holes[connectedMarkerIdx[1]].sections[connectedMarkerIdx[2]].markers[connectedMarkerIdx[3]].event.push(newEvent);
-        }
-      }
-    }
     
+    //fix event connecttion
+    const results = this.checkEventConnection(upperMarkerId, lowerMarkerId)
+    if(results.result == true){
+      //if event is connected between upper and lower
+      
+      const upperIdx = this.search_idx_list[upperMarkerId.toString()];
+      const lowerIdx = this.search_idx_list[lowerMarkerId.toString()];
+      const upperEvents = this.projects[upperIdx[0]].holes[upperIdx[1]].sections[upperIdx[2]].markers[upperIdx[3]].event;
+      const lowerEvents = this.projects[lowerIdx[0]].holes[lowerIdx[1]].sections[lowerIdx[2]].markers[lowerIdx[3]].event;
+      //fix upper marker
+      for(let e=0;e<upperEvents.length;e++){
+        if(upperEvents[e][2].toString() == results.connection[1].toString()){
+          //if connect to lower direction
+          upperEvents[e][2] = lowerMarkerId;
+          break;
+        }        
+      }
+      //fix lower marker
+      for(let e=0;e<lowerEvents.length;e++){
+        if(lowerEvents[e][2].toString() == results.connection[results.connection.length-2].toString()){
+          //if connect to upper direction
+          lowerEvents[e][2] = upperMarkerId;
+          break;
+        }        
+      }
+
+    }
+
     //trim target markerdata
     if(upperMarkerId !== null){
       //not top
@@ -4119,18 +4147,39 @@ class LevelCompilerCore extends EventEmitter{
     if(this.projects[sectionIdx[0]].holes[sectionIdx[1]].sections[sectionIdx[2]].markers[upperIdx].isMaster == true && this.projects[sectionIdx[0]].holes[sectionIdx[1]].sections[sectionIdx[2]].markers[lowerIdx].isMaster == true){
       newMarkerData.isMaster = true;
     }
-    //event
-    for(let ue of upperMarkerData.event){
-      if(ue[2].toString() == lowerMarkerData.id.toString()){
-        if(ue[1] == "downward" || ue[1] == "through-down"){
-          newMarkerData.event.push([ue[0], "through-up", upperId, ue[3], ue[4]]);
-          newMarkerData.event.push([ue[0], "through-down", lowerId, ue[3], ue[4]]);
-        }
+
+    //fix event connecttion
+    const eventConnection = this.checkEventConnection(upperId, lowerId);
+    let upperEventData = null;
+    if(eventConnection.result==true){
+      //if connected
+      //upper
+      for(let e=0; upperMarkerData.event.length; e++){
+        if(upperMarkerData.event[e][2].toString() == lowerMarkerData.id.toString()){
+          //if connected to lower marker, update
+          upperMarkerData.event[e][2] = newMarkerData.id;
+          upperEventData = JSON.parse(JSON.stringify(upperMarkerData.event[e]));
+          break;
+        }        
+      }
+      //new
+      newMarkerData.event.push([upperEventData[0], "through-up",   upperId, upperEventData[3], upperEventData[4]]);
+      newMarkerData.event.push([upperEventData[0], "through-down", lowerId, upperEventData[3], upperEventData[4]]);
+
+      //lower
+      for(let e=0; lowerMarkerData.event.length; e++){
+        if(lowerMarkerData.event[e][2].toString() == upperMarkerData.id.toString()){
+          //if connected to upper marker, update
+          lowerMarkerData.event[e][2] = newMarkerData.id;
+          break;
+        }        
       }
     }
 
+    //add marker
     this.projects[sectionIdx[0]].holes[sectionIdx[1]].sections[sectionIdx[2]].markers.push(newMarkerData);
 
+    //connect markers
     this.disconnectMarkers(upperId, lowerId, "vertical");
     this.connectMarkers(upperId, newMarkerId, "vertical");
     this.connectMarkers(newMarkerId, lowerId, "vertical");
@@ -4471,14 +4520,21 @@ class LevelCompilerCore extends EventEmitter{
       const ev = this.projects[upperIdx[0]].holes[upperIdx[1]].sections[upperIdx[2]].markers[upperIdx[3]].event[e];
       if(ev[2].toString() == lowerId.toString()){
         //if connected
-        
         if(targetTypes.includes(ev[0])){      
           deleteIdx.push(e);
         }
       }
     }
-    for(let idx of deleteIdx){
-      this.projects[upperIdx[0]].holes[upperIdx[1]].sections[upperIdx[2]].markers[upperIdx[3]].event.splice(idx, 1);
+    for(let idx of deleteIdx.sort((a, b) => b - a)){
+      const event = this.projects[upperIdx[0]].holes[upperIdx[1]].sections[upperIdx[2]].markers[upperIdx[3]].event;
+      //update
+      for(let e=0; e<event.length; e++){
+        if(event[e][1]=="through-up"){
+          event[e][1] = "upward";
+        }
+      }
+      //delete
+      event.splice(idx, 1);
     }
     
     //delete lower
@@ -4492,8 +4548,17 @@ class LevelCompilerCore extends EventEmitter{
         }
       }
     }
-    for(let idx of deleteIdx){
-      this.projects[lowerIdx[0]].holes[lowerIdx[1]].sections[lowerIdx[2]].markers[lowerIdx[3]].event.splice(idx, 1);
+    for(let idx of deleteIdx.sort((a, b) => b - a)){
+      const event = this.projects[lowerIdx[0]].holes[lowerIdx[1]].sections[lowerIdx[2]].markers[lowerIdx[3]].event;
+
+      //update
+      for(let e=0; e<event.length; e++){
+        if(event[e][1]=="through-down"){
+          event[e][1] = "downward";
+        }
+      }
+      //delete
+      event.splice(idx, 1);
     }
 
     //case erosion remove lower marker
@@ -5301,7 +5366,7 @@ class LevelCompilerCore extends EventEmitter{
     //get row id list
     let resultIds = [];
     let visited = new Set();
-    
+     
     for(let p=0; p<this.projects.length;p++){
       for(let h=0;h<this.projects[p].holes.length;h++){
         for(let s=0;s<this.projects[p].holes[h].sections.length;s++){
@@ -5402,7 +5467,10 @@ class LevelCompilerCore extends EventEmitter{
     
     return resultIds; 
   }
-  constructCSVdata(resultIds, baseProjectID=this.base_project_id){
+  constructCSVforLC(resultIds, baseProjectID=this.base_project_id){
+    this.setStatus("running","construct csv for LC");
+    //resultIds: [cd, [horizontalMarkers...]]
+    //type: "lc", "lf"
     //make output data
     let prevMasterHole = "";
     let output = [];
@@ -5516,6 +5584,268 @@ class LevelCompilerCore extends EventEmitter{
     
     this.setStatus("completed","");
     return output;
+  }
+
+  constructCSVforLF(resultIds, baseProjectID=this.base_project_id){
+    this.setStatus("running","construct csv for LF");
+    //resultIds: [cd, [horizontalMarkers...]]
+    //type: "lc", "lf"
+    //make output data
+    let prevMasterHole = "";
+    let modelOutput = [];
+    let eventListOutput = [["Bore_hole",	"Core_number",	"Event_top",	"Event_bottom",	"ID"]];
+    let connectionCounts = 0;
+
+    for(let i=0;i<resultIds.length;i++){
+      let masterConnections = ["@9999", "@9999", "@9999","@9999"];
+      let compositeDepth = "@9999";
+
+      const ids  = resultIds[i][1];
+      let rowData = [];
+      let masterHole = "";
+      let curMasterHole = [];      
+      for(let p=0; p<this.projects.length;p++){
+
+        for(let h=0; h<this.projects[p].holes.length; h++){
+          const holeData = this.projects[p].holes[h];
+          let cellsData = []; //[name, distance, drilling depth]
+          if(this.projects[p].id.toString() == baseProjectID.toString()){
+            cellsData[0] = "@9999";
+            cellsData[1] = "@9999";
+            cellsData[2] = "@9999";
+          }
+        
+          for(let c=0;c<ids.length;c++){
+            const id = ids[c];          
+            const idx = this.search_idx_list[id.toString()];    
+            const sectionData = this.getDataByIdx([idx[0],idx[1],idx[2],null]);       
+            const markerData  = this.getDataByIdx(idx);
+            if(holeData.id.toString() == [id[0],id[1],null,null].toString()){              
+              //get marker data
+              if(baseProjectID.toString() == this.projects[p].id.toString()){
+                //if target project
+                cellsData[0] = "@"+markerData.name.replace(/-(top|bottom)/g, " $1");
+                cellsData[1] = "@"+markerData.distance.toFixed(1);
+                cellsData[2] = "@"+markerData.drilling_depth.toFixed(1);
+
+                //calc composite depth
+                let targetData = new Trinity();
+                targetData.name = "";
+                targetData.project_name = this.projects[p].name;
+                targetData.hole_name    = holeData.name;
+                targetData.section_name = sectionData.name;
+                targetData.distance     = markerData.distance;
+                const cd = this.getDepthFromTrinity(id, [targetData], "composite_depth");
+                if(cd[0][1]){
+                  compositeDepth = "@"+cd[0][1].toFixed(1);
+                }
+
+                //get event list
+                //Bore_hole	core_number	Event_top	Event_bottom	ID
+                let eventData = [];
+                for(let e=0;e<markerData.event.length;e++){
+                  if(markerData.event[e][0]=="erosion"){
+                    //case erosion event
+                    const txt = "Erosion event was detected at "+
+                                holeData.name+"-"+sectionData.name+"-"+markerData.distance.toFixed(1)+"cm. "+
+                                "Level Finder does not support erosion event.";
+                    console.log("LCCore: "+txt);
+                    this.setErrorAlert("",txt);
+                    return false;
+                  }else if(markerData.event[e][0]=="markup"){
+                    //case markup
+                    const txt = "Unsupported markup event for Level Finder was detected at "+
+                                holeData.name+"-"+sectionData.name+"-"+markerData.distance.toFixed(1)+"cm. "+
+                                "Removed from exported data.";
+                    console.log("LCCore: "+txt);
+                    this.setError("",txt);
+                    continue;
+                    //return "Unsupported markup event for Level Finder was detected.";
+                  }else{
+                    //case deposition event
+                    if(markerData.event[e][1] == "upward"){
+                      //event start
+                      eventData[0] = holeData.name;
+                      eventData[1] = sectionData.name;
+                      eventData[3] = markerData.distance;
+                      if(markerData.event[e][3]=="tephra"){
+                        eventData[4] = "(Tephra)";
+                      }
+                      eventData[4] += markerData.name;
+
+                      //find event end
+                      let connectedId = markerData.event[e][2];
+                      let tc = 0;
+                      while(connectedId && tc<100){
+                        tc++;
+                        const connectedIdx = this.search_idx_list[connectedId.toString()];
+                        const connectedMarkerData = this.getDataByIdx(connectedIdx);
+                        for(let ce=0; ce<connectedMarkerData.event.length; ce++){
+                          if(connectedMarkerData.event[ce][1] == "downward"){
+                            //found end point
+                            connectedId = null;
+                            eventData[2] = connectedMarkerData.distance;
+                          }else if(connectedMarkerData.event[ce][1] == "through-up"){
+                            //found through-up
+                            connectedId = connectedMarkerData.event[ce][2];
+                            break;
+                          }else{
+                            //found through-down
+                          }
+                        }
+                        if(tc==100){
+                          console.log("LCCore: Failed to detect event upper.");
+                          this.setErrorAlert("","Failed to detect event upper.");
+                          return false;
+                        }                        
+                      }                      
+                    } 
+                    
+                    //add row to output event data
+                    if(eventData.length == 5){
+                      eventListOutput.push(eventData);
+                    }else if(eventData.length == 0){
+
+                    }else{
+                      console.log("LCCore: Failed to get event data.");
+                      this.setErrorAlert("","Failed to get event data.");
+                      return false;
+                    }
+                  }
+
+                }
+              }
+
+              //get project master connections
+              if((baseProjectID.toString() == this.projects[p].id.toString()) && markerData.isMaster == true){
+                curMasterHole.push(this.getDataByIdx(this.search_idx_list[[markerData.id[0],markerData.id[1],null,null].toString()]).name);
+              }  
+              
+              //get workspace master connections
+              for(let hc=0;hc<markerData.h_connection.length; hc++){
+                const connectedId = markerData.h_connection[hc];
+                if([connectedId[0], null,null,null].toString() == this.base_project_id.toString()){
+                  //if connected base project
+                  const connectedMarkerData = this.getDataByIdx(this.search_idx_list[connectedId.toString()]);
+                  if((connectedMarkerData.id.toString() == this.base_project_id.toString() && connectedMarkerData.isMaster )|| masterConnections[0] == "@9999"){
+                    masterConnections[0] = "@"+holeData.name;
+                    masterConnections[1] = "@"+sectionData.name;
+                    masterConnections[2] = "@"+markerData.distance.toFixed(1);
+                    masterConnections[3] = "@"+holeData.name+"-"+sectionData.name+"-"+markerData.name;
+                  }
+                }
+
+                
+                
+              } 
+            }
+          }
+
+          rowData = [...rowData, ...cellsData];
+        }        
+      }
+
+      //check length
+      if(rowData.length<12){
+        const numAddHole = (12-rowData.length)/3;
+        if(Number.isInteger(numAddHole)){
+          for(let n=0;n<numAddHole;n++){
+            rowData = [...rowData,"@9999","@9999","@8888"];
+          }
+        }else{
+          console.log("LCCore: Unexpected number of columns encountered");
+          this.setErrorAlert("","Unexpected number of columns encountered");
+          return false;
+        }
+      }       
+
+      //calc master hole
+      if(curMasterHole.length==0){
+        //case top/bottom
+        masterHole = prevMasterHole;
+      }else if(curMasterHole.length==1){
+        //case not connection point
+        if(prevMasterHole==""){
+          //case top
+          prevMasterHole = "@"+curMasterHole[0];
+        }
+        masterHole = prevMasterHole;
+      }else if(curMasterHole.length == 2){
+        //case connection point
+        connectionCounts += 1;
+        for(let c=0;c<curMasterHole.length;c++){
+          if("@"+curMasterHole[c] !== prevMasterHole){
+            masterHole = "@K-"+String(connectionCounts).padStart(3, "0");
+            prevMasterHole = "@"+curMasterHole[c];
+            break;
+          }            
+        }          
+      }else{
+        console.log("LCCore: Too many master marker detected at Line: " + c+1);
+        this.setErrorAlert("","Too many master marker detected at Line: " + c+1);
+        return false;
+      }
+
+      //add header
+      if(i==0){
+        //header
+        let header = ["@Master section"];
+        for(let p=0; p<this.projects.length; p++){
+          for(let h=0; h<this.projects[p].holes.length; h++){
+            const hole = this.projects[p].holes[h];
+            if(baseProjectID.toString() == this.projects[p].id.toString()){
+              //if target id
+              header = [...header, "@Lamina name (" + hole.name + ")", "@Position on the Scale in the Photo (PSP) (cm)", "@Drilling depth (cm)"];
+            }            
+          }
+        }
+
+        if(header.length-1<12){
+          const numAddHole = (12-(header.length-1))/3;
+          if(Number.isInteger(numAddHole)){
+            for(let n=0;n<numAddHole;n++){
+              header = [...header,"@Laminaname()", "@Position on the Scale in the Photo (PSP) (cm)", "@Drilling depth (cm)"];
+            }
+          }else{
+            console.log("LCCore: Unexpected number of columns encountered");
+            this.setErrorAlert("","Unexpected number of columns encountered");
+            return false;
+          }
+        }
+
+        //add composite depth
+        header = [...header, "@Compsite depth (cm)"];
+
+        //if duo
+        if(baseProjectID !== this.base_project_id){
+          header  = [...header, "@Master core hole name",	"@Master core number",	"@Master core distance from core top (cm)", "@Master core lamina name"];
+        }
+
+        modelOutput.push(header);
+      }
+
+      //check data
+      if (rowData.every(item => item === "@9999")) {
+        //there is no data
+        continue;
+      }
+
+      //add master info
+      rowData.unshift(masterHole);
+      rowData.push(compositeDepth);
+
+      //if duo
+      if(baseProjectID !== this.base_project_id){
+        rowData = [...rowData, ...masterConnections];
+      }
+
+      //add row to outpt model data
+      modelOutput.push(rowData);
+      
+    }
+    
+    this.setStatus("completed","");
+    return {model: modelOutput, event:eventListOutput};
   }
 
   changeBaseProject(baseProjectId){
