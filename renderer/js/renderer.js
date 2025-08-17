@@ -1806,7 +1806,21 @@ document.addEventListener("DOMContentLoaded", () => {
       if(["change_marker_name","change_marker_distance"].includes(objOpts.edit.mode)){
         let target = null;
         let response=null;
+        
         if(objOpts.edit.mode == "change_marker_name"){
+          if(objOpts.edit.marker_from.markerName.includes("-top") || objOpts.edit.marker_from.markerName.includes("-bottom")){
+            response = await window.LCapi.askdialog(
+              "Reserved Name Change Warning",
+              "You are attempting to change a name that is reserved by system rules. Do you want to proceed with this change?"
+            );
+
+            if(!response.response){
+              isProcessing = false;
+              return
+            } else{
+              response = null;
+            }           
+          }
           target = "name";
           const askData = {
             title:"Change marker name",
@@ -1814,8 +1828,21 @@ document.addEventListener("DOMContentLoaded", () => {
             value:"",
             type:"text",
           };
+
           response = await window.LCapi.inputdialog(askData);
+
+          //if top/bottom
+          if(objOpts.edit.marker_from.markerName.includes("-top") || objOpts.edit.marker_from.markerName.includes("-bottom")){            
+            const regex = new RegExp(`^${objOpts.edit.marker_from.holeName}-${objOpts.edit.marker_from.sectionName}-(top|bottom)$`);
+            if(!regex.test(response)){
+              isProcessing = false;
+              alert("Invalid name format. Please use the format: <Hole Name>-<Section Name>-top/bottom");
+              return
+            }
+          }          
+
           console.log("[Editor]: Change marker: " + target);
+          
         }else if(objOpts.edit.mode == "change_marker_distance"){
           target = "distance";
           const askData = {

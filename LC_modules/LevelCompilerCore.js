@@ -5023,6 +5023,7 @@ class LevelCompilerCore extends EventEmitter{
 
      //check duplicate
     let isUsed = false;
+    let isUpdateMarkerName = false;
     if(idx.filter(item => item !== null).length == 1){
       //project
       for(let data of this.projects){
@@ -5033,6 +5034,7 @@ class LevelCompilerCore extends EventEmitter{
       }
     }else if(idx.filter(item => item !== null).length == 2){
       //hole
+      isUpdateMarkerName = true;
       for(let data of this.projects[idx[0]].holes){
         if(value !== "" && data.name == lcfnc.zeroPadding(value)){
           isUsed = true;
@@ -5041,9 +5043,10 @@ class LevelCompilerCore extends EventEmitter{
       }
     }else if(idx.filter(item => item !== null).length == 3){
       //section
+      isUpdateMarkerName = true;
       for(let data of this.projects[idx[0]].holes[idx[1]].sections){
         if(value !== "" && data.name == lcfnc.zeroPadding(value)){
-          isUsed = true;
+          isUsed = true;          
           break;
         }
       }
@@ -5060,7 +5063,25 @@ class LevelCompilerCore extends EventEmitter{
     //apply to reference type array
     if(isUsed == false){
       targetData.name = lcfnc.zeroPadding(value);
-      console.log("MAIN: Change marker name.");
+      if(isUpdateMarkerName){
+        //update top/bottom name
+        const holeData    = this.getDataByIdx([idx[0],idx[1],null,null]);
+        let sectionData = null;
+        if(idx[2]){
+          //change section name
+          sectionData = this.getDataByIdx([idx[0],idx[1],idx[2],null]);
+          sectionData.markers[0].name = holeData.name+"-"+sectionData.name+"-top";
+          sectionData.markers[sectionData.markers.length-1].name = holeData.name+"-"+sectionData.name+"-bottom";
+        }else{
+          //change hole name
+          for(let i=0;i<holeData.sections.length;i++){
+            sectionData = holeData.sections[i];
+            sectionData.markers[0].name = holeData.name+"-"+sectionData.name+"-top";
+            sectionData.markers[sectionData.markers.length-1].name = holeData.name+"-"+sectionData.name+"-bottom";
+          }        
+        }
+      }
+      console.log("MAIN: Change target name.");
       this.setStatus("completed","");
       return true;
     }else{
@@ -5624,6 +5645,7 @@ class LevelCompilerCore extends EventEmitter{
               //get marker data
               if(baseProjectID.toString() == this.projects[p].id.toString()){
                 //if target project
+                
                 cellsData[0] = "@"+markerData.name.replace(/-(top|bottom)/g, " $1");
                 cellsData[1] = "@"+markerData.distance.toFixed(1);
                 cellsData[2] = "@"+markerData.drilling_depth.toFixed(1);
@@ -5667,9 +5689,11 @@ class LevelCompilerCore extends EventEmitter{
                       //event start
                       eventData[0] = holeData.name;
                       eventData[1] = sectionData.name;
-                      eventData[3] = markerData.distance;
+                      eventData[3] = markerData.distance.toFixed(1);
                       if(markerData.event[e][3]=="tephra"){
                         eventData[4] = "(Tephra)";
+                      }else{
+                        eventData[4] = "";
                       }
                       eventData[4] += markerData.name;
 
@@ -5684,7 +5708,7 @@ class LevelCompilerCore extends EventEmitter{
                           if(connectedMarkerData.event[ce][1] == "downward"){
                             //found end point
                             connectedId = null;
-                            eventData[2] = connectedMarkerData.distance;
+                            eventData[2] = connectedMarkerData.distance.toFixed(1);
                           }else if(connectedMarkerData.event[ce][1] == "through-up"){
                             //found through-up
                             connectedId = connectedMarkerData.event[ce][2];

@@ -1532,8 +1532,8 @@ function createMainWIndow() {
       };
       const idx = exportLCCore.search_idx_list[exportProjectId.toString()];
       const version = exportLCCore.projects[0].correlation_version.replace(/\(\d{2}:\d{2}:\d{2}\)/, "");
-      const saveModelName = exportLCCore.projects[idx[0]].name+"Correlation model ("+version+").csv"; 
-      const saveEventName = exportLCCore.projects[idx[0]].name+"List of Event Layers ("+version+").csv"; 
+      const saveModelName = exportLCCore.projects[idx[0]].name+" Correlation model ("+version+").csv"; 
+      const saveEventName = exportLCCore.projects[idx[0]].name+" List of Event Layers ("+version+").csv"; 
 
       putcsvfile(mainWindow, saveModelName, outputArray.model);
       putcsvfile(mainWindow, saveEventName, outputArray.event);
