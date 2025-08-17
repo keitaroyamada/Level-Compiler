@@ -1506,7 +1506,14 @@ function createMainWIndow() {
       let outputArray = exportLCCore.constructCSVforLC(dataMap, exportProjectId);
       const idx = exportLCCore.search_idx_list[exportProjectId.toString()];
       const version = exportLCCore.projects[0].correlation_version.replace(/\(\d{2}:\d{2}:\d{2}\)/, "");
-      const saveName = "[correlation]"+exportLCCore.projects[idx[0]].name+"("+version+").csv"; 
+      let saveName = "";
+      if(exportLCCore.projects[i].id.toString() == exportLCCore.base_project_id.toString()){
+        saveName = "[correlation]";
+      }else{
+        saveName = "[duo]";
+      }
+      saveName += exportLCCore.projects[idx[0]].name+"("+version+").csv"; 
+      
       putcsvfile(mainWindow, saveName, outputArray);
       console.log("MAIN: Export ", saveName);
     }
@@ -3602,13 +3609,13 @@ function createMainWIndow() {
             visible:isEditMode,
             submenu:[
               {
-                label: "Export model as csv",
+                label: "Export csv model for Level Compiler",
                 click: () => {
-                  mainWindow.webContents.send("ExportCorrelationAsCsvMenuClicked");
+                  mainWindow.webContents.send("ExportCorrelationAsLCMenuClicked");
                 },
               },
               {
-                label: "Export model for Level Finder Format",
+                label: "Export csv model for Level Finder",
                 click: () => {
                   mainWindow.webContents.send("ExportCorrelationAsLFMenuClicked");
                 },

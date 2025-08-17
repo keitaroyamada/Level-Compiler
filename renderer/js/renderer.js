@@ -1,7 +1,7 @@
 document.addEventListener("DOMContentLoaded", () => {
  
   //============================================================================================xxxxxxxxxx
-  let developerMode = true;
+  let developerMode = false;
   //base properties
   const scroller = document.getElementById("scroller");
   let canvasBase = document.getElementById("canvasBase");
@@ -150,7 +150,7 @@ document.addEventListener("DOMContentLoaded", () => {
     objOpts.event.folded_width  = 0.1;//rate
     objOpts.event.face_height = 0.98;//rate
   
-    objOpts.connection.line_colour = "Gray";
+    objOpts.connection.line_colour = "Black";
     objOpts.connection.line_width = 1.5;
     objOpts.connection.indexWidth = objOpts.hole.distance * 0.7; //20;
     objOpts.connection.emphasize_non_horizontal = true;
@@ -3031,13 +3031,25 @@ document.addEventListener("DOMContentLoaded", () => {
   
   //============================================================================================
   //load correlation model
-  window.LCapi.receive("ExportCorrelationAsCsvMenuClicked", async () => {
+  window.LCapi.receive("ExportCorrelationAsLCMenuClicked", async () => {
     console.log(LCCore.projects.length)
     await window.LCapi.ExportCorrelationAsCsv();
   });
   window.LCapi.receive("ExportCorrelationAsLFMenuClicked", async () => {
-    console.log(LCCore.projects.length)
-    const result = await window.LCapi.ExportCorrelationAsLF();
+    const response = await window.LCapi.askdialog(
+      "Export model",
+      "Please note that the following expression cannot be used in LF format.\n"+      
+      "+ If erosion event included, it cannot be converted.\n"+
+      "+ If CD is not defined, the marker will be ignored.: \n"+
+      "+ If markup event included, it will be ignored.\n"+
+      "+ With 5 or more holes in a project, output is produced but cannot be loaded in Level Finder.\n"+
+      "Are you sure you want to export?"
+    );
+
+    if(response.response){
+      const result = await window.LCapi.ExportCorrelationAsLF();
+    }
+    
   });
   //============================================================================================
   document.getElementById("bt_chart").addEventListener("click", async () => {
@@ -3737,7 +3749,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     // Ctrl + R => Redo model
-    if (event.ctrlKey && event.key === "r") {
+    if (event.ctrlKey && event.shiftKey && (event.key === "z" || event.key === "Z")) {
       event.preventDefault();
       const result = await undo("redo");//undo
       if(result == true){
