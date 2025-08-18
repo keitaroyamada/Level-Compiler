@@ -3911,13 +3911,24 @@ document.addEventListener("DOMContentLoaded", () => {
         if(LCCore.projects[p].holes[h].sections.length == 0){
           continue
         }
-        let hole_top = LCCore.projects[p].holes[h].sections[0].markers[0][objOpts.canvas.depth_scale];
-        let hole_bottom = LCCore.projects[p].holes[h].sections.slice(-1)[0].markers.slice(-1)[0][objOpts.canvas.depth_scale];
+        let hole_top = Infinity;
+        let hole_bottom = -Infinity;
+        for (let s = 0; s < LCCore.projects[p].holes[h].sections.length; s++) {
+          const section_top_cd = LCCore.projects[p].holes[h].sections[s].markers[0][objOpts.canvas.depth_scale];
+          if(section_top_cd && hole_top > section_top_cd){
+            hole_top = section_top_cd;
+          }
+          
+          const section_bottom_cd = LCCore.projects[p].holes[h].sections[s].markers.slice(-1)[0][objOpts.canvas.depth_scale];
+          if(section_bottom_cd && hole_bottom<section_bottom_cd){
+            hole_bottom = section_bottom_cd;
+          } 
+        }
         
-        if (hole_top !== null && holes_top > hole_top) {
+        if (hole_top !== Infinity && hole_top !== null && holes_top > hole_top) {
           holes_top = hole_top;
         }
-        if (hole_bottom !== null && holes_bottom < hole_bottom) {
+        if (hole_bottom !== -Infinity && hole_bottom !== null && holes_bottom < hole_bottom) {
           holes_bottom = hole_bottom;
         }
       }
@@ -3961,7 +3972,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const bottom_padding = 100;
 
-    let canvasBaseWidth  = parseInt(objOpts.project.pad_x*3+(objOpts.hole.distance + objOpts.hole.width + shift_x) * (num_total_holes + 1) * xMag + pad_x);
+    let canvasBaseWidth  = parseInt(objOpts.project.pad_x*3+(objOpts.hole.distance + objOpts.hole.width + shift_x) * (num_total_holes + 1) * xMag + pad_x + 500);
     let canvasBaseHeight = parseInt(objOpts.project.pad_y*3+(holes_bottom + bottom_padding - holes_top + shift_y + objOpts.canvas.bottom_pad) * yMag + pad_y);
 
     //case base is too small

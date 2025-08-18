@@ -84,86 +84,102 @@ class LevelCompilerCore extends EventEmitter{
   }
 
   //methods
-  loadModelFromCsv(model_path) {
-    console.time("        Load csv");
+  loadModelFromCsv(model_path, type="forLC") {
     this.setStatus("running", "Start loadModelFromCsv");
 
     //Initialise
     const projectData = new Project();
-
-    //load model
-    projectData._model_data = lcfnc.readcsv(model_path);
-    var fileName = model_path.split(/[/\\]/).pop();
-    const patern = /\[?(.*?)\]?([^\[\]()]*)(?:\((.*?)\))?\.csv$/; // ^(.*?)\((.*?)\)\.csv$/)
-    var match = fileName.match(patern);
     let model_info = {};
-
     let isDuo = false;
-    if (match) {
-      //check model type
-      if (this.projects.length == 0) {
-        if (match[1].toLowerCase().includes("correlation")) {
-          model_info.name = match[2];
-          model_info.version = match[3];
-          projectData.model_type = "correlation";
-          isDuo = false;
 
-          this.setStatus("running", "Load correlation file.");
-          console.log("LCCore: Load correlation file.");
-        } else if (match[1].toLowerCase().includes("duo")) {
-          model_info.name = match[2];
-          model_info.version = match[3];
-          projectData.model_type = "duo";
-          isDuo = false;
-          this.setStatus("running"," Load duo file.");
-          console.log("LCCore: Load duo file.");
-        } else if (match[1] == "" || match[1] == undefined) {
-          this.setErrorAlert("","E001: There is no identifier for model in the file name.")
-          console.log("LCCore: E001: There is no identifier for model in the file name.");
-          return null;
-        } else {
-          this.setErrorAlert("","E002: The identifier is not correct. Please use 'correlation' or 'duo'.");
-          console.log("LCCore: E002: The identifier is not correct. Please use 'correlation' or 'duo'."          );
-          return null;
-        }
-      } else if (this.projects.length > 0) {
-        if (match[1].toLowerCase().includes("correlation")) {
-          if (this.projects[0].model_type == "duo"){
-            //if duo, replace
+    if(type=="forLC"){
+      //load model
+      projectData._model_data = lcfnc.readcsv(model_path);
+      var fileName = model_path.split(/[/\\]/).pop();
+      const patern = /\[?(.*?)\]?([^\[\]()]*)(?:\((.*?)\))?\.csv$/; // ^(.*?)\((.*?)\)\.csv$/)
+      var match = fileName.match(patern);      
+      
+      if (match) {
+        //check model type
+        if (this.projects.length == 0) {
+          if (match[1].toLowerCase().includes("correlation")) {
             model_info.name = match[2];
             model_info.version = match[3];
             projectData.model_type = "correlation";
             isDuo = false;
-            this.setStatus("running","Load correlation file after duo model.");
-            console.log("LCCore: Load correlation file after duo model.");
-          }else{
-            this.setErrorAlert("","E003: Skipped load the model. Multiple correlation model is not supported. Please use Duo model.");
-            console.log("LCCore: E003: Skipped load the model. Multiple correlation model is not supported. Please use Duo model.");
+
+            this.setStatus("running", "Load correlation file.");
+            console.log("LCCore: Load correlation file.");
+          } else if (match[1].toLowerCase().includes("duo")) {
+            model_info.name = match[2];
+            model_info.version = match[3];
+            projectData.model_type = "duo";
+            isDuo = false;
+            this.setStatus("running"," Load duo file.");
+            console.log("LCCore: Load duo file.");
+          } else if (match[1] == "" || match[1] == undefined) {
+            this.setErrorAlert("","E001: There is no identifier for model in the file name.")
+            console.log("LCCore: E001: There is no identifier for model in the file name.");
             return null;
-          }          
-        } else if (match[1].toLowerCase().includes("duo")) {
-          model_info.name = match[2];
-          model_info.version = match[3];
-          projectData.model_type = "duo";
-          isDuo = true;
-          this.setStatus("running","Load duo file.");
-          console.log("LCCore: Load duo file.");
-        } else if (match[1] == "" || match[1] == undefined) {
-          this.setErrorAlert("","E004: The identifier is not correct. Please use 'correlation' or 'duo'.");
-          console.log("LCCore: E004: The identifier is not correct. Please use 'correlation' or 'duo'.");
-          return null;
+          } else {
+            this.setErrorAlert("","E002: The identifier is not correct. Please use 'correlation' or 'duo'.");
+            console.log("LCCore: E002: The identifier is not correct. Please use 'correlation' or 'duo'."          );
+            return null;
+          }
+        } else if (this.projects.length > 0) {
+          if (match[1].toLowerCase().includes("correlation")) {
+            if (this.projects[0].model_type == "duo"){
+              //if duo, replace
+              model_info.name = match[2];
+              model_info.version = match[3];
+              projectData.model_type = "correlation";
+              isDuo = false;
+              this.setStatus("running","Load correlation file after duo model.");
+              console.log("LCCore: Load correlation file after duo model.");
+            }else{
+              this.setErrorAlert("","E003: Skipped load the model. Multiple correlation model is not supported. Please use Duo model.");
+              console.log("LCCore: E003: Skipped load the model. Multiple correlation model is not supported. Please use Duo model.");
+              return null;
+            }          
+          } else if (match[1].toLowerCase().includes("duo")) {
+            model_info.name = match[2];
+            model_info.version = match[3];
+            projectData.model_type = "duo";
+            isDuo = true;
+            this.setStatus("running","Load duo file.");
+            console.log("LCCore: Load duo file.");
+          } else if (match[1] == "" || match[1] == undefined) {
+            this.setErrorAlert("","E004: The identifier is not correct. Please use 'correlation' or 'duo'.");
+            console.log("LCCore: E004: The identifier is not correct. Please use 'correlation' or 'duo'.");
+            return null;
+          } else {
+            this.setErrorAlert("","E005: The identifier is not correct. Please use 'correlation' or 'duo'.");
+            console.log("LCCore: E005: The identifier is not correct. Please use 'correlation' or 'duo'.");
+            return null;
+          }
         } else {
-          this.setErrorAlert("","E005: The identifier is not correct. Please use 'correlation' or 'duo'.");
-          console.log("LCCore: E005: The identifier is not correct. Please use 'correlation' or 'duo'.");
           return null;
         }
       } else {
+        this.setError("","E051: This is no project data.");
         return null;
       }
-    } else {
-      this.setError("","E051: This is no project data.");
-      return null;
-    }
+    }else if(type=="forLF"){
+      //convert
+      const convertedData = this.convertLF2LC(model_path);
+      projectData._model_data = convertedData.model;
+
+      model_info.name = convertedData.name;
+      model_info.version = convertedData.version;
+
+      projectData.model_type = convertedData.type;
+      if(convertedData.type=="duo"){
+        isDuo = true;
+      }else{
+        isDuo = false;
+      }
+      
+    }    
 
     //add project data
     const newProjectId = lcfnc.getUniqueId();
@@ -544,15 +560,12 @@ class LevelCompilerCore extends EventEmitter{
         this.connectDuoModel();
       }
     }
-    
 
     //this.sortModelByOrder();
     this.sortModel();
 
     console.log("LCCore: Model loaded from csv.");
     this.setStatus("completed","Model loaded from csv.")
-
-    console.timeEnd("        Load csv")
 
     return true;
 
@@ -620,7 +633,132 @@ class LevelCompilerCore extends EventEmitter{
     this.replaceNewId();
           
   }
-  
+  loadEventListFromCsv(filepath){
+    if(this.projects.length==0) return false;
+    this.setStatus("running", "Start load Event List From Csv");
+
+    //for import Level Finder format
+    //load model
+    const eventList = lcfnc.readcsv(filepath);
+    var fileName = filepath.split(/[/\\]/).pop();
+    const patern = /\[?(.*?)\]?([^\[\]()]*)(?:\((.*?)\))?\.csv$/; // ^(.*?)\((.*?)\)\.csv$/)
+    var match = fileName.match(patern);  
+    const version = match[3];
+    const name = match[2]; 
+
+    //formatting
+    for(let i=1; i< eventList.length; i++){
+      const holeName      = eventList[i][0];    
+      const sectionName   = eventList[i][1];        
+      const upperDistance = parseFloat(eventList[i][2]);
+      const lowerDistance = parseFloat(eventList[i][3]);
+      const eventName     = eventList[i][4];
+
+      //search target project
+      let targetProjectId = null;
+      let targetHoleId    = null;
+      let targetSectionId = null;
+      this.projects.forEach(p => {
+        p.holes.forEach(h=>{
+          const hole = /^\d$/.test(holeName) ? holeName.padStart(2,"0") : holeName;
+          if(h.name == hole){
+            targetProjectId = p.id;
+            targetHoleId    = h.id;
+
+            h.sections.forEach(s=>{
+            const section = /^\d$/.test(sectionName) ? sectionName.padStart(2,"0") : sectionName;
+            if(s.name == section){
+              targetSectionId = s.id;
+            }
+          })
+          }         
+        })
+      })
+
+      if(!targetProjectId && !targetHoleId && !targetSectionId){
+        //there is no target hole
+        continue
+      }
+
+      //check marker exist
+      let upperIdx = this.getIdxFromTrinity(targetProjectId, [holeName, sectionName, upperDistance]);
+      let lowerIdx = this.getIdxFromTrinity(targetProjectId, [holeName, sectionName, lowerDistance]);
+      let upperId = null;
+      let lowerId = null;
+      if(upperIdx[3] == null){
+        //there is no marker
+        let trinityData = new Trinity();
+        trinityData.name = "";
+        trinityData.project_name = this.projects[upperIdx[0]].name;
+        trinityData.hole_name = holeName;
+        trinityData.section_name = sectionName;
+        trinityData.distance = upperDistance;
+
+        const depthData = this.getDepthFromTrinity(targetSectionId, [trinityData], "composite_depth");
+        
+        this.addMarker(targetSectionId, depthData[0][1], "composite_depth");
+        upperIdx = this.getIdxFromTrinity(targetProjectId, [holeName, sectionName, upperDistance]);
+      }
+
+      if(lowerIdx[3] == null){
+        //there is no marker
+        let trinityData = new Trinity();
+        trinityData.name = "";
+        trinityData.project_name = this.projects[lowerIdx[0]].name;
+        trinityData.hole_name = holeName;
+        trinityData.section_name = sectionName;
+        trinityData.distance = lowerDistance;
+
+        const depthData = this.getDepthFromTrinity(targetSectionId, [trinityData], "composite_depth");
+        
+        this.addMarker(targetSectionId, depthData[0][1], "composite_depth");
+        lowerIdx = this.getIdxFromTrinity(targetProjectId, [holeName, sectionName, lowerDistance]);
+      }
+
+      //add event
+      if(upperIdx[3] !== null && lowerIdx[3] !== null){
+        const upperMarkerData = this.projects[upperIdx[0]].holes[upperIdx[1]].sections[upperIdx[2]].markers[upperIdx[3]];       
+        const lowerMarkerData = this.projects[lowerIdx[0]].holes[lowerIdx[1]].sections[lowerIdx[2]].markers[lowerIdx[3]];
+
+        let upperEventColour = "general";
+        let lowerEventColour = "general";
+        if(eventName.toLowerCase().includes("tephra")){
+          upperEventColour = "tephra";
+          lowerEventColour = "tephra";
+        }else if(eventName.toLowerCase().includes("void")){
+          upperEventColour = "void";
+          lowerEventColour = "void";
+        }else if(eventName.toLowerCase().includes("disturbed")){
+          upperEventColour = "disturbed";
+          lowerEventColour = "disturbed";
+        }else if(eventName.toLowerCase().includes("earthquake")){
+          upperEventColour = "earthquake";
+          lowerEventColour = "earthquake";
+        }          
+        
+        const upperEventData = ["deposition", "downward",lowerMarkerData.id, upperEventColour, null];
+        const lowerEventData = ["deposition", "upward",  upperMarkerData.id, lowerEventColour, null];
+
+        upperMarkerData.event.push(upperEventData);
+        lowerMarkerData.event.push(lowerEventData);
+      }
+    }
+
+    //connect duo
+    if(this.projects.length>1){
+      const baseIdx = this.search_idx_list[this.base_project_id];
+      if(this.projects[baseIdx[0]].model_type == "correlation"){
+        this.connectDuoModel();
+      }
+    }
+
+    //this.sortModelByOrder();
+    this.sortModel();
+
+    console.log("LCCore: Event List is loaded from csv.");
+    this.setStatus("completed","Event List is loaded from csv.");
+    return true
+  }
   replaceNewId(){
     //register
     let newIds = {};
@@ -976,10 +1114,10 @@ class LevelCompilerCore extends EventEmitter{
         this.projects[p].holes.forEach(h=>{
           h.sections.forEach(s=>{
             s.markers.forEach(m=>{
-              if(m.composite_depth>CD_bottom){
+              if(m.composite_depth && m.composite_depth>CD_bottom){
                 CD_bottom = m.composite_depth;
               }
-              if(m.composite_depth<CD_top){
+              if(m.composite_depth && m.composite_depth<CD_top){
                 CD_top = m.composite_depth;
               }
             })
@@ -992,7 +1130,6 @@ class LevelCompilerCore extends EventEmitter{
         if(CD_top == Infinity){
           CD_top = 0;
         }
-
         
         this.projects[p].composite_depth_top = CD_top;
         this.projects[p].composite_depth_bottom = CD_bottom;
@@ -1236,11 +1373,12 @@ class LevelCompilerCore extends EventEmitter{
       for(let h=0;h<this.projects[p].holes.length;h++){
         for(let s=0;s<this.projects[p].holes[h].sections.length;s++){
           for(let m=0;m<this.projects[p].holes[h].sections[s].markers.length;m++){
-            if(this.projects[p].holes[h].sections[s].markers[m].composite_depth > projectCdBottom){
-              projectCdBottom = this.projects[p].holes[h].sections[s].markers[m].composite_depth;
+            const cd = this.projects[p].holes[h].sections[s].markers[m].composite_depth;
+            if(cd && cd > projectCdBottom){
+              projectCdBottom = cd;;
             }
-            if(this.projects[p].holes[h].sections[s].markers[m].composite_depth < projectCdTop){
-              projectCdTop = this.projects[p].holes[h].sections[s].markers[m].composite_depth;
+            if(cd && cd < projectCdTop){
+              projectCdTop = cd;
             }
           }
         }
@@ -1252,6 +1390,7 @@ class LevelCompilerCore extends EventEmitter{
       if(projectCdTop == Infinity){
         projectCdTop = 0;
       }
+
       this.projects[p].composite_depth_top = projectCdTop;
       this.projects[p].composite_depth_bottom = projectCdBottom;
     }
@@ -2026,12 +2165,7 @@ class LevelCompilerCore extends EventEmitter{
     //holeIdx: retrurned from "getHoleListFromCsv"
     let sectionList = [];
     const topIndices = lcfnc.findCsvIdx(model_data, "top", null, holeIdx[0]);
-    const bottomIndices = lcfnc.findCsvIdx(
-      model_data,
-      "bottom",
-      null,
-      holeIdx[0]
-    );
+    const bottomIndices = lcfnc.findCsvIdx(model_data, "bottom", null, holeIdx[0]);
 
     //check matches num of top and bottom
     if (topIndices.length === bottomIndices.length) {
@@ -5382,10 +5516,7 @@ class LevelCompilerCore extends EventEmitter{
             idx[2] = s;
             for (let m = 0; m < section.markers.length; m++) {
               const marker = section.markers[m];
-              if (
-                Math.round(marker.distance * 10) / 10 ==
-                Math.round(parseFloat(distance) * 10) / 10
-              ) {
+              if (Math.round(marker.distance * 10) / 10 == Math.round(parseFloat(distance) * 10) / 10) {
                 idx[3] = m;
               }
             }
@@ -6035,6 +6166,119 @@ class LevelCompilerCore extends EventEmitter{
     return JSON.parse(JSON.stringify(this, (key, value) => {
       return key.startsWith('_') ? undefined : value;
     }));
+  }
+
+  convertLF2LC(filepath){
+    //this function is converting correlation model csv for Level Finder to correlation model csv for Level Compiler
+    
+    let outModelData = [];
+
+    //load model
+    const modelData = lcfnc.readcsv(filepath);
+    
+    //check
+    let version = "";
+    let modelName = "";
+    var fileName = filepath.split(/[/\\]/).pop();
+    const patern = /\[?(.*?)\]?([^\[\]()]*)(?:\((.*?)\))?\.csv$/; // ^(.*?)\((.*?)\)\.csv$/)
+    var match = fileName.match(patern);
+    if(match && match[1] && match[2]){    
+      modelName = match[2]; 
+      version = match[3];
+    }
+
+    let modelType = "correlation";
+    if(modelData[0][14] !== undefined && modelData[0][15] !== undefined && modelData[0][16] !== undefined){
+      modelType = "duo";
+    }
+
+    //header
+    let header = ["Master"];
+    if(modelType=="duo"){
+      header.push("Master hole",	"Master section",	"Master distance (cm)",	"Master lamina name");
+    }
+
+    let numHoles = 0;    
+    for(let i=0; i<4; i++){
+      //count holes
+      
+      if(modelData[0][1+3*i]){
+        const match = modelData[0][1+3*i].slice(1).match(/\(([^)]*)\)/);
+
+        if(match && match[1]){     
+          numHoles++;   
+
+          //LF model has 4 holes
+          header.push(modelData[0][1+3*i].slice(1)+"[general]"); //lamina name
+          header.push("Distance from core top (cm)"); //distance
+          header.push("Drilling depth (cm)"); //drilling depth
+          header.push("Event"); // event
+        }
+      }      
+    }
+    outModelData.push(header);
+
+    //body
+    for(let r=1; r<modelData.length; r++){
+      let fromRow = modelData[r];
+      let toRow   = [];
+
+      //master hole
+      let masterHole = "";
+      if(r==1){
+        masterHole += "top/";
+      }
+
+      if(fromRow[0].includes("-")){
+        //if jump point
+        if(modelData[r-1][0].slice(1) == modelData[r+1][0].slice(1)){
+          masterHole += modelData[r-1][0].slice(1);
+        }else{
+          masterHole += modelData[r-1][0].slice(1)+"/"+modelData[r+1][0].slice(1);
+        }        
+      }else{
+        //others
+        masterHole += fromRow[0].slice(1);
+      }
+
+      if(r==modelData.length-1){
+        masterHole += "/bottom";
+      }
+
+      //add zero point
+      if(r==1){
+        masterHole += "("+modelData[1][13].slice(1)+")";
+      }
+
+      toRow.push(masterHole);
+
+      //add master connection
+      let startPos = 1;
+      if(modelType=="duo"){
+        const masterHole = (fromRow[14].slice(1) == "9999") ? "" : fromRow[14].slice(1);
+        const masterSec  = (fromRow[15].slice(1) == "9999") ? "" : fromRow[15].slice(1);
+        const masterDist = (fromRow[16].slice(1) == "9999") ? "" : fromRow[16].slice(1);
+        const masterName = (fromRow[17].slice(1) == "9999") ? "" : fromRow[17].slice(1);
+
+        toRow.push(masterHole, masterSec, masterDist, masterName);
+      }
+
+      //hole data
+      for(let h=0; h<numHoles; h++){
+        let name   = (fromRow[startPos+3*h].slice(1) == "9999") ? ""   : fromRow[startPos+3*h].slice(1);
+        const dist = (fromRow[startPos+1+3*h].slice(1) == "9999") ? "" : fromRow[startPos+1+3*h].slice(1);
+        const dd   = (fromRow[startPos+2+3*h].slice(1) == "9999") ? "" : fromRow[startPos+2+3*h].slice(1);
+        const event= "";
+
+        name = name.replace(" top","-top");
+        name = name.replace(" bottom","-bottom");
+
+        toRow.push(name, dist, dd, event);
+      }
+      outModelData.push(toRow);
+    }
+
+    return {name: modelName, type:modelType, version: version, model: outModelData};
   }
 
   updateVersionInfo(date=null){

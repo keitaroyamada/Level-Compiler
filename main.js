@@ -3250,27 +3250,15 @@ function createMainWIndow() {
   function initialiseDataPath(type){
     globalPath.dataPaths.filter(data => data.type !== type);
   }
-  function registerModelFromCsv(fullpath){
+  function registerModelFromCsv(fullpath, type="forLC"){
     try {
       //register model
-      const isLoad = LCCore.loadModelFromCsv(fullpath);
+      const isLoad = LCCore.loadModelFromCsv(fullpath, type);
       //register path
       globalPath.dataPaths.push({type:"csvmodel", path:fullpath});
 
       console.log('MAIN: Registered correlation model from "' + fullpath + '"' );
       return true
-
-      /*
-      if(isLoad == true){
-        //register path
-        globalPath.dataPaths.push({type:"csvmodel", path:fullpath});
-
-        console.log('MAIN: Registered correlation model from "' + fullpath + '"' );
-        return true
-      }else{
-        return null;
-      }
-      */
       
     } catch (error) {
       console.log(error);
@@ -3450,7 +3438,7 @@ function createMainWIndow() {
             label:"Load",
             submenu:[
               {
-                label: "Load LC model",
+                label: "Load Correlation Model from lcmodel",
                 accelerator: "CmdOrCtrl+M",
                 //accelerator: "CmdOrCtrl+S",
                 click: async () => {
@@ -3458,7 +3446,29 @@ function createMainWIndow() {
                   await registerLCModel(fullpath);
                   mainWindow.webContents.send("UpdateViewFromMain");                },
               },
+              {
+                label: "Load Correlation Model from csv",              
+                click: async() => {
+                  const fullpath = await getfile(mainWindow, "Please chose Correlation model CSV file", [{name: "CSV file", extensions: ["csv"]}]);
+                  if(fullpath){
+                    registerModelFromCsv(fullpath);
+                    mainWindow.webContents.send("UpdateViewFromMain");
+                  }
+                },
+              },
               { type: "separator" },
+              {
+                label: "Load Age model",
+                click: async() => {
+                  const fullpath = await getfile(mainWindow, "Please chose Age model CSV file", [{name: "CSV file", extensions: ["csv"]}]);
+                  if(fullpath){
+                    console.log(fullpath)
+                    //register
+                    registerAgeFromCsv(fullpath);
+                    mainWindow.webContents.send("UpdateViewFromMain");
+                  }
+                },
+              },
               {
                 label: "Load Core Images",
                 click: async() => {
@@ -3491,26 +3501,38 @@ function createMainWIndow() {
           },
           {
             label:"Import",
-            submenu:[
+            submenu:[              
               {
-                label: "Load Correlation Model",              
+                label: "Import Correlation Model for Level Finder",
                 click: async() => {
-                  const fullpath = await getfile(mainWindow, "Please chose Correlation model CSV file", [{name: "CSV file", extensions: ["csv"]}]);
+                  const fullpath = await getfile(mainWindow, "Please Chose Correlation Model (fro LF)", [{name: "CSV file", extensions: ["csv"]}]);
                   if(fullpath){
-                    registerModelFromCsv(fullpath);
+                    console.log("MAIN: Import correlation model for Level Finder from", fullpath)
+                    registerModelFromCsv(fullpath, "forLF");
                     mainWindow.webContents.send("UpdateViewFromMain");
+                    //mainWindow.webContents.send("ImportCorrelationModelForLFMenuClicked");
                   }
                 },
               },
               {
-                label: "Load Age model",
+                label: "Import Event List for Level Finder",
                 click: async() => {
-                  const fullpath = await getfile(mainWindow, "Please chose Age model CSV file", [{name: "CSV file", extensions: ["csv"]}]);
+                  const fullpath = await getfile(mainWindow, "Please Chose Event List (for LF))", [{name: "CSV file", extensions: ["csv"]}]);
                   if(fullpath){
-                    console.log(fullpath)
-                    //register
-                    registerAgeFromCsv(fullpath);
-                    mainWindow.webContents.send("UpdateViewFromMain");
+                    console.log("MAIN: Import event list for Level Finder from", fullpath)
+                    LCCore.loadEventListFromCsv(fullpath);
+                    mainWindow.webContents.send("UpdateViewFromMain");                    
+                    //mainWindow.webContents.send("ImportEventListForLFMenuClicked");
+                  }
+                },
+              },
+              {
+                label: "Import Age Model for Level Finder",
+                click: async() => {
+                  const fullpath = await getfile(mainWindow, "Please Chose Age Model (for LF)", [{name: "CSV file", extensions: ["csv"]}]);
+                  if(fullpath){
+                    console.log("MAIN: Import age model for Level Finder from", fullpath)
+                    mainWindow.webContents.send("ImportAgeModelForLFMenuClicked");
                   }
                 },
               },
