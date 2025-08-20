@@ -22,13 +22,14 @@ class LevelCompilerCore extends EventEmitter{
     this.projects = [];
     this.search_idx_list = {};
     this.base_project_id = null;
-    this.state = {
+
+    //[_] properties are not exported.
+    this._state = {
       status: 'Initialise',
       statusDetails: null,      
       hasError: false,    
       errorDetails: null,  
     };
-    //[_] properties are not exported.
     this._performance = {},
     this._pathCache = {};
     this._distanceCache = {};
@@ -44,43 +45,43 @@ class LevelCompilerCore extends EventEmitter{
   
   //status type: ["Initialise","running","completed","error","error_important"]
   setStatus(newStatus, statusDetails) {
-    this.state.status = newStatus;
-    this.state.statusDetails = statusDetails;
-    this.state.hasError = false; 
-    this.state.errorDetails = null;
-    this.emit('change', this.state);
+    this._state.status = newStatus;
+    this._state.statusDetails = statusDetails;
+    this._state.hasError = false; 
+    this._state.errorDetails = null;
+    this.emit('change', this._state);
   }
   setError(errorMessage,statusDetails) {
-    this.state.status = 'error';
-    this.state.statusDetails = statusDetails;
-    this.state.hasError = true; 
-    this.state.errorDetails = errorMessage;
-    this.emit('error_minor', this.state);
+    this._state.status = 'error';
+    this._state.statusDetails = statusDetails;
+    this._state.hasError = true; 
+    this._state.errorDetails = errorMessage;
+    this.emit('error_minor', this._state);
   }
   setErrorAlert(errorMessage,statusDetails) {
-    this.state.status = 'error_alert';
-    this.state.statusDetails = statusDetails;
-    this.state.hasError = true; 
-    this.state.errorDetails = errorMessage;
-    this.emit('error_alert', this.state);
+    this._state.status = 'error_alert';
+    this._state.statusDetails = statusDetails;
+    this._state.hasError = true; 
+    this._state.errorDetails = errorMessage;
+    this.emit('error_alert', this._state);
   }
   setErrorFatal(errorMessage,statusDetails) {
-    this.state.status = 'error_fatal';
-    this.state.statusDetails = statusDetails;
-    this.state.hasError = true; 
-    this.state.errorDetails = errorMessage;
-    this.emit('error_fatal', this.state);
+    this._state.status = 'error_fatal';
+    this._state.statusDetails = statusDetails;
+    this._state.hasError = true; 
+    this._state.errorDetails = errorMessage;
+    this.emit('error_fatal', this._state);
   }
   setUpdateDepth() {
     //set update event for LCAge, LCPlot
-    this.state.status = 'update_depth';
-    this.state.statusDetails = null;
-    this.state.hasError = false; 
-    this.state.errorDetails = null;
+    this._state.status = 'update_depth';
+    this._state.statusDetails = null;
+    this._state.hasError = false; 
+    this._state.errorDetails = null;
     this.emit('update_depth');
   }
   getState() {
-    return this.state;
+    return this._state;
   }
 
   //methods
@@ -4252,6 +4253,7 @@ class LevelCompilerCore extends EventEmitter{
           = connectedMarkerData.h_connection.filter(id=>id.toString() !== targetId.toString());
     }
     this.setStatus("completed","");
+    return true
   }
   addMarker(...args){
     this.setStatus("running","start addMarker");
@@ -4577,7 +4579,6 @@ class LevelCompilerCore extends EventEmitter{
     this.projects[markerIdx[0]].holes[markerIdx[1]].sections[markerIdx[2]].markers[markerIdx[3]].drilling_depth = parseFloat(dd);
     this.setStatus("completed","");
     return true;
-   
   }
 
   addEvent(upperId, lowerId, depositionType, value){
@@ -5377,7 +5378,7 @@ class LevelCompilerCore extends EventEmitter{
         const rate_from_upper = (dist - dist_upper) / (dist_lower - dist_upper);
         const rate_from_lower = (dist_lower - dist) / (dist_lower - dist_upper);
         this.setStatus("completed","");
-        return [ sectionData.markers[m].id, sectionData.markers[m + 1].id, rate_from_upper, rate_from_lower];
+        return [sectionData.markers[m].id, sectionData.markers[m + 1].id, rate_from_upper, rate_from_lower];
       }
     }
 
@@ -6162,11 +6163,12 @@ class LevelCompilerCore extends EventEmitter{
   }
 
   exportSerialisedModel() {
-    //export
-    return JSON.parse(JSON.stringify(this, (key, value) => {
-      return key.startsWith('_') ? undefined : value;
-    }));
-  }
+  return JSON.parse(JSON.stringify(this, (key, value) => {
+    if (typeof value === "function") return undefined;
+    if (key && key[0] === "_") return undefined;
+    return value;
+  }));
+}
 
   convertLF2LC(filepath){
     //this function is converting correlation model csv for Level Finder to correlation model csv for Level Compiler

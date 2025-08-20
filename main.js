@@ -57,7 +57,8 @@ let LCCore = new LevelCompilerCore();
 let LCAge  = new LevelCompilerAge();;
 let LCPlot = new LevelCompilerPlot();
 const history = new UndoManager();
-let labelerHistory = new UndoManager();
+history.setInitialState(LCCore.exportSerialisedModel());
+let labelerHistory = null;
 let tempCore = null; //for labeler
 let viewerCore = null; //for floating viewer
 let globalPath = {
@@ -229,7 +230,7 @@ function createMainWIndow() {
   ipcMain.handle("LoadModelFromLCCore", async (_e) => {
     //import model
     try{
-      const zipped = await zipData(LCCore);
+      const zipped = await zipData(LCCore.exportSerialisedModel());
 
       console.log("MAIN: Load correlation model.");
       return zipped;
@@ -277,7 +278,7 @@ function createMainWIndow() {
     }
 
     try{
-      const zipped = await zipData(LCCore);
+      const zipped = await zipData(LCCore.exportSerialisedModel());
 
       console.log("MAIN: Load age model into LCCore. id: " +  LCAge.selected_id + " name:" +  model_name);
       return zipped;
@@ -340,7 +341,6 @@ function createMainWIndow() {
     targetList = tempPath.dataPaths.filter(item=>item.type=="core_images");
     for(const data of targetList){
       const fullpath = data.path;
-      console.log(fullpath)
       if(fullpath !== undefined){
         registerCoreImage(fullpath,"core_images",null);
       }
@@ -429,6 +429,7 @@ function createMainWIndow() {
     return coreImages;
   });
   async function loadCoreImages(loadOptions, type){
+    const isShowMemory = false;
     //console.log("   Load core image called")
     let releasedWorkers = 0;
     let numTotalTasks = 0;
@@ -464,14 +465,14 @@ function createMainWIndow() {
       const idleWorkers = []; // Idle worker list
 
       for(const target of targetList){
-        for(const id of loadOptions.targetIds){
+        for(const id of loadOptions.targetIds){          
           let idx = null;
           let targetHoleData = null;
           let targetSectionData = null;
           if(type=="core_images"){
             idx = LCCore.search_idx_list[id.toString()];
             targetHoleData = LCCore.projects[idx[0]].holes[idx[1]];
-            targetSectionData = targetHoleData.sections[idx[2]];
+            targetSectionData = JSON.parse(JSON.stringify(targetHoleData.sections[idx[2]]));
           }else if(type=="labeler"){
             targetHoleData = tempCore.projects[0].holes[0];
             targetSectionData = targetHoleData.sections[0];
@@ -499,8 +500,9 @@ function createMainWIndow() {
           //calc new image size
           const coreLength = targetSectionData.markers[targetSectionData.markers.length-1].distance - targetSectionData.markers[0].distance;
           let new_height = Math.round(200 * 100, 0); //max
-          if(new_height > loadOptions.dpcm[imBaseName] * coreLength){
-            new_height = Math.round(loadOptions.dpcm[imBaseName] * coreLength);
+          const dpcm = loadOptions.dpcm[imBaseName] ? loadOptions.dpcm[imBaseName] : loadOptions.dpcm;
+          if(new_height > dpcm * coreLength){
+            new_height = Math.round(dpcm * coreLength);
           }
           //calc resize        
           const new_size = { height: new_height, width: 1 };
@@ -537,6 +539,8 @@ function createMainWIndow() {
       await new Promise((resolve, reject) => {
         workers.forEach((worker) => {
           worker.on("exit", (code) => {
+            if (isShowMemory) setImmediate(() => console.log('after exit (code=' + code + ')', process.memoryUsage()));
+
             //count num releases
             releasedWorkers +=1;
 
@@ -565,18 +569,26 @@ function createMainWIndow() {
       async function initialiseWorkerPool(numWorkers, tasks, idleWorkers, taskResults) {
         const workers = [];  
         let n = 0;
+
+        if (isShowMemory) console.log('baseline(before spawn)', process.memoryUsage());
         for (let i = 0; i < numWorkers; i++) {
           const worker = new Worker(path.join(__dirname, './LC_modules/makeModelImageWorker.js'));
           workers.push(worker);
           idleWorkers.push(worker);
-      
+          
+          if (isShowMemory) console.log('baseline(after spawn #' + i + ')', process.memoryUsage());
+
           // when completed//errored
           worker.on("message", async(result) => {
+            if(isShowMemory) console.log('recv', process.memoryUsage());
             //console.log("MAIN: Worker finished task.");
             n +=1;
             progressBar = await updateProgress(progressBar, n, numTotalTasks);
             // if get result
             mergeMissingKeys(taskResults, result);
+
+            if (isShowMemory) console.log('after release', process.memoryUsage());
+             if (isShowMemory) setImmediate(() => console.log('next tick after recv', process.memoryUsage()));
       
             if (tasks.length > 0) {
               idleWorkers.push(worker); // reuse worker
@@ -596,6 +608,8 @@ function createMainWIndow() {
       
           //if error
           worker.on("error", async(err) => {
+            if (isShowMemory) console.log('error recv', process.memoryUsage());
+
             n+=1;
             progressBar = await updateProgress(progressBar, n, numTotalTasks);
             console.error("Worker error:", err);
@@ -865,11 +879,6 @@ function createMainWIndow() {
       return "fail_to_add"
     }
   });
-  
-
-
-
-
   ipcMain.handle("progressbar", async (_e, tit, txt, indeterminate) => {
     progressBar = null;
     progressBar = progressDialog(mainWindow, tit, txt, indeterminate);
@@ -886,8 +895,6 @@ function createMainWIndow() {
       progressBar = null; 
     }         
   });
-  
-
   ipcMain.handle("askdialog", (_e, tit, txt) => {
     const options = {
       type: "question",
@@ -1488,8 +1495,6 @@ function createMainWIndow() {
       });
     });
   });
-  
-
   ipcMain.handle("ExportCorrelationAsCsvFromRenderer", async (_e) => {
     console.log("MAIN: Start contructing CSV data.");
     LCCore.updateVersionInfo();
@@ -1519,7 +1524,6 @@ function createMainWIndow() {
     }
         
   });
-
   ipcMain.handle("ExportCorrelationAsLFFromRenderer", async (_e) => {
     console.log("MAIN: Start contructing Legacy LF data.");
     LCCore.updateVersionInfo();
@@ -1547,18 +1551,21 @@ function createMainWIndow() {
       console.log("MAIN: Export ", saveModelName, saveEventName);
     }
   });
-
   ipcMain.handle("InitialiseTempCore", async (_e) => {
-    //import modeln
-    labelerHistory = new UndoManager();
+    //import modeln 
     tempCore = initialiseLCCore();
     tempCore.addProject("correlation","temp");
     tempCore.addHole(tempCore.projects[0].id, "temp");
 
+    labelerHistory = new UndoManager();
+    labelerHistory.start = 1;
+    labelerHistory.setInitialState(tempCore.exportSerialisedModel());
+
     globalPath.dataPaths = globalPath.dataPaths.filter(data => data.type !== "labeler");
 
     console.log("MAIN: Labeler Project data is initialised.");
-    return JSON.parse(JSON.stringify(tempCore));
+
+    return tempCore.exportSerialisedModel();
   });
   ipcMain.handle("getDisplayInfo", async (_e) => {
     //get data
@@ -1566,9 +1573,11 @@ function createMainWIndow() {
 
     return results;
   });
-
   ipcMain.handle("LabelerAddSectionData", async (_e, holeName, sectionName) => {
+    //create new section
     //change temp hole name
+    //const result = LCCore.addSectionModel(targetHoleIds[0], sectionData);
+
     tempCore.changeName(tempCore.projects[0].holes[0].id, holeName);
 
     //add section
@@ -1586,21 +1595,33 @@ function createMainWIndow() {
     inData.dd_bottom = 100;
     tempCore.addSection(tempCore.projects[0].holes[0].id, inData);
 
-    return JSON.parse(JSON.stringify(tempCore));
+    return tempCore.exportSerialisedModel();
   });
   ipcMain.handle("LabelerAddMarkerData", async (_e, name, depth, relative_x) => {
     //add marker
-    tempCore.addMarker(tempCore.projects[0].holes[0].sections[0].id, depth, "distance",relative_x);
-    const nearMarkers = tempCore.getMarkerIdsByDistance(tempCore.projects[0].holes[0].sections[0].id,depth);
+    const result = tempCore.addMarker(tempCore.projects[0].holes[0].sections[0].id, depth, "distance", relative_x);
+    
+    if(result==true){
+      const nearMarkers = tempCore.getMarkerIdsByDistance(tempCore.projects[0].holes[0].sections[0].id, depth);
 
-    if(nearMarkers[2]==0){
-      tempCore.changeName(nearMarkers[0], name);
-    }else if(nearMarkers[3]==0){
-      tempCore.changeName(nearMarkers[1], name);
-    }
-    tempCore.sortModel();
+      let result2;
+      if(nearMarkers[2]==0){
+        //if lower marker is as same as target marker
+        result2 = tempCore.changeName(nearMarkers[0], name);
+      }else if(nearMarkers[3]==0){
+        //if upper marker is as same as target marker
+        result2 = tempCore.changeName(nearMarkers[1], name);
+      }
 
-    return JSON.parse(JSON.stringify(tempCore));
+      if(result2==true){
+        tempCore.sortModel();
+        return tempCore.exportSerialisedModel();
+      }else{
+        return false;
+      }
+    }else{
+      return false;
+    }    
   });
   ipcMain.handle("LabelerChangeMarker", (_e, markerId, type, value) => {
     //
@@ -1610,27 +1631,27 @@ function createMainWIndow() {
       //value:distance
       const result = tempCore.changeDistance(markerId, parseFloat(value));
       if(result == true){
-        return JSON.parse(JSON.stringify(tempCore));
+        return tempCore.exportSerialisedModel();
       }else{
         console.log("LABELER: "+result)
-        return JSON.parse(JSON.stringify(tempCore));
+        return false;
       }
     }else if(type=="name"){
       const result = tempCore.changeName(markerId, value)
       if(result == true){
-        return JSON.parse(JSON.stringify(tempCore));
+        return tempCore.exportSerialisedModel();
       }else{
         console.log("LABELER: "+result)
-        return JSON.parse(JSON.stringify(tempCore));
+        return false;
       }
     }else if(type == "drilling_depth"){
       //value:distance
       const result = tempCore.changeDrillingDepth(markerId, parseFloat(value));
       if(result == true){
-        return JSON.parse(JSON.stringify(tempCore));
+        return tempCore.exportSerialisedModel();
       }else{
         console.log("LABELER: "+result)
-        return JSON.parse(JSON.stringify(tempCore));
+        return false;
       }
     }
   });
@@ -1638,12 +1659,11 @@ function createMainWIndow() {
     //console.log(markerId)
     const result = tempCore.deleteMarker(markerId);
     if(result == true){
-      return JSON.parse(JSON.stringify(tempCore));
+      return tempCore.exportSerialisedModel();
     }else{
       console.log("LABELER: "+result)
-      return JSON.parse(JSON.stringify(tempCore));
+      return false;
     }
-
   });
   ipcMain.handle("LabelerSaveData", (_e, data) => {
     /*
@@ -1662,7 +1682,6 @@ function createMainWIndow() {
     const annotationData = JSON.stringify(data.section_data,null,2);
 
     const dataName  = data.hole_name +"-"+ data.section_name;
-
 
       dialog
       .showOpenDialog({
@@ -1691,6 +1710,7 @@ function createMainWIndow() {
 
   });
   ipcMain.handle("LabelerLoadSectionModel", (_e, dirHandle, fileName) => {
+    //register lcsection model
     try{
       //get file path
       const pathData = path.parse(dirHandle);
@@ -1713,7 +1733,6 @@ function createMainWIndow() {
       //check
       if(fs.existsSync(fullpath)){
         //load section data
-        console.log(fullpath)
         const fileContent = fs.readFileSync(fullpath, 'utf8');
         const sectionData = JSON.parse(fileContent);
 
@@ -1721,9 +1740,16 @@ function createMainWIndow() {
         const name = fileName;
         const holeName = name.split(/[-.]+/)[0];
         const sectionName = name.split(/[-.]+/)[1];
-        Object.assign(tempCore.projects[0].holes[0].sections[0], sectionData);
+        console.log("MAIN: Load "+holeName+"-"+sectionName+" data from: ",fullpath)
 
-        return JSON.parse(JSON.stringify(tempCore));
+        tempCore.changeName(tempCore.projects[0].holes[0].id, holeName);
+        const result = tempCore.addSectionModel(tempCore.projects[0].holes[0].id, sectionData);
+        if(result){
+          return tempCore.exportSerialisedModel();
+        }else{
+          return false
+        }
+        
       }else{
         
         return false
@@ -1771,14 +1797,13 @@ function createMainWIndow() {
       converterWindow.webContents.send("ConverterMenuClicked", data);
     });   
   });
-
   ipcMain.handle("PlotterClose", (_e, data) => {
     isPlotterClose = true;
     plotWindow.removeAllListeners("close");
     plotWindow.close();
     plotWindow = null;
     mainWindow.webContents.send("PlotterClosed", "");
-  })
+  });
   ipcMain.on("windowCloseButton", (_e) => {
     isPlotterClose = false;
     plotWindow.removeAllListeners("close");
@@ -1786,7 +1811,7 @@ function createMainWIndow() {
     plotWindow = null;
     mainWindow.webContents.send("PlotterClosed", "");
     isPlotterClose = true;
-  })
+  });
   ipcMain.handle("OpenImporter", async (_e) => {
     if (importerWindow) {
       importerWindow.focus();
@@ -1826,7 +1851,6 @@ function createMainWIndow() {
       return;
     }
   });
-
   ipcMain.handle("LoadPlotFromLCPlot", async (_e) => {
     //calc latest age and depth
     //LCPlot.calcAgeCollectionPosition(LCCore, LCAge);
@@ -1848,7 +1872,6 @@ function createMainWIndow() {
     }
     return null;
   });
-
   ipcMain.handle("CalcCompositeDepth", async (_e) => {
     //import model
     console.log("MAIN: Calc composite depth.");
@@ -1857,7 +1880,6 @@ function createMainWIndow() {
 
     return LCCore.exportSerialisedModel();
   });
-
   ipcMain.handle("CalcEventFreeDepth", async (_e) => {
     //import model
     console.log("MAIN: Calc event free depth");
@@ -1865,9 +1887,6 @@ function createMainWIndow() {
     //LCCore.getModelSummary();
     return LCCore.exportSerialisedModel();
   });
-
-
-
   ipcMain.handle("GetAgeFromEFD", async (_e, efd, method) => {
     //calc age
     const age = LCAge.getAgeFromEFD(efd, method);
@@ -1877,7 +1896,6 @@ function createMainWIndow() {
       return age.mid;
     }
   });
-
   ipcMain.handle("GetAgeFromCD", async (_e, cd, method) => {
     //calc efd
     if (LCCore.base_project_id == null) {
@@ -2214,7 +2232,7 @@ function createMainWIndow() {
       return true;
     }
     return false
-  })
+  });
   ipcMain.on("dividerExport", async (_e, data) => {
     putcsvfile(mainWindow, null, data);    
     console.log("MAIN: Exported Divided data.");
@@ -2279,12 +2297,10 @@ function createMainWIndow() {
   ipcMain.handle("SendDepthToFinder", async (_e, data) => {
     finderWindow.webContents.send("SendDepthFromMain", data);
   });
-
   ipcMain.on("request-mainprocess-info", (event) => {
     const info = "";
     event.sender.send("mainprocess-info", info);
   });
-
   ipcMain.on("toggle-devtools", async(_e, data) => {
     if(data == "divider"){
       if (dividerWindow.webContents.isDevToolsOpened()) {
@@ -2345,34 +2361,42 @@ function createMainWIndow() {
   });
   ipcMain.handle("sendUndo", async (_e, type) => { 
     if(type=="main"){
-      const result = await history.undo({LCCore:LCCore, LCAge:LCAge, LCPlot:LCPlot});   
+      const result = history.undo();   
       if(result !== null){
-        //Undo deep copy
-        //assignObject(LCCore, result.LCCore);
+        //mainWindow.webContents.send("rendererLog", result);
+
+        //Undo
         LCCore = initialiseLCCore();
-        LCCore.loadModelFromLcmodel(result.LCCore)
+        Object.assign(LCCore, result.state);
         LCCore.updateSearchIdx();
-        assignObject(LCAge, result.LCAge);
-        assignObject(LCPlot, result.LCPlot);
 
-        //for Undo image
-        const changedSections = checkChanges(LCCore, result.LCCore);
+        //get changed sections
+        const changedSections = getChangedSections(result.delta);
+        let changedIds = [];
+        changedSections.forEach(i=>{          
+          changedIds.push(LCCore.projects[i.project].holes[i.hole].sections[i.section].id);
+          
+          LCCore.projects[i.project].holes[i.hole].sections[i.section].markers.forEach(m=>{
+          })
+        })       
 
-        let dcpms = {};
-        for (let i=0;i<changedSections.length;i++){
-          const idx = LCCore.search_idx_list[changedSections[i]];
+        //Undo image
+        //set image resolution
+        let dpcms = {};
+        for (let i=0;i<changedIds.length;i++){
+          const idx = LCCore.search_idx_list[changedIds[i]];
           const holeData = LCCore.projects[idx[0]].holes[idx[1]];
           const sectionData = LCCore.projects[idx[0]].holes[idx[1]].sections[idx[2]];
-          dcpms[holeData.name+"-"+sectionData.name] = 30;
+          dpcms[holeData.name+"-"+sectionData.name] = 30;
         }
 
         //Undo images
         let imagePaths = globalPath.dataPaths.filter(item=>item.type=="core_images");
-        if(imagePaths.length>0 && changedSections.length>0){
+        if(imagePaths.length>0 && changedIds.length>0){
           const coreImages = await loadCoreImages({
-            targetIds:changedSections,
+            targetIds:changedIds,
             operations:["drilling_depth","composite_depth","event_free_depth","age"],
-            dpcm:dcpms,
+            dpcm:30, //e.g. 30 or [DPCM<im name> = 30]
           },"core_images");
 
           if(coreImages!==null){
@@ -2386,10 +2410,14 @@ function createMainWIndow() {
         return false;
       }
     }else if(type=="labeler"){
-      const result = await labelerHistory.undo({tempCore:tempCore});   
+      const result = labelerHistory.undo();   
       if(result !== null){
         //Undo deep copy
-        assignObject(tempCore, result.tempCore);
+        tempCore = initialiseLCCore();
+        Object.assign(tempCore, result.state);
+        tempCore.updateSearchIdx();
+
+        //assignObject(tempCore, result.state);
         console.log("MAIN: Undo loaded.");
         return true;
       }else{
@@ -2400,44 +2428,121 @@ function createMainWIndow() {
   });
   ipcMain.handle("sendRedo", async (_e, type) => {
     if(type=="main"){
-      const result = await history.redo({LCCore:LCCore, LCAge:LCAge, LCPlot:LCPlot});
-      
+      const result = history.redo();      
       if(result !== null){
-        assignObject(LCCore, result.LCCore);
-        assignObject(LCAge,  result.LCAge);
-        assignObject(LCPlot, result.LCPlot);
-        console.log("MAIN: Redo loaded.");
-        return true;
-      }else{
-        return false;
-      }
-    }else if(type=="labeler"){
-      const result = await labelerHistory.redo({tempCore:tempCore});   
-      if(result !== null){
-        //Undo deep copy
-        assignObject(tempCore, result.tempCore);
+        //redo
+        LCCore = initialiseLCCore();
+        Object.assign(LCCore, result.state);
+        LCCore.calcCompositeDepth();
+        LCCore.updateSearchIdx();
+
+        //get changed sections
+        const changedSections = getChangedSections(result.delta);
+
+        let changedIds = [];
+        changedSections.forEach(i=>{          
+          changedIds.push(LCCore.projects[i.project].holes[i.hole].sections[i.section].id);
+        })
+
+        //Undo image
+        //set image resolution
+        let dpcms = {};
+        for (let i=0;i<changedIds.length;i++){
+          const idx = LCCore.search_idx_list[changedIds[i]];
+          const holeData = LCCore.projects[idx[0]].holes[idx[1]];
+          const sectionData = LCCore.projects[idx[0]].holes[idx[1]].sections[idx[2]];
+          dpcms[holeData.name+"-"+sectionData.name] = 30;
+        }
+
+        //Undo images
+        let imagePaths = globalPath.dataPaths.filter(item=>item.type=="core_images");
+        if(imagePaths.length>0 && changedIds.length>0){
+          const coreImages = await loadCoreImages({
+            targetIds:changedIds,
+            operations:["drilling_depth","composite_depth","event_free_depth","age"],
+            dpcm:30,
+          },"core_images");
+
+          if(coreImages!==null){
+            mainWindow.webContents.send("LoadCoreImagesMenuClicked", coreImages);
+          }
+        }
 
         console.log("MAIN: Redo loaded.");
         return true;
       }else{
         return false;
       }
+    }else if(type=="labeler"){
+      const result = labelerHistory.redo();   
+      if(result !== null){
+        tempCore = initialiseLCCore();
+        Object.assign(tempCore, result.state);
+
+        console.log("MAIN: Labeler redo loaded.");
+        return true;
+      }else{
+        return false;
+      }
     }
   });
-  ipcMain.handle("sendSaveState", async (_e, type) => {
+  ipcMain.handle("sendSaveState", async (_e, type, name="unnamed") => {
     if(type=="main"){
-      history.saveState({LCCore:LCCore, LCAge:LCAge, LCPlot:LCPlot});
+      history.saveState(LCCore.exportSerialisedModel(), name);
       console.log("MAIN: State saved. Num of history is " + history.undoStack.length);    
       return true;
     }else if(type=="labeler"){
-      labelerHistory.saveState({tempCore:tempCore});
+      labelerHistory.saveState(tempCore.exportSerialisedModel(), name);
       console.log("MAIN: State saved. Num of history is " + labelerHistory.undoStack.length);    
       return true;
     }
   });
+  function getChangedSections(delta) {
+    if (!delta?.projects) {
+        return [];
+    }
+
+    const changed = new Set();
+    const projectsDelta = delta.projects;
+
+    for (const pk in projectsDelta) {
+        if (pk === '_t') continue;
+        const pDelta = projectsDelta[pk];
+        const pi = +pk.replace(/^_/, '');
+
+        const holesDelta = pDelta.holes;
+        if (!holesDelta) continue;
+
+        for (const hk in holesDelta) {
+            if (hk === '_t') continue;
+            const hDelta = holesDelta[hk];
+            const hi = +hk.replace(/^_/, '');
+
+            const sectionsDelta = hDelta.sections;
+            if (!sectionsDelta) continue;
+
+            for (const sk in sectionsDelta) {
+                if (sk === '_t') continue;
+                const sDelta = sectionsDelta[sk];
+                const si = +sk.replace(/^_/, '');
+
+                // セクションの削除
+                if (sk.startsWith('_')) {
+                    changed.add(JSON.stringify({ project: pi, hole: hi, section: si, change: 'deleted' }));
+                } 
+                // セクションの追加または変更
+                else {
+                    if (Object.keys(sDelta).length > 0) {
+                        changed.add(JSON.stringify({ project: pi, hole: hi, section: si, change: 'updated' }));
+                    }
+                }
+            }
+        }
+    }
+    return Array.from(changed).map(item => JSON.parse(item));
+  }
   //------------------------------------------------------------------------------------------------
   //for converter
-
   ipcMain.handle("cvtGetAgeModelList", async (_e) => {
     //get data
     let data = [];
@@ -2447,7 +2552,6 @@ function createMainWIndow() {
     });
     return data;
   });
-
   ipcMain.handle("cvtGetCorrelationModelList", async (_e) => {
     //get data
     let data = [];
@@ -2462,7 +2566,6 @@ function createMainWIndow() {
     data.push([LCCore.projects[idx].id, LCCore.projects[idx].name]);
     return data;
   });
-
   ipcMain.handle("cvtLoadCsv", async (_e, title, ext, path) => {
     let result = null;
     if(path==null){
@@ -2493,7 +2596,6 @@ function createMainWIndow() {
     //console.log(data);
     putcsvfile(mainWindow, null, data);
   });
-
   //--------------------------------------------------------------------------------------------------
  
   //--------------------------------------------------------------------------------------------------
@@ -2538,14 +2640,13 @@ function createMainWIndow() {
     }
   });
   ipcMain.handle("getSectionLimit", async (_e, projectId, holeName, sectionName) => {
-      const idx = LCCore.getIdxFromTrinity(projectId, [holeName, sectionName, ""]);
+    const idx = LCCore.getIdxFromTrinity(projectId, [holeName, sectionName, ""]);
 
-      const sectionData = LCCore.projects[idx[0]].holes[idx[1]].sections[idx[2]];
-      const dist_upper = sectionData.markers[0].distance;
-      const dist_lower = sectionData.markers[sectionData.markers.length - 1].distance;
-      return [dist_upper, dist_lower];
-    }
-  );
+    const sectionData = LCCore.projects[idx[0]].holes[idx[1]].sections[idx[2]];
+    const dist_upper = sectionData.markers[0].distance;
+    const dist_lower = sectionData.markers[sectionData.markers.length - 1].distance;
+    return [dist_upper, dist_lower];
+  });
   ipcMain.handle("MoveToHorizon", async (_e, data) => {
     mainWindow.webContents.send("MoveToHorizonFromFinder", data);
   });
@@ -2855,278 +2956,6 @@ function createMainWIndow() {
 
     return results;
   });
-  ipcMain.handle("connectMarkers", (_e, fromId, toId, direction) => {
-    const res = LCCore.connectMarkers(fromId, toId, direction);
-    console.log(res)
-    if(res == true){
-      return true
-    }else{
-      return false
-    }    
-  });
-  ipcMain.handle("disconnectMarkers", (_e, fromId, toId, direction) => {
-    const res = LCCore.disconnectMarkers(fromId, toId, direction);
-    if(res==true){
-      return true
-    }else{
-      return false
-    }
-    
-  });
-  ipcMain.handle("disconnectAllConnections", (_e, fromId, direction) => {
-    const fromIdx = LCCore.search_idx_list[fromId.toString()];
-    
-    let connections = [];
-    if (direction == "horizontal"){
-      connections = LCCore.projects[fromIdx[0]].holes[fromIdx[1]].sections[fromIdx[2]].markers[fromIdx[3]].h_connection;
-    }else{
-      connections = LCCore.projects[fromIdx[0]].holes[fromIdx[1]].sections[fromIdx[2]].markers[fromIdx[3]].v_connection;
-    }
-
-    let results = true;
-    if (connections.length==0){
-      console.log("MAIN: There is no connections at "+LCCore.projects[fromIdx[0]].holes[fromIdx[1]].sections[fromIdx[2]].name+"-"+LCCore.projects[fromIdx[0]].holes[fromIdx[1]].sections[fromIdx[2]].markers[fromIdx[3]].name)
-      return false;
-    }else{
-      while (connections.length > 0) {
-        const toId = connections[0];
-
-        const res = LCCore.disconnectMarkers(fromId, toId, direction);
-        if(!res){
-          results = false;
-        }
-      }
-    }
-
-    if(results==true){
-      return true
-    }else{
-      return false
-    }
-    
-  });
-  ipcMain.handle("deleteMarker", (_e, targetId) => {
-    LCCore.deleteMarker(targetId);
-    console.log("MAIN: Delete target marker.");
-  });
-  ipcMain.handle("addMarker", (_e, sectionId, depth, depthScale,relativeX) => {
-    //add
-    LCCore.addMarker(sectionId, depth, depthScale, relativeX);
-
-    console.log("MAIN: Add a new marker on the section: " + sectionId +" of " + depth +" cm "+depthScale);
-  });
-  ipcMain.handle("SetZeroPoint", async(_e, markerId, value) => {
-    
-    const result = LCCore.setZeroPoint(markerId, value);
-
-    if (result == true) {
-      console.log("MAIN: Add hole completed.");
-      return result;
-    } else {
-      console.log("MAIN: Failed to add a new hole.");
-      return result
-    }
-  });
-  ipcMain.handle("SetMaster", async(_e, markerId, type) => {
-    
-    const result = LCCore.setMaster(markerId, type);
-
-    if (result == true) {
-      console.log("MAIN: Change master flag.");
-      return result;
-    } else {
-      console.log("MAIN: Failed to chnage master flag.");
-      return result
-    }
-  });
-  ipcMain.handle("AddEvent", async(_e, upperId, lowerId, depositionType, value) => {
-    let result = LCCore.addEvent(upperId, lowerId, depositionType, value);
-
-    if (result == true) {
-      console.log("MAIN: Add event layer.");
-      return result;
-    } else {
-      console.log("MAIN: Failed to add event layer.");
-      return result
-    }
-  });
-  ipcMain.handle("DeleteEvent", async(_e, upperId, lowerId, type) => {
-    
-    const result = LCCore.deleteEvent(upperId, lowerId, []);
-
-    if (result == true) {
-      console.log("MAIN: Delete event layer.");
-      return result;
-    } else {
-      console.log("MAIN: Failed to delete event layer.");
-      return result
-    }
-  });
-  ipcMain.handle("changeMarker", (_e, markerId, type, value) => {
-    //
-    const idx = LCCore.search_idx_list[markerId.toString()];
-    
-    if(type == "distance"){
-      //value:distance
-      const result = LCCore.changeDistance(markerId, value);
-      if(result == true){
-        console.log("MAIN: Change marker distance.");
-      }else{
-        console.log("MAIN: Failed to change marker distance.")
-      }
-      return result;
-    }else if(type=="name"){
-      const result = LCCore.changeName(markerId, value)
-      return result;
-    }else if(type=="descriptions"){
-      const result = LCCore.changeDescriptions(markerId, value)
-      return result;
-    }
-  });
-  ipcMain.handle("changeSection", (_e, sectionId, type, value) => {
-    //
-    const idx = LCCore.search_idx_list[sectionId.toString()];
-    
-    if(type=="name"){
-      const result = LCCore.changeName(sectionId, value);
-      return result;
-    }else if(type=="descriptions"){
-      const result = LCCore.changeDescriptions(sectionId, value)
-      return result;
-    }
-  });
-  ipcMain.handle("deleteSection", (_e, sectionId) => {
-    //    
-    const result = LCCore.deleteSection(sectionId);//LCCore.deleteSection(sectionId);
-    if(result == true){
-      console.log("MAIN: Delete section.")
-      return result;  
-    }else{
-      console.log("MAIN: Failed to delete section.")
-      return result;  
-    }
-    
-  });
-  ipcMain.handle("addSection", (_e, sectionId, data) => {
-    //    
-    const result = LCCore.addSection(sectionId,data);//LCCore.deleteSection(sectionId);
-    if(result == true){
-      console.log("MAIN: Add section.")
-      return result;  
-    }else{
-      console.log("MAIN: Failed to add section.")
-      return result;  
-    }
-    
-  });
-  ipcMain.handle("addHole", async(_e, projectId, name) => {
-    
-    const result = LCCore.addHole(projectId, name);
-
-    if (result == true) {
-      console.log("MAIN: Add hole completed.");
-      return result;
-    } else {
-      console.log("MAIN: Failed to add a new hole.");
-      return result
-    }
-  });
-  ipcMain.handle("moveHoleToProject", async(_e, holeId, projectId) => {
-    
-    const result = LCCore.moveHoleToProject(holeId, projectId);
-
-    if (result == true) {
-      console.log("MAIN: Move hole completed.");
-      return result;
-    } else {
-      console.log("MAIN: Failed to move this hole.");
-      return result
-    }
-  });
-  ipcMain.handle("deleteHole", async(_e, holeId) => {
-    
-    const result = LCCore.deleteHole(holeId);
-
-    if (result == true) {
-      console.log("MAIN: Delete hole completed.");
-      return result;
-    } else {
-      console.log("MAIN: Failed to delete hole.");
-      return result
-    }
-
-    
-  });
-  ipcMain.handle("changeHole", (_e, holeId, type, value) => {
-    //
-    const idx = LCCore.search_idx_list[holeId.toString()];
-    
-    if(type=="name"){
-      const result = LCCore.changeName(holeId, value);
-      return result;
-    }else if(type=="descriptions"){
-      const result = LCCore.changeDescriptions(holeId, value);
-      return result;
-    }else if(type=="order"){
-      const result = LCCore.changeHoleOrder(holeId, value);
-      return result;
-    }
-  });
-  ipcMain.handle("addProject", async(_e, type, name) => {
-    
-    const result = LCCore.addProject(type, name);
-
-    if (result == true) {
-      console.log("MAIN: Add project completed.");
-      return result;
-    } else {
-      console.log("MAIN: Failed to add a new project.");
-      return result
-    }
-  });
-  ipcMain.handle("deleteProject", async(_e, projectId) => {
-    
-    const result = LCCore.deleteProject(projectId);
-
-    if (result == true) {
-      console.log("MAIN: Delete project completed.");
-      return result;
-    } else {
-      console.log("MAIN: Failed to delete project.");
-      return result
-    }
-
-    
-  });
-  ipcMain.handle("changeProject", (_e, projectId, type, value) => {
-    if(type=="name"){
-      const result = LCCore.changeName(projectId, value);
-      return result;
-    }else if(type=="descriptions"){
-      const result = LCCore.changeDescriptions(projectId, value);
-      return result;
-    }
-  });
-  ipcMain.handle("changeWorkspace", (_e, type, value) => {
-    if(type=="name"){
-      LCCore.name = value;
-      return true;
-    }else if(type=="descriptions"){
-      LCCore.descriptions = value;
-      return true;
-    }
-  });
-  ipcMain.handle("mergeProjects", (_e) => {
-    const result = LCCore.mergeProjects();
-
-    if (result == true) {
-      console.log("MAIN: Merge projects completed.");
-      return result;
-    } else {
-      console.log("MAIN: Failed to merge projects.");
-      return result
-    }
-  });
   ipcMain.handle("changeEditMode", (_e,mode) => {
     
     isEditMode = mode;
@@ -3188,7 +3017,282 @@ function createMainWIndow() {
       shell.openExternal(url);
     }
   });
+  //--------------------------------------------------------------------------------------------------
+  ipcMain.handle("addMarker", (_e, sectionId, depth, depthScale,relativeX) => {
+    //add
+    const result = LCCore.addMarker(sectionId, depth, depthScale, relativeX);
+    if(result==true){
+      console.log("MAIN: Add a new marker on the section: " + sectionId +" of " + depth +" cm "+depthScale);
+      return true
+    }else{
+      return result
+    }   
+  });
+  ipcMain.handle("deleteMarker", (_e, targetId) => {
+    const result = LCCore.deleteMarker(targetId);
+    if(result==true){
+      console.log("MAIN: Delete target marker.");
+      return true
+    }else{
+      return false
+    }    
+  });
+  ipcMain.handle("changeMarker", (_e, markerId, type, value) => {    
+    if(type == "distance"){
+      //value:distance
+      const result = LCCore.changeDistance(markerId, value);
+      if(result == true){
+        console.log("MAIN: Change marker distance.");
+      }else{
+        console.log("MAIN: Failed to change marker distance.")
+      }
+      return result;
+    }else if(type=="name"){
+      const result = LCCore.changeName(markerId, value)
+      return result;
+    }else if(type=="descriptions"){
+      const result = LCCore.changeDescriptions(markerId, value)
+      return result;
+    }
+  });
+  ipcMain.handle("connectMarkers", (_e, fromId, toId, direction) => {
+    const res = LCCore.connectMarkers(fromId, toId, direction);
+
+    if(res == true){
+      return true
+    }else{
+      return false
+    }    
+  });
+  ipcMain.handle("disconnectMarkers", (_e, fromId, toId, direction) => {
+    const res = LCCore.disconnectMarkers(fromId, toId, direction);
+    if(res==true){
+      return true
+    }else{
+      return false
+    }    
+  });
+  ipcMain.handle("disconnectAllConnections", (_e, fromId, direction) => {
+    const fromIdx = LCCore.search_idx_list[fromId.toString()];
+    
+    let connections = [];
+    if (direction == "horizontal"){
+      connections = LCCore.projects[fromIdx[0]].holes[fromIdx[1]].sections[fromIdx[2]].markers[fromIdx[3]].h_connection;
+    }else{
+      connections = LCCore.projects[fromIdx[0]].holes[fromIdx[1]].sections[fromIdx[2]].markers[fromIdx[3]].v_connection;
+    }
+
+    let results = true;
+    if (connections.length==0){
+      console.log("MAIN: There is no connections at "+LCCore.projects[fromIdx[0]].holes[fromIdx[1]].sections[fromIdx[2]].name+"-"+LCCore.projects[fromIdx[0]].holes[fromIdx[1]].sections[fromIdx[2]].markers[fromIdx[3]].name)
+      return false;
+    }else{
+      while (connections.length > 0){
+        const toId = connections[0];
+
+        const res = LCCore.disconnectMarkers(fromId, toId, direction);
+        if(!res){
+          results = false;
+        }
+      }
+    }
+
+    if(results==true){
+      return true
+    }else{
+      return false
+    }
+    
+  });
+  ipcMain.handle("addSection", (_e, sectionId, data) => {
+    //    
+    const result = LCCore.addSection(sectionId,data);//LCCore.deleteSection(sectionId);
+    if(result == true){
+      console.log("MAIN: Add section.")
+      return result;  
+    }else{
+      console.log("MAIN: Failed to add section.")
+      return result;  
+    }
+    
+  });
+  ipcMain.handle("deleteSection", (_e, sectionId) => {
+    //    
+    const result = LCCore.deleteSection(sectionId);//LCCore.deleteSection(sectionId);
+    if(result == true){
+      console.log("MAIN: Delete section.")
+      return result;  
+    }else{
+      console.log("MAIN: Failed to delete section.")
+      return result;  
+    }
+    
+  });
+  ipcMain.handle("changeSection", (_e, sectionId, type, value) => {    
+    if(type=="name"){
+      const result = LCCore.changeName(sectionId, value);
+      return result;
+    }else if(type=="descriptions"){
+      const result = LCCore.changeDescriptions(sectionId, value);
+      return result;
+    }
+  });
+  ipcMain.handle("addHole", async(_e, projectId, name) => {
+    
+    const result = LCCore.addHole(projectId, name);
+
+    if (result == true) {
+      console.log("MAIN: Add hole completed.");
+      return result;
+    } else {
+      console.log("MAIN: Failed to add a new hole.");
+      return result
+    }
+  });
+  ipcMain.handle("deleteHole", async(_e, holeId) => {
+    
+    const result = LCCore.deleteHole(holeId);
+
+    if (result == true) {
+      console.log("MAIN: Delete hole completed.");
+      return result;
+    } else {
+      console.log("MAIN: Failed to delete hole.");
+      return result
+    }
+
+    
+  });
+  ipcMain.handle("changeHole", (_e, holeId, type, value) => {
+    
+    if(type=="name"){
+      const result = LCCore.changeName(holeId, value);
+      return result;
+    }else if(type=="descriptions"){
+      const result = LCCore.changeDescriptions(holeId, value);
+      return result;
+    }else if(type=="order"){
+      const result = LCCore.changeHoleOrder(holeId, value);
+      return result;
+    }
+  });
+  ipcMain.handle("moveHoleToProject", async(_e, holeId, projectId) => {
+    
+    const result = LCCore.moveHoleToProject(holeId, projectId);
+
+    if (result == true) {
+      console.log("MAIN: Move hole completed.");
+      return result;
+    } else {
+      console.log("MAIN: Failed to move this hole.");
+      return result
+    }
+  });
+  ipcMain.handle("addProject", async(_e, type, name) => {
+    
+    const result = LCCore.addProject(type, name);
+
+    if (result == true) {
+      console.log("MAIN: Add project completed.");
+      return result;
+    } else {
+      console.log("MAIN: Failed to add a new project.");
+      return result
+    }
+  });
+
+  ipcMain.handle("SetZeroPoint", async(_e, markerId, value) => {
+    
+    const result = LCCore.setZeroPoint(markerId, value);
+
+    if (result == true) {
+      console.log("MAIN: Add hole completed.");
+      return result;
+    } else {
+      console.log("MAIN: Failed to add a new hole.");
+      return result
+    }
+  });
+  ipcMain.handle("SetMaster", async(_e, markerId, type) => {
+    
+    const result = LCCore.setMaster(markerId, type);
+
+    if (result == true) {
+      console.log("MAIN: Change master flag.");
+      return result;
+    } else {
+      console.log("MAIN: Failed to chnage master flag.");
+      return result
+    }
+  });
+  ipcMain.handle("deleteProject", async(_e, projectId) => {
+    
+    const result = LCCore.deleteProject(projectId);
+
+    if (result == true) {
+      console.log("MAIN: Delete project completed.");
+      return result;
+    } else {
+      console.log("MAIN: Failed to delete project.");
+      return result
+    }
+    
+  });
+  ipcMain.handle("changeProject", (_e, projectId, type, value) => {
+    if(type=="name"){
+      const result = LCCore.changeName(projectId, value);
+      return result;
+    }else if(type=="descriptions"){
+      const result = LCCore.changeDescriptions(projectId, value);
+      return result;
+    }
+  });
+  ipcMain.handle("mergeProjects", (_e) => {
+    const result = LCCore.mergeProjects();
+
+    if (result == true) {
+      console.log("MAIN: Merge projects completed.");
+      return result;
+    } else {
+      console.log("MAIN: Failed to merge projects.");
+      return result
+    }
+  });
+  ipcMain.handle("changeWorkspace", (_e, type, value) => {
+    if(type=="name"){
+      LCCore.name = value;
+      return true;
+    }else if(type=="descriptions"){
+      LCCore.descriptions = value;
+      return true;
+    }
+  });
+  ipcMain.handle("AddEvent", async(_e, upperId, lowerId, depositionType, value) => {
+    let result = LCCore.addEvent(upperId, lowerId, depositionType, value);
+
+    if (result == true) {
+      console.log("MAIN: Add event layer.");
+      return result;
+    } else {
+      console.log("MAIN: Failed to add event layer.");
+      return result
+    }
+  });
+  ipcMain.handle("DeleteEvent", async(_e, upperId, lowerId, type) => {
+    
+    const result = LCCore.deleteEvent(upperId, lowerId, []);
+
+    if (result == true) {
+      console.log("MAIN: Delete event layer.");
+      return result;
+    } else {
+      console.log("MAIN: Failed to delete event layer.");
+      return result
+    }
+  });
   
+  
+  //--------------------------------------------------------------------------------------------------  
   //--------------------------------------------------------------------------------------------------
   function checkChanges(currentLCCore, beforeLCCore){
     let changedIds = [];
@@ -3210,9 +3314,11 @@ function createMainWIndow() {
         })
       })
     })
-    console.log("MAIN: ",changedIds.length, "sections are chenged.")
+    
     return changedIds;
   }
+  
+
   function initialiseLCCore(){
     let newLCCore = new LevelCompilerCore();
 
@@ -3254,6 +3360,7 @@ function createMainWIndow() {
     try {
       //register model
       const isLoad = LCCore.loadModelFromCsv(fullpath, type);
+      history.setInitialState(LCCore.exportSerialisedModel());
       //register path
       globalPath.dataPaths.push({type:"csvmodel", path:fullpath});
 
@@ -3297,6 +3404,7 @@ function createMainWIndow() {
       //register
       if(inData.LCCore!==null){
         LCCore.loadModelFromLcmodel(inData.LCCore);
+        history.setInitialState(LCCore.exportSerialisedModel());
       } 
       if(inData.LCAge!==null){
         assignObject(LCAge, inData.LCAge);
@@ -3355,7 +3463,6 @@ function createMainWIndow() {
   function registerCoreImage(fullpath, type, name){
     try{
       globalPath.dataPaths.push({type:type, path:fullpath, name:name});
-
       console.log("MAIN: Core images in the folder is registered.")
       return true
     }catch(err){
@@ -4136,9 +4243,13 @@ async function getfile(mainWindow, title, ext) {
 async function zipData(data) {
   return new Promise((resolve, reject) => {
     console.time("zipped")
-      console.time("zippped_in_stringify")
-    const jsonData = JSON.stringify(data);
-      console.timeEnd("zippped_in_stringify")
+    let jsonData;
+    if(typeof data !== "string"){
+      jsonData = JSON.stringify(data);
+    }else{
+      jsonData = data;
+    }
+    
     zlib.gzip(jsonData, (err, buffer) => {
       if (err) {
         reject(err);

@@ -92,11 +92,10 @@ contextBridge.exposeInMainWorld("LCapi", {
   sendSettings:(args1,args2) => ipcRenderer.invoke("sendSettings",args1,args2),
   getDisplayInfo:() => ipcRenderer.invoke("getDisplayInfo"),
 
-  
-  
+
   sendUndo: (args1) => ipcRenderer.invoke('sendUndo',args1),
   sendRedo: (args1) => ipcRenderer.invoke('sendRedo',args1),
-  sendSaveState: (args1) => ipcRenderer.invoke('sendSaveState',args1),  
+  sendSaveState: (args1, args2) => ipcRenderer.invoke('sendSaveState',args1, args2),  
  
   //main -> renderer
   receive: (channel, func) => {

@@ -31,7 +31,7 @@ contextBridge.exposeInMainWorld("LabelerApi", {
 
   sendUndo: (args1) => ipcRenderer.invoke('sendUndo',args1),
   sendRedo: (args1) => ipcRenderer.invoke('sendRedo',args1),
-  sendSaveState: (args1) => ipcRenderer.invoke('sendSaveState',args1),  
+  sendSaveState: (args1,args2) => ipcRenderer.invoke('sendSaveState',args1,args2),  
   loadModel: () => ipcRenderer.invoke("LabelerLoadModel"),
 
   //main -> renderer

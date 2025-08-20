@@ -1,7 +1,7 @@
 {
   "name": "levelcompiler",
   "productName": "Level-Compiler",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "description": "Stratigraphic Correlation Viewer and Compiler",
   "main": "main.js",
   "scripts": {
@@ -18,6 +18,7 @@
     "electron-progressbar": "^2.2.1",
     "electron-prompt": "^1.7.0",
     "electron-updater": "^6.6.2",
+    "jsondiffpatch": "^0.7.3",
     "jszip": "^3.10.1",
     "license-checker": "^25.0.1",
     "mathjs": "^14.5.3",

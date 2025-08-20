@@ -43,6 +43,7 @@ document.addEventListener("DOMContentLoaded", () => {
       console.log("Initialised models: ",tempCore);
       console.log("Initialised images; ", modelImages);
     }
+    updateView();
   });
   document.getElementById("resetButton").addEventListener("click", async (event) => {
     //initialise
@@ -78,6 +79,7 @@ document.addEventListener("DOMContentLoaded", () => {
   });
   async function initialise(){
     tempCore = await window.LabelerApi.InitialiseTempCore();
+    console.log("[Labeler]: Initiarised. ",tempCore)
 
     zoom_rate = [0.3, 0.05];
     relative_pos = [0, 0];
@@ -164,83 +166,107 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     })
 
+    //too many file loaded
+    if((orderLC.length==0 && orderImage.length==0) || orderLC.length>1 || orderImage.length>1){
+      return
+    }
+    if(tempCore.projects[0].holes[0].sections.length>0){
+      return
+    }
 
-    //load
-    let droppedData;
-    if(orderLC.length > 0){
-      //load from model
-      droppedData = dataList[orderLC[0]];
-      const baseName = dataList[orderLC[0]].name.split(/[.]+/)[0];
-      
-      holeName = baseName.split(/[-]+/)[0];
-      sectionName = baseName.split(/[-]+/)[1];
-
-      const isImExist = await window.LabelerApi.isExistFile(droppedData.path, baseName+".jpg");
-
-      //const isImExist = await window.LabelerApi.CheckImagesInDir(h.name+"-"+s.name+".jpg");
-      if(isImExist){
-        //if same name imaeg exist          
-        tempCore = await addSectionData(holeName, sectionName);
-        tempCore = await loadSectionModel(droppedData.path, droppedData.name);
-        
-        console.log("Load annotation data: \n",tempCore);
-        //register&load image
-        const res = await window.LabelerApi.RegisterCoreImage(droppedData.path, "labeler");
-        if(res==true){
-          //load images
-          console.log("loading")
-          modelImages = await loadCoreImages(modelImages, tempCore, objOpts, ["drilling_depth", "composite_depth"]);
-          console.log("Created model Info: \n",modelImages);
-        }else{
-          alert("Failed to load image. The image name and the model name need to match.")
-          return
-        }
-      }else{
-        alert("There is no image corresponding LC model. The image name and the model name need to match.");
+    //check
+    let dirPath   = "";
+    let fileName  = "";
+    let isImExist = false;
+    let isModelExist = false;
+    if(orderLC.length == 1){
+      dirPath  = dataList[orderLC[0]].path;
+      fileName = dataList[orderLC[0]].name.split(/[.]+/)[0];
+      holeName = fileName.split(/[-]+/)[0];
+      sectionName = fileName.split(/[-]+/)[1];
+      if (/^\d$/.test(sectionName)){
+        alert("Single-digit numbers are not allowed as section names");
         return
-      }     
-    }else{
-      //load from image
-      if(orderImage.length > 0){
-        console.log("Labeler: Load the core image");
+      }
 
-        //check image exist, read only first image
-        droppedData = dataList[orderImage[0]];
-        const baseName = droppedData.name.split(/[.]+/)[0];
-        holeName = baseName.split(/[-]+/)[0];
-        sectionName = baseName.split(/[-]+/)[1];
-        if (/^\d$/.test(sectionName)){
-          alert("Single-digit numbers are not allowed as section names");
-          return
-        }
+      //check
+      if(!isModelExist){
+        isModelExist = await window.LabelerApi.isExistFile(dirPath, fileName+".lcsection");
+      }
+      if(!isImExist){
+        isImExist = await window.LabelerApi.isExistFile(dirPath, fileName+".jpg");
+      }
+       
+    }
+    if(orderImage.length == 1){
+      dirPath  = dataList[orderImage[0]].path;
+      fileName = dataList[orderImage[0]].name.split(/[.]+/)[0];
+      holeName = fileName.split(/[-]+/)[0];
+      sectionName = fileName.split(/[-]+/)[1];
+      if (/^\d$/.test(sectionName)){
+        alert("Single-digit numbers are not allowed as section names");
+        return
+      }
 
-        tempCore = await addSectionData(holeName, sectionName);
-        console.log("Create new annotation data: \n",tempCore);
+      //check
+      if(!isModelExist){
+        isModelExist = await window.LabelerApi.isExistFile(dirPath, fileName+".lcsection");
+      }
+      if(!isImExist){
+        isImExist = await window.LabelerApi.isExistFile(dirPath, fileName+".jpg");
+      }
+    }
 
-        //register&load image
-        const res = await window.LabelerApi.RegisterCoreImage(droppedData.path, "labeler");
+    //if lcmodel exist
+    if(isModelExist){
+      if(isImExist){
+        console.log("Section data detected.");
+        //load model
+        console.log(holeName, sectionName)
+        tempCore = await loadSectionModel(dirPath, fileName+".lcsection");
+        await undo("save", "Load Model");//undo
+        console.log("Load annotation data: \n",tempCore);
 
+        //load image
+        const res = await window.LabelerApi.RegisterCoreImage(dirPath, "labeler");
         if(res==true){
           //load images
           modelImages = await loadCoreImages(modelImages, tempCore, objOpts, ["drilling_depth"]);
+          console.log(modelImages)
+          await undo("save", "Load Model with image");//undo
           console.log("Created model Info: \n",modelImages);
-
-          //check model exist
-          const isExist = await window.LabelerApi.isExistFile(droppedData.path, baseName+".lcsection");
-          if(isExist){
-            tempCore = await window.LabelerApi.InitialiseTempCore();
-            tempCore = await addSectionData(holeName, sectionName);
-            tempCore = await loadSectionModel(droppedData.path, droppedData.name);
-            console.log("Load annotation data: \n",tempCore);
-
-          }
-
         }else{
-          alert("Failed to load a image.")
+          tempCore = initialise();
           return
         }
+        console.log("Load image data: \n",modelImages);
+      }else{
+        alert("There is no image corresponding LC model. The image name and the model name need to match.");
+        return
+      }
+    }else{
+      if(isImExist){
+        console.log("There is no model data. Make new model and Load image.");
+        //make model
+        console.log(holeName, sectionName)
+        tempCore = await addSectionData(holeName, sectionName);
+        console.log("Load annotation data: \n",tempCore);
+
+        //load image
+        const res = await window.LabelerApi.RegisterCoreImage(dirPath, "labeler");
+        if(res==true){
+          //load images
+          modelImages = await loadCoreImages(modelImages, tempCore, objOpts, ["drilling_depth"]);
+          await undo("save", "Load Model with image");//undo
+          console.log("Created model Info: \n",modelImages);
+        }else{
+          tempCore = initialise();
+          return
+        }
+
       }
     }
+
 
 
 
@@ -632,7 +658,7 @@ document.addEventListener("DOMContentLoaded", () => {
     
     if (objOpts.marker_from !== null) {
       //if get both markers
-      if(["change_marker_name","change_marker_distance","change_marker_dd"].includes(objOpts.mode)){
+      if(["change_marker_name", "change_marker_distance", "change_marker_dd"].includes(objOpts.mode)){
         let target = null;
         let response=null;
         if(objOpts.mode == "change_marker_name"){
@@ -680,14 +706,84 @@ document.addEventListener("DOMContentLoaded", () => {
          
         if (response !== null) {
           const targetId = [ht.project, ht.hole, ht.section, ht.nearest_marker];
+          if(ht.nearest_marker_name.includes("-top") || ht.nearest_marker_name.includes("-bottom")){
+            const askData2 = await window.LabelerApi.askdialog(
+              "Batch change marker drilling depth",
+              "Do you want to update the all marker's drilling depth?"
+            );
+            if (askData2.response) {
+              //first, update top/bottom
+              const tb = await window.LabelerApi.changeMarker(targetId, target, response);
+              if(tb){
+                tempCore = tb;
+                await undo("save", "Replace Top/Bottom Drilling depth");//undo
+              }
 
-          await undo("save");//undo
-          tempCore = await window.LabelerApi.changeMarker(targetId, target, response);
-          console.log("Annotation data: \n",tempCore);
+              //batch
+              //stack markers info
+              const numMarkers = tempCore.projects[0].holes[0].sections[0].markers.length;
+              let deleteIds = [];
+              let markers = {};
+              for(let i=1; i<numMarkers-1; i++){
+                const markerData = JSON.parse(JSON.stringify(tempCore.projects[0].holes[0].sections[0].markers[i]));
+                const id = markerData.id;
+                deleteIds.push(id);
+                markers[id.toString()] = {name: markerData.name, distance: markerData.distance, relative_x: markerData.definition_relative_x};
+              }
 
+              //delete
+              for(let i=0; i<deleteIds.length; i++){
+                const mData = markers[deleteIds[i].toString()];
+                const res1 = await window.LabelerApi.deleteMarker(deleteIds[i]);
+                if(res1){
+                  console.log(mData.name+" is deleted.");
+                  tempCore = res1;                                    
+                }else{
+                  console.log("Faild to delete: "+mData.name);
+                }
+              }
+              await undo("save", "Delete All Markers");//undo
+              //create
+              for(let i=0; i<deleteIds.length; i++){
+                const mData = markers[deleteIds[i].toString()];
+                const res2 = await addMarkerData(mData.name, mData.distance, mData.relative_x);
+                if(res2){
+                  console.log(mData.name+" is created.");
+                  tempCore = res2;                                    
+                }else{
+                  console.log("Faild to create: "+mData);
+                }
+              }
+              await undo("save", "Replace Marker Drilling depth");//undo
+              
+              
+              
+              
+              console.log("Annotation data: \n",tempCore);
+
+            }else{
+              //
+              const result3 = await window.LabelerApi.changeMarker(targetId, target, response);
+              if(result3){
+                await undo("save", "Change Marker Drilling Depth");//undo
+                tempCore = result3;
+                console.log("Annotation data: \n",tempCore);
+              }else{
+                console.log("Fail to update"); 
+              }
+            }
+          }else{
+            const result3 = await window.LabelerApi.changeMarker(targetId, target, response);
+            if(result3){
+              await undo("save", "Change Marker Drilling Depth");//undo
+              tempCore = result3;
+              console.log("Annotation data: \n",tempCore);
+            }else{
+              console.log("Fail to update"); 
+            }
+          }
         }
       }
-
     }
 
     updateView();
@@ -717,9 +813,11 @@ document.addEventListener("DOMContentLoaded", () => {
           
           console.log("[Editor]: Delete marker: " + fromId);
 
-          await undo("save");//undo
-          tempCore = await window.LabelerApi.deleteMarker(fromId);
-
+          const result = await window.LabelerApi.deleteMarker(fromId);
+          if(result){
+            tempCore = result;
+            await undo("save", "Delete Marker");//undo
+          }
         }
       }
     }
@@ -757,10 +855,13 @@ document.addEventListener("DOMContentLoaded", () => {
         //console.log("[Labeler]: Add marker between " + upperId +" and "+lowerId);
         console.log("[Labeler]: Add marker");
         
-        await undo("save");//undo
+        const result = await addMarkerData(response, ht.distance, ht.relative_x);
 
-        tempCore = await addMarkerData(response, ht.distance, ht.relative_x);
-        console.log("Annotation data: \n",tempCore);
+        if(result){
+          tempCore = result;
+          console.log("Annotation data: \n",tempCore);
+          await undo("save", "Add Marker");//undo
+        }
         updateView();
       }
     }
@@ -841,13 +942,12 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     }
 
-    // Ctrl + R => Redo model
-    if (event.ctrlKey && event.key === "r") {
+    // Ctrl + Shift + Z => Redo model
+    if (event.ctrlKey && event.shiftKey && (event.key === "z" || event.key === "Z")) {
       event.preventDefault();
       const result = await undo("redo");//undo
       if(result == true){
-        tempCore = await window.LabelerApi.loadModel();
-          
+        tempCore = await window.LabelerApi.loadModel();          
         console.log("[Labeler]: Redo model");
         console.log(tempCore);
 
@@ -1110,6 +1210,7 @@ document.addEventListener("DOMContentLoaded", () => {
       distance:null, 
       nearest_marker: null, 
       nearest_distance:null,
+      nearest_marker_name: null,
       upper_marker:null,
       lower_marker:null,
     };
@@ -1173,6 +1274,7 @@ document.addEventListener("DOMContentLoaded", () => {
           markerDistance = lowerDistance;
         }
 
+        results.nearest_marker_name = LCCore.projects[0].holes[0].sections[0].markers[nearestIdx].name;
         results.nearest_distance = markerDistance;
         results.nearest_marker   = LCCore.projects[0].holes[0].sections[0].markers[nearestIdx].id[3];  
         results.upper_marker     = LCCore.projects[0].holes[0].sections[0].markers[upperIdx].id[3];
@@ -1183,7 +1285,7 @@ document.addEventListener("DOMContentLoaded", () => {
     
     return results;
   }
-  async function undo(type){
+  async function undo(type, name="unnamed"){
     return new Promise(async(resolve, reject)=>{
       let result;
       if(type == "undo"){
@@ -1193,9 +1295,9 @@ document.addEventListener("DOMContentLoaded", () => {
         result = await window.LabelerApi.sendRedo("labeler");
         console.log("[Labeler]: Recieved redo data: "+result);
       }else if(type == "save"){
-        result = await window.LabelerApi.sendSaveState("labeler");
-      }
-      
+        result = await window.LabelerApi.sendSaveState("labeler", name);
+        console.log("[Labeler]: Recieved save data: ",result);
+      }      
        resolve(result);
     })
   }
@@ -1260,7 +1362,7 @@ document.addEventListener("DOMContentLoaded", () => {
       let sectionTopDistance    = null;
       let sectionBottomDistance = null;
       
-      if(tempCore !== null && modelImages["drilling_depth"][holeName+"-"+sectionName] !== undefined){        
+      if(tempCore !== null && modelImages["drilling_depth"][holeName+"-"+sectionName] !== undefined && modelImages["drilling_depth"][holeName+"-"+sectionName].height !== undefined){        
       
         coreLength = tempCore.projects[0].holes[0].sections[0].markers[tempCore.projects[0].holes[0].sections[0].markers.length-1].distance - tempCore.projects[0].holes[0].sections[0].markers[0].distance;
         dpcm = modelImages["drilling_depth"][holeName+"-"+sectionName].height / coreLength;
