@@ -706,7 +706,7 @@ document.addEventListener("DOMContentLoaded", () => {
          
         if (response !== null) {
           const targetId = [ht.project, ht.hole, ht.section, ht.nearest_marker];
-          if(ht.nearest_marker_name.includes("-top") || ht.nearest_marker_name.includes("-bottom")){
+          if(objOpts.mode == "change_marker_dd" && (ht.nearest_marker_name.includes("-top") || ht.nearest_marker_name.includes("-bottom"))){
             const askData2 = await window.LabelerApi.askdialog(
               "Batch change marker drilling depth",
               "Do you want to update the all marker's drilling depth?"
@@ -856,7 +856,7 @@ document.addEventListener("DOMContentLoaded", () => {
         console.log("[Labeler]: Add marker");
         
         const result = await addMarkerData(response, ht.distance, ht.relative_x);
-
+ 
         if(result){
           tempCore = result;
           console.log("Annotation data: \n",tempCore);
@@ -906,13 +906,12 @@ document.addEventListener("DOMContentLoaded", () => {
 
       const result = await window.LabelerApi.saveLabelerData(data);
 
-      /*
       if(result == true){
+        alert("Successfully saved data.")
         console.log("Successfully saved data.")
       }else{
         alert("Failed to save annotated data.")
       }
-        */
       
     }
   });

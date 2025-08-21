@@ -1616,6 +1616,10 @@ function createMainWIndow() {
       if(result2==true){
         tempCore.sortModel();
         return tempCore.exportSerialisedModel();
+      }else if(result2=="used"){
+        //name is same, but add without name
+        tempCore.sortModel();
+        return tempCore.exportSerialisedModel();
       }else{
         return false;
       }
