@@ -2242,7 +2242,7 @@ function createMainWIndow() {
     return false
   });
   ipcMain.on("dividerExport", async (_e, data) => {
-    putcsvfile(mainWindow, null, data);    
+    putcsvfile(dividerWindow, null, data);    
     console.log("MAIN: Exported Divided data.");
   });
   ipcMain.handle("OpenFinder", async (_e) => {
@@ -2601,8 +2601,9 @@ function createMainWIndow() {
     }
   });
   ipcMain.handle("cvtExport", async (_e, data) => {
+    //from converter
     //console.log(data);
-    putcsvfile(mainWindow, null, data);
+    putcsvfile(converterWindow, null, data);
   });
   //--------------------------------------------------------------------------------------------------
  
@@ -4343,9 +4344,11 @@ async function findFileInDir(in_path, fileName, type) {
   }
 }
 //--------------------------------------------------------------------------------------------------
-async function putcsvfile(mainWindow, filePath, data) {
+async function putcsvfile(window=mainWindow, filePath, data) {
   dialog
-    .showSaveDialog({
+    .showSaveDialog(
+      window,
+      {
       title: "Please select save path",
       defaultPath: filePath !== null? filePath:app.getPath("desktop"),
       buttonLabel: "Save",
