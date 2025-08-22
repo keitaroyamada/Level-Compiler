@@ -978,6 +978,9 @@ document.getElementById("calcButton").addEventListener("click", () => {
     return
   }
 
+  //for plot/export
+  interpolatedData = resultList;
+
   //for counts
   const table = document.getElementById("target_table");
   const tbody = table.querySelector("tbody");
