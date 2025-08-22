@@ -1690,7 +1690,9 @@ function createMainWIndow() {
     const dataName  = data.hole_name +"-"+ data.section_name;
 
       dialog
-      .showOpenDialog({
+      .showOpenDialog(
+        labelerWindow,
+        {
         title: "Please select a folder to save",
         defaultPath: app.getPath("desktop"),
         buttonLabel: "Save",
@@ -3407,7 +3409,7 @@ function createMainWIndow() {
     globalPath.dataPaths.push({type:"lcmodel",path:fullpath});
 
     //import data
-    const inData = await loadmodelfile(fullpath);
+    const inData = await loadmodelfile(mainWindow, fullpath);
 
     //register
     if(inData!==null){
@@ -3678,14 +3680,14 @@ function createMainWIndow() {
   
                     if(globalPath.saveModelPath == null){
                       //save as new file
-                      const result = await putmodelfile(outData, null);
+                      const result = await putmodelfile(mainWindow, outData, null);
                       if(result){
                         globalPath.saveModelPath = result;
                         LCCore.updateVersionInfo();
                       }                      
                     }else{
                       //save orverwrite
-                      const result = await putmodelfile(outData, globalPath.saveModelPath);
+                      const result = await putmodelfile(mainWindow, outData, globalPath.saveModelPath);
                       if(result){
                         globalPath.saveModelPath = result;
                         LCCore.updateVersionInfo();
@@ -3712,10 +3714,10 @@ function createMainWIndow() {
   
                     if(globalPath.saveModelPath == null){
                       //save as new file
-                      globalPath.saveModelPath = await putmodelfile(outData, null);
+                      globalPath.saveModelPath = await putmodelfile(mainWindow, outData, null);
                     }else{
                       //save orverwrite
-                      globalPath.saveModelPath = await putmodelfile(outData, globalPath.saveModelPath);
+                      globalPath.saveModelPath = await putmodelfile(mainWindow, outData, globalPath.saveModelPath);
                     }
                   }                
                 },
@@ -3736,7 +3738,7 @@ function createMainWIndow() {
                     const outData = {LCCore:outLCCore, LCAge:LCAge, LCPlotAge:out_LCPlot};
   
                     //save as new file
-                    globalPath.saveModelPath = await putmodelfile(outData, null);
+                    globalPath.saveModelPath = await putmodelfile(mainWindow, outData, null);
                     
                   }                
                 },              
@@ -3775,7 +3777,7 @@ function createMainWIndow() {
                       message: "Are you sure you want to exit?",
                     };
   
-                    const response = dialog.showMessageBoxSync(null, options);
+                    const response = dialog.showMessageBoxSync(mainWindow, options);
   
                     if (response === 1) {
                       app.quit(); 
@@ -3897,7 +3899,9 @@ function createMainWIndow() {
               }
                
               if(text !== null){
-                dialog.showMessageBox({
+                dialog.showMessageBox(
+                  mainWindow,
+                  {
                   type: 'info',
                   title: 'Model versions',
                   message: text,
@@ -3934,7 +3938,9 @@ function createMainWIndow() {
                          `  -[Max Rank]: ${item.max_rank}\n`
                 }).join('\n');
 
-                dialog.showMessageBox({
+                dialog.showMessageBox(
+                  mainWindow,
+                  {
                   type: 'info',
                   title: 'Model statistics',
                   message: text,
@@ -4164,7 +4170,7 @@ function createMainWIndow() {
               label: "Help",
               submenu: [
                 { label: "About", click: createAboutWindow },
-                { label: "Check update", click: async()=>{await checkUpdate("button")}},
+                { label: "Check update", click: async()=>{await checkUpdate(mainWindow, "button")}},
                 { label: "Usage", click: ()=>{shell.openExternal('https://www.youtube.com/playlist?list=PLraahvJ2B_L7ClUMTZNnz7Fs3swqovV4y')} },
               ],
             },
@@ -4173,7 +4179,7 @@ function createMainWIndow() {
             {
               label: "Help",
               submenu: [
-                { label: "Check update", click: async()=>{await checkUpdate("button")}},
+                { label: "Check update", click: async()=>{await checkUpdate(mainWindow, "button")}},
                 { label: "Usage", click: ()=>{shell.openExternal('https://www.youtube.com/playlist?list=PLraahvJ2B_L7ClUMTZNnz7Fs3swqovV4y')} },
               ],
             },
@@ -4232,7 +4238,7 @@ async function updateProgress(progress, n, N){
     return progress;
   }
 }
-async function getfile(mainWindow, title, ext) {
+async function getfile(window=null, title, ext) {
   const options = {
     title: title,
     filters: ext,
@@ -4240,7 +4246,7 @@ async function getfile(mainWindow, title, ext) {
   };
 
   try {
-    const result = await dialog.showOpenDialog(mainWindow, options);
+    const result = await dialog.showOpenDialog(window, options);
     if (!result.canceled) {
       return result.filePaths[0];
     }
@@ -4271,14 +4277,14 @@ async function zipData(data) {
   });
 }
 //--------------------------------------------------------------------------------------------------
-async function getDirectory(mainWindow, title) {
+async function getDirectory(window=null, title) {
   const options = {
     title: title,
     properties: ["openDirectory"], 
   };
 
   try {
-    const result = await dialog.showOpenDialog(mainWindow, options);
+    const result = await dialog.showOpenDialog(window, options);
     if (!result.canceled) {
       return result.filePaths[0]; 
     }
@@ -4344,7 +4350,7 @@ async function findFileInDir(in_path, fileName, type) {
   }
 }
 //--------------------------------------------------------------------------------------------------
-async function putcsvfile(window=mainWindow, filePath, data) {
+async function putcsvfile(window=null, filePath, data) {
   dialog
     .showSaveDialog(
       window,
@@ -4363,23 +4369,27 @@ async function putcsvfile(window=mainWindow, filePath, data) {
       }
     })
     .catch((err) => {
-      const response = dialog.showMessageBoxSync(null, {
-        type: "error",
-        buttons: ["OK"],
-        title: "Info",
-        message: "Failed to save file.",
-        detail: err.message,
-      });
-      console.log(err);
+      const response = dialog.showMessageBoxSync(
+        window,
+        {
+          type: "error",
+          buttons: ["OK"],
+          title: "Info",
+          message: "Failed to save file.",
+          detail: err.message,
+        });
+        console.log(err);
     });
 }
 //--------------------------------------------------------------------------------------------------
-async function putmodelfile(data, path) {
+async function putmodelfile(window, data, path) {
   try{
     //get save path
     let filePath = null;
     if(path == null){
-      const file = await dialog.showSaveDialog({
+      const file = await dialog.showSaveDialog(
+        window,
+        {
         title: "Please select save path",
         defaultPath: app.getPath("desktop"),
         buttonLabel: "Save",
@@ -4414,14 +4424,18 @@ async function putmodelfile(data, path) {
       }
     }   
     
-    dialog.showMessageBox({
+    dialog.showMessageBox(
+      window,
+      {
       type: 'info',
       title: 'Saved',
       message: `The correlation model was saved successfully.`,
       buttons: ['OK']
     }).catch((err) => {
       console.error('Error displaying message box:', err);
-      dialog.showMessageBox({
+      dialog.showMessageBox(
+        window,
+        {
       type: 'info',
       title: 'No Saved',
       message: 'Error displaying message box:', err,
@@ -4430,14 +4444,18 @@ async function putmodelfile(data, path) {
     return filePath;
   }catch(err) {
       console.log(err);
-      dialog.showMessageBox({
+      dialog.showMessageBox(
+        window,
+        {
       type: 'info',
       title: 'Saved',
       message: `Failed to save the correlation model.` + err,
       buttons: ['OK']
     }).catch((err) => {
       console.error('Error displaying message box:', err);
-      dialog.showMessageBox({
+      dialog.showMessageBox(
+        window,
+        {
       type: 'info',
       title: 'No Saved',
       message: 'Error displaying message box:', err,
@@ -4446,13 +4464,15 @@ async function putmodelfile(data, path) {
   };
 }
 //--------------------------------------------------------------------------------------------------
-async function loadmodelfile(...args) {
+async function loadmodelfile(window, ...args) {
   try{
     //get file path
     let filepath = null;
     if(args.length == 0){
       //cane no path
-      const file = await dialog.showOpenDialog({
+      const file = await dialog.showOpenDialog(
+        window,
+        {
         title: "Please select file to load",
         defaultPath: app.getPath("desktop"),
         buttonLabel: "Load",
@@ -4554,7 +4574,7 @@ function assignObject (obj,data){
     }
   });
 }
-async function checkUpdate(from){
+async function checkUpdate(window, from){
   //this process does not work in MSI app.
   //check update in the github
   autoUpdater.allowPrerelease = true;
@@ -4566,7 +4586,9 @@ async function checkUpdate(from){
   //}
   
   autoUpdater.on('update-available', (info) => {
-    dialog.showMessageBox({
+    dialog.showMessageBox(
+      window,
+      {
       type: 'info',
       title: 'Update Available',
       message: `A new version (${info.version}) is available. Would you like to get the new version?`,
@@ -4579,7 +4601,9 @@ async function checkUpdate(from){
       }
     }).catch((err) => {
       console.error('Error displaying message box:', err);
-      dialog.showMessageBox({
+      dialog.showMessageBox(
+        window,
+        {
       type: 'info',
       title: 'No Updates',
       message: 'Error displaying message box:', err,
@@ -4590,7 +4614,9 @@ async function checkUpdate(from){
 
   autoUpdater.on('update-not-available', () => {
     if (from == "button"){
-      dialog.showMessageBox({
+      dialog.showMessageBox(
+        window,
+        {
       type: 'info',
       title: 'No Updates Available',
       message: 'You are already using the latest version.',
@@ -4600,7 +4626,9 @@ async function checkUpdate(from){
 
   autoUpdater.on('error', (err) => {
     if (from == "button"){
-      dialog.showMessageBox({
+      dialog.showMessageBox(
+        window,
+        {
         type: 'error',
         title: 'Update Error',
         message: `An error occurred: ${err.message}`,
@@ -4668,7 +4696,7 @@ app.whenReady().then(async() => {
   createMainWIndow();
 
   //check update
-  checkUpdate("startup");
+  checkUpdate(mainWindow, "startup");
 
   app.on("activate", (I) => {
     if (BrowserWindow.getAllWindows().length === 0) {
