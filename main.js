@@ -136,9 +136,10 @@ function createMainWIndow() {
   ipcMain.handle("InitialiseCorrelationModel", async (_e) => {
     //initialise
     LCCore = initialiseLCCore();
+    const zipped = await zipData(LCCore.exportSerialisedModel());
 
     console.log("MAIN: Project correlation data is initialised.");
-    return LCCore.exportSerialisedModel();
+    return zipped;
   });
   ipcMain.handle("InitialiseAgeModel", async (_e) => {
     //initialise
@@ -158,18 +159,19 @@ function createMainWIndow() {
     //import modeln
     LCPlot.data_collections = [];
     LCPlot.data_selected_id = null;
+    const zipped = await zipData(LCPlot);
 
-    zipData(LCPlot)
-      .then((zipped) => {
+    if(zipped){
+      mainWindow.webContents.send("importedData", zipped);
+
+      if(plotWindow){
         plotWindow.webContents.send("importedData", zipped);
-        mainWindow.webContents.send("importedData", zipped);
-      })
-      .catch((err) => {
-        console.error("MAIN: Failed to zip: ", err);
-      });
-
-    console.log("MAIN: Project plot data collection is initialised.");
-    return;
+      }      
+      
+      console.log("MAIN: Project plot data collection is initialised.");
+      return;
+    }
+  
   });
   ipcMain.handle("InitialisePaths", async (_e) => {
     //import modeln
@@ -1881,15 +1883,17 @@ function createMainWIndow() {
     console.log("MAIN: Calc composite depth.");
    
     LCCore.calcCompositeDepth(LCCore.base_project_id);
+    const zipped = await zipData(LCCore.exportSerialisedModel());
 
-    return LCCore.exportSerialisedModel();
+    return zipped;
   });
   ipcMain.handle("CalcEventFreeDepth", async (_e) => {
     //import model
     console.log("MAIN: Calc event free depth");
     LCCore.calcEventFreeDepth(LCCore.base_project_id);
+    const zipped = await zipData(LCCore.exportSerialisedModel());
     //LCCore.getModelSummary();
-    return LCCore.exportSerialisedModel();
+    return zipped;
   });
   ipcMain.handle("GetAgeFromEFD", async (_e, efd, method) => {
     //calc age
@@ -3365,6 +3369,7 @@ function createMainWIndow() {
       //register model
       const isLoad = LCCore.loadModelFromCsv(fullpath, type);
       history.setInitialState(LCCore.exportSerialisedModel());
+
       //register path
       globalPath.dataPaths.push({type:"csvmodel", path:fullpath});
 

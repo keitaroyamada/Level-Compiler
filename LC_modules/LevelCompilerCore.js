@@ -96,6 +96,7 @@ class LevelCompilerCore extends EventEmitter{
     if(type=="forLC"){
       //load model
       projectData._model_data = lcfnc.readcsv(model_path);
+      projectData.descriptions = "The initial model is loaded from a csv model for Level Compiler.";
       var fileName = model_path.split(/[/\\]/).pop();
       const patern = /\[?(.*?)\]?([^\[\]()]*)(?:\((.*?)\))?\.csv$/; // ^(.*?)\((.*?)\)\.csv$/)
       var match = fileName.match(patern);      
@@ -168,6 +169,7 @@ class LevelCompilerCore extends EventEmitter{
     }else if(type=="forLF"){
       //convert
       const convertedData = this.convertLF2LC(model_path);
+      projectData.descriptions = "The initial model is loaded from a csv model for Level Finder.";
       projectData._model_data = convertedData.model;
 
       model_info.name = convertedData.name;

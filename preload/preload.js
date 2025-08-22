@@ -13,7 +13,7 @@ contextBridge.exposeInMainWorld("LCapi", {
   InitialiseCorrelationModel: () => ipcRenderer.invoke("InitialiseCorrelationModel"),
   InitialiseAgeModel: () => ipcRenderer.invoke("InitialiseAgeModel"),
   InitialiseAgePlot: () => ipcRenderer.invoke("InitialisePlotAgeCollection"),
-  InitialiseDataPlot: () => ipcRenderer.invoke("InitialisePlotDataCollection"),
+  InitialiseDataPlot: () => ipcRenderer.invoke("initialisePlotDataCollection"),
   InitialisePaths: () => ipcRenderer.invoke("InitialisePaths"),
 
   //register and load models

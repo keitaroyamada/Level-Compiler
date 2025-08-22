@@ -742,6 +742,19 @@ document.addEventListener("DOMContentLoaded", () => {
     if(Object.keys(modelImages.drilling_depth).length>0){
       //modelImages = await loadCoreImages(modelImages, LCCore, objOpts, "age");
     }
+
+    let isConnected = true;
+    for(let p=0; p<LCCore.projects.length; p++){
+      if(!includesString(LCCore.projects[p], LCCore.base_project_id[0])){
+        isConnected = false;
+      }
+    }
+
+    if(!objOpts.edit.editable && !isConnected){
+      alert("Please note that loaded model includes a project that is not connected to the master.\n"+
+            "The project will have its own CD, EFD calculated."
+          );
+    }
     
     updateView();
   });
@@ -4297,7 +4310,7 @@ document.addEventListener("DOMContentLoaded", () => {
             projectDispName,
             project_x0 + 40,
             project_y0 + 40,
-          );
+          ); 
 
           //show project area
           if(objOpts.project.is_show_area){
@@ -5950,136 +5963,142 @@ document.addEventListener("DOMContentLoaded", () => {
   async function loadModel(isUpdateView=true) {
     //load model into LCCore
     //now, LC is able to hold one project file, model_id is dummy
-     const result = await window.LCapi.LoadModelFromLCCore();
-
-     if(result !== null){
-      //unzip
-      const cs = new DecompressionStream('gzip');
-      const decompressedStream = new Response(
-        new Blob([result]).stream().pipeThrough(cs)
-      );
-      const decompressed = await decompressedStream.text();
-      LCCore = JSON.parse(decompressed);
-
-      if (LCCore) {
-        //calc composite depth
-        LCCore = await window.LCapi.CalcCompositeDepth();
-  
-        //calc event free depth
-        LCCore = await window.LCapi.CalcEventFreeDepth();
-  
-        //sort
-        LCCore = sortProjectByOrder(LCCore);
-        LCCore = sortHoleByOrder(LCCore);
-
-        //initialise hole list
-        while (document.getElementById("hole_list").firstChild) {
-          document.getElementById("hole_list").removeChild(document.getElementById("hole_list").firstChild);
+    const results = await unzip( await window.LCapi.LoadModelFromLCCore() );
+    
+    if (results) {
+      //load model
+      LCCore = results;
+      let isConnected = true;
+      
+      //check model
+      for(let p=0; p<LCCore.projects.length; p++){
+        if(!includesString(LCCore.projects[p], LCCore.base_project_id[0])){
+          isConnected = false;
         }
-  
-        //add hole list
-        LCCore.projects.forEach((project, p) => {
-          const container = document.getElementById("hole_list");
-          const projItemDiv = document.createElement("div");
-          const projListCheck = document.createElement("input");
-          projListCheck.type = "checkbox";
-          projListCheck.id = project.id;
-          projListCheck.checked = backup_hole_enable[project.id.toString()] !== undefined?  backup_hole_enable[project.id.toString()] : true;
-          const projListlabel = document.createElement("label");
-          projListlabel.htmlFor = projListCheck.id;
-          projListlabel.textContent = project.name;
-          projItemDiv.style.paddingLeft = "0px";
-  
-          projItemDiv.appendChild(projListCheck);
-          projItemDiv.appendChild(projListlabel);
-  
-          project.holes.forEach((hole) => {
-            const checkboxDiv = document.createElement("div");
-            const checkbox = document.createElement("input");
-            checkbox.type = "checkbox";
-            checkbox.id = hole.id.toString();
-            checkbox.name = hole.name;
-            checkbox.checked = backup_hole_enable[hole.id.toString()] !== undefined ?  backup_hole_enable[hole.id.toString()] : true;
-            const label = document.createElement("label");
-            label.htmlFor = hole.id.toString();
-            label.textContent = hole.name;
-            checkboxDiv.style.paddingLeft = "20px";
-  
-            checkboxDiv.appendChild(checkbox);
-            checkboxDiv.appendChild(label);
-  
-            projItemDiv.appendChild(checkboxDiv);
-          });
-  
-          container.appendChild(projItemDiv);
-        });
-  
-        
-        //apply enable info
-        for(let  project of LCCore.projects){
-          let en = backup_hole_enable[project.id.toString()];
-          if(en === undefined){
-            //initial case
-            project.enable = true;
-          }else{
-            project.enable = en;
-          }
-          for(let hole of project.holes){
-            en = backup_hole_enable[hole.id.toString()];
-            if(en === undefined){
-              hole.enable = true;
-            }else{
-              hole.enable = en;
-            }
-          }
-        }
-  
-        //update position
-        objOpts.canvas.depth_scale = document.getElementById("YAxisSelect").value;    
-
-        let yMag = objOpts.canvas.dpir * objOpts.canvas.zoom_level[1];
-        let pad_y = objOpts.canvas.pad_y;
-        const shift_y = objOpts.canvas.shift_y;
-  
-        if (objOpts.canvas.depth_scale == "age") {
-          yMag = yMag * objOpts.canvas.age_zoom_correction[0];
-          pad_y = pad_y + objOpts.canvas.age_zoom_correction[1];
-        }
-
-        /*
-        let newPad_y = objOpts.canvas.pad_y;;
-        if(LCCore.projects[0].composite_depth_top !==null){
-          newPad_y = (LCCore.projects[0].composite_depth_top + shift_y) * yMag + pad_y;
-        }
-        objOpts.canvas.pad_y = newPad_y;
-        */
-  
-        //shwo model summary
-        console.log("[Renderer]: Correlation Model has been loaded into the renderer.");
-        console.log(
-          "Name: " + LCCore.name,
-          "\nDescriptions: " + LCCore.descriptions,
-          "\nModel data: " , LCCore
-        );
-        /*
-        LCCore.projects.forEach(p=>{
-          console.log(
-            "Project ID: " + p.id[0],
-            "\nProject name: " + p.name,
-            "\nVersion: " + p.correlation_version,
-            "\nType: " + p.model_type,
-            "\nModel data: " , p
-          );
-        })
-        */
-  
-        if(isUpdateView){
-          updateView();
-        }
-        
+      }
+      console.log(objOpts.edit.editable,isConnected)
+      if(!objOpts.edit.editable && !isConnected){
+        alert("Please note that loaded model includes a project that is not connected to the master.\n"+
+              "The UNCONNECTED project will have its own CD, EFD calculated."
+            );
       }
 
-     }    
+      //calc composite depth
+      LCCore = await unzip( await window.LCapi.CalcCompositeDepth());
+     
+      //calc event free depth
+      LCCore = await unzip( await window.LCapi.CalcEventFreeDepth());
+
+      //sort
+      LCCore = sortProjectByOrder(LCCore);
+      LCCore = sortHoleByOrder(LCCore);
+
+      //initialise hole list
+      while (document.getElementById("hole_list").firstChild) {
+        document.getElementById("hole_list").removeChild(document.getElementById("hole_list").firstChild);
+      }
+
+      //add hole list
+      LCCore.projects.forEach((project, p) => {
+        const container = document.getElementById("hole_list");
+        const projItemDiv = document.createElement("div");
+        const projListCheck = document.createElement("input");
+        projListCheck.type = "checkbox";
+        projListCheck.id = project.id;
+        projListCheck.checked = backup_hole_enable[project.id.toString()] !== undefined?  backup_hole_enable[project.id.toString()] : true;
+        const projListlabel = document.createElement("label");
+        projListlabel.htmlFor = projListCheck.id;
+        projListlabel.textContent = project.name;
+        projItemDiv.style.paddingLeft = "0px";
+
+        projItemDiv.appendChild(projListCheck);
+        projItemDiv.appendChild(projListlabel);
+
+        project.holes.forEach((hole) => {
+          const checkboxDiv = document.createElement("div");
+          const checkbox = document.createElement("input");
+          checkbox.type = "checkbox";
+          checkbox.id = hole.id.toString();
+          checkbox.name = hole.name;
+          checkbox.checked = backup_hole_enable[hole.id.toString()] !== undefined ?  backup_hole_enable[hole.id.toString()] : true;
+          const label = document.createElement("label");
+          label.htmlFor = hole.id.toString();
+          label.textContent = hole.name;
+          checkboxDiv.style.paddingLeft = "20px";
+
+          checkboxDiv.appendChild(checkbox);
+          checkboxDiv.appendChild(label);
+
+          projItemDiv.appendChild(checkboxDiv);
+        });
+
+        container.appendChild(projItemDiv);
+      });
+
+      
+      //apply enable info
+      for(let  project of LCCore.projects){
+        let en = backup_hole_enable[project.id.toString()];
+        if(en === undefined){
+          //initial case
+          project.enable = true;
+        }else{
+          project.enable = en;
+        }
+        for(let hole of project.holes){
+          en = backup_hole_enable[hole.id.toString()];
+          if(en === undefined){
+            hole.enable = true;
+          }else{
+            hole.enable = en;
+          }
+        }
+      }
+
+      //update position
+      objOpts.canvas.depth_scale = document.getElementById("YAxisSelect").value;    
+
+      let yMag = objOpts.canvas.dpir * objOpts.canvas.zoom_level[1];
+      let pad_y = objOpts.canvas.pad_y;
+      const shift_y = objOpts.canvas.shift_y;
+
+      if (objOpts.canvas.depth_scale == "age") {
+        yMag = yMag * objOpts.canvas.age_zoom_correction[0];
+        pad_y = pad_y + objOpts.canvas.age_zoom_correction[1];
+      }
+
+      /*
+      let newPad_y = objOpts.canvas.pad_y;;
+      if(LCCore.projects[0].composite_depth_top !==null){
+        newPad_y = (LCCore.projects[0].composite_depth_top + shift_y) * yMag + pad_y;
+      }
+      objOpts.canvas.pad_y = newPad_y;
+      */
+
+      //shwo model summary
+      console.log("[Renderer]: Correlation Model has been loaded into the renderer.");
+      console.log(
+        "Name: " + LCCore.name,
+        "\nDescriptions: " + LCCore.descriptions,
+        "\nModel data: " , LCCore
+      );
+      /*
+      LCCore.projects.forEach(p=>{
+        console.log(
+          "Project ID: " + p.id[0],
+          "\nProject name: " + p.name,
+          "\nVersion: " + p.correlation_version,
+          "\nType: " + p.model_type,
+          "\nModel data: " , p
+        );
+      })
+      */
+
+      if(isUpdateView){
+        updateView();
+      }
+      
+    }   
   }
   async function registerAge(in_path) {
     if (in_path == null) {
@@ -6106,16 +6125,10 @@ document.addEventListener("DOMContentLoaded", () => {
   }
   async function loadAge(age_id) {
     //load age model
-    const results = await window.LCapi.LoadAgeFromLCAge(age_id);
-
+    const results = await unzip( await window.LCapi.LoadAgeFromLCAge(age_id));
+    
     if (results) {
-      //unzip
-      const cs = new DecompressionStream('gzip');
-      const decompressedStream = new Response(
-        new Blob([results]).stream().pipeThrough(cs)
-      );
-      const decompressed = await decompressedStream.text();
-      LCCore = JSON.parse(decompressed);
+      LCCore = results;
 
       //apply enable info
       for(let  project of LCCore.projects){
@@ -6192,18 +6205,10 @@ document.addEventListener("DOMContentLoaded", () => {
   }
   async function loadPlotData() {
     //LC plot age_collection id is as same as LCAge id
-    const results = await window.LCapi.LoadPlotFromLCPlot();
+    const results = await unzip( await window.LCapi.LoadPlotFromLCPlot());
     if (results!==null) {
-      //unzip
-      const cs = new DecompressionStream('gzip');
-      const decompressedStream = new Response(
-        new Blob([results]).stream().pipeThrough(cs)
-      );
-      const decompressed = await decompressedStream.text();
-      const originalData = JSON.parse(decompressed);
-
       //load
-      LCPlot = originalData;
+      LCPlot = results;
       const num_age_collections = LCPlot.age_collections.length;
       const num_data_collections= LCPlot.data_collections.length;
       console.log("[Renderer]: Plot Data have been loaded into the renderer.");
@@ -6798,7 +6803,19 @@ function sortHoleByOrder(LCCore) {
   });
   return LCCore;
 }
-
+async function unzip(result){
+  if(result !== null){
+    //unzip
+    const cs = new DecompressionStream('gzip');
+    const decompressedStream = new Response(
+      new Blob([result]).stream().pipeThrough(cs)
+    );
+    const decompressed = await decompressedStream.text();
+    return JSON.parse(decompressed);
+  }else{
+    return null
+  }
+}
 //--------------------------------------------------------------------------------------------------
 async function createCircleImage(p, canvasSize, radius, color) {
   let fallbackImg = p.createGraphics(canvasSize, canvasSize);
