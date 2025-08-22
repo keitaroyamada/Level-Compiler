@@ -49,6 +49,7 @@ document.addEventListener("DOMContentLoaded", () => {
     var checkbox = document.createElement("input");
     checkbox.type = "checkbox";
     checkbox.checked = true;
+    
     cell0.appendChild(checkbox);
 
     //Actural depth
@@ -79,7 +80,7 @@ document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("directionOptions").addEventListener("change", async (event) => {
 
     //get data
-    let targetData = getTableData("target_table");
+    let [targetData] = getTableData("target_table");
 
     if(event.target.value=="actual2definition"){
       calcDirection = "act->def";
@@ -206,7 +207,7 @@ document.addEventListener("DOMContentLoaded", () => {
             type:"number",
           };
       let start = parseFloat(await window.DividerApi.inputdialog(askData));
-      console.log(start)
+
       if(isNaN(start)){
         return;
       }
@@ -303,7 +304,6 @@ document.addEventListener("DOMContentLoaded", () => {
         distUpper = distLower;
         distLower = resultLower.distance;
       }
-      console.log(distUpper, distLower)
       
       i += 1;
     }
@@ -312,7 +312,7 @@ document.addEventListener("DOMContentLoaded", () => {
     var table = document.getElementById("target_body");
     
     //make new row    
-    console.log(calcDirection)
+    //console.log(calcDirection)
     for (let i=0; i<targetLists.length;i++){
       var row = table.insertRow();
       const target = targetLists[i];
@@ -597,6 +597,7 @@ document.addEventListener("DOMContentLoaded", () => {
     //get depth definition data from table
     var table = document.getElementById("depth_table");
     var rows = table.rows;
+
     //plot section
     const section_height = parseFloat(rows[rows.length - 1].cells[2].innerText) - parseFloat(rows[1].cells[2].innerText);
     const plot_height_rate = canvas.height / (section_height + padding_top * 2);
@@ -688,8 +689,8 @@ document.addEventListener("DOMContentLoaded", () => {
     const graphW   = graphH;
 
     // --- extract data and compute ranges ---
-    const defs = rowsData.map(r => parseFloat(r.cells[2].innerText)).filter(v => !isNaN(v));
-    const acts = rowsData.map(r => parseFloat(r.cells[3].innerText)).filter(v => !isNaN(v));
+    const defs = rowsData.filter(r => r.cells[0].querySelector('input[type="checkbox"]')?.checked).map(r => parseFloat(r.cells[2].innerText)).filter(v => !isNaN(v));
+    const acts = rowsData.filter(r => r.cells[0].querySelector('input[type="checkbox"]')?.checked).map(r => parseFloat(r.cells[3].innerText)).filter(v => !isNaN(v));
     const targetTable = document.getElementById("target_table");
     const targetRows  = Array.from(targetTable.tBodies[0].rows);
     const targetActsUpper = targetRows.map(r => parseFloat(r.cells[2].innerText)).filter(v => !isNaN(v));
@@ -870,17 +871,23 @@ document.addEventListener("DOMContentLoaded", () => {
     const table = document.getElementById(targetName);
     const tbody = table.querySelector("tbody");
     const rows = Array.from(tbody.rows);
-    const data = rows.map(row => {
-        return Array.from(row.cells).map(cell => {
-          const checkbox = cell.querySelector('input[type="checkbox"]');
-          if (checkbox) {
-            return checkbox.checked;
-          }
-          const text = cell.innerText.trim();
-          return text === "" ? null : text;  
-        });
-    });
-    return data;
+    const data = rows
+      .map((row, idx) => {
+        if (!row.querySelector('input[type="checkbox"]')?.checked) return null;
+        return {
+          index: idx,
+          values: Array.from(row.cells).map((cell, i) => {
+            if(i === 0){
+              return true; // checked
+            }
+
+            const text = cell.innerText.trim();
+            return text === "" ? null : text;  
+          })
+        };
+    }).filter(v => v !== null);
+
+    return [data.map(v => v.values), data.map(v => v.index)]
   }
   function updateTableCell(tableId, rowIndex, colIndex, value, editable=false) {
     const table = document.getElementById(tableId);
@@ -942,9 +949,9 @@ document.getElementById("definition_lower").addEventListener("click", () => {
   //-------------------------------------------------------------------------------------------
 document.getElementById("calcButton").addEventListener("click", () => {
   //get data
-  let targetData = getTableData("target_table");
+  const [targetData, targetIdx] = getTableData("target_table");
   //const filteredTargetData = targetData.filter(row => row[0]===true);
-  let depthData  = getTableData("depth_table");
+  const [depthData] = getTableData("depth_table");
 
   if(targetData.length==0 || depthData.length==0) return;
 
@@ -954,7 +961,7 @@ document.getElementById("calcButton").addEventListener("click", () => {
   });
   depthData.sort((item1, item2) => {
     return parseFloat(item1[1]) - parseFloat(item2[1]);
-  });
+  });4
 
   //get hole/section data
   const holeIdx = document.getElementById("holeOptions").value;
@@ -962,7 +969,7 @@ document.getElementById("calcButton").addEventListener("click", () => {
 
   const holeId = holeList[holeIdx][1];
   const secId  = sectionList[holeIdx][sectionIdx][1];
-  
+
   //calc main
   let resultList = window.DividerApi.dividerConverter([holeId, secId, depthData], targetData, calcDirection);
   console.log("[divider]: calced results", resultList);
@@ -971,44 +978,39 @@ document.getElementById("calcButton").addEventListener("click", () => {
     return
   }
 
-  //for plot
-  interpolatedData = resultList;
+  //for counts
+  const table = document.getElementById("target_table");
+  const tbody = table.querySelector("tbody");
+  const rows = Array.from(tbody.rows);
 
   //apply table
-  for(let i=0;i<resultList.length;i++){
-    const result = resultList[i];
+  for(let i=0;i<rows.length;i++){
+    if(targetIdx.includes(i)){
+      const idx = targetIdx.indexOf(i);
+      const result = resultList[idx];
 
-    updateTableCell("target_table", i, 1, result.name); //name
-    updateTableCell("target_table", i, 2, result.actual_distance_upper==null ? NaN : Math.round(result.actual_distance_upper * 10) / 10); //actural upper
-    updateTableCell("target_table", i, 3, result.actual_distance_lower==null ? NaN : Math.round(result.actual_distance_lower * 10) / 10); //actural lower
-    updateTableCell("target_table", i, 4, result.definition_distance_upper==null ? NaN : Math.round(result.definition_distance_upper * 10) / 10); //definition upper
-    updateTableCell("target_table", i, 5, result.definition_distance_lower==null ? NaN: Math.round(result.definition_distance_lower * 10) / 10); //definition lower
-    updateTableCell("target_table", i, 6, result.age_mid_upper==null ? NaN : Math.round(result.age_mid_upper * 10) / 10); //age upper
-    updateTableCell("target_table", i, 7, result.age_mid_lower==null ? NaN : Math.round(result.age_mid_lower * 10) / 10); //age lower
-    updateTableCell("target_table", i, 8, result.calc_type_upper +"/"+ result.calc_type_lower); //polation type
-
-    /*
-    name:    targetRowData[0],
-    project: depthList[0].project_name,
-    hole:    depthList[0].hole_name,
-    section: depthList[0].section_name,
-    definition_distance_lower:null,
-    definition_distance_upper:null,
-    definition_cd_upper: null,
-    definition_cd_lower: null,
-    definition_efd_upper: null,
-    definition_efd_lower: null,
-    target_distance_lower: parseFloat(targetRowData[2]),
-    target_distance_upper: parseFloat(targetRowData[1]),
-    age_mid_lower:null,
-    age_mid_upper:null,
-    age_upper_lower:null,
-    age_upper_upper:null,
-    age_lower_lower:null,
-    age_lower_upper:null,
-    calc_type_upper: null,
-    calc_type_lower: null
-    */
+      updateTableCell("target_table", targetIdx[idx], 1, result.name); //name
+      updateTableCell("target_table", targetIdx[idx], 2, result.actual_distance_upper==null ? NaN : Math.round(result.actual_distance_upper * 10) / 10); //actural upper
+      updateTableCell("target_table", targetIdx[idx], 3, result.actual_distance_lower==null ? NaN : Math.round(result.actual_distance_lower * 10) / 10); //actural lower
+      updateTableCell("target_table", targetIdx[idx], 4, result.definition_distance_upper==null ? NaN : Math.round(result.definition_distance_upper * 10) / 10); //definition upper
+      updateTableCell("target_table", targetIdx[idx], 5, result.definition_distance_lower==null ? NaN: Math.round(result.definition_distance_lower * 10) / 10); //definition lower
+      updateTableCell("target_table", targetIdx[idx], 6, result.age_mid_upper==null ? NaN : Math.round(result.age_mid_upper * 10) / 10); //age upper
+      updateTableCell("target_table", targetIdx[idx], 7, result.age_mid_lower==null ? NaN : Math.round(result.age_mid_lower * 10) / 10); //age lower
+      updateTableCell("target_table", targetIdx[idx], 8, result.calc_type_upper +"/"+ result.calc_type_lower); //polation type
+    }else{
+      //delete data
+      //updateTableCell("target_table", i, 1, result.name); //name
+      if(calcDirection == "def->act"){
+        updateTableCell("target_table", i, 2, null); //age upper
+        updateTableCell("target_table", i, 3, null); //age lower
+      }else if(calcDirection == "act->def" ){
+        updateTableCell("target_table", i, 4, null); //age upper
+        updateTableCell("target_table", i, 5, null); //age lower
+      }
+      updateTableCell("target_table", i, 6, null); //age upper
+      updateTableCell("target_table", i, 7, null); //age lower
+      updateTableCell("target_table", i, 8, null); //polation type
+    }
   }
 
   updatePlot();
