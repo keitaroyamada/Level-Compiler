@@ -24,7 +24,7 @@ The detailed usage will be uploaded by this summer.
 - 1.2. Load section images ['Load section images' (English / 日本語)](https://youtu.be/wR7f6GwND_s)
 - 1.3. Plot data -Plotter-
 - 1.4. Batch depth conversion -Converter-
-- 1.5. Calc sampling depth -Divider-
+- 1.5. Calc sampling depth -Divider- ['Divider Usage (English / 日本語)'](https://youtu.be/WAslven5zdE)
 - 2.1. Description on core image -Labeler-   ['Labeler Usage (English / 日本語)'](https://youtu.be/SkIqG0wph_U)
 - 2.2. Make model from GUI  ['Make model by GUI (English / 日本語)'](https://youtu.be/iKafKTT8cCY)
 - 2.3. Make model from spreadsheet  ['Make model by csv (English / 日本語)'](https://youtu.be/sbdBxqxL3Cc)  
