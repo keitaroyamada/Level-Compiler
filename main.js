@@ -885,8 +885,10 @@ function createMainWIndow() {
     progressBar = null;
     progressBar = progressDialog(mainWindow, tit, txt, indeterminate);
 
-    await new Promise(resolve => setTimeout(resolve, 100));
-    progressBar.detail = "Processing...";
+    if(progressBar){
+      await new Promise(resolve => setTimeout(resolve, 100));
+      progressBar.detail = "Processing...";
+    }    
   });
   ipcMain.handle("updateProgressbar", async (_e, n, N) => {
     progressBar = await updateProgress(progressBar, n, N);
@@ -1671,7 +1673,7 @@ function createMainWIndow() {
       return false;
     }
   });
-  ipcMain.handle("LabelerSaveData", (_e, data) => {
+  ipcMain.handle("LabelerSaveData", async(_e, data) => {
     /*
     let data = {
         hole_name: holeName,
@@ -1689,31 +1691,26 @@ function createMainWIndow() {
 
     const dataName  = data.hole_name +"-"+ data.section_name;
 
-      dialog
-      .showOpenDialog(
-        labelerWindow,
-        {
-        title: "Please select a folder to save",
-        defaultPath: app.getPath("desktop"),
-        buttonLabel: "Save",
-        properties: ["openDirectory", "createDirectory"],
-      })
-      .then((result) => {
+   
+      try{
+        const result = await dialog.showOpenDialog(labelerWindow, {
+          title: "Please select a folder to save",
+          defaultPath: app.getPath("desktop"),
+          buttonLabel: "Save",
+          properties: ["openDirectory", "createDirectory"],
+        });
+
         if (!result.canceled && result.filePaths[0]) {
-          //save original image
           fs.writeFileSync(path.join(result.filePaths[0], dataName+".jpg"), originalImage);
-          //save labeled image
           fs.writeFileSync(path.join(result.filePaths[0], dataName+"_definition.jpg"), labeledImage);
-          //save annotation
           fs.writeFileSync(path.join(result.filePaths[0], dataName+".lcsection"), annotationData);
-          console.log("MAIN: Save "+dataName+" at "+path.join(result.filePaths[0]))
-          return true
+          console.log("MAIN: Save "+dataName+" at "+path.join(result.filePaths[0]));
+          return true;
         }
-      })
-      .catch((err) => {
+      }catch(err){
         console.log(err);
         return err;
-      });
+      };
       
 
   });
