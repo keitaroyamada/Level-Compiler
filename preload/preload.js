@@ -91,6 +91,7 @@ contextBridge.exposeInMainWorld("LCapi", {
   changeEditMode:(args1) => ipcRenderer.invoke("changeEditMode",args1),
   sendSettings:(args1,args2) => ipcRenderer.invoke("sendSettings",args1,args2),
   getDisplayInfo:() => ipcRenderer.invoke("getDisplayInfo"),
+  changeEnable:(args1,args2) => ipcRenderer.invoke("changeEnable",args1,args2),
 
 
   sendUndo: (args1) => ipcRenderer.invoke('sendUndo',args1),

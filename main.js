@@ -3234,8 +3234,17 @@ function createMainWIndow() {
     }
   });
   ipcMain.handle("deleteProject", async(_e, projectId) => {
-    
-    const result = LCCore.deleteProject(projectId);
+    const options = {
+      type: "question",
+      buttons: ["No", "Yes"],
+      defaultId: 0,
+      title: "Dlete Project",
+      message: "Do you aslo want to delete the connections between projects?",
+    };
+
+    const { response } = await dialog.showMessageBox(mainWindow, options);
+console.log(response)
+    const result = LCCore.deleteProject(projectId, response);
 
     if (result == true) {
       console.log("MAIN: Delete project completed.");
@@ -3298,7 +3307,17 @@ function createMainWIndow() {
       return result
     }
   });
-  
+  ipcMain.handle("changeEnable", async(_e, targetId, isEnable) => {
+    const result = LCCore.changeEnable(targetId, isEnable);
+
+    if (result == true) {
+      console.log("MAIN: Change model enables.");
+      return result;
+    } else {
+      console.log("MAIN: Failed to change model enables.");
+      return result
+    }
+  });
   
   //--------------------------------------------------------------------------------------------------  
   //--------------------------------------------------------------------------------------------------

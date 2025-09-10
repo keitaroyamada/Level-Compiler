@@ -1075,6 +1075,8 @@ class LevelCompilerCore extends EventEmitter{
               let transferMarkerData = null;
               for (let i = 0; i < currentMarkerData.h_connection.length; i++){
                 let tempMarkerData = this.getDataByIdx(this.search_idx_list[currentMarkerData.h_connection[i]]);
+                if(!tempMarkerData) continue;//continue // under construction                
+                
                 if (tempMarkerData.isMaster == true){
                   //if connect master marker
                   transferMarkerData = tempMarkerData;
@@ -1087,6 +1089,8 @@ class LevelCompilerCore extends EventEmitter{
               let transferMarkerData = null;
               for (let i = 0; i < currentMarkerData.h_connection.length; i++){
                 let tempMarkerData = this.getDataByIdx(this.search_idx_list[currentMarkerData.h_connection[i]]);
+                if(!tempMarkerData) continue;//continue // under construction 
+
                 if (tempMarkerData.isMaster == true){
                   //if connect master marker
                   transferMarkerData = tempMarkerData;
@@ -3126,6 +3130,9 @@ class LevelCompilerCore extends EventEmitter{
       //get marker data
       //console.log(currentMarkerId+"=>"+hNeighborMarkerIds[h])
       const neighborMarkerIdx  = this.search_idx_list[hNeighborMarkerIds[h].toString()];
+      if(!neighborMarkerIdx){
+        continue; // under construction
+      }
       const neighborMarkerData = this.projects[neighborMarkerIdx[0]].holes[neighborMarkerIdx[1]].sections[neighborMarkerIdx[2]].markers[neighborMarkerIdx[3]];
      
       //get master connection
@@ -5097,7 +5104,7 @@ class LevelCompilerCore extends EventEmitter{
     return true;
 
   }
-  deleteProject(projectId){
+  deleteProject(projectId, isDeleteConnection = true){
     this.setStatus("running","start deleteProject");
     this.updateSearchIdx();
     const projectIdx = this.search_idx_list[projectId.toString()];
@@ -5113,26 +5120,38 @@ class LevelCompilerCore extends EventEmitter{
     }
         
     //delete connection
-    for(let p=0; p<this.projects.length;p++){
-      for(let h=0;h<this.projects[p].holes.length;h++){
-        for(let s=0;s<this.projects[p].holes[h].sections.length;s++){
-          for(let m=0;m<this.projects[p].holes[h].sections[s].markers.length;m++){
-            //remove deleted h_connection
-            this.projects[p].holes[h].sections[s].markers[m].h_connection
-              = this.projects[p].holes[h].sections[s].markers[m].h_connection.filter(hc=>!deleteList.has(hc.toString()));
-            //remove deleted v_connection
-            this.projects[p].holes[h].sections[s].markers[m].v_connection
-              = this.projects[p].holes[h].sections[s].markers[m].v_connection.filter(vc=>!deleteList.has(vc.toString()));
-            //Initialise
-            this.projects[p].holes[h].sections[s].markers[m].composite_depth = null;
-            this.projects[p].holes[h].sections[s].markers[m].event_free_depth = null;
+    if(isDeleteConnection){
+      for(let p=0; p<this.projects.length;p++){
+        for(let h=0;h<this.projects[p].holes.length;h++){
+          for(let s=0;s<this.projects[p].holes[h].sections.length;s++){
+            for(let m=0;m<this.projects[p].holes[h].sections[s].markers.length;m++){
+              //remove deleted h_connection
+              this.projects[p].holes[h].sections[s].markers[m].h_connection
+                = this.projects[p].holes[h].sections[s].markers[m].h_connection.filter(hc=>!deleteList.has(hc.toString()));
+              //remove deleted v_connection
+              this.projects[p].holes[h].sections[s].markers[m].v_connection
+                = this.projects[p].holes[h].sections[s].markers[m].v_connection.filter(vc=>!deleteList.has(vc.toString()));
+              //Initialise
+              this.projects[p].holes[h].sections[s].markers[m].composite_depth = null;
+              this.projects[p].holes[h].sections[s].markers[m].event_free_depth = null;
+            }
           }
         }
       }
-    }
+    }    
     
     //delete project
-    this.projects = this.projects.filter(project=>project.id.toString()!==projectId.toString());   
+    this.projects = this.projects.filter(project=>project.id.toString()!==projectId.toString());
+
+    //update base id
+    if(this.base_project_id[0] == projectId[0]){
+      //if delete master "correlation" project
+      if(this.projects.length>0){
+        this.base_project_id = this.projects[0].id;
+      }else{
+        this.base_project_id = null;
+      }      
+    }    
 
     this.updateSearchIdx();
     this.calcCompositeDepth();
@@ -5282,6 +5301,18 @@ class LevelCompilerCore extends EventEmitter{
       this.setStatus("completed","");
       return true;
     }
+  }
+  changeEnable(targetId, isEnable){
+    this.setStatus("running","start change enable");
+    this.updateSearchIdx();
+    const idx = this.search_idx_list[targetId.toString()];
+    const targetData = this.getDataByIdx(idx);
+
+    targetData.enable = isEnable;
+
+    console.log("MAIN: Change enable of " + targetData.name + ".");
+    this.setStatus("completed","");
+    return true;
   }
   searchHconnection(startId) {
     this.setStatus("running","searchHconnection");

@@ -1,7 +1,6 @@
 document.addEventListener("DOMContentLoaded", () => {
  
   //============================================================================================xxxxxxxxxx
-  let developerMode = false;
   //base properties
   const scroller = document.getElementById("scroller");
   let canvasBase = document.getElementById("canvasBase");
@@ -62,6 +61,7 @@ document.addEventListener("DOMContentLoaded", () => {
       plot:{},
       edit:{},
       image:{},
+      developer:{},
     };
     objOpts.canvas.depth_scale = "composite_depth";
     objOpts.canvas.zoom_level = [4, 3]; //[x, y](300pix/1m)
@@ -175,6 +175,9 @@ document.addEventListener("DOMContentLoaded", () => {
     objOpts.edit.handleClick = null;
     objOpts.edit.handleMove = null;
     objOpts.edit.passwards = "admin";
+
+    objOpts.developer.developerMode = false;
+
   
     objOpts.pen.colour = "Red";
     objOpts.image.dpcm = 30;
@@ -232,7 +235,7 @@ document.addEventListener("DOMContentLoaded", () => {
   //============================================================================================
   //hide test event
   document.getElementById("footerLeftText").addEventListener("click", async () => {
-    if(developerMode){
+    if(objOpts.developer.developerMode){
       const results = await window.LCapi.getDisplayInfo();
 
       const dpi = results.height / objOpts.canvas.display_height; // hight is already divided by scale factor
@@ -809,7 +812,7 @@ document.addEventListener("DOMContentLoaded", () => {
   //Edit correlation model
   document.addEventListener('contextmenu', handleNormalContextmenu);
   window.LCapi.receive("EditCorrelation", async () => {
-    if(!developerMode && !objOpts.edit.editable){   
+    if(!objOpts.developer.developerMode && !objOpts.edit.editable){   
       const askData = {
         title:"Edit model",
         label:"Please enter passwards.",
@@ -3089,7 +3092,7 @@ document.addEventListener("DOMContentLoaded", () => {
   });
   //============================================================================================
   //check hole list
-  document.querySelector("#hole_list").addEventListener("change", function (event) {
+  document.querySelector("#hole_list").addEventListener("change", async function (event) {
       if (event.target.type === "checkbox") {
         //get id
         const target_id = event.target.id.split(",");
@@ -3110,14 +3113,20 @@ document.addEventListener("DOMContentLoaded", () => {
           LCCore.projects[target_idx[0]].enable = setVal;
           //backup
           backup_hole_enable[LCCore.projects[target_idx[0]].id.toString()] = setVal;
-          LCCore.projects[target_idx[0]].holes.forEach((hole) => {
+          for(let h=0; h<LCCore.projects[target_idx[0]].holes.length;h++){
+            const hole = LCCore.projects[target_idx[0]].holes[h];
             hole.enable = setVal;
             const el = document.getElementById(hole.id.toString());
             el.checked = setVal;
             //backup
             backup_hole_enable[hole.id.toString()] = setVal;
+            //update model
+            if(objOpts.edit.editable){
+              await window.LCapi.changeEnable(hole.id, setVal);
+            }
+            
             console.log("[Renderer]: Hole "+hole.name +" is "+setType+".");
-          });
+          }
         } else {
           //case hole selected
           LCCore.projects[target_idx[0]].holes[target_idx[1]].enable = setVal;
@@ -3136,16 +3145,25 @@ document.addEventListener("DOMContentLoaded", () => {
             document.getElementById([target_id[0],null,null,null].toString()).checked = false;            
             LCCore.projects[target_idx[0]].enable = false;
             //backup
+            //update model
+            if(objOpts.edit.editable){
+              await window.LCapi.changeEnable(LCCore.projects[target_idx[0]].id, false);
+            }
+
             backup_hole_enable[LCCore.projects[target_idx[0]].id.toString()] = false;
           }else{
             document.getElementById([target_id[0],null,null,null].toString()).checked = true;
             LCCore.projects[target_idx[0]].enable = true;
             //backup
-           backup_hole_enable[LCCore.projects[target_idx[0]].id.toString()] = true;
+            //update model
+            if(objOpts.edit.editable){
+              await window.LCapi.changeEnable(LCCore.projects[target_idx[0]].id, true);
+            }            
+
+            backup_hole_enable[LCCore.projects[target_idx[0]].id.toString()] = true;
           }
         }
 
-         
         //console.log(LCCore);
         //update plot
         updateView();
@@ -3450,6 +3468,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const pen = objOpts.pen;
     const plot = objOpts.plot; 
     const image = objOpts.image;
+    const developer = objOpts.developer;
     const options={
       editable:true,
       called_from:"renderer",
@@ -3469,6 +3488,7 @@ document.addEventListener("DOMContentLoaded", () => {
         age,
         pen,
         image,
+        developer,
       }
     };
       
@@ -3493,6 +3513,7 @@ document.addEventListener("DOMContentLoaded", () => {
       const pen = objOpts.pen;
       const image = objOpts.image; 
       const plot = objOpts.plot; 
+      const developer = objOpts.developer; 
 
       const settings = {
         canvas,
@@ -3505,9 +3526,10 @@ document.addEventListener("DOMContentLoaded", () => {
         age,
         pen,
         image,  
+        developer,
       };
         
-    await window.LCapi.sendSettings(settings, "settings");
+      await window.LCapi.sendSettings(settings, "settings");
     }else{
       Object.assign(objOpts.canvas, data.canvas);
       Object.assign(objOpts.project, data.project);
@@ -3519,6 +3541,7 @@ document.addEventListener("DOMContentLoaded", () => {
       Object.assign(objOpts.age, data.age);
       Object.assign(objOpts.pen, data.pen);
       Object.assign(objOpts.image, data.image); 
+      Object.assign(objOpts.developer, data.developer); 
     }
     
     console.log("[RENDERER]: Setting is updated.",data)
@@ -3588,7 +3611,7 @@ document.addEventListener("DOMContentLoaded", () => {
     
     //get/show footer text
     let options = {canvas:{depth_scale: objOpts.canvas.depth_scale, age_precision: objOpts.canvas.age_precision}};
-    if(developerMode){
+    if(objOpts.developer.developerMode){
       options.canvas.depth_scale = "canvas_position";
     }
     
@@ -3665,7 +3688,7 @@ document.addEventListener("DOMContentLoaded", () => {
       if (event.shiftKey) {
         //change hole distance
         event.preventDefault();
-        objOpts.hole.distance -= 0.01 * deltaY;
+        objOpts.hole.distance += 0.01 * deltaY;
         objOpts.connection.indexWidth = objOpts.hole.distance * 0.7;
         //objOpts.connection.indexWidth += 0.015 * deltaY;
         if (objOpts.connection.indexWidth < 0) {
@@ -4257,7 +4280,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
       //main
       let isBbaseProjectMaster = false;
-      const baseProjectIdx = getIdxById(LCCore, LCCore.base_project_id); 
+      const baseProjectIdx = getIdxById(LCCore, LCCore.base_project_id);
+      //console.log(LCCore.base_project_id, baseProjectIdx) 
       if(LCCore.projects[baseProjectIdx[0]].model_type == "correlation"){
         isBbaseProjectMaster = true;
       }      
@@ -4296,7 +4320,7 @@ document.addEventListener("DOMContentLoaded", () => {
         if(project.enable == true){
           //show project name
           let projectDispName = project.name; 
-          if(developerMode){
+          if(objOpts.developer.developerMode){
             projectDispName = project.id[0].slice(0,5);
           }
           
@@ -4372,7 +4396,7 @@ document.addEventListener("DOMContentLoaded", () => {
           let hole_x0 = (objOpts.hole.distance + objOpts.hole.width) * (num_disable.total + hole.order - num_disable.hole);
           //add  hole name---------------------------------------------------
           let holeDispName = hole.name; 
-          if(developerMode){
+          if(objOpts.developer.developerMode){
             holeDispName = hole.id[1].slice(0,5);
           }
           sketch.fill(objOpts.hole.font_colour);
@@ -4579,7 +4603,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
             //add section name-------------------------------------------------
             let secDispName = hole.name + "-" + section.name; 
-            if(developerMode){
+            if(objOpts.developer.developerMode){
               secDispName = section.id[2].slice(0,5);
             }
 
@@ -4866,7 +4890,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 //add marker name--------------------------------------------
                 if (m !== 0 && m !== section.markers.length - 1) {
                   let markerDispName = marker.name;
-                  if(developerMode){
+                  if(objOpts.developer.developerMode){
                     markerDispName = marker.id[3].slice(0,5);
                   }
                   sketch.fill(objOpts.marker.font_colour);
@@ -6304,7 +6328,6 @@ document.addEventListener("DOMContentLoaded", () => {
       if (vectorObjects == null) {
         vectorObjects = new p5(p5Sketch);
       }
-
       document.getElementById("p5Canvas").style.display = "block";
       document.getElementById("rasterCanvas").style.display = "none";
 
@@ -6482,8 +6505,10 @@ function getNearestConnectedMarkerIdx(LCCore, idFrom, objOpts) {
   } else {
     currentMarkerData.h_connection.forEach((c) => {
       const idx = this.getIdxById(LCCore, c);
-      if (LCCore.projects[idx[0]].holes[idx[1]].sections[idx[2]].markers[idx[3]].isMaster) {
-        isMasterConnection += 1;
+      if (idx.every(id=>id!==null)){
+        if (LCCore.projects[idx[0]].holes[idx[1]].sections[idx[2]].markers[idx[3]].isMaster) {
+          isMasterConnection += 1;
+        }
       }
     });
   }
@@ -6493,52 +6518,38 @@ function getNearestConnectedMarkerIdx(LCCore, idFrom, objOpts) {
   let connectedHoleData    = null;
   let connectedProjectData = null;
 
-  //check and replace connection---------------------------------------------------------------------------
+  if(currentMarkerData.h_connection.length==0) return null;
+  let idTo;
+  let idxTo;
+  let listTo;
+  let connectedTotalOrder = Infinity;
+  for (let i = 0; i < currentMarkerData.h_connection.length; i++) {
+    //get 2nd or later index
+    idTo = currentMarkerData.h_connection[i];
+    idxTo = this.getIdxById(LCCore, idTo);
+    if(idxTo.every(id=>id===null)) continue
+    listTo = getListIdx(holeList, idxTo[0], idxTo[1]);
 
-  //get first data beacause some case include only single connection
-  let idTo   = currentMarkerData.h_connection[0];
-  let idxTo  = this.getIdxById(LCCore, idTo);
-  let listTo = getListIdx(holeList, idxTo[0], idxTo[1]);
-  let connectedTotalOrder = holeList[listTo][0];
-
-  //if next marker order is large and enable, get
-  if (connectedTotalOrder > currentTotalOrder && LCCore.projects[idxTo[0]].holes[idxTo[1]].enable) {
-    connectedMarkerData = LCCore.projects[idxTo[0]].holes[idxTo[1]].sections[idxTo[2]].markers[idxTo[3]];
-    connectedHoleData   = LCCore.projects[idxTo[0]].holes[idxTo[1]];
-    connectedProjectData= LCCore.projects[idxTo[0]];
-  } else {
-    //case lost connected marker and remains only connection (unsuspected error)
-  }
-
-  //if find marker located in nearer hole, replace---------------------------------------------
-  if (currentMarkerData.h_connection.length > 1) {
-    for (let i = 1; i < currentMarkerData.h_connection.length; i++) {
-      //get 2nd or later index
-      idTo = currentMarkerData.h_connection[i];
-      idxTo = this.getIdxById(LCCore, idTo);
-      let listTo = getListIdx(holeList, idxTo[0], idxTo[1]);
-
-      //new connection available
-      if (connectedHoleData !== null) {
-        if (holeList[listTo][0] > currentTotalOrder && holeList[listTo][0] < connectedTotalOrder && LCCore.projects[idxTo[0]].holes[idxTo[1]].enable ) {
-          //if connected hole has large order, enable but the order smaller (nearer place in canvas) than stocked one.
-          connectedMarkerData  = LCCore.projects[idxTo[0]].holes[idxTo[1]].sections[idxTo[2]].markers[idxTo[3]];
-          connectedHoleData    = LCCore.projects[idxTo[0]].holes[idxTo[1]];
-          connectedProjectData = LCCore.projects[idxTo[0]];
-          connectedTotalOrder  = holeList[listTo][0];
-        }
-      } else {
-        //previously checked connection is died (unsuspected error)
-        if (holeList[listTo][0] > currentTotalOrder && LCCore.projects[idxTo[0]].holes[idxTo[1]].enable) {
-          connectedMarkerData  = LCCore.projects[idxTo[0]].holes[idxTo[1]].sections[idxTo[2]].markers[idxTo[3]];
-          connectedHoleData    = LCCore.projects[idxTo[0]].holes[idxTo[1]];
-          connectedProjectData = LCCore.projects[idxTo[0]];
-          connectedTotalOrder  = holeList[listTo][0];
-        }
+    //new connection available
+    if (connectedHoleData !== null) {
+      if (holeList[listTo][0] > currentTotalOrder && holeList[listTo][0] < connectedTotalOrder && LCCore.projects[idxTo[0]].holes[idxTo[1]].enable ) {
+        //if connected hole has large order, enable but the order smaller (nearer place in canvas) than stocked one.
+        connectedMarkerData  = LCCore.projects[idxTo[0]].holes[idxTo[1]].sections[idxTo[2]].markers[idxTo[3]];
+        connectedHoleData    = LCCore.projects[idxTo[0]].holes[idxTo[1]];
+        connectedProjectData = LCCore.projects[idxTo[0]];
+        connectedTotalOrder  = holeList[listTo][0];
+      }
+    } else {
+      //previously checked connection is died (unsuspected error)
+      if (holeList[listTo][0] > currentTotalOrder && LCCore.projects[idxTo[0]].holes[idxTo[1]].enable) {
+        connectedMarkerData  = LCCore.projects[idxTo[0]].holes[idxTo[1]].sections[idxTo[2]].markers[idxTo[3]];
+        connectedHoleData    = LCCore.projects[idxTo[0]].holes[idxTo[1]];
+        connectedProjectData = LCCore.projects[idxTo[0]];
+        connectedTotalOrder  = holeList[listTo][0];
       }
     }
   }
-    
+  if(connectedTotalOrder===Infinity) return null
 
   //count num disable holes between connection for plot x position------------------------------
   if (connectedHoleData == null) {
@@ -6591,6 +6602,15 @@ function getNearestConnectedMarkerIdx(LCCore, idFrom, objOpts) {
     //if all connected markers are died(unsuspected error)
     return null;
   } else {
+    //check bidirectional connection
+    let isBiconnect = false;
+    connectedMarkerData.h_connection.forEach(hc=>{
+      if(hc.toString() === idFrom.toString()){
+        isBiconnect = true;
+      }
+    });
+    if(!isBiconnect) return null;
+
     //check is ringht next for plot style
     let isNext = false;
     const idxTo = this.getIdxById(LCCore, connectedMarkerData.id);
