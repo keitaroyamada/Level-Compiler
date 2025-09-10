@@ -13,16 +13,15 @@
   "author": "ky",
   "license": "MIT",
   "dependencies": {
-    "csv-parse": "^5.6.0",
-    "csv-stringify": "^6.5.2",
+    "csv-parse": "^6.1.0",
+    "csv-stringify": "^6.6.0",
     "electron-progressbar": "^2.2.1",
     "electron-prompt": "^1.7.0",
     "electron-updater": "^6.6.2",
     "jsondiffpatch": "^0.7.3",
     "jszip": "^3.10.1",
     "license-checker": "^25.0.1",
-    "mathjs": "^14.5.3",
-    "sharp": "^0.34.2"
+    "sharp": "^0.34.3"
   },
   "build": {
     "appId": "io.github.ky_apps.Level-Compiler",
@@ -55,7 +54,7 @@
     ]
   },
   "devDependencies": {
-    "@emnapi/runtime": "^1.4.3",
+    "@emnapi/runtime": "^1.5.0",
     "electron": "^36.3.1",
     "electron-builder": "^25.1.8",
     "electronmon": "^2.0.3"

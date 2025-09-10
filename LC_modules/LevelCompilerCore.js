@@ -10,7 +10,6 @@ const { copyFileSync } = require("original-fs");
 const { setegid } = require("process");
 const { Console } = require("console");
 const { randomUUID: uuidv4 } = require("crypto");
-const math = require('mathjs');
 
 class LevelCompilerCore extends EventEmitter{
   constructor() {
