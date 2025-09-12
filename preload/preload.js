@@ -97,6 +97,8 @@ contextBridge.exposeInMainWorld("LCapi", {
   sendUndo: (args1) => ipcRenderer.invoke('sendUndo',args1),
   sendRedo: (args1) => ipcRenderer.invoke('sendRedo',args1),
   sendSaveState: (args1, args2) => ipcRenderer.invoke('sendSaveState',args1, args2),  
+  getChangedSectionIds: (args1,args2) => ipcRenderer.invoke('getChangedSectionIds',args1,args2),
+  
  
   //main -> renderer
   receive: (channel, func) => {

@@ -2504,6 +2504,15 @@ function createMainWIndow() {
       return true;
     }
   });
+  ipcMain.handle("getChangedSectionIds", async (_e, type, numPrevious) => {
+    if(type=="main"){
+      const result = history.getDelta(numPrevious);
+      const ids = getChangedSectionIds(history.lastState, result);
+
+      console.log("MAIN: Get state differences.");    
+      return ids;
+    }
+  });
   function getChangedSections(delta) {
     if (!delta?.projects) {
         return [];
@@ -2533,20 +2542,80 @@ function createMainWIndow() {
                 const sDelta = sectionsDelta[sk];
                 const si = +sk.replace(/^_/, '');
 
-                // セクションの削除
                 if (sk.startsWith('_')) {
-                    changed.add(JSON.stringify({ project: pi, hole: hi, section: si, change: 'deleted' }));
-                } 
-                // セクションの追加または変更
-                else {
-                    if (Object.keys(sDelta).length > 0) {
-                        changed.add(JSON.stringify({ project: pi, hole: hi, section: si, change: 'updated' }));
+                    changed.add(JSON.stringify({ 
+                      project: pi, 
+                      hole: hi, 
+                      section: si, 
+                      change: 'deleted', 
+                      details: ["distance", "age", "composite_depth", "event_free_depth", "drilling_depth"]
+                    }));
+                } else if (Array.isArray(sDelta) && sDelta.length === 1 && typeof sDelta[0] === 'object') {
+                  const details = new Set();
+                  if (sDelta[0].markers) {
+                    for (const marker of sDelta[0].markers) {
+                      if ("distance" in marker)        details.add("distance");
+                      if ("age" in marker)             details.add("age");
+                      if ("composite_depth" in marker) details.add("composite_depth");
+                      if ("event_free_depth" in marker) details.add("event_free_depth");
+                      if ("drilling_depth" in marker)  details.add("drilling_depth");
                     }
+                  }
+
+                  changed.add(JSON.stringify({
+                    project: pi, 
+                    hole: hi, 
+                    section: si, 
+                    change: 'added',
+                    details:Array.from(details)
+                  }));
+                } else if (sDelta && Object.keys(sDelta).length > 0) {
+                  const details = new Set();
+                  if (sDelta.markers) {
+                    const markersDelta = sDelta.markers;
+                    for (const mk in markersDelta) {
+                      if (mk === "_t") continue;
+                      const mDelta = markersDelta[mk];
+                      if (mDelta?.distance)        details.add("distance");
+                      if (mDelta?.age)             details.add("age");
+                      if (mDelta?.composite_depth) details.add("composite_depth");
+                      if (mDelta?.event_free_depth) details.add("event_free_depth");
+                      if (mDelta?.drilling_depth)  details.add("drilling_depth");
+                    }
+                  }
+                  changed.add(JSON.stringify({
+                    project: pi, 
+                    hole: hi, 
+                    section: si, 
+                    change: 'updated',
+                    details:Array.from(details)
+                  }));
                 }
             }
         }
     }
     return Array.from(changed).map(item => JSON.parse(item));
+  }
+  function getChangedSectionIds(lastState, delta) {
+    const changes = getChangedSections(delta);
+    const ids = [];
+
+    for (const c of changes) {
+      if (c.change === "updated" || c.change === "added") {
+        const sec = lastState
+          ?.projects?.[c.project]
+          ?.holes?.[c.hole]
+          ?.sections?.[c.section];
+        if (sec?.id) ids.push({ id: sec.id, change: c.change, details:c.details });
+      } else if (c.change === "deleted") {
+        const deleted = delta.projects?.[c.project]
+          ?.holes?.[c.hole]
+          ?.sections?.[`_${c.section}`]?.[0];
+        if (deleted?.id) ids.push({ id: deleted.id, change: c.change, details:c.details });
+      }
+    }
+
+    return ids;
   }
   //------------------------------------------------------------------------------------------------
   //for converter

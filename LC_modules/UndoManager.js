@@ -2,7 +2,7 @@
 
 const jsondiffpatch = require('jsondiffpatch').create({
     objectHash: function(obj, index) {
-    if (!obj || typeof obj !== 'object') return '$$' + index; // ★ガード
+    if (!obj || typeof obj !== 'object') return '$$' + index;
         const id = obj.id;
 
         // if string id
@@ -63,6 +63,37 @@ class UndoManager {
         }
 
         this.lastState = JSON.parse(JSON.stringify(currentState));
+    }
+
+    /**
+     * @param {number} numPrevious Number of generations back to reference for the difference
+     */
+    getDelta(numPrevious) { 
+        if (this.undoStack.length === 0) {
+            console.warn("UndoManager: No saved states.");
+            return null;
+        }
+
+        const idx = (this.undoStack.length - 1) - (numPrevious - 1);
+        if (idx < 0) {
+            console.warn("UndoManager: Requested generation is out of range.");
+            return null;
+        }
+        
+        if (idx < 0 || idx >= this.undoStack.length) {
+            console.warn("UndoManager: Requested generation is out of range.");
+            return null;
+        }
+        return this.undoStack[idx].delta;
+    }
+    /**
+     * @returns {Array<{name: string, delta: object}>}
+     */
+    getHistory() {
+        return this.undoStack.map(entry => ({
+            name: entry.name,
+            delta: entry.delta
+        }));
     }
 
     /**

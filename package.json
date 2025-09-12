@@ -25,9 +25,7 @@
   },
   "build": {
     "appId": "io.github.ky_apps.Level-Compiler",
-    "npmArgs": [
-      "--include=optional"
-    ],
+    "npmRebuild": false,
     "publish": {
       "provider": "github",
       "owner": "keitaroyamada",

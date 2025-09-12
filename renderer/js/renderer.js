@@ -1658,10 +1658,12 @@ document.addEventListener("DOMContentLoaded", () => {
             if(toMarkerData.depth_source[0]!=="master"){
               targetIds.push(toId);
             } 
-            const affectedSections = getConnectedSectionIds(targetIds);
-            if(affectedSections.length>0){
-              modelImages.load_target_ids = affectedSections;
-              modelImages = await loadCoreImages(modelImages, LCCore, objOpts, ["drilling_depth","composite_depth","event_free_depth", "age"]);
+            const changedData = await getUpdatedSectionIds("depth");
+            console.log("[Renderer]: Affected sections:",changedData);
+            //const affectedSections = getConnectedSectionIds(targetIds);
+            if(changedData.ids.length>0){
+              modelImages.load_target_ids = changedData.ids;
+              modelImages = await loadCoreImages(modelImages, LCCore, objOpts, changedData.details);
             }
             isProcessing = false;
             updateView();
@@ -1689,10 +1691,12 @@ document.addEventListener("DOMContentLoaded", () => {
           if(result==true){
             await undo("save","Connect Sections");//undo
             await loadModel();
-            const affectedSections = getConnectedSectionIds([fromId, toId]);
-            if(affectedSections.length>0){
-              modelImages.load_target_ids = affectedSections;
-              modelImages = await loadCoreImages(modelImages, LCCore, objOpts, ["drilling_depth","composite_depth","event_free_depth", "age"]);
+            const changedData = await getUpdatedSectionIds("depth");
+            console.log("[Renderer]: Affected sections:",changedData);
+            //const affectedSections = getConnectedSectionIds([fromId, toId]);
+            if(changedData.ids.length>0){
+              modelImages.load_target_ids = changedData.ids;
+              modelImages = await loadCoreImages(modelImages, LCCore, objOpts, changedData.details);
             }
             
             updateView();
@@ -1718,10 +1722,12 @@ document.addEventListener("DOMContentLoaded", () => {
             await undo("save","Disconnect Sections");//undo
             await loadModel();
 
-            const affectedSections = getConnectedSectionIds([fromId, toId]);
-            if(affectedSections.length>0){
-              modelImages.load_target_ids = affectedSections;
-              modelImages = await loadCoreImages(modelImages, LCCore, objOpts, ["drilling_depth","composite_depth","event_free_depth", "age"]);
+            const changedData = await getUpdatedSectionIds("depth");
+            console.log("[Renderer]: Affected sections:",changedData);
+            //const affectedSections = getConnectedSectionIds([fromId, toId]);
+            if(changedData.ids.length>0){
+              modelImages.load_target_ids = changedData.ids;
+              modelImages = await loadCoreImages(modelImages, LCCore, objOpts, changedData.details);
             }
   
             updateView();
@@ -1910,7 +1916,7 @@ document.addEventListener("DOMContentLoaded", () => {
         let numMaster = 0;
         for(let hc of LCCore.projects[idx[0]].holes[idx[1]].sections[idx[2]].markers[idx[3]].h_connection){
           const idxh = getIdxById(LCCore, hc);
-          console.log(idx, idxh)
+          
           if(idxh[0] == idx[0]){
             if(LCCore.projects[idxh[0]].holes[idxh[1]].sections[idxh[2]].markers[idxh[3]].isMaster == true){
               numMaster++;
@@ -1929,6 +1935,15 @@ document.addEventListener("DOMContentLoaded", () => {
           await loadModel();
           await loadAge(document.getElementById("AgeModelSelect").value);
           await loadPlotData();
+          
+          const changedData = await getUpdatedSectionIds();          
+          console.log("[Renderer]: Affected sections:",changedData);
+
+          if(changedData.ids.length>0){
+              modelImages.load_target_ids = changedData.ids;
+              modelImages = await loadCoreImages(modelImages, LCCore, objOpts, changedData.details);
+          }
+            
           updateView();
           console.log("[Renderer]: Set a new master.");
         }else{
@@ -2023,11 +2038,13 @@ document.addEventListener("DOMContentLoaded", () => {
             
               console.log("[Renderer]: Disconnect markers: ", disconnectedIds)
 
-              const affectedSections = getConnectedSectionIds(disconnectedIds);
+              const changedData = await getUpdatedSectionIds("depth");          
+              console.log("[Renderer]: Affected sections:",changedData);
+              //const affectedSections = getConnectedSectionIds(disconnectedIds);
               
-              if(affectedSections.length>0){
-                modelImages.load_target_ids = affectedSections;
-                modelImages = await loadCoreImages(modelImages, LCCore, objOpts, ["drilling_depth","composite_depth","event_free_depth", "age"]);
+              if(changedData.ids.length>0){
+                modelImages.load_target_ids = changedData.ids;
+                modelImages = await loadCoreImages(modelImages, LCCore, objOpts, changedData.details);
               }
     
               updateView();
@@ -2302,7 +2319,7 @@ document.addEventListener("DOMContentLoaded", () => {
         if(response2 !== null){
           const upperId   = [ht.project, ht.hole, ht.section, ht.upper_marker];
           const lowerId   = [ht.project, ht.hole, ht.section, ht.lower_marker];
-          console.log("[Editor]: Add event between " + upperId +" and "+lowerId);
+          //console.log("[Editor]: Add event between " + upperId +" and "+lowerId);
 
           let result = null;
           if(["deposition","d","markup","m"].includes(response1.toLowerCase())){
@@ -2319,10 +2336,12 @@ document.addEventListener("DOMContentLoaded", () => {
             await loadModel();
             await loadAge(document.getElementById("AgeModelSelect").value);
             await loadPlotData();
-            const affectedSections = getConnectedSectionIds([upperId, lowerId]);
-            if(affectedSections.length>0){
-              modelImages.load_target_ids = affectedSections;
-              modelImages = await loadCoreImages(modelImages, LCCore, objOpts, ["drilling_depth","event_free_depth", "age"]);
+            const changedData = await getUpdatedSectionIds("depth");          
+            console.log("[Renderer]: Affected sections:",changedData);
+            //const affectedSections = getConnectedSectionIds([upperId, lowerId]);
+            if(changedData.ids.length>0){
+              modelImages.load_target_ids = changedData.ids;
+              modelImages = await loadCoreImages(modelImages, LCCore, objOpts, changedData.details);
             }
 
             console.log("[Renderer]: Add a new event.]");
@@ -2348,10 +2367,12 @@ document.addEventListener("DOMContentLoaded", () => {
           await loadModel();
           await loadAge(document.getElementById("AgeModelSelect").value);
           await loadPlotData();
-          const affectedSections = getConnectedSectionIds([upperId, lowerId]);
-          if(affectedSections.length>0){
-            modelImages.load_target_ids = affectedSections;
-            modelImages = await loadCoreImages(modelImages, LCCore, objOpts, ["drilling_depth","event_free_depth", "age"]);
+          const changedData = await getUpdatedSectionIds("depth");
+          console.log("[Renderer]: Affected sections:",changedData);
+          //const affectedSections = getConnectedSectionIds([upperId, lowerId]);
+          if(changedData.ids.length>0){
+            modelImages.load_target_ids = changedData.ids;
+            modelImages = await loadCoreImages(modelImages, LCCore, objOpts, changedData.details);
           }
           updateView();
           console.log("[Renderer]: Deleted selected event.")
@@ -2665,10 +2686,12 @@ document.addEventListener("DOMContentLoaded", () => {
             if(await window.LCapi.connectMarkers(fromId, toId, "vertical")){
               await undo("save","Connect Sections");//undo
               await loadModel();
-              const affectedSections = getConnectedSectionIds([fromId, toId]);
-              if(affectedSections.length>0){
-                modelImages.load_target_ids = affectedSections;
-                modelImages = await loadCoreImages(modelImages, LCCore, objOpts, ["drilling_depth","composite_depth","event_free_depth", "age"]);
+              const changedData = await getUpdatedSectionIds("depth");
+              console.log("[Renderer]: Affected sections:",changedData);
+              //const affectedSections = getConnectedSectionIds([fromId, toId]);
+              if(changedData.ids.length>0){
+                modelImages.load_target_ids = changedData.ids;
+                modelImages = await loadCoreImages(modelImages, LCCore, objOpts, changedData.details);
               }
               
               updateView();
@@ -2691,11 +2714,12 @@ document.addEventListener("DOMContentLoaded", () => {
             if(await window.LCapi.disconnectMarkers(fromId, toId, "vertical")){
               await undo("save","Disconnect Markers");//undo
               await loadModel();
-
-              const affectedSections = getConnectedSectionIds([fromId, toId]);
-              if(affectedSections.length>0){
-                modelImages.load_target_ids = affectedSections;
-                modelImages = await loadCoreImages(modelImages, LCCore, objOpts, ["drilling_depth","composite_depth","event_free_depth", "age"]);
+              const changedData = await getUpdatedSectionIds("depth");
+              console.log("[Renderer]: Affected sections:",changedData);
+              //const affectedSections = getConnectedSectionIds([fromId, toId]);
+              if(changedData.ids.length>0){
+                modelImages.load_target_ids = changedData.ids;
+                modelImages = await loadCoreImages(modelImages, LCCore, objOpts, changedData.details);
               }
     
               updateView();
@@ -6000,7 +6024,7 @@ document.addEventListener("DOMContentLoaded", () => {
           isConnected = false;
         }
       }
-      console.log(objOpts.edit.editable,isConnected)
+      
       if(!objOpts.edit.editable && !isConnected){
         alert("Please note that loaded model includes a project that is not connected to the master.\n"+
               "The UNCONNECTED project will have its own CD, EFD calculated."
@@ -6363,6 +6387,49 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     return output;
+  }
+  async function getUpdatedSectionIds(mode="normal"){
+    //mode: normal, depth
+    const changedSectionIds = await undo("getChangedSectionIds");
+    
+    let ids = [];
+    let details = new Set();
+    for(let i=0; i< changedSectionIds.length; i++){
+      const changedData = changedSectionIds[i];
+      
+      if(changedData.change == "updated"){
+        if(mode == "depth"){
+          if(changedData.details.includes("drilling_depth") || changedData.details.includes("composite_depth") || changedData.details.includes("event_free_depth") || changedData.details.includes("age")){
+            ids.push(changedData.id);
+            changedData.details.forEach(d=>{
+              details.add(d);
+            })
+          }        
+        }else if(mode == "normal"){
+          ids.push(changedData.id);
+          changedData.details.forEach(d=>{
+            details.add(d);
+          })
+        }        
+      } else if(changedData.change == "deleted"){
+
+      } else if(changedData.change == "added"){
+        if(mode == "depth"){
+          if(changedData.details.includes("drilling_depth") || changedData.details.includes("composite_depth") || changedData.details.includes("event_free_depth") || changedData.details.includes("age")){
+            ids.push(changedData.id);
+            changedData.details.forEach(d=>{
+              details.add(d);
+            })
+          } 
+        }else if(mode == "normal"){
+          ids.push(changedData.id);
+          changedData.details.forEach(d=>{
+            details.add(d);
+          })
+        }
+      }
+    }
+    return {ids: ids, details:Array.from(details)};
   }
   
   //============================================================================================
@@ -6865,15 +6932,16 @@ async function undo(type, name="unnamed"){
     let result;
     if(type == "undo"){
       result = await window.LCapi.sendUndo("main");
-      console.log("[Renderer]: Recieved undo data: "+result);
+      console.log("[Renderer]: Recieved undo data: ",result);
     }else if(type == "redo"){
       result = await window.LCapi.sendRedo("main");
-      console.log("[Renderer]: Recieved redo data: "+result);
+      console.log("[Renderer]: Recieved redo data: ",result);
     }else if(type == "save"){
       result = await window.LCapi.sendSaveState("main", name);
+    }else if(type == "getChangedSectionIds"){
+      result = await window.LCapi.getChangedSectionIds("main", 1);
     }
 
-    
      resolve(result);
   })
 }

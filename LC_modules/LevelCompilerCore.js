@@ -1496,12 +1496,15 @@ class LevelCompilerCore extends EventEmitter{
             }else{
               marker.h_connection.forEach(hc=>{
                 const hidx = this.search_idx_list[hc.toString()];
-                const connected_cd = this.projects[hidx[0]].holes[hidx[1]].sections[hidx[2]].markers[hidx[3]].composite_depth;
+                if(hidx){
+                  const connected_cd = this.projects[hidx[0]].holes[hidx[1]].sections[hidx[2]].markers[hidx[3]].composite_depth;
 
-                if(marker.composite_depth !== connected_cd){
-                  //counts CD confliction
-                  result.cd_confliction_counts+=1;
-                }                
+                  if(marker.composite_depth !== connected_cd){
+                    //counts CD confliction
+                    result.cd_confliction_counts+=1;
+                  }  
+                }
+                              
               })
             }
 
@@ -1511,12 +1514,14 @@ class LevelCompilerCore extends EventEmitter{
             }else{
               marker.h_connection.forEach(hc=>{
                 const hidx = this.search_idx_list[hc.toString()];
-                const connected_efd = this.projects[hidx[0]].holes[hidx[1]].sections[hidx[2]].markers[hidx[3]].event_free_depth;
+                if(hidx){
+                  const connected_efd = this.projects[hidx[0]].holes[hidx[1]].sections[hidx[2]].markers[hidx[3]].event_free_depth;
 
-                if(marker.event_free_depth !== connected_efd){
-                  //counts EFD confliction
-                  result.efd_confliction_counts+=1;
-                }                
+                  if(marker.event_free_depth !== connected_efd){
+                    //counts EFD confliction
+                    result.efd_confliction_counts+=1;
+                  }  
+                }                              
               })
             }
 
@@ -1526,12 +1531,14 @@ class LevelCompilerCore extends EventEmitter{
             }else{
               marker.h_connection.forEach(hc=>{
                 const hidx = this.search_idx_list[hc.toString()];
-                const connected_age = this.projects[hidx[0]].holes[hidx[1]].sections[hidx[2]].markers[hidx[3]].age;
+                if(hidx){
+                  const connected_age = this.projects[hidx[0]].holes[hidx[1]].sections[hidx[2]].markers[hidx[3]].age;
 
-                if(marker.age !== connected_age){
-                  //counts age confliction
-                  result.age_confliction_counts+=1;
-                }                
+                  if(marker.age !== connected_age){
+                    //counts age confliction
+                    result.age_confliction_counts+=1;
+                  }  
+                }                              
               })
             }
 
@@ -1548,23 +1555,25 @@ class LevelCompilerCore extends EventEmitter{
             marker.h_connection.forEach(hc=>{
               //check connections
               const cIdx = this.search_idx_list[hc.toString()];
-              this.projects[cIdx[0]].holes[cIdx[1]].sections[cIdx[2]].markers[cIdx[3]].h_connection.forEach(hc2=>{
-                if(hc2.toString() == marker.id.toString()){
-                  //if bidirectionary connected
-                  if(hc[0] == project.id[0]){
-                    //counts own project
-                    result.connection_counts[this.projects[cIdx[0]].name] += 1/2;
-                  }else{
-                    //counts other project
-                    result.connection_counts[this.projects[cIdx[0]].name] += 1;
-                  }
+              if(cIdx){
+                this.projects[cIdx[0]].holes[cIdx[1]].sections[cIdx[2]].markers[cIdx[3]].h_connection.forEach(hc2=>{
+                  if(hc2.toString() == marker.id.toString()){
+                    //if bidirectionary connected
+                    if(hc[0] == project.id[0]){
+                      //counts own project
+                      result.connection_counts[this.projects[cIdx[0]].name] += 1/2;
+                    }else{
+                      //counts other project
+                      result.connection_counts[this.projects[cIdx[0]].name] += 1;
+                    }
 
-                  //check master connection
-                  if(this.projects[cIdx[0]].model_type == "correlation"){
-                    result.is_connected_master = true;
+                    //check master connection
+                    if(this.projects[cIdx[0]].model_type == "correlation"){
+                      result.is_connected_master = true;
+                    }
                   }
-                }
-              })
+                })
+              }              
             })
           });
         });
@@ -3390,7 +3399,11 @@ class LevelCompilerCore extends EventEmitter{
             for(let h=0; h<targetMarkerData.h_connection.length; h++){
               const hcId  = targetMarkerData.h_connection[h];
               const hcIdx = this.search_idx_list[hcId.toString()];
+              if(!hcIdx){
+                continue
+              }
               const hMarkerData = this.projects[hcIdx[0]].holes[hcIdx[1]].sections[hcIdx[2]].markers[hcIdx[3]];
+              
               if(hMarkerData[calcType] == null){
                 let isTransfer = false;
                 let nearestMarkers = this.measurePerformance(this.searchNearestMarkers,hMarkerData, calcType);
@@ -4405,6 +4418,9 @@ class LevelCompilerCore extends EventEmitter{
       let numMaster = 0;
       for(let hc of this.projects[idx[0]].holes[idx[1]].sections[idx[2]].markers[idx[3]].h_connection){
         const idxh = this.search_idx_list[hc.toString()];
+        if(!idxh){
+          continue
+        }
         if(idx[0] == idxh[0]){
           if(this.projects[idxh[0]].holes[idxh[1]].sections[idxh[2]].markers[idxh[3]].isMaster == true){
             numMaster++;
