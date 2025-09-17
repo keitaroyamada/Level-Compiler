@@ -18,7 +18,7 @@ parentPort.on("message", async(task) => {
       event_free_depth: {},
       age:{},
     };
- 
+  
     
     try {
       //load original images

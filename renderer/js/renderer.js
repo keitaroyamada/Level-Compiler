@@ -61,7 +61,7 @@ document.addEventListener("DOMContentLoaded", () => {
       plot:{},
       edit:{},
       image:{},
-      developer:{},
+      developer: {},
     };
     objOpts.canvas.depth_scale = "composite_depth";
     objOpts.canvas.zoom_level = [4, 3]; //[x, y](300pix/1m)
@@ -98,7 +98,7 @@ document.addEventListener("DOMContentLoaded", () => {
     objOpts.project.area_colour_disconnected = "#FFE5E5";
     objOpts.project.pad_x = 80;
     objOpts.project.pad_y = 200;
-
+  
     objOpts.hole.distance = 20;
     objOpts.hole.width = 20;
     objOpts.hole.line_colour = "lightgreen";
@@ -176,13 +176,11 @@ document.addEventListener("DOMContentLoaded", () => {
     objOpts.edit.handleMove = null;
     objOpts.edit.passwards = "admin";
 
-    objOpts.developer.developerMode = false;
-
-  
+    objOpts.developer.mode = "user"; 
     objOpts.pen.colour = "Red";
-    objOpts.image.dpcm = 30;
+    objOpts.image.dpcm = 24;
     objOpts.image.dpcm_high = 200;
-  
+    objOpts.image.enableLoad = {composite_depth: true, event_free_depth: true, age: true};
     objOpts.age.incon_size = 20;
     objOpts.age.alt_radius = 3;
      
@@ -235,7 +233,7 @@ document.addEventListener("DOMContentLoaded", () => {
   //============================================================================================
   //hide test event
   document.getElementById("footerLeftText").addEventListener("click", async () => {
-    if(objOpts.developer.developerMode){
+    if(["developer","root"].includes(objOpts.developer.mode)){
       const results = await window.LCapi.getDisplayInfo();
 
       const dpi = results.height / objOpts.canvas.display_height; // hight is already divided by scale factor
@@ -812,7 +810,7 @@ document.addEventListener("DOMContentLoaded", () => {
   //Edit correlation model
   document.addEventListener('contextmenu', handleNormalContextmenu);
   window.LCapi.receive("EditCorrelation", async () => {
-    if(!objOpts.developer.developerMode && !objOpts.edit.editable){   
+    if(["user"].includes(objOpts.developer.mode) && !objOpts.edit.editable){   
       const askData = {
         title:"Edit model",
         label:"Please enter passwards.",
@@ -822,7 +820,7 @@ document.addEventListener("DOMContentLoaded", () => {
       response = await window.LCapi.inputdialog(askData);
       if(response !==null){
         if(response !== objOpts.edit.passwards){
-          alert("Please input correct paswards.");
+          alert("Please input correct passwords.");
           return
         }
       }else{
@@ -1936,12 +1934,12 @@ document.addEventListener("DOMContentLoaded", () => {
           await loadAge(document.getElementById("AgeModelSelect").value);
           await loadPlotData();
           
-          const changedData = await getUpdatedSectionIds();          
+          const changedData = await getUpdatedSectionIds("depth");          
           console.log("[Renderer]: Affected sections:",changedData);
 
           if(changedData.ids.length>0){
               modelImages.load_target_ids = changedData.ids;
-              modelImages = await loadCoreImages(modelImages, LCCore, objOpts, changedData.details);
+              modelImages = await loadCoreImages(modelImages, LCCore, objOpts, changedData.details);//11111111
           }
             
           updateView();
@@ -3635,7 +3633,7 @@ document.addEventListener("DOMContentLoaded", () => {
     
     //get/show footer text
     let options = {canvas:{depth_scale: objOpts.canvas.depth_scale, age_precision: objOpts.canvas.age_precision}};
-    if(objOpts.developer.developerMode){
+    if(["developer","root"].includes(objOpts.developer.mode)){
       options.canvas.depth_scale = "canvas_position";
     }
     
@@ -4344,7 +4342,7 @@ document.addEventListener("DOMContentLoaded", () => {
         if(project.enable == true){
           //show project name
           let projectDispName = project.name; 
-          if(objOpts.developer.developerMode){
+          if(["developer","root"].includes(objOpts.developer.mode)){
             projectDispName = project.id[0].slice(0,5);
           }
           
@@ -4420,7 +4418,7 @@ document.addEventListener("DOMContentLoaded", () => {
           let hole_x0 = (objOpts.hole.distance + objOpts.hole.width) * (num_disable.total + hole.order - num_disable.hole);
           //add  hole name---------------------------------------------------
           let holeDispName = hole.name; 
-          if(objOpts.developer.developerMode){
+          if(["developer","root"].includes(objOpts.developer.mode)){
             holeDispName = hole.id[1].slice(0,5);
           }
           sketch.fill(objOpts.hole.font_colour);
@@ -4627,7 +4625,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
             //add section name-------------------------------------------------
             let secDispName = hole.name + "-" + section.name; 
-            if(objOpts.developer.developerMode){
+            if(["developer","root"].includes(objOpts.developer.mode)){
               secDispName = section.id[2].slice(0,5);
             }
 
@@ -4914,7 +4912,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 //add marker name--------------------------------------------
                 if (m !== 0 && m !== section.markers.length - 1) {
                   let markerDispName = marker.name;
-                  if(objOpts.developer.developerMode){
+                  if(["developer","root"].includes(objOpts.developer.mode)){
                     markerDispName = marker.id[3].slice(0,5);
                   }
                   sketch.fill(objOpts.marker.font_colour);
@@ -6404,6 +6402,9 @@ document.addEventListener("DOMContentLoaded", () => {
             changedData.details.forEach(d=>{
               details.add(d);
             })
+            if(details.size>0 && !details.has("drilling_depth")){
+              details.add("drilling_depth");
+            }
           }        
         }else if(mode == "normal"){
           ids.push(changedData.id);
@@ -6420,6 +6421,9 @@ document.addEventListener("DOMContentLoaded", () => {
             changedData.details.forEach(d=>{
               details.add(d);
             })
+            if(details.size>0 && !details.has("drilling_depth")){
+              details.add("drilling_depth");
+            }
           } 
         }else if(mode == "normal"){
           ids.push(changedData.id);
@@ -6994,6 +6998,16 @@ async function loadCoreImages(modelImages, LCCore, objOpts, operations) {
 
   //await window.LCapi.progressbar("Load images"+depthScale, txt);
   //await window.LCapi.updateProgressbar(1, 1);
+
+  //check operations
+  
+  for (const op in objOpts.image.enableLoad) {
+    if(!objOpts.image.enableLoad[op]){
+      operations = operations.filter(item => item !== op);
+    }
+  }
+  console.log(operations)
+  
   return new Promise(async (resolve, reject) => {
     //initialise
     let results = modelImages;

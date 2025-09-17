@@ -514,7 +514,7 @@ function createMainWIndow() {
           tasks.push({
             type:"continue",
             imageName:imBaseName,
-            imagePath:fullpath,
+            imagePath:fullpath,            
             imageSize:new_size,
             operations:loadOptions.operations,
             sectionData:targetSectionData,
