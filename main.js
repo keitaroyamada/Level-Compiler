@@ -3124,10 +3124,174 @@ function createMainWIndow() {
     }
   });
   //--------------------------------------------------------------------------------------------------
+  //-----workspace-----
+  ipcMain.handle("changeWorkspace", (_e, type, value) => {
+    if(type=="name"){
+      LCCore.name = value;
+      return true;
+    }else if(type=="descriptions"){
+      LCCore.descriptions = value;
+      return true;
+    }
+  });
+  //-----project-----
+  ipcMain.handle("addProject", async(_e, type, name) => {
+    
+    const result = LCCore.addProject(type, name);
+
+    if (result == true) {
+      console.log("MAIN: Add project completed.");
+      return result;
+    } else {
+      console.log("MAIN: Failed to add a new project.");
+      return result
+    }
+  });
+  ipcMain.handle("deleteProject", async(_e, projectId) => {
+    const options = {
+      type: "question",
+      buttons: ["No", "Yes"],
+      defaultId: 0,
+      title: "Dlete Project",
+      message: "Do you aslo want to delete the connections between projects?",
+    };
+
+    const { response } = await dialog.showMessageBox(mainWindow, options);
+
+    const result = LCCore.deleteProject(projectId, response);
+
+    if (result == true) {
+      LCCore.calcCompositeDepth();
+      LCCore.calcEventFreeDepth();
+      console.log("MAIN: Delete project completed.");
+      return result;
+    } else {
+      console.log("MAIN: Failed to delete project.");
+      return result
+    }
+    
+  });
+  ipcMain.handle("changeProject", (_e, projectId, type, value) => {
+    if(type=="name"){
+      const result = LCCore.changeName(projectId, value);
+      return result;
+    }else if(type=="descriptions"){
+      const result = LCCore.changeDescriptions(projectId, value);
+      return result;
+    }
+  });
+  ipcMain.handle("mergeProjects", (_e) => {
+    const result = LCCore.mergeProjects();
+
+    if (result == true) {
+      LCCore.calcCompositeDepth();
+      LCCore.calcEventFreeDepth();
+      console.log("MAIN: Merge projects completed.");
+      return result;
+    } else {
+      console.log("MAIN: Failed to merge projects.");
+      return result
+    }
+  }); 
+  //-----hole-----
+  ipcMain.handle("addHole", async(_e, projectId, name) => {
+    
+    const result = LCCore.addHole(projectId, name);
+
+    if (result == true) {
+      console.log("MAIN: Add hole completed.");
+      return result;
+    } else {
+      console.log("MAIN: Failed to add a new hole.");
+      return result
+    }
+  });
+  ipcMain.handle("deleteHole", async(_e, holeId) => {
+    
+    const result = LCCore.deleteHole(holeId);
+
+    if (result == true) {
+      LCCore.calcCompositeDepth();
+      LCCore.calcEventFreeDepth();
+      console.log("MAIN: Delete hole completed.");
+      return result;
+    } else {
+      console.log("MAIN: Failed to delete hole.");
+      return result
+    }
+
+    
+  });
+  ipcMain.handle("changeHole", (_e, holeId, type, value) => {
+    
+    if(type=="name"){
+      const result = LCCore.changeName(holeId, value);
+      return result;
+    }else if(type=="descriptions"){
+      const result = LCCore.changeDescriptions(holeId, value);
+      return result;
+    }else if(type=="order"){
+      const result = LCCore.changeHoleOrder(holeId, value);
+      return result;
+    }
+  });
+  ipcMain.handle("moveHoleToProject", async(_e, holeId, projectId) => {
+    
+    const result = LCCore.moveHoleToProject(holeId, projectId);
+
+    if (result == true) {
+      LCCore.calcCompositeDepth();
+      LCCore.calcEventFreeDepth();
+      console.log("MAIN: Move hole completed.");
+      return result;
+    } else {
+      console.log("MAIN: Failed to move this hole.");
+      return result
+    }
+  });
+  //-----section-----
+  ipcMain.handle("addSection", (_e, sectionId, data) => {
+    //    
+    const result = LCCore.addSection(sectionId,data);//LCCore.deleteSection(sectionId);
+    if(result == true){
+      console.log("MAIN: Add section.")
+      return result;  
+    }else{
+      console.log("MAIN: Failed to add section.")
+      return result;  
+    }
+    
+  });
+  ipcMain.handle("deleteSection", (_e, sectionId) => {
+    //    
+    const result = LCCore.deleteSection(sectionId);//LCCore.deleteSection(sectionId);
+    if(result == true){
+      LCCore.calcCompositeDepth();
+      LCCore.calcEventFreeDepth();
+      console.log("MAIN: Delete section.")
+      return result;  
+    }else{
+      console.log("MAIN: Failed to delete section.")
+      return result;  
+    }
+    
+  });
+  ipcMain.handle("changeSection", (_e, sectionId, type, value) => {    
+    if(type=="name"){
+      const result = LCCore.changeName(sectionId, value);
+      return result;
+    }else if(type=="descriptions"){
+      const result = LCCore.changeDescriptions(sectionId, value);
+      return result;
+    }
+  });
+  //-----marker-----
   ipcMain.handle("addMarker", (_e, sectionId, depth, depthScale,relativeX) => {
     //add
     const result = LCCore.addMarker(sectionId, depth, depthScale, relativeX);
     if(result==true){
+      LCCore.calcCompositeDepth();
+      LCCore.calcEventFreeDepth();
       console.log("MAIN: Add a new marker on the section: " + sectionId +" of " + depth +" cm "+depthScale);
       return true
     }else{
@@ -3137,6 +3301,8 @@ function createMainWIndow() {
   ipcMain.handle("deleteMarker", (_e, targetId) => {
     const result = LCCore.deleteMarker(targetId);
     if(result==true){
+      LCCore.calcCompositeDepth();
+      LCCore.calcEventFreeDepth();
       console.log("MAIN: Delete target marker.");
       return true
     }else{
@@ -3148,6 +3314,8 @@ function createMainWIndow() {
       //value:distance
       const result = LCCore.changeDistance(markerId, value);
       if(result == true){
+        LCCore.calcCompositeDepth();
+        LCCore.calcEventFreeDepth();
         console.log("MAIN: Change marker distance.");
       }else{
         console.log("MAIN: Failed to change marker distance.")
@@ -3161,10 +3329,41 @@ function createMainWIndow() {
       return result;
     }
   });
+  //-----event-----
+  ipcMain.handle("AddEvent", async(_e, upperId, lowerId, depositionType, value) => {
+    let result = LCCore.addEvent(upperId, lowerId, depositionType, value);
+
+    if (result == true) {
+      LCCore.calcCompositeDepth();
+      LCCore.calcEventFreeDepth();
+      console.log("MAIN: Add event layer.");
+      return result;
+    } else {
+      console.log("MAIN: Failed to add event layer.");
+      return result
+    }
+  });
+  ipcMain.handle("DeleteEvent", async(_e, upperId, lowerId, type) => {
+    
+    const result = LCCore.deleteEvent(upperId, lowerId, []);
+
+    if (result == true) {
+      LCCore.calcCompositeDepth();
+      LCCore.calcEventFreeDepth();
+      console.log("MAIN: Delete event layer.");
+      return result;
+    } else {
+      console.log("MAIN: Failed to delete event layer.");
+      return result
+    }
+  });
+  //-----action----- 
   ipcMain.handle("connectMarkers", (_e, fromId, toId, direction) => {
     const res = LCCore.connectMarkers(fromId, toId, direction);
 
     if(res == true){
+      LCCore.calcCompositeDepth();
+      LCCore.calcEventFreeDepth();
       return true
     }else{
       return false
@@ -3173,6 +3372,8 @@ function createMainWIndow() {
   ipcMain.handle("disconnectMarkers", (_e, fromId, toId, direction) => {
     const res = LCCore.disconnectMarkers(fromId, toId, direction);
     if(res==true){
+      LCCore.calcCompositeDepth();
+      LCCore.calcEventFreeDepth();
       return true
     }else{
       return false
@@ -3205,111 +3406,19 @@ function createMainWIndow() {
       }
     }
 
+    if(results.success>0){
+      LCCore.calcCompositeDepth();
+      LCCore.calcEventFreeDepth();
+    }
     return results
-    
   });
-  ipcMain.handle("addSection", (_e, sectionId, data) => {
-    //    
-    const result = LCCore.addSection(sectionId,data);//LCCore.deleteSection(sectionId);
-    if(result == true){
-      console.log("MAIN: Add section.")
-      return result;  
-    }else{
-      console.log("MAIN: Failed to add section.")
-      return result;  
-    }
-    
-  });
-  ipcMain.handle("deleteSection", (_e, sectionId) => {
-    //    
-    const result = LCCore.deleteSection(sectionId);//LCCore.deleteSection(sectionId);
-    if(result == true){
-      console.log("MAIN: Delete section.")
-      return result;  
-    }else{
-      console.log("MAIN: Failed to delete section.")
-      return result;  
-    }
-    
-  });
-  ipcMain.handle("changeSection", (_e, sectionId, type, value) => {    
-    if(type=="name"){
-      const result = LCCore.changeName(sectionId, value);
-      return result;
-    }else if(type=="descriptions"){
-      const result = LCCore.changeDescriptions(sectionId, value);
-      return result;
-    }
-  });
-  ipcMain.handle("addHole", async(_e, projectId, name) => {
-    
-    const result = LCCore.addHole(projectId, name);
-
-    if (result == true) {
-      console.log("MAIN: Add hole completed.");
-      return result;
-    } else {
-      console.log("MAIN: Failed to add a new hole.");
-      return result
-    }
-  });
-  ipcMain.handle("deleteHole", async(_e, holeId) => {
-    
-    const result = LCCore.deleteHole(holeId);
-
-    if (result == true) {
-      console.log("MAIN: Delete hole completed.");
-      return result;
-    } else {
-      console.log("MAIN: Failed to delete hole.");
-      return result
-    }
-
-    
-  });
-  ipcMain.handle("changeHole", (_e, holeId, type, value) => {
-    
-    if(type=="name"){
-      const result = LCCore.changeName(holeId, value);
-      return result;
-    }else if(type=="descriptions"){
-      const result = LCCore.changeDescriptions(holeId, value);
-      return result;
-    }else if(type=="order"){
-      const result = LCCore.changeHoleOrder(holeId, value);
-      return result;
-    }
-  });
-  ipcMain.handle("moveHoleToProject", async(_e, holeId, projectId) => {
-    
-    const result = LCCore.moveHoleToProject(holeId, projectId);
-
-    if (result == true) {
-      console.log("MAIN: Move hole completed.");
-      return result;
-    } else {
-      console.log("MAIN: Failed to move this hole.");
-      return result
-    }
-  });
-  ipcMain.handle("addProject", async(_e, type, name) => {
-    
-    const result = LCCore.addProject(type, name);
-
-    if (result == true) {
-      console.log("MAIN: Add project completed.");
-      return result;
-    } else {
-      console.log("MAIN: Failed to add a new project.");
-      return result
-    }
-  });
-
   ipcMain.handle("SetZeroPoint", async(_e, markerId, value) => {
     
     const result = LCCore.setZeroPoint(markerId, value);
-
+    
     if (result == true) {
+      LCCore.calcCompositeDepth();
+      LCCore.calcEventFreeDepth();
       console.log("MAIN: Add hole completed.");
       return result;
     } else {
@@ -3322,87 +3431,15 @@ function createMainWIndow() {
     const result = LCCore.setMaster(markerId, type);
 
     if (result == true) {
+      LCCore.calcCompositeDepth();
+      LCCore.calcEventFreeDepth();
       console.log("MAIN: Change master flag.");
       return result;
     } else {
       console.log("MAIN: Failed to chnage master flag.");
       return result
     }
-  });
-  ipcMain.handle("deleteProject", async(_e, projectId) => {
-    const options = {
-      type: "question",
-      buttons: ["No", "Yes"],
-      defaultId: 0,
-      title: "Dlete Project",
-      message: "Do you aslo want to delete the connections between projects?",
-    };
-
-    const { response } = await dialog.showMessageBox(mainWindow, options);
-console.log(response)
-    const result = LCCore.deleteProject(projectId, response);
-
-    if (result == true) {
-      console.log("MAIN: Delete project completed.");
-      return result;
-    } else {
-      console.log("MAIN: Failed to delete project.");
-      return result
-    }
-    
-  });
-  ipcMain.handle("changeProject", (_e, projectId, type, value) => {
-    if(type=="name"){
-      const result = LCCore.changeName(projectId, value);
-      return result;
-    }else if(type=="descriptions"){
-      const result = LCCore.changeDescriptions(projectId, value);
-      return result;
-    }
-  });
-  ipcMain.handle("mergeProjects", (_e) => {
-    const result = LCCore.mergeProjects();
-
-    if (result == true) {
-      console.log("MAIN: Merge projects completed.");
-      return result;
-    } else {
-      console.log("MAIN: Failed to merge projects.");
-      return result
-    }
-  });
-  ipcMain.handle("changeWorkspace", (_e, type, value) => {
-    if(type=="name"){
-      LCCore.name = value;
-      return true;
-    }else if(type=="descriptions"){
-      LCCore.descriptions = value;
-      return true;
-    }
-  });
-  ipcMain.handle("AddEvent", async(_e, upperId, lowerId, depositionType, value) => {
-    let result = LCCore.addEvent(upperId, lowerId, depositionType, value);
-
-    if (result == true) {
-      console.log("MAIN: Add event layer.");
-      return result;
-    } else {
-      console.log("MAIN: Failed to add event layer.");
-      return result
-    }
-  });
-  ipcMain.handle("DeleteEvent", async(_e, upperId, lowerId, type) => {
-    
-    const result = LCCore.deleteEvent(upperId, lowerId, []);
-
-    if (result == true) {
-      console.log("MAIN: Delete event layer.");
-      return result;
-    } else {
-      console.log("MAIN: Failed to delete event layer.");
-      return result
-    }
-  });
+  });  
   ipcMain.handle("changeEnable", async(_e, targetId, isEnable) => {
     const result = LCCore.changeEnable(targetId, isEnable);
 

@@ -1628,7 +1628,6 @@ class LevelCompilerCore extends EventEmitter{
     this.setStatus("completed","Checked model.")
     return results;
   }
-
   upgradeToLatestMembers(){
     //add new properties for previous version model
     this.projects.forEach(p=>{
@@ -2133,7 +2132,6 @@ class LevelCompilerCore extends EventEmitter{
     }
     this.setStatus("completed","")
   }
-
   //subfunctions
   getHoleListFromCsv(projectData) {
     this.setStatus("running","start getHoleListFromCsv");
@@ -2944,7 +2942,6 @@ class LevelCompilerCore extends EventEmitter{
     this.updateSearchIdx();
     this.setStatus("completed","");
   }
-
   updateSearchIdx() {
     this.setStatus("running","start updateSearchIdx");
     this.search_idx_list = [];
@@ -3028,7 +3025,6 @@ class LevelCompilerCore extends EventEmitter{
     this.setStatus("completed","");
     return null;
   }
-
   findZeroPointId() {
     this.setStatus("running","start findZeroPointId");
     let output = [];
@@ -3127,7 +3123,6 @@ class LevelCompilerCore extends EventEmitter{
     this.setStatus("completed","");
    return compositeDepth;
   }
-
   dfs_getNeighborSet(currentMarkerId, calcRange, calcType) {
     this.setStatus("running","strat dfs_getNeighborSet");
     let output = [];
@@ -3289,7 +3284,6 @@ class LevelCompilerCore extends EventEmitter{
     this.setStatus("completed","");
     return skippedList;
   }
-
   getPolationList(p, calcType){
     this.setStatus("running","start getPolationList");
     let polationList = [];
@@ -3806,7 +3800,6 @@ class LevelCompilerCore extends EventEmitter{
     return {"upperId": upperId,"lowerId":lowerId};
 
   }
-
   calcMarkerDistance(neighborMarkerData, currentMarkerData, calcType){
     this.setStatus("running","start calcMarkerDistance");
     //this function is calced distance from the same hole for initial model construction.
@@ -3900,7 +3893,6 @@ class LevelCompilerCore extends EventEmitter{
     this.setStatus("completed","");
     return distance;
   }
-  
   linearInterp(D1, D3, d2d1, d3d1){
     this.setStatus("running","start linearInterp");
     //D1:   upper marker depth (e.g. CD/EFD) parseFloat(upperMarkerData[calcType]);
@@ -4086,7 +4078,6 @@ class LevelCompilerCore extends EventEmitter{
     }
     this.setStatus("completed","");
   }
-
   disconnectMarkers(fromId, toId, direction) {
     this.setStatus("running","start disconnectMarkers");
     this.updateSearchIdx();
@@ -4170,7 +4161,6 @@ class LevelCompilerCore extends EventEmitter{
     }
     this.setStatus("completed","");
   }
-
   checkEventConnection(fromId, toId){
     let results = {
       result: false,
@@ -4416,8 +4406,6 @@ class LevelCompilerCore extends EventEmitter{
     //set new
     this.projects[idx[0]].holes[idx[1]].sections[idx[2]].markers[[idx[3]]].isZeroPoint = parseFloat(value);
 
-    this.calcCompositeDepth();
-    this.calcEventFreeDepth();
     this.setStatus("completed","");
     return true;
 
@@ -4449,9 +4437,6 @@ class LevelCompilerCore extends EventEmitter{
 
       this.projects[idx[0]].holes[idx[1]].sections[idx[2]].markers[idx[3]].isMaster = true;
     }
-
-    this.calcCompositeDepth();
-    this.calcEventFreeDepth();
 
     this.setStatus("completed","");
     return true;
@@ -4618,7 +4603,6 @@ class LevelCompilerCore extends EventEmitter{
     this.setStatus("completed","");
     return true;
   }
-
   addEvent(upperId, lowerId, depositionType, value){
     this.setStatus("running","start addEvent");
     //depositionType: deposition, erosion, markup
@@ -4705,8 +4689,6 @@ class LevelCompilerCore extends EventEmitter{
     }
 
     this.updateSearchIdx();
-    this.calcCompositeDepth();
-    this.calcEventFreeDepth();
 
     this.setStatus("completed","");
     return true;
@@ -4775,8 +4757,7 @@ class LevelCompilerCore extends EventEmitter{
     //}
 
     this.updateSearchIdx();
-    this.calcCompositeDepth();
-    this.calcEventFreeDepth();
+
     console.log("LCCore: Delete deposite/markup event.")
 
     this.setStatus("completed","");
@@ -4813,9 +4794,6 @@ class LevelCompilerCore extends EventEmitter{
     //delete section
     this.projects[sectionIdx[0]].holes[sectionIdx[1]].sections = this.projects[sectionIdx[0]].holes[sectionIdx[1]].sections.filter(sec=>sec.id[2].toString()!==sectionId[2].toString());
     
-    
-    this.calcCompositeDepth();
-    this.calcEventFreeDepth();
     this.updateSearchIdx();
 
     this.setStatus("completed","");
@@ -4965,7 +4943,7 @@ class LevelCompilerCore extends EventEmitter{
     this.setStatus("completed","");
     return true;
   }
-  moveHoleToProject(holeId, toProjectId, updateModel=true){
+  moveHoleToProject(holeId, toProjectId){
     if(holeId[0]==toProjectId[0]) return false;
 
     this.setStatus("running","start moveHoleToProject");
@@ -5053,10 +5031,6 @@ class LevelCompilerCore extends EventEmitter{
     //update model
     this.sortModelByOrder();    
     this.updateSearchIdx()
-    if(updateModel){
-      this.calcCompositeDepth();
-      this.calcEventFreeDepth();
-    }
 
     this.setStatus("completed","");
     return true;    
@@ -5183,14 +5157,11 @@ class LevelCompilerCore extends EventEmitter{
     }    
 
     this.updateSearchIdx();
-    this.calcCompositeDepth();
-    this.calcEventFreeDepth();
 
     this.setStatus("completed","");
     return true;
     
   }
-
   mergeProjects(){
     this.setStatus("completed","start mergeProject");
 
@@ -5228,13 +5199,10 @@ class LevelCompilerCore extends EventEmitter{
     //update model
     this.sortModelByOrder();  
     this.updateSearchIdx();
-    this.calcCompositeDepth();
-    this.calcEventFreeDepth();
 
     this.setStatus("completed","");
     return true;
   }
-
   changeName(targetId, value){
     this.setStatus("running","start changeName");
     this.updateSearchIdx();
@@ -5562,7 +5530,7 @@ class LevelCompilerCore extends EventEmitter{
 
     this.setStatus("completed","");
     return output;
- }
+  }
   getIdxFromTrinity(projectId, [holeName, sectionName, distance]) {
     this.setStatus("running","getIdxFromTrinity");
     //get idx
@@ -5934,7 +5902,6 @@ class LevelCompilerCore extends EventEmitter{
     this.setStatus("completed","");
     return output;
   }
-
   constructCSVforLF(resultIds, baseProjectID=this.base_project_id){
     this.setStatus("running","construct csv for LF");
     //resultIds: [cd, [horizontalMarkers...]]
@@ -6200,11 +6167,9 @@ class LevelCompilerCore extends EventEmitter{
     this.setStatus("completed","");
     return {model: modelOutput, event:eventListOutput};
   }
-
   changeBaseProject(baseProjectId){
     this.base_project_id = baseProjectId;
   }
-
   measurePerformance(func, ...args) {
     if (this._measurePerformance === false) {
       return func.apply(this, args); 
@@ -6230,15 +6195,13 @@ class LevelCompilerCore extends EventEmitter{
 
     return result;
   }
-
   exportSerialisedModel() {
   return JSON.parse(JSON.stringify(this, (key, value) => {
     if (typeof value === "function") return undefined;
     if (key && key[0] === "_") return undefined;
     return value;
   }));
-}
-
+  }
   convertLF2LC(filepath){
     //this function is converting correlation model csv for Level Finder to correlation model csv for Level Compiler
     
@@ -6351,7 +6314,6 @@ class LevelCompilerCore extends EventEmitter{
 
     return {name: modelName, type:modelType, version: version, model: outModelData};
   }
-
   updateVersionInfo(date=null){
     let version = "";
     if(date){

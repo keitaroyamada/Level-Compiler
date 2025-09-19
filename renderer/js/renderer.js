@@ -372,7 +372,7 @@ document.addEventListener("DOMContentLoaded", () => {
           //load into LCCore (load process is in receive("RegisteredLCModel")
           await registerLCModel(droppedData.path);
           //load registered model from main to renderer with making up hole list view
-          await loadModel();
+          await loadModel(true, true);
           //updateView();
           const selected_age_model_id = document.getElementById("AgeModelSelect").value; 
           await loadAge(selected_age_model_id);//load age data included LCCore
@@ -387,7 +387,7 @@ document.addEventListener("DOMContentLoaded", () => {
             await registerModel(droppedData.path);
 
             if(numModel==i+1){
-              await loadModel();
+              await loadModel(true, true);
             }
           } else if(droppedData.name.includes("[age]")){
             //case age file
@@ -406,7 +406,7 @@ document.addEventListener("DOMContentLoaded", () => {
           const result = await window.LCapi.addSectionFromLcsection(droppedData.path);
           //"duplicate_section","duplicate_hole","fail_to_add","no_path","no_hole"
           if(result==true){
-            await loadModel();
+            await loadModel(true, true);
             console.log(LCCore)
           }else{
             console.log("[Renderer]: Failed to load section data"+result);
@@ -735,7 +735,7 @@ document.addEventListener("DOMContentLoaded", () => {
   //============================================================================================
   //load correlation model
   window.LCapi.receive("UpdateViewFromMain", async () => {
-    await loadModel(false);
+    await loadModel(false, false);
     const registeredAgeList = await window.LCapi.MirrorAgeList();
     setAgeList(registeredAgeList);
     const selected_age_model_id = document.getElementById("AgeModelSelect").value; 
@@ -774,17 +774,12 @@ document.addEventListener("DOMContentLoaded", () => {
     //await registerModelFromLCCore()
     //await registerAgeFromLCAge();
 
-    console.time("Load model") 
-    await loadModel(false);//make up hole list view
-    console.timeEnd("Load model")
+    await loadModel(false, true);//make up hole list view
 
-    console.time("Load age")
     const selected_age_model_id = document.getElementById("AgeModelSelect").value; 
     await loadAge(selected_age_model_id);//load age data included LCCore
-    console.timeEnd("Load age")
 
     await loadPlotData();
-
 
     updateView();    
     await window.LCapi.clearProgressbar();
@@ -1135,7 +1130,7 @@ document.addEventListener("DOMContentLoaded", () => {
             const result = await window.LCapi.changeMarker(targetId, "descriptions",response);
             if(result == true){
               console.log("[Renderer]: Chnage marker descriptions.")
-              await loadModel(false);
+              await loadModel(false, false);
             }
           }
         }
@@ -1198,7 +1193,7 @@ document.addEventListener("DOMContentLoaded", () => {
             const result = await window.LCapi.changeSection(targetId, "descriptions",response);
             if(result == true){
               console.log("[Renderer]: Chnage section descriptions.")
-              await loadModel(false);
+              await loadModel(false,false);
             }
           }
         }
@@ -1260,7 +1255,7 @@ document.addEventListener("DOMContentLoaded", () => {
             const result = await window.LCapi.changeHole(targetId, "descriptions",response);
             if(result == true){
               console.log("[Renderer]: Chnage hole descriptions.")
-              await loadModel(false);
+              await loadModel(false,false);
             }
           }
         }
@@ -1360,7 +1355,7 @@ document.addEventListener("DOMContentLoaded", () => {
             const result = await window.LCapi.changeProject(targetId, "descriptions",response);
             if(result == true){
               console.log("[Renderer]: Chnage project descriptions.")
-              await loadModel(false);
+              await loadModel(false,false);
             }
           }
         }
@@ -1376,7 +1371,7 @@ document.addEventListener("DOMContentLoaded", () => {
         if(result == true){
           await undo("save", "Merge Project");
 
-          await loadModel(false);
+          await loadModel(false,false);
           //await registerModelFromLCCore()
           //await registerAgeFromLCAge();
           const selected_age_model_id = document.getElementById("AgeModelSelect").value;
@@ -1480,7 +1475,7 @@ document.addEventListener("DOMContentLoaded", () => {
         if(result == true){
           await undo("save", "Change Hole Order");//undo
           console.log("[Renderer]: Chnage hole order.")
-          await loadModel(false);
+          await loadModel(false,false);
         }
         updateView();
       }
@@ -1518,7 +1513,7 @@ document.addEventListener("DOMContentLoaded", () => {
           const result = await window.LCapi.changeWorkspace("name",response);
           if(result == true){
             console.log("[Renderer]: Chnage workspace name.")
-            await loadModel(false);
+            await loadModel(false,false);
           }
         }        
       }else{
@@ -1537,7 +1532,7 @@ document.addEventListener("DOMContentLoaded", () => {
           const result = await window.LCapi.changeWorkspace("descriptions",response);
           if(result == true){
             console.log("[Renderer]: Chnage workspace descriptions.")
-            await loadModel(false);
+            await loadModel(false,false);
           }
         }        
       }else{
@@ -1555,6 +1550,10 @@ document.addEventListener("DOMContentLoaded", () => {
       document.getElementById("bt_zoom0").click();
     }else if(clickResult == "zoomactual"){
       document.getElementById("bt_zoomactual").click();
+    }else if(clickResult == "reloadModel"){
+      if(LCCore){
+               
+      }
     }else{
       objOpts.edit.contextmenu_enable = true;
       objOpts.edit.hittest = null;
@@ -1647,7 +1646,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     
           if(result==true){
             await undo("save","Connect Markers");//undo
-            await loadModel(false);
+            await loadModel(false, false);
             const fromIdx = getIdxById(LCCore, fromId);
             const fromMarkerData = LCCore.projects[fromIdx[0]].holes[fromIdx[1]].sections[fromIdx[2]].markers[fromIdx[3]];
             const toIdx = getIdxById(LCCore, toId);
@@ -1692,7 +1691,7 @@ document.addEventListener("DOMContentLoaded", () => {
           
           if(result==true){
             await undo("save","Connect Sections");//undo
-            await loadModel();
+            await loadModel(false,false);
             const changedData = await getUpdatedSectionIds("depth");
             console.log("[Renderer]: Affected sections:",changedData);
             //const affectedSections = getConnectedSectionIds([fromId, toId]);
@@ -1722,7 +1721,7 @@ document.addEventListener("DOMContentLoaded", () => {
           }
           if(result == true){
             await undo("save","Disconnect Sections");//undo
-            await loadModel();
+            await loadModel(false,false);
 
             const changedData = await getUpdatedSectionIds("depth");
             console.log("[Renderer]: Affected sections:",changedData);
@@ -1886,7 +1885,7 @@ document.addEventListener("DOMContentLoaded", () => {
           const result = await window.LCapi.changeMarker(targetId, target, response);
           if(result == true){
             await undo("save","Change Marker "+target.charAt(0).toUpperCase() + target.slice(1));//undo
-            await loadModel();
+            await loadModel(false,false);
             updateView();
           }else{
             let txt="";
@@ -1934,7 +1933,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const result = await window.LCapi.SetMaster(targetId, "enable");
         if(result==true){
           await undo("save","Set Master");//undo
-          await loadModel();
+          await loadModel(false, false);
           await loadAge(document.getElementById("AgeModelSelect").value);
           await loadPlotData();
           
@@ -1959,7 +1958,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const result = await window.LCapi.SetMaster(targetId, "disable");
         if(result==true){
           await undo("save","Unset Master");//undo
-          await loadModel();
+          await loadModel(false,false);
           await loadAge(document.getElementById("AgeModelSelect").value);
           await loadPlotData();
           updateView();
@@ -2009,7 +2008,7 @@ document.addEventListener("DOMContentLoaded", () => {
           const result = await window.LCapi.SetZeroPoint(targetId, response);
           if(result==true){
             await undo("save","Set Zero Point");//undo
-            await loadModel();
+            await loadModel(false,false);
             await loadAge(document.getElementById("AgeModelSelect").value);
             await loadPlotData();
             updateView();
@@ -2041,7 +2040,7 @@ document.addEventListener("DOMContentLoaded", () => {
             }
 
             await undo("save","Disconnect Marker");//undo
-            await loadModel();
+            await loadModel(false,false);
 
             const changedData = await getUpdatedSectionIds("depth");          
             console.log("[Renderer]: Affected sections:",changedData);
@@ -2142,7 +2141,7 @@ document.addEventListener("DOMContentLoaded", () => {
           const result = await window.LCapi.deleteMarker(fromId);
           if(result==true){
             await undo("save","Delete Marker");//undo
-            await loadModel();
+            await loadModel(false,false);
           }          
         }
       }
@@ -2205,7 +2204,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const result = await window.LCapi.addMarker(sectionId, objOpts.edit.marker_from.y, objOpts.canvas.depth_scale, ht.relative_x);
         if(result == true){
           await undo("save","Add Marker");//undo
-          await loadModel();
+          await loadModel(false,false);
         }
         
       }
@@ -2335,13 +2334,13 @@ document.addEventListener("DOMContentLoaded", () => {
           if(result == true){
             await undo("save","Add Event");//undo
 
-            await loadModel();
+            await loadModel(false,false);
             await loadAge(document.getElementById("AgeModelSelect").value);
             await loadPlotData();
             const changedData = await getUpdatedSectionIds("depth");          
             console.log("[Renderer]: Affected sections:",changedData);
             //const affectedSections = getConnectedSectionIds([upperId, lowerId]);
-            if(changedData.ids.length>0){
+            if(changedData.ids.length>0 && (objOpts.image.enableLoad.event_free_depth || objOpts.image.enableLoad.age)){
               modelImages.load_target_ids = changedData.ids;
               modelImages = await loadCoreImages(modelImages, LCCore, objOpts, changedData.details);
             }
@@ -2366,13 +2365,13 @@ document.addEventListener("DOMContentLoaded", () => {
         result = await window.LCapi.DeleteEvent(upperId, lowerId,[]);
         if(result == true){
           await undo("save","Delete Event");//undo
-          await loadModel();
+          await loadModel(false,false);
           await loadAge(document.getElementById("AgeModelSelect").value);
           await loadPlotData();
           const changedData = await getUpdatedSectionIds("depth");
           console.log("[Renderer]: Affected sections:",changedData);
           //const affectedSections = getConnectedSectionIds([upperId, lowerId]);
-          if(changedData.ids.length>0){
+          if(changedData.ids.length>0 && (objOpts.image.enableLoad.event_free_depth || objOpts.image.enableLoad.age)){
             modelImages.load_target_ids = changedData.ids;
             modelImages = await loadCoreImages(modelImages, LCCore, objOpts, changedData.details);
           }
@@ -2455,7 +2454,7 @@ document.addEventListener("DOMContentLoaded", () => {
           alert("[ "+response+" ] has already been used. Please input a unique name that has not been used.");
         }else if(result==true){
           await undo("save","Change Section Name");//undo
-          await loadModel();
+          await loadModel(false,false);
           updateView();
         }
       }
@@ -2490,7 +2489,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const result = await window.LCapi.deleteSection(targetId);
         if(result){
           await undo("save","Delete Section");//undo
-          await loadModel();
+          await loadModel(false,false);
           await loadAge(document.getElementById("AgeModelSelect").value);
           await loadPlotData();
           updateView();
@@ -2573,7 +2572,7 @@ document.addEventListener("DOMContentLoaded", () => {
           const result = await window.LCapi.addSection(targetId, inData);
           if(result==true){
             await undo("save","Add Section");//undo
-            await loadModel();
+            await loadModel(false,false);
             await loadAge(document.getElementById("AgeModelSelect").value);
             await loadPlotData();
           }else{
@@ -2687,7 +2686,7 @@ document.addEventListener("DOMContentLoaded", () => {
             //case connect vertival
             if(await window.LCapi.connectMarkers(fromId, toId, "vertical")){
               await undo("save","Connect Sections");//undo
-              await loadModel();
+              await loadModel(false,false);
               const changedData = await getUpdatedSectionIds("depth");
               console.log("[Renderer]: Affected sections:",changedData);
               //const affectedSections = getConnectedSectionIds([fromId, toId]);
@@ -2715,7 +2714,7 @@ document.addEventListener("DOMContentLoaded", () => {
             //case connect vertival
             if(await window.LCapi.disconnectMarkers(fromId, toId, "vertical")){
               await undo("save","Disconnect Markers");//undo
-              await loadModel();
+              await loadModel(false,false);
               const changedData = await getUpdatedSectionIds("depth");
               console.log("[Renderer]: Affected sections:",changedData);
               //const affectedSections = getConnectedSectionIds([fromId, toId]);
@@ -2804,7 +2803,7 @@ document.addEventListener("DOMContentLoaded", () => {
           alert("[ "+response+" ] has already been used. Please input a unique name that has not been used.");
         }else if(result==true){
           await undo("save","Change Hole Name");//undo
-          await loadModel();
+          await loadModel(false,false);
         }        
       }
     }
@@ -2838,7 +2837,7 @@ document.addEventListener("DOMContentLoaded", () => {
         if(result == true){
           await undo("save","Delete Hole");//undo
           console.log("[Renderer]: Delete hole.")
-          await loadModel();
+          await loadModel(false,false);
           await loadAge(document.getElementById("AgeModelSelect").value);
           await loadPlotData();
           updateView();
@@ -2878,7 +2877,7 @@ document.addEventListener("DOMContentLoaded", () => {
         if(result == true){
           await undo("save", "Add Hole");//undo
           console.log("[Renderer]: Add hole.")
-          await loadModel();
+          await loadModel(false,false);
 
           //add dummy section for plot
 
@@ -2961,7 +2960,7 @@ document.addEventListener("DOMContentLoaded", () => {
         if(result == true){
           await undo("save","Add Project");//undo
           console.log("[Renderer]: Add project.")
-          await loadModel();
+          await loadModel(false,false);
           await loadAge(document.getElementById("AgeModelSelect").value);
           await loadPlotData();
           updateView();
@@ -3011,7 +3010,7 @@ document.addEventListener("DOMContentLoaded", () => {
         if(result == true){
           await undo("save","Delete Project");//undo
           console.log("[Renderer]: Delete project.")
-          await loadModel();
+          await loadModel(false,false);
 
           await loadAge(document.getElementById("AgeModelSelect").value);
           await loadPlotData();
@@ -3031,9 +3030,9 @@ document.addEventListener("DOMContentLoaded", () => {
         const result = await window.LCapi.changeProject(targetId, "name",response);
         if(result == true){
           console.log("[Renderer]: Chnage project name.")
-          await loadModel();
-          await loadAge(document.getElementById("AgeModelSelect").value);
-          await loadPlotData();
+          await loadModel(false,false);
+          //await loadAge(document.getElementById("AgeModelSelect").value);
+          //await loadPlotData();
           updateView();
         }else if(result=="used"){
           console.log("[Renderer]: "+response+" has already been used. Please input a unique name that has not been used.");
@@ -3057,7 +3056,7 @@ document.addEventListener("DOMContentLoaded", () => {
         if(result == true){
           await undo("save","Move Hole");//undo
           console.log("[Renderer]: Move the selected hole to this project.")
-          await loadModel();
+          await loadModel(false,false);
           await loadAge(document.getElementById("AgeModelSelect").value);
           await loadPlotData();
           updateView();
@@ -3209,7 +3208,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
       await window.LCapi.Reregister();
 
-      await loadModel();
+      await loadModel(false, true);
       const registeredAgeList = await window.LCapi.MirrorAgeList();
       console.log(registeredAgeList)
       setAgeList(registeredAgeList);
@@ -3807,7 +3806,7 @@ document.addEventListener("DOMContentLoaded", () => {
       if(result == true){
         const selected_age_model_id = document.getElementById("AgeModelSelect").value;
 
-        await loadModel(false);
+        await loadModel(false,false);
         await loadAge(selected_age_model_id);
         await loadPlotData();
           
@@ -3826,7 +3825,7 @@ document.addEventListener("DOMContentLoaded", () => {
       if(result == true){
         const selected_age_model_id = document.getElementById("AgeModelSelect").value;
 
-        await loadModel();
+        await loadModel(false, false);
         await loadAge(selected_age_model_id);
         await loadPlotData();
           
@@ -6021,7 +6020,7 @@ document.addEventListener("DOMContentLoaded", () => {
     
     return true;
   }
-  async function loadModel(isUpdateView=true) {
+  async function loadModel(isUpdateView=true, isRecalcDepth=true) {
     //load model into LCCore
     //now, LC is able to hold one project file, model_id is dummy
     const results = await unzip( await window.LCapi.LoadModelFromLCCore() );
@@ -6044,11 +6043,13 @@ document.addEventListener("DOMContentLoaded", () => {
             );
       }
 
-      //calc composite depth
-      LCCore = await unzip( await window.LCapi.CalcCompositeDepth());
-     
-      //calc event free depth
-      LCCore = await unzip( await window.LCapi.CalcEventFreeDepth());
+      if(isRecalcDepth){
+        //calc composite depth
+        LCCore = await unzip( await window.LCapi.CalcCompositeDepth());
+      
+        //calc event free depth
+        LCCore = await unzip( await window.LCapi.CalcEventFreeDepth());
+      }
 
       //sort
       LCCore = sortProjectByOrder(LCCore);
@@ -7020,8 +7021,7 @@ async function loadCoreImages(modelImages, LCCore, objOpts, operations) {
     if(!objOpts.image.enableLoad[op]){
       operations = operations.filter(item => item !== op);
     }
-  }
-  console.log(operations)
+  }  
   
   return new Promise(async (resolve, reject) => {
     //initialise
@@ -7088,6 +7088,7 @@ async function loadCoreImages(modelImages, LCCore, objOpts, operations) {
         operations:operations,
         dpcm:results.image_resolution,//dpcm:objOpts.image.dpcm,
       };
+      console.log(loadOptions)
 
       //main Progress   
       await new Promise(async(p5resolve,p5reject) => {
@@ -7158,27 +7159,31 @@ async function assignCoreImages(coreImages, imageBuffers) {
                   let blob = new Blob([imageBuffers[depthScale][imName]], { type: 'image/jpeg' });
                   let url = URL.createObjectURL(blob);
 
-                  if (results[depthScale][imName]) { delete results[depthScale][imName]; }
-                  results[depthScale][imName] = await p.loadImage(
-                    url,
-                    async () => {
-                      //console.log("[Renderer]: Assign image of " + imName +" in "+depthScale);
-                      suc+=1;
+                  if (results[depthScale][imName]) { 
+                    results[depthScale][imName] = undefined; 
+                  }
 
-                      URL.revokeObjectURL(url);
-                      blob = null;
-                      resolveImage();
-                    },
-                    async () => {
-                      //console.log("[Renderer]: Failed to assign image of " + imName +" in "+depthScale);
-                      results[depthScale][imName] = undefined;
-                      try { URL.revokeObjectURL(url); } catch(_) {}
-                      blob = null;
-                      resolveImage();
-                    }
-                  );
+                  results[depthScale][imName] = await new Promise((resolveImg, rejectImg)=>{
+                    p.loadImage(
+                      url,
+                      img => {
+                        suc += 1;
+                        setTimeout(() => URL.revokeObjectURL(url),0);
+                        blob = null;
+                        resolveImg(img);
+                      },
+                      () => {
+                        results[depthScale][imName] = undefined;
+                        setTimeout(() => {try { URL.revokeObjectURL(url); } catch(_) {}},0)
+                        
+                        blob = null;
+                        resolveImg(undefined);
+                      }
+                    );
+                  });
 
                   results.plot_colour[imName] = false; 
+                  resolveImage();
                 } catch (err) {
                   console.log(err);
                   
