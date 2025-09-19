@@ -3941,7 +3941,7 @@ document.addEventListener("DOMContentLoaded", () => {
               objOpts.edit.handleClick = null;
             }
             document.addEventListener("mousemove", objOpts.edit.handleMove);
-          }else if(event.ctrlKey && event.key ==="2"){
+          }else if(event.ctrlKey && event.key ==="0"){
             objOpts.edit.contextmenu_enable = false;
             objOpts.edit.hittest = null;
             objOpts.edit.marker_from = null;
@@ -3956,6 +3956,11 @@ document.addEventListener("DOMContentLoaded", () => {
           }
         }
       }
+    }
+
+    // Ctrl + f => finder
+    if (event.ctrlKey && event.key === "f") {
+      document.getElementById("bt_finder").click();
     }
     
         
