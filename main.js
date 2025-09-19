@@ -95,7 +95,28 @@ function createMainWIndow() {
     mainWindow.webContents.openDevTools();
   }
   mainWindow.loadFile(path.join(__dirname, "./renderer/index.html"));
-  mainWindow.on('close', () => {
+  mainWindow.on('close', async(event) => {
+    const historyList = history.getHistory();
+    const lastAction = historyList[historyList.length-1];
+
+    if(historyList.length>0 && !lastAction.name.includes("export lcmodel")){
+      event.preventDefault();
+
+      const options = {
+        type: "question",
+        buttons: ["No", "Yes"],
+        defaultId: 0,
+        title: "Unsaved Changes",
+        message: "Unsaved changes to the model. Do you really want to exit?",
+      };
+
+      const response = await dialog.showMessageBox(null, options);
+      console.log(response)
+      if(response.response === 0){
+        return
+      }
+    }
+
     if (finderWindow && !finderWindow.isDestroyed()) {
       finderWindow.close();
     }
@@ -119,6 +140,10 @@ function createMainWIndow() {
     }
     if (plotWindow && !plotWindow.isDestroyed()) {
       plotWindow.close();
+    }
+
+    if(mainWindow && !mainWindow.isDestroyed()){
+      mainWindow.destroy();
     }
   });
 
@@ -1526,6 +1551,7 @@ function createMainWIndow() {
       putcsvfile(mainWindow, saveName, outputArray);
       console.log("MAIN: Export ", saveName);
     }
+    history.saveState(LCCore.exportSerialisedModel(), "export csvmodel");
         
   });
   ipcMain.handle("ExportCorrelationAsLFFromRenderer", async (_e) => {
@@ -1554,6 +1580,7 @@ function createMainWIndow() {
       putcsvfile(mainWindow, saveEventName, outputArray.event);
       console.log("MAIN: Export ", saveModelName, saveEventName);
     }
+    history.saveState(LCCore.exportSerialisedModel(), "export csvmodel");
   });
   ipcMain.handle("InitialiseTempCore", async (_e) => {
     //import modeln 
@@ -3054,6 +3081,8 @@ function createMainWIndow() {
           width: 700,
           height: 700,
           webPreferences: {preload: path.join(__dirname, "preload", "preload_settings.js"),},
+          parent: mainWindow,
+          model: true,
         });
         
         //converterWindow.setAlwaysOnTop(true, "normal");
@@ -3154,31 +3183,29 @@ function createMainWIndow() {
     
     let connections = [];
     if (direction == "horizontal"){
-      connections = LCCore.projects[fromIdx[0]].holes[fromIdx[1]].sections[fromIdx[2]].markers[fromIdx[3]].h_connection;
+      connections = JSON.parse(JSON.stringify(LCCore.projects[fromIdx[0]].holes[fromIdx[1]].sections[fromIdx[2]].markers[fromIdx[3]].h_connection));
     }else{
       connections = LCCore.projects[fromIdx[0]].holes[fromIdx[1]].sections[fromIdx[2]].markers[fromIdx[3]].v_connection;
     }
 
-    let results = true;
+    let results = {success: 0,failure: 0};
     if (connections.length==0){
       console.log("MAIN: There is no connections at "+LCCore.projects[fromIdx[0]].holes[fromIdx[1]].sections[fromIdx[2]].name+"-"+LCCore.projects[fromIdx[0]].holes[fromIdx[1]].sections[fromIdx[2]].markers[fromIdx[3]].name)
       return false;
     }else{
-      while (connections.length > 0){
-        const toId = connections[0];
+      for (let i=0; i<connections.length; i++){
+        const toId = connections[i];
 
         const res = LCCore.disconnectMarkers(fromId, toId, direction);
-        if(!res){
-          results = false;
+        if(res){
+          results.success += 1;
+        }else{
+          results.failure += 1;
         }
       }
     }
 
-    if(results==true){
-      return true
-    }else{
-      return false
-    }
+    return results
     
   });
   ipcMain.handle("addSection", (_e, sectionId, data) => {
@@ -3769,6 +3796,7 @@ console.log(response)
                       if(result){
                         globalPath.saveModelPath = result;
                         LCCore.updateVersionInfo();
+                        history.saveState(LCCore.exportSerialisedModel(), "export lcmodel");
                       }                      
                     }else{
                       //save orverwrite
@@ -3776,6 +3804,7 @@ console.log(response)
                       if(result){
                         globalPath.saveModelPath = result;
                         LCCore.updateVersionInfo();
+                        history.saveState(LCCore.exportSerialisedModel(), "export lcmodel");
                       }
                       
                     }
@@ -3804,6 +3833,7 @@ console.log(response)
                       //save orverwrite
                       globalPath.saveModelPath = await putmodelfile(mainWindow, outData, globalPath.saveModelPath);
                     }
+                    history.saveState(LCCore.exportSerialisedModel(), "export lcmodel");
                   }                
                 },
               },
@@ -3824,6 +3854,7 @@ console.log(response)
   
                     //save as new file
                     globalPath.saveModelPath = await putmodelfile(mainWindow, outData, null);
+                    history.saveState(LCCore.exportSerialisedModel(), "export lcmodel");
                     
                   }                
                 },              
@@ -4304,6 +4335,10 @@ function progressDialog(window, tit, txt, indeterminate){
   return progress;
 }
 async function updateProgress(progress, n, N){
+  if (!progress || progress.isCompleted()) {
+    return null;                       
+  } 
+  
   try{
     if (progress) {
       progress.value = (n / N) * 100;
@@ -4312,15 +4347,18 @@ async function updateProgress(progress, n, N){
       if (n / N >= 1) {
         progress.setCompleted();
         progress.close();
-        progress = null;
+        return null;
       }
     }
     return progress;
   }catch(err){
-    progress.on("aborted");
     console.error("MAIN: In progressbar", err);
-    progress.close();
-    return progress;
+
+    if (progress && !progress.isCompleted()) {
+      progress.close();  
+    } 
+
+    return null;
   }
 }
 async function getfile(window=null, title, ext) {

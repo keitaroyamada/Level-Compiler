@@ -2809,11 +2809,17 @@ class LevelCompilerCore extends EventEmitter{
   }
   getMarkerNameFromId(id) {
     this.setStatus("running","start getMarkerNameFromId");
-    if (id == null){
+    if (id === null){
       this.setError("","E053: Input id is empty.")
       return null;
-    }
+    } 
+
     const idx = this.search_idx_list[id.toString()];
+    if(idx===undefined){
+      this.setError("","E073: Traget index is undefined. The target may not be connected. ")
+      return null
+    } 
+    
     const holeName   = this.projects[idx[0]].holes[idx[1]].name;
     const secName    = this.projects[idx[0]].holes[idx[1]].sections[idx[2]].name;
     const markerName = this.projects[idx[0]].holes[idx[1]].sections[idx[2]].markers[idx[3]].name;
@@ -4066,8 +4072,12 @@ class LevelCompilerCore extends EventEmitter{
       
       hconnected.forEach((c) => {
         const ci = this.search_idx_list[c];
-        let newhconnected = hconnected.filter(item => item.toString() !== c.toString());
-        this.projects[ci[0]].holes[ci[1]].sections[ci[2]].markers[ci[3]].h_connection = newhconnected;
+        if(ci){
+          let newhconnected = hconnected.filter(item => item.toString() !== c.toString());
+          this.projects[ci[0]].holes[ci[1]].sections[ci[2]].markers[ci[3]].h_connection = newhconnected;
+        }else{
+          console.log("LCCore: disconnected marker detected.")
+        }        
       });
       return true
     } else {
@@ -4124,18 +4134,22 @@ class LevelCompilerCore extends EventEmitter{
       let connectionIdxFrom = null;
       let connectionIdxTo = null;
       //check in connection of from
+      if(fromIdx){
+        this.projects[fromIdx[0]].holes[fromIdx[1]].sections[fromIdx[2]].markers[fromIdx[3]].h_connection.forEach((h_c, n) => {
+          if (h_c.toString() == toId.toString()) {
+            connectionIdxFrom = n;
+          }
+        });
+      }
       
-      this.projects[fromIdx[0]].holes[fromIdx[1]].sections[fromIdx[2]].markers[fromIdx[3]].h_connection.forEach((h_c, n) => {
-        if (h_c.toString() == toId.toString()) {
-          connectionIdxFrom = n;
-        }
-      });
       //check in connection of to
-      this.projects[toIdx[0]].holes[toIdx[1]].sections[toIdx[2]].markers[toIdx[3]].h_connection.forEach((h_c, n) => {
-        if (h_c.toString() == fromId.toString()) {
-          connectionIdxTo = n;
-        }
-      });
+      if(toIdx){
+        this.projects?.[toIdx[0]]?.holes?.[toIdx[1]]?.sections?.[toIdx[2]]?.markers?.[toIdx[3]]?.h_connection.forEach((h_c, n) => {
+          if (h_c.toString() == fromId.toString()) {
+            connectionIdxTo = n;
+          }
+        });
+      }      
 
       //disconnect
       if (connectionIdxFrom !== null && connectionIdxTo !== null) {
@@ -5350,14 +5364,18 @@ class LevelCompilerCore extends EventEmitter{
       currentId = stack.pop();
       if (!visitedId.has(currentId.toString())) {
         currentIdx = this.search_idx_list[currentId];
-
+        
         visitedId.add(currentId.toString());
 
-        this.projects[currentIdx[0]].holes[currentIdx[1]].sections[currentIdx[2]].markers[currentIdx[3]].h_connection.forEach((h) => {
-          if (!visitedId.has(h.toString())) {
-            stack.push(h);
-          }
-        });
+        if(currentIdx){
+          
+          this.projects[currentIdx[0]].holes[currentIdx[1]].sections[currentIdx[2]].markers[currentIdx[3]].h_connection.forEach((h) => {
+            if (!visitedId.has(h.toString())) {
+              stack.push(h);
+            }
+          });
+        }
+        
       }
     }
 
@@ -5453,6 +5471,9 @@ class LevelCompilerCore extends EventEmitter{
       //if section is not selected
       for(let p=0; p<this.projects.length;p++){
         //if target project
+        if(!this.projects[p]){
+          continue
+        }
         for(let h=0; h<this.projects[p].holes.length;h++){            
           //fisrt, search in the selected hole
           tempSectionData = null;

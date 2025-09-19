@@ -134,7 +134,7 @@ document.addEventListener("DOMContentLoaded", () => {
     objOpts.marker.font_colour = "black";
     objOpts.marker.show_name_labels = true;
     objOpts.marker.show_distance_labels = true;
-    objOpts.marker.emphasize_reversed = true;
+    objOpts.marker.emphasise_reversed = true;
   
     objOpts.event.line_colour = "red";
     objOpts.event.face_colour = {
@@ -150,12 +150,16 @@ document.addEventListener("DOMContentLoaded", () => {
     objOpts.event.folded_width  = 0.1;//rate
     objOpts.event.face_height = 0.98;//rate
   
+    objOpts.connection.emphasise_master_connections = false;
+    objOpts.connection.master_section_line_width = 4;
+    objOpts.connection.base_master_section_colour = "Blue"
+    objOpts.connection.duo_master_section_colour = "#73A7D1";
     objOpts.connection.line_colour = "Black";
     objOpts.connection.line_width = 1.5;
     objOpts.connection.indexWidth = objOpts.hole.distance * 0.7; //20;
-    objOpts.connection.emphasize_non_horizontal = true;
+    objOpts.connection.emphasise_non_horizontal = true;
     objOpts.connection.show_remote_connections = true;
-    objOpts.connection.emphasize_remote_connections = true;
+    objOpts.connection.emphasise_remote_connections = true;
   
     objOpts.plot.isVisible = false;
     objOpts.plot.collecion_idx = 0;
@@ -2028,27 +2032,27 @@ document.addEventListener("DOMContentLoaded", () => {
             console.log("[Editor]: Disconnected connections in " + fromId);
             
             const result = await window.LCapi.disconnectAllConnections(fromId, "horizontal");
-            if(result == true){
-              await undo("save","Disconnect Marker");//undo
-              await loadModel();
-              const disconnectedIds = toIds;
-              disconnectedIds.push(fromId);
-            
-              console.log("[Renderer]: Disconnect markers: ", disconnectedIds)
-
-              const changedData = await getUpdatedSectionIds("depth");          
-              console.log("[Renderer]: Affected sections:",changedData);
-              //const affectedSections = getConnectedSectionIds(disconnectedIds);
-              
-              if(changedData.ids.length>0){
-                modelImages.load_target_ids = changedData.ids;
-                modelImages = await loadCoreImages(modelImages, LCCore, objOpts, changedData.details);
-              }
-    
-              updateView();
-            }else{
-              console.log("[Renderer]: Failed")
+            if(result.success > 0 && result.failure == 0){
+              console.log("[Renderer]: Disconnected markers");
+            }else if(result.success > 0 && result.failure > 0){
+              console.log("[Renderer]: Partially disconnected the markers.");
+            }else if(result.success == 0 && result.failure > 0){
+              console.log("[Renderer]: Failed to disconnect markers");
             }
+
+            await undo("save","Disconnect Marker");//undo
+            await loadModel();
+
+            const changedData = await getUpdatedSectionIds("depth");          
+            console.log("[Renderer]: Affected sections:",changedData);
+            //const affectedSections = getConnectedSectionIds(disconnectedIds);
+            
+            if(changedData.ids.length>0){
+              modelImages.load_target_ids = changedData.ids;
+              modelImages = await loadCoreImages(modelImages, LCCore, objOpts, changedData.details);
+            }
+  
+            updateView();
             
           }
         }
@@ -4737,7 +4741,7 @@ document.addEventListener("DOMContentLoaded", () => {
               }
 
               //check reversed
-              if(objOpts.marker.emphasize_reversed){
+              if(objOpts.marker.emphasise_reversed){
                 if(m!==0){
                   if(section.markers[m-1][objOpts.canvas.depth_scale] > marker[objOpts.canvas.depth_scale]){
                     sketch.stroke("Cyan"); 
@@ -4833,10 +4837,10 @@ document.addEventListener("DOMContentLoaded", () => {
                 if (section.markers[m + 1] !== undefined) {
                   if (section.markers[m + 1].isMaster) {
                     sketch.drawingContext.setLineDash([]);
-                    sketch.strokeWeight(4);                    
-                    sketch.stroke("blue"); //(markerLineColour);
+                    sketch.strokeWeight(objOpts.connection.master_section_line_width);                    
+                    sketch.stroke(objOpts.connection.base_master_section_colour); //(markerLineColour);
                     if(project.model_type == "duo"){
-                      sketch.stroke(115,167,209);
+                      sketch.stroke(objOpts.connection.duo_master_section_colour);
                     }
                     const next_marker_top = section.markers[m + 1][objOpts.canvas.depth_scale];
                     sketch.line(
@@ -5045,7 +5049,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 //get style
                 if (cn_y0 !== cn_y3) {
                   //not horizontal
-                  if (objOpts.connection.emphasize_non_horizontal && objOpts.canvas.depth_scale !== "drilling_depth"){
+                  if (objOpts.connection.emphasise_non_horizontal && objOpts.canvas.depth_scale !== "drilling_depth"){
                     connection_colour = "Cyan";
                     connection_line_width = objOpts.connection.line_width * 4;
                   }
@@ -5077,18 +5081,24 @@ document.addEventListener("DOMContentLoaded", () => {
                   if(hole.order>=orderMaster[0] && hole.order<orderMaster[1]){
                     //if connection of master section
                     if(project.model_type == "duo"){
-                      connection_colour = [115,167,209];
+                      connection_colour = objOpts.connection.duo_master_section_colour;
                     }else{
-                      connection_colour = "Blue";
-                    }                    
-                    connection_line_width = objOpts.connection.line_width * 1.3
+                      connection_colour = objOpts.connection.base_master_section_colour;
+                    }
+                    
+                    connection_line_width = objOpts.connection.line_width;
+
+                    if(objOpts.connection.emphasise_master_connections){
+                      connection_line_width = connection_line_width * 2;
+                    }               
+                    
                   }
                 }
 
                 if (connectionData.isNext == false) {
                   //connected core is not located at the next
                   if (objOpts.connection.show_remote_connections){
-                    if(objOpts.connection.emphasize_remote_connections){
+                    if(objOpts.connection.emphasise_remote_connections){
                       sketch.drawingContext.setLineDash([5, 5]);
                     }
                   }else{
