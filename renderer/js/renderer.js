@@ -180,7 +180,7 @@ document.addEventListener("DOMContentLoaded", () => {
     objOpts.edit.handleMove = null;
     objOpts.edit.passwards = "admin";
 
-    objOpts.developer.mode = "user"; 
+    objOpts.developer.mode = "root"; 
     objOpts.pen.colour = "Red";
     objOpts.image.dpcm = 24;
     objOpts.image.dpcm_high = 200;
@@ -4649,10 +4649,10 @@ document.addEventListener("DOMContentLoaded", () => {
             sketch.rotate((objOpts.section.font_angle / 180) * Math.PI);
             sketch.text(secDispName, 0, 0);
             sketch.pop();
-
+            
+            //make marker objects=================================================================================
+            let msaterDirection = "non";
             for (let m = 0; m < section.markers.length; m++) {
-              //make marker objects=================================================================================
-                           
               //load marker data
               const marker = section.markers[m];
               let markerLineColour = objOpts.marker.line_colour;
@@ -4837,25 +4837,118 @@ document.addEventListener("DOMContentLoaded", () => {
               );
 
               //add master section-----------------------------------------
-              if (marker.isMaster) {
-                if (section.markers[m + 1] !== undefined) {
-                  if (section.markers[m + 1].isMaster) {
-                    sketch.drawingContext.setLineDash([]);
-                    sketch.strokeWeight(objOpts.connection.master_section_line_width);                    
-                    sketch.stroke(objOpts.connection.base_master_section_colour); //(markerLineColour);
-                    if(project.model_type == "duo"){
-                      sketch.stroke(objOpts.connection.duo_master_section_colour);
-                    }
-                    const next_marker_top = section.markers[m + 1][objOpts.canvas.depth_scale];
-                    sketch.line(
-                      (hole_x0 + shift_x) * xMag + pad_x,
-                      (marker_top + shift_y) * yMag + pad_y,
-                      (hole_x0 + shift_x) * xMag + pad_x,
-                      (next_marker_top + shift_y) * yMag + pad_y
-                    );
+              const curreM = countMaster(LCCore, marker, "project");   
+              const lowerM = countMaster(LCCore, section.markers[m + 1], "project");             
+
+              if(curreM.own == 1){
+                if(curreM.total==1){
+                  //horizontal marker is NOT master
+                  if(lowerM.own == 1){
+                    msaterDirection = "vertical";
+                  }else{
+                    msaterDirection = "none";
                   }
+                }else if(curreM.total==2){
+                  //horizontal marker is master
+                  if(lowerM.own == 0){
+                    //lower marker is NOT master
+                    msaterDirection = "horizontal";
+                  }else{
+                    //lower marker is also master
+                    if(msaterDirection=="none" || msaterDirection=="horizontal"){
+                      //master come from hconnection or startpoint or parallel section
+                      msaterDirection = "vertical";
+                    }else if(msaterDirection=="vertical"){
+                      //master come from vconnection
+                      msaterDirection = "horizontal";
+                    }
+                  }
+                }else{
+                  //unsuspected case (master marker>=3)
+                  msaterDirection = "none";
                 }
+              }else{
+                msaterDirection = "none";
               }
+
+              if(msaterDirection == "vertical"){
+                //plot
+                sketch.drawingContext.setLineDash([]);
+                sketch.strokeWeight(objOpts.connection.master_section_line_width);                    
+                sketch.stroke(objOpts.connection.base_master_section_colour); //(markerLineColour);
+                if(project.model_type == "duo"){
+                  sketch.stroke(objOpts.connection.duo_master_section_colour);
+                }
+
+                const next_marker_top = section.markers[m + 1][objOpts.canvas.depth_scale];
+                sketch.line(
+                  (hole_x0 + shift_x) * xMag + pad_x,
+                  (marker_top + shift_y) * yMag + pad_y,
+                  (hole_x0 + shift_x) * xMag + pad_x,
+                  (next_marker_top + shift_y) * yMag + pad_y
+                );
+
+                
+              }
+
+              if(["developer","root"].includes(objOpts.developer.mode)){
+                  //data depth source arrow
+                  sketch.drawingContext.setLineDash([]);
+                  sketch.strokeWeight(1);                    
+                  sketch.stroke("white");
+                  if(marker.depth_source[1] || marker.depth_source[2]){
+                    if(section.markers[m - 1] && marker.depth_source[1]){
+                      const upper_source = getDataFromId(LCCore, marker.depth_source[1]);
+                      if(upper_source  && section.markers[m - 1].id[1] === marker.depth_source[1][1]){
+                        const before_marker_top = upper_source[objOpts.canvas.depth_scale];
+                        sketch.line(
+                          (hole_x0 + shift_x) * xMag + pad_x + sec_w - 10,
+                          (marker_top + shift_y) * yMag + pad_y,
+                          (hole_x0 + shift_x) * xMag + pad_x + sec_w - 10,
+                          (before_marker_top + shift_y) * yMag + pad_y
+                        );
+                        sketch.line(
+                          (hole_x0 + shift_x) * xMag + pad_x + sec_w - 10,
+                          (marker_top + shift_y) * yMag + pad_y,
+                          (hole_x0 + shift_x) * xMag + pad_x + sec_w - 10 + 5,
+                          (marker_top + shift_y) * yMag + pad_y - 10
+                        );
+                        sketch.line(
+                          (hole_x0 + shift_x) * xMag + pad_x + sec_w - 10,
+                          (marker_top + shift_y) * yMag + pad_y,
+                          (hole_x0 + shift_x) * xMag + pad_x + sec_w - 10 -5,
+                          (marker_top + shift_y) * yMag + pad_y - 10
+                        );
+                      }                    
+                    }
+
+                    if(section.markers[m + 1] && marker.depth_source[2]){
+                      const lower_source = getDataFromId(LCCore, marker.depth_source[2]);
+                      if(lower_source && section.markers[m + 1].id[1] === marker.depth_source[2][1]){     
+                        const next_marker_top = lower_source[objOpts.canvas.depth_scale];                 
+                        sketch.line(
+                          (hole_x0 + shift_x) * xMag + pad_x + sec_w -10,
+                          (marker_top + shift_y) * yMag + pad_y,
+                          (hole_x0 + shift_x) * xMag + pad_x + sec_w -10,
+                          (next_marker_top + shift_y) * yMag + pad_y
+                        );
+                        sketch.line(
+                          (hole_x0 + shift_x) * xMag + pad_x + sec_w -10 + 5,
+                          (marker_top + shift_y) * yMag + pad_y + 10,
+                          (hole_x0 + shift_x) * xMag + pad_x + sec_w -10,
+                          (marker_top + shift_y) * yMag + pad_y
+                        );
+                        sketch.line(
+                          (hole_x0 + shift_x) * xMag + pad_x + sec_w -10 -5,
+                          (marker_top + shift_y) * yMag + pad_y + 10,
+                          (hole_x0 + shift_x) * xMag + pad_x + sec_w -10,
+                          (marker_top + shift_y) * yMag + pad_y
+                        );
+                      }
+                    }
+                  }                  
+                }
+
               //add rank marker-------------------------------------------
               if (objOpts.marker.is_rank) {
                 sketch.fill("black");
@@ -4891,29 +4984,48 @@ document.addEventListener("DOMContentLoaded", () => {
                   9
                 );
 
-                //cd rank(unreliability)
-                //if (marker.unreliability== 1) {
-                //  sketch.fill("red");
-                 // sketch.ellipse(
-                 //   (hole_x0 + shift_x) * xMag + pad_x,
-                 //   (marker_top + shift_y) * yMag + pad_y,
-                 //   4
-                 // );
-                //}
-
                 //master flag
                 if (marker.isMaster){
                   sketch.noFill();
                   sketch.stroke("Blue");
-                  sketch.strokeWeight(1); 
+                  
+                  sketch.strokeWeight(2); 
                   sketch.ellipse(
                     (hole_x0 + shift_x) * xMag + pad_x,
                     (marker_top + shift_y) * yMag + pad_y,
-                    12
+                    17
                   );
-                }
-              }
+                  if (marker.isZeroPoint!==false){
+                    sketch.noFill();
+                    sketch.stroke("Cyan");
+                    sketch.strokeWeight(3); 
+                    sketch.ellipse(
+                      (hole_x0 + shift_x) * xMag + pad_x,
+                      (marker_top + shift_y) * yMag + pad_y,
+                      25
+                    );
+                  }
+                }  
+                
+                if(["developer","root"].includes(objOpts.developer.mode)){
+                  if(
+                    marker.depth_source[1] && 
+                    marker.depth_source[1][0] !== marker.id[0] &&
+                    marker.depth_source[1][0] !== LCCore.base_project_id[0]
+                  ){                  
+                    sketch.noFill();
+                    sketch.stroke("Red");
+                    
+                    sketch.strokeWeight(2); 
+                    sketch.ellipse(
+                      (hole_x0 + shift_x) * xMag + pad_x,
+                      (marker_top + shift_y) * yMag + pad_y,
+                      17
+                    );
+                  }
+                }                
 
+              }
               
               //add marker name without top/bottom name
               if(objOpts.marker.show_name_labels){
@@ -4940,15 +5052,20 @@ document.addEventListener("DOMContentLoaded", () => {
                 sketch.noStroke();
                 sketch.textFont(objOpts.marker.font);
                 sketch.textSize(objOpts.marker.font_size);
-                sketch.text(
-                  (Math.round(marker.distance * 10) / 10).toFixed(1).toString(),
-                  (hole_x0 + shift_x) * xMag + pad_x + objOpts.marker.width * xMag + 5,
-                  (marker_top + shift_y) * yMag + pad_y - 2
-                );
-              }
-
-              
-              
+                if(["developer","root"].includes(objOpts.developer.mode)){
+                  sketch.text(
+                    (Math.round(marker[objOpts.canvas.depth_scale] * 10) / 10).toFixed(1).toString()+'('+(Math.round(marker.distance * 10) / 10).toFixed(1).toString()+')',
+                    (hole_x0 + shift_x) * xMag + pad_x + objOpts.marker.width * xMag + 5,
+                    (marker_top + shift_y) * yMag + pad_y - 2
+                  );
+                }else{
+                  sketch.text(
+                    (Math.round(marker.distance * 10) / 10).toFixed(1).toString(),
+                    (hole_x0 + shift_x) * xMag + pad_x + objOpts.marker.width * xMag + 5,
+                    (marker_top + shift_y) * yMag + pad_y - 2
+                  );
+                }                
+              }              
 
               //-----------------------------------------------------------
               //make connection objects=================================================================================
@@ -5032,8 +5149,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
                 //get connectied hole position
                 const connectedHole_x0 = (objOpts.hole.distance + objOpts.hole.width) * ((LCCore.projects[idxTo[0]].order * objOpts.project.interval)+ (connectionData.num_total - connectionData.num_total_disable)); //LCCore.projects[idxTo[0]].holes[idxTo[1]].order
-
-                const connectedMarker_top = LCCore.projects[idxTo[0]].holes[idxTo[1]].sections[idxTo[2]].markers[idxTo[3]][objOpts.canvas.depth_scale];
+                const connectedMarker  = LCCore.projects[idxTo[0]].holes[idxTo[1]].sections[idxTo[2]].markers[idxTo[3]];
+                const connectedMarker_top = connectedMarker[objOpts.canvas.depth_scale];
 
                 if (connectedMarker_top == null) {
                   //console.log("Connected marker position is null.");
@@ -5117,6 +5234,43 @@ document.addEventListener("DOMContentLoaded", () => {
                 sketch.line(cn_x0, cn_y0, cn_x1, cn_y1); //start point
                 sketch.line(cn_x1, cn_y1, cn_x2, cn_y2); //index left
                 sketch.line(cn_x2, cn_y2, cn_x3, cn_y3); //index right
+
+                if(["developer","root"].includes(objOpts.developer.mode)){
+                  let dir = null;
+                  if(marker.depth_source[1]){
+                    if(marker.depth_source[1][1] !== marker.id[1]){
+                      //not same hole
+                      if(marker.depth_source[1][3] == connectedMarker.id[3]){
+                        //connected between markers
+                        dir = "left";
+                      }
+                    }                                     
+                  }
+
+                  if(connectedMarker.depth_source[1]){
+                    if(connectedMarker.depth_source[1][1] !== connectedMarker.id[1]){
+                      //not same hole
+                      if(connectedMarker.depth_source[1][3] == marker.id[3]){
+                        //connected between markers
+                        dir = "right";
+                      }
+                    }   
+                  }
+                 
+
+                  //connectedMarker
+                  //sourceMarker
+                       
+                  sketch.drawingContext.setLineDash([]);
+                  if(dir=="right"){
+                    sketch.line(cn_x2, cn_y2-5, cn_x3, cn_y3); 
+                    sketch.line(cn_x2, cn_y2+5, cn_x3, cn_y3); 
+                  }else if(dir=="left"){
+                    sketch.line(cn_x0, cn_y0, cn_x1, cn_y1-5);
+                    sketch.line(cn_x0, cn_y0, cn_x1, cn_y1+5);
+                  }
+
+                }
 
                 //------------------------------------------------------------                
               } 
@@ -6768,7 +6922,54 @@ function getIdxById(LCCore, id) {
     return null;
   }
 }
+function getDataFromId(LCCore, id){
+  const idx = getIdxById(LCCore, id);
+  const nullIndex = idx.indexOf(null);
+  const validLevels = nullIndex !== -1 ? nullIndex : idx.length;
 
+  switch (validLevels) {
+    case 4:
+      return LCCore.projects[idx[0]].holes[idx[1]].sections[idx[2]].markers[idx[3]];
+    case 3:
+      return LCCore.projects[idx[0]].holes[idx[1]].sections[idx[2]];
+    case 2:
+      return LCCore.projects[idx[0]].holes[idx[1]];
+    case 1:
+      return LCCore.projects[idx[0]];
+    default:
+      return null;
+  }
+}
+function countMaster(LCCore, markerData, calcRange="project"){
+  let results = {own: 0, horizontal:0, total :0};
+  if(!markerData){
+    return results
+  }
+
+  if (markerData.isMaster){
+    results.own +=1;
+  }
+     
+  markerData.h_connection.forEach(hid=>{
+    const idx = getIdxById(LCCore, hid);
+    if(idx){
+      if(calcRange == "project"){
+        if(markerData.id[0]===hid[0]){
+          if(LCCore.projects[idx[0]].holes[idx[1]].sections[idx[2]].markers[idx[3]].isMaster){
+            results.horizontal++;
+          }
+        }
+      }else{
+        if(LCCore.projects[idx[0]].holes[idx[1]].sections[idx[2]].markers[idx[3]].isMaster){
+          results.horizontal++;
+        }
+      } 
+    }
+  })
+
+  results.total = results.own + results.horizontal;
+  return results;
+}
 function isPointInRect(point, rect) {
   return (
     point[0] >= rect[0] &&
