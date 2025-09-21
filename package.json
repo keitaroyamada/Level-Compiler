@@ -1,7 +1,7 @@
 {
   "name": "levelcompiler",
   "productName": "Level-Compiler",
-  "version": "1.2.0",
+  "version": "1.0.0",
   "description": "Stratigraphic Correlation Viewer and Compiler",
   "main": "main.js",
   "scripts": {
@@ -31,6 +31,7 @@
       "owner": "keitaroyamada",
       "repo": "Level-Compiler"
     },
+    "artifactName": "${productName}-Setup-${version}.${ext}",
     "win": {
       "target": [
         "nsis"
@@ -42,7 +43,12 @@
       "icon": "./icon/levelcompiler.png",
       "hardenedRuntime": true,
       "entitlements": "entitlements.mac.plist",
-      "entitlementsInherit": "entitlements.mac.plist"
+      "entitlementsInherit": "entitlements.mac.plist",
+      "notarize": {
+        "teamId": "${process.env.APPLE_TEAM_ID}",
+        "appleId": "${process.env.APPLE_ID}",
+        "appleIdPassword": "${process.env.APPLE_ID_PASSWORD}"
+      }
     },
     "linux": {
       "icon": "./icon/levelcompiler.png"

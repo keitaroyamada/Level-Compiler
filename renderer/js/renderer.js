@@ -181,7 +181,7 @@ document.addEventListener("DOMContentLoaded", () => {
     objOpts.edit.handleMove = null;
     objOpts.edit.passwards = "admin";
 
-    objOpts.developer.mode = "user"; 
+    objOpts.developer.mode = "root"; 
     objOpts.pen.colour = "#ff0000";
     objOpts.image.dpcm = 24;
     objOpts.image.dpcm_high = 200;
@@ -237,15 +237,13 @@ document.addEventListener("DOMContentLoaded", () => {
   //============================================================================================
   //============================================================================================
   //hide test event
-  document.getElementById("footerLeftText").addEventListener("click", async () => {
+  document.getElementById("footerRightText").addEventListener("click", async () => {
     if(["root"].includes(objOpts.developer.mode)){
-      const results = await window.LCapi.getDisplayInfo();
-
-      const dpi = results.height / objOpts.canvas.display_height; // hight is already divided by scale factor
-
-      console.log(results.height , objOpts.canvas.display_height , results.scaleFactor,dpi)
+      //const results = await window.LCapi.getDisplayInfo();
+      //const dpi = results.height / objOpts.canvas.display_height; // hight is already divided by scale factor
+      //console.log(results.height , objOpts.canvas.display_height , results.scaleFactor,dpi)
       
-
+      document.getElementById("footerLeftText").textContent = "aaaaaaaaaaaaa";  
     }
   });
   //============================================================================================
@@ -3578,6 +3576,15 @@ document.addEventListener("DOMContentLoaded", () => {
     document.getElementById("bt_divider").click();
   });
   //============================================================================================
+  window.LCapi.receive("footerLeft", async (data) => {
+
+    document.getElementById("footerLeftText").textContent = data; 
+    
+    setTimeout(() => {
+      document.getElementById("footerLeftText").textContent = "";
+    }, 10000);
+
+  });
   //============================================================================================
   //FInder send event (move to)
   window.LCapi.receive("MoveToHorizonFromFinder", async (data) => {
@@ -3642,7 +3649,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
     
     const txt = await getFooterInfo(LCCore, objOpts.edit.hittest, options);
-    document.getElementById("footerLeftText").innerText = txt;
+    document.getElementById("footerRightText").textContent = txt;
 
     //target line
     var target_line = document.getElementById("horizontal_target");
@@ -3687,7 +3694,7 @@ document.addEventListener("DOMContentLoaded", () => {
       objOpts.edit.hittest = ht;
 
       const txt = await getFooterInfo(LCCore, objOpts.edit.hittest, objOpts);
-      document.getElementById("footerLeftText").innerText = txt;
+      document.getElementById("footerRightText").textContent = txt;
 
       ///scroller position
       canvasPos[0] = scroller.scrollLeft;//* xMag;

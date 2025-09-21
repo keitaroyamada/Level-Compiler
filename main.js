@@ -67,6 +67,7 @@ let globalPath = {
 };
 
 //windows
+let mainWindow = null;
 let finderWindow = null;
 let dividerWindow = null;
 let converterWindow = null;
@@ -78,7 +79,7 @@ let plotWindow = null;
 let progressBar = null;
 
 function createMainWIndow() {
-  const mainWindow = new BrowserWindow({
+  mainWindow = new BrowserWindow({
     title: "Level Compiler",
     width: isDev ? 2000 : 1000,
     height: 800,
@@ -4738,13 +4739,68 @@ async function checkUpdate(window, from){
   //this process does not work in MSI app.
   //check update in the github
   autoUpdater.allowPrerelease = true;
-  autoUpdater.autoDownload = false;
-  //if (isDev) {
-  //  autoUpdater.forceDevUpdateConfig = true; // for dev
-  //}else{
-  //  autoUpdater.forceDevUpdateConfig = false; // for dev
-  //}
+  autoUpdater.autoDownload = true;
+  autoUpdater.forceDevUpdateConfig = true;
+  let currentDownload = "";
+
+  autoUpdater.on('update-available', async(info) => {
+    try {
+      await autoUpdater.downloadUpdate();
+      currentDownload = info.files[0].url || info.files[0].name;
+      window.webContents.send("footerLeft", `A new update is available.`);
+    } catch (err) {
+      console.error("Full download failed:", err);
+      dialog.showMessageBox(window, {
+        type: "error",
+        title: "Download Failed",
+        message: "Could not download the full update. Would you like to get it manually?",
+        buttons: ["Download", "Cancel"],
+      }).then((result) => {
+        if (result.response === 0) {
+          shell.openExternal("https://github.com/keitaroyamada/Level-Compiler/releases/latest");
+        }
+      });
+    }    
+  });
+
+  autoUpdater.on("update-downloaded", (info) => {
+    window.webContents.send("footerLeft", `Version ${info.version} has been downloaded.`);
+    dialog.showMessageBox(window, {
+      type: "info",
+      title: "Update Ready",
+      message: `Version ${info.version} has been downloaded. Install and restart now?`,
+      buttons: ["Install", "Later"],
+    }).then((result) => {
+      if (result.response === 0) {
+        autoUpdater.quitAndInstall();
+      }
+      window.webContents.send("footerLeft", "");
+    }).catch((err) => {
+      console.error("Error displaying install dialog:", err);
+      window.webContents.send("footerLeft", "Error displaying install dialog.");
+    });
+  });
+
+  autoUpdater.on("download-progress", (progressObj) => {
+    const logMsg = `New downloading ${currentDownload} - ${Math.round(progressObj.percent)}%`;
+    console.log(logMsg);
+    window.webContents.send("footerLeft", logMsg);
+  });
+
+
+  autoUpdater.on("error", (err) => {
+    if (from === "button") {
+      dialog.showMessageBox(window, {
+        type: "error",
+        title: "Update Error",
+        message: `An error occurred: ${err.message}`,
+      });
+      window.webContents.send("footerLeft", "An error occured in auto updater.");
+    }
+  });
+
   
+  /*
   autoUpdater.on('update-available', (info) => {
     dialog.showMessageBox(
       window,
@@ -4795,9 +4851,9 @@ async function checkUpdate(window, from){
       });
     }
   });
+  */
 
   await autoUpdater.checkForUpdates();
-
 }
 //--------------------------------------------------------------------------------------------------
 function getSettings(type){
@@ -4856,7 +4912,9 @@ app.whenReady().then(async() => {
   createMainWIndow();
 
   //check update
-  checkUpdate(mainWindow, "startup");
+  mainWindow.once("ready-to-show", () => {
+    checkUpdate(mainWindow, "startup");
+  });
 
   app.on("activate", (I) => {
     if (BrowserWindow.getAllWindows().length === 0) {
