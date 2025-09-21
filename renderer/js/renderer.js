@@ -84,7 +84,7 @@ document.addEventListener("DOMContentLoaded", () => {
     objOpts.canvas.is_connection = true;
     objOpts.canvas.draw_core_photo = false;
     objOpts.canvas.draw_core_photo_plot = true;
-    objOpts.canvas.photo_plot_colour = "Red";
+    objOpts.canvas.photo_plot_colour = "#ff0000";
     objOpts.canvas.finder_y = 0;
     objOpts.canvas.age_precision = 0;
     objOpts.canvas.display_height = 20.2;
@@ -92,7 +92,7 @@ document.addEventListener("DOMContentLoaded", () => {
     objOpts.project.interval = 1;
     objOpts.project.font = "Arial";
     objOpts.project.font_size = 25;
-    objOpts.project.font_colour = "black";
+    objOpts.project.font_colour = "#000000";
     objOpts.project.is_show_area = true;
     objOpts.project.area_colour = "#EBEBEB";
     objOpts.project.area_colour_disconnected = "#FFE5E5";
@@ -101,60 +101,61 @@ document.addEventListener("DOMContentLoaded", () => {
   
     objOpts.hole.distance = 20;
     objOpts.hole.width = 20;
-    objOpts.hole.line_colour = "lightgreen";
+    objOpts.hole.line_colour = "#90EE90";
     objOpts.hole.line_width = 2;
     objOpts.hole.font = "Arial";
     objOpts.hole.font_size = 20;
-    objOpts.hole.font_colour = "black";
+    objOpts.hole.font_colour = "#000000";
   
-    objOpts.section.line_colour = "gray";
-    objOpts.section.face_colour = "lightgray";
+    objOpts.section.line_colour = "#808080";
+    objOpts.section.face_colour = "#D3D3D3";
     objOpts.section.line_width = 2;
     objOpts.section.width = 20;
     objOpts.section.font = "Arial";
     objOpts.section.font_size = 20;
     objOpts.section.font_angle =  -90;
     objOpts.section.font_pos_x = -10;
-    objOpts.section.font_colour = "black";
+    objOpts.section.font_colour = "#000000";
   
-    objOpts.marker.line_colour = "gray";
+    objOpts.marker.line_colour = "#808080";
     objOpts.marker.line_width = 1;
     objOpts.marker.width = 20;
     objOpts.marker.is_rank = false;
     objOpts.marker.rank_colours = [
-      "blue",
-      "green",
-      "lightgreen",
-      "orange",
-      "red",
+      "#008000", // green
+      "#66CC66", // medium green
+      "#99FF99", // light green
+      "#FFD580", // light orange-yellow
+      "#FFA500", // orange
+      "#FF0000"  // red
     ];
     objOpts.marker.ignore_zoom_level = 0.4;
     objOpts.marker.font = "Arial";
     objOpts.marker.font_size = 12;
-    objOpts.marker.font_colour = "black";
+    objOpts.marker.font_colour = "#000000";
     objOpts.marker.show_name_labels = true;
     objOpts.marker.show_distance_labels = true;
     objOpts.marker.emphasise_reversed = true;
   
-    objOpts.event.line_colour = "red";
+    objOpts.event.line_colour = "#ff0000";
     objOpts.event.face_colour = {
-      general: "Gold",
-      erosion: "Teal",
-      tephra: "Crimson",
-      void: "Purple",
-      disturbed: "SlateGray",
-      earthquake: "green",
+      general: "#FFD700",    // gold
+      erosion: "#008080",    // teal
+      tephra: "#DC143C",     // crimson
+      void: "#800080",       // purple
+      disturbed: "#708090",  // slate gray
+      earthquake: "#008000"  // green
     };
     objOpts.event.line_width = 1;
-    objOpts.event.line_colour = "Gray"; //rate
+    objOpts.event.line_colour = "#808080"; //rate
     objOpts.event.folded_width  = 0.1;//rate
     objOpts.event.face_height = 0.98;//rate
   
     objOpts.connection.emphasise_master_connections = false;
     objOpts.connection.master_section_line_width = 4;
-    objOpts.connection.base_master_section_colour = "Blue"
+    objOpts.connection.base_master_section_colour = "#0000FF"
     objOpts.connection.duo_master_section_colour = "#73A7D1";
-    objOpts.connection.line_colour = "Black";
+    objOpts.connection.line_colour = "#000000";
     objOpts.connection.line_width = 1.5;
     objOpts.connection.indexWidth = objOpts.hole.distance * 0.7; //20;
     objOpts.connection.emphasise_non_horizontal = true;
@@ -180,8 +181,8 @@ document.addEventListener("DOMContentLoaded", () => {
     objOpts.edit.handleMove = null;
     objOpts.edit.passwards = "admin";
 
-    objOpts.developer.mode = "root"; 
-    objOpts.pen.colour = "Red";
+    objOpts.developer.mode = "user"; 
+    objOpts.pen.colour = "#ff0000";
     objOpts.image.dpcm = 24;
     objOpts.image.dpcm_high = 200;
     objOpts.image.enableLoad = {composite_depth: true, event_free_depth: true, age: true};
@@ -189,24 +190,24 @@ document.addEventListener("DOMContentLoaded", () => {
     objOpts.age.alt_radius = 3;
      
     objOpts.age.incon_list = {
-      terrestrial: ["", "Green"],
-      terrestrial_unreliable: ["", "Green"],
-      terrestrial_disable: ["", "Gray"],
-      marine: ["", "Blue"],
-      marine_unreliable: ["", "Blue"],
-      marine_disable: ["", "Gray"],
-      tephra: ["", "Red"],
-      tephra_unreliable: ["", "Red"],
-      tephra_disable: ["", "Gray"],
-      orbital: ["", "Orange"],
-      orbital_unreliable: ["", "Orange"],
-      orbital_disable: ["", "Gray"],
-      general: ["", "Black"],
-      general_unreliable: ["", "Black"],
-      general_disable: ["", "Gray"],
-      historical: ["", "Brown"],
-      historical_unreliable: ["", "Brown"],
-      historical_disable: ["", "Gray"],
+      terrestrial: ["", "#008000"],
+      terrestrial_unreliable: ["", "#008000"],
+      terrestrial_disable: ["", "#808080"],
+      marine: ["", "#0000FF"],
+      marine_unreliable: ["", "#0000FF"],
+      marine_disable: ["", "#808080"],
+      tephra: ["", "#ff0000"],
+      tephra_unreliable: ["", "#ff0000"],
+      tephra_disable: ["", "#808080"],
+      orbital: ["", "#FFA500"],
+      orbital_unreliable: ["", "#FFA500"],
+      orbital_disable: ["", "#808080"],
+      general: ["", "#000000"],
+      general_unreliable: ["", "#000000"],
+      general_disable: ["", "#808080"],
+      historical: ["", "#A52A2A"],
+      historical_unreliable: ["", "#A52A2A"],
+      historical_disable: ["", "#808080"],
       interpolation: ["", "transparent"],
       interpolation_unreliable: ["", "transparent"],
       interpolation_disable: ["", "transparent"],
@@ -237,7 +238,7 @@ document.addEventListener("DOMContentLoaded", () => {
   //============================================================================================
   //hide test event
   document.getElementById("footerLeftText").addEventListener("click", async () => {
-    if(["developer","root"].includes(objOpts.developer.mode)){
+    if(["root"].includes(objOpts.developer.mode)){
       const results = await window.LCapi.getDisplayInfo();
 
       const dpi = results.height / objOpts.canvas.display_height; // hight is already divided by scale factor
@@ -3636,7 +3637,7 @@ document.addEventListener("DOMContentLoaded", () => {
     
     //get/show footer text
     let options = {canvas:{depth_scale: objOpts.canvas.depth_scale, age_precision: objOpts.canvas.age_precision}};
-    if(["developer","root"].includes(objOpts.developer.mode)){
+    if(["root"].includes(objOpts.developer.mode)){
       options.canvas.depth_scale = "canvas_position";
     }
     
@@ -4154,8 +4155,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
         //scale title
         sketch.drawingContext.setLineDash([]);
-        sketch.fill("black");
-        sketch.noStroke(); // sketch.stroke("black");
+        sketch.fill("#000000");
+        sketch.noStroke(); // sketch.stroke("#000000");
         sketch.textFont("Arial");
         sketch.textSize("30px");
         sketch.push();
@@ -4221,8 +4222,8 @@ document.addEventListener("DOMContentLoaded", () => {
           //label
           const tickLabel = txt(tickType, y);
           const tickWidth = ctx.measureText(tickLabel).width;
-          sketch.fill("black");
-          sketch.noStroke(); // sketch.stroke("black");
+          sketch.fill("#000000");
+          sketch.noStroke(); // sketch.stroke("#000000");
           sketch.textFont("Arial");
           sketch.textSize("20px");
           sketch.text(tickLabel, scroller.scrollLeft + 50, y + 8);
@@ -4248,8 +4249,8 @@ document.addEventListener("DOMContentLoaded", () => {
           //label
           const tickLabel = txt(tickType, y);
           const tickWidth = ctx.measureText(tickLabel).width;
-          sketch.fill("black");
-          sketch.noStroke(); // sketch.stroke("black");
+          sketch.fill("#000000");
+          sketch.noStroke(); // sketch.stroke("#000000");
           sketch.textFont("Arial");
           sketch.textSize("20px");
           sketch.text(tickLabel, scroller.scrollLeft + 50, y + 8);
@@ -4288,14 +4289,14 @@ document.addEventListener("DOMContentLoaded", () => {
         
 
         sketch.strokeWeight(1);
-        sketch.stroke("Red");
+        sketch.stroke("#ff0000");
         sketch.line(
           target_x0,
           target_y,
           target_x1,
           target_y
         );
-        sketch.fill("Red");
+        sketch.fill("#ff0000");
         sketch.triangle(
           target_x0,      target_y,
           target_x0 - 10, target_y + 5, 
@@ -4350,7 +4351,7 @@ document.addEventListener("DOMContentLoaded", () => {
         if(project.enable == true){
           //show project name
           let projectDispName = project.name; 
-          if(["developer","root"].includes(objOpts.developer.mode)){
+          if(["root"].includes(objOpts.developer.mode)){
             projectDispName = project.id[0].slice(0,5);
           }
           
@@ -4395,7 +4396,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 sketch.push();//save
                 sketch.fill(0,0,0,0);
                 sketch.strokeWeight(3);
-                sketch.stroke("Red");
+                sketch.stroke("#ff0000");
                 
                 sketch.rect(project_x0, project_y0, project_w, project_h, 3, 3, 3, 3); //rounded
                 sketch.pop();
@@ -4426,7 +4427,7 @@ document.addEventListener("DOMContentLoaded", () => {
           let hole_x0 = (objOpts.hole.distance + objOpts.hole.width) * (num_disable.total + hole.order - num_disable.hole);
           //add  hole name---------------------------------------------------
           let holeDispName = hole.name; 
-          if(["developer","root"].includes(objOpts.developer.mode)){
+          if(["root"].includes(objOpts.developer.mode)){
             holeDispName = hole.id[1].slice(0,5);
           }
           sketch.fill(objOpts.hole.font_colour);
@@ -4491,7 +4492,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 sketch.push();//save
                 sketch.fill(0,0,0,0);
                 sketch.strokeWeight(3);
-                sketch.stroke("Red");
+                sketch.stroke("#ff0000");
                 const hole_ht_x0 = (hole_x0 + shift_x) * xMag + pad_x - 3;
                 const hole_ht_y0 = (hole_top + shift_y) * yMag + pad_y - 3;
                 const hole_ht_w  = objOpts.section.width * xMag + 6;
@@ -4548,7 +4549,7 @@ document.addEventListener("DOMContentLoaded", () => {
               if(["change_section_name","delete_section","connect_section", "disconnect_section"].includes(objOpts.edit.mode)){
                 if(objOpts.edit.hittest.hole == hole.id[1] && objOpts.edit.hittest.section == section.id[2]){
                   sketch.strokeWeight(3);
-                  sketch.stroke("Red");
+                  sketch.stroke("#ff0000");
                 }               
               }
             }
@@ -4556,7 +4557,7 @@ document.addEventListener("DOMContentLoaded", () => {
             if(objOpts.edit.section_from !== null){
               if(objOpts.edit.section_from.project == section.id[0] && objOpts.edit.section_from.hole == section.id[1] && objOpts.edit.section_from.section == section.id[2]){
                 sketch.strokeWeight(3);
-                sketch.stroke("Green");
+                sketch.stroke("#008000");
               }
             }
             
@@ -4633,7 +4634,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
             //add section name-------------------------------------------------
             let secDispName = hole.name + "-" + section.name; 
-            if(["developer","root"].includes(objOpts.developer.mode)){
+            if(["root"].includes(objOpts.developer.mode)){
               secDispName = section.id[2].slice(0,5);
             }
 
@@ -4709,7 +4710,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     const lower_depth = marker[objOpts.canvas.depth_scale];
                     sketch.push()
                     sketch.noFill();
-                    sketch.stroke("Red");
+                    sketch.stroke("#ff0000");
                     sketch.strokeWeight(3);
                     sketch.rect(
                       (hole_x0 + shift_x) * xMag + pad_x + 3,
@@ -4765,14 +4766,14 @@ document.addEventListener("DOMContentLoaded", () => {
                     if(Math.abs(objOpts.edit.hittest.nearest_distance) < objOpts.edit.sensibility){
                       if(hitId.toString() == marker.id.toString()){
                         sketch.strokeWeight(3);
-                        sketch.stroke("Red");
+                        sketch.stroke("#ff0000");
                       }
                     }
                   } else if(objOpts.edit.mode == "add_marker"){
                     if(objOpts.edit.hittest.project == project.id[0] && objOpts.edit.hittest.hole == hole.id[1] && objOpts.edit.hittest.section == section.id[2]){
                       sketch.push();//save
                       sketch.strokeWeight(1);
-                      sketch.stroke("Red");
+                      sketch.stroke("#ff0000");
                       sketch.line(
                         (hole_x0 + shift_x) * xMag + pad_x,
                         sketch.mouseY+scroller.scrollTop, //(marker_top + shift_y) * yMag + pad_y,
@@ -4788,7 +4789,7 @@ document.addEventListener("DOMContentLoaded", () => {
                   const hitId = [objOpts.edit.marker_from.project, objOpts.edit.marker_from.hole, objOpts.edit.marker_from.section, objOpts.edit.marker_from.nearest_marker];
                   if(hitId.toString() == marker.id.toString()){
                     sketch.strokeWeight(3);
-                    sketch.stroke("Red");
+                    sketch.stroke("#ff0000");
 
                     if(objOpts.edit.marker_to == null){
                       //console.log(objOpts.edit);
@@ -4816,7 +4817,7 @@ document.addEventListener("DOMContentLoaded", () => {
                   const hitId = [objOpts.edit.marker_to.project, objOpts.edit.marker_to.hole, objOpts.edit.marker_to.section, objOpts.edit.marker_to.nearest_marker];
                   if(hitId.toString() == marker.id.toString()){
                     sketch.strokeWeight(3);
-                    sketch.stroke("Red");
+                    sketch.stroke("#ff0000");
                   }
                 }
               }
@@ -4896,6 +4897,7 @@ document.addEventListener("DOMContentLoaded", () => {
                   sketch.drawingContext.setLineDash([]);
                   sketch.strokeWeight(1);                    
                   sketch.stroke("white");
+                  sketch.fill("white");
                   if(marker.depth_source[1] || marker.depth_source[2]){
                     if(section.markers[m - 1] && marker.depth_source[1]){
                       const upper_source = getDataFromId(LCCore, marker.depth_source[1]);
@@ -4918,6 +4920,11 @@ document.addEventListener("DOMContentLoaded", () => {
                           (marker_top + shift_y) * yMag + pad_y,
                           (hole_x0 + shift_x) * xMag + pad_x + sec_w - 10 -5,
                           (marker_top + shift_y) * yMag + pad_y - 10
+                        );
+                        sketch.ellipse(
+                          (hole_x0 + shift_x) * xMag + pad_x + sec_w -10,
+                          (before_marker_top + shift_y) * yMag + pad_y,
+                          3
                         );
                       }                    
                     }
@@ -4944,14 +4951,19 @@ document.addEventListener("DOMContentLoaded", () => {
                           (hole_x0 + shift_x) * xMag + pad_x + sec_w -10,
                           (marker_top + shift_y) * yMag + pad_y
                         );
-                      }
+                        sketch.ellipse(
+                          (hole_x0 + shift_x) * xMag + pad_x + sec_w -10,
+                          (next_marker_top + shift_y) * yMag + pad_y,
+                          3
+                        );
+                      }                     
                     }
                   }                  
                 }
 
               //add rank marker-------------------------------------------
               if (objOpts.marker.is_rank) {
-                sketch.fill("black");
+                sketch.fill("#000000");
                 sketch.noStroke();
                 sketch.textFont("Arial");
                 sketch.textSize(15);
@@ -4970,9 +4982,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
                 //connection rank
                 if (marker.connection_rank == null) {
-                  sketch.fill("black");
+                  sketch.fill("#000000");
                 } else if (marker.connection_rank > 4) {
-                  sketch.fill("brown");
+                  sketch.fill("#A52A2A");
                 } else {
                   sketch.fill(
                     objOpts.marker.rank_colours[marker.connection_rank]
@@ -4987,7 +4999,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 //master flag
                 if (marker.isMaster){
                   sketch.noFill();
-                  sketch.stroke("Blue");
+                  sketch.stroke("#0000FF");
                   
                   sketch.strokeWeight(2); 
                   sketch.ellipse(
@@ -5007,14 +5019,15 @@ document.addEventListener("DOMContentLoaded", () => {
                   }
                 }  
                 
-                if(["developer","root"].includes(objOpts.developer.mode)){
+                if(["root"].includes(objOpts.developer.mode)){
+                  //data source is dirrerent project
                   if(
                     marker.depth_source[1] && 
                     marker.depth_source[1][0] !== marker.id[0] &&
                     marker.depth_source[1][0] !== LCCore.base_project_id[0]
                   ){                  
                     sketch.noFill();
-                    sketch.stroke("Red");
+                    sketch.stroke("#ff0000");
                     
                     sketch.strokeWeight(2); 
                     sketch.ellipse(
@@ -5032,7 +5045,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 //add marker name--------------------------------------------
                 if (m !== 0 && m !== section.markers.length - 1) {
                   let markerDispName = marker.name;
-                  if(["developer","root"].includes(objOpts.developer.mode)){
+                  if(["root"].includes(objOpts.developer.mode)){
                     markerDispName = marker.id[3].slice(0,5);
                   }
                   sketch.fill(objOpts.marker.font_colour);
@@ -5052,9 +5065,10 @@ document.addEventListener("DOMContentLoaded", () => {
                 sketch.noStroke();
                 sketch.textFont(objOpts.marker.font);
                 sketch.textSize(objOpts.marker.font_size);
-                if(["developer","root"].includes(objOpts.developer.mode)){
+                if(["root"].includes(objOpts.developer.mode)){
                   sketch.text(
-                    (Math.round(marker[objOpts.canvas.depth_scale] * 10) / 10).toFixed(1).toString()+'('+(Math.round(marker.distance * 10) / 10).toFixed(1).toString()+')',
+                    //objOpts.canvas.depth_scale
+                    (Math.round(marker["composite_depth"] * 10) / 10).toFixed(1).toString()+'('+(Math.round(marker.distance * 10) / 10).toFixed(1).toString()+')['+marker.unreliability?.toFixed(2).toString()+']',
                     (hole_x0 + shift_x) * xMag + pad_x + objOpts.marker.width * xMag + 5,
                     (marker_top + shift_y) * yMag + pad_y - 2
                   );
@@ -5171,8 +5185,19 @@ document.addEventListener("DOMContentLoaded", () => {
                 if (cn_y0 !== cn_y3) {
                   //not horizontal
                   if (objOpts.connection.emphasise_non_horizontal && objOpts.canvas.depth_scale !== "drilling_depth"){
+                    sketch.fill(objOpts.marker.font_colour);
+                    sketch.noStroke();
+                    sketch.textFont(objOpts.marker.font);
+                    sketch.textSize(objOpts.marker.font_size);
+                    sketch.text(
+                      "("+Math.abs(cn_y0 - cn_y3).toFixed(1).toString()+")",
+                      (cn_x1 + cn_x2)/2,
+                      (cn_y1 + cn_y2)/2 - 10
+                    )
+                    
                     connection_colour = "Cyan";
                     connection_line_width = objOpts.connection.line_width * 4;
+                    
                   }
                 }
 
@@ -5236,6 +5261,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 sketch.line(cn_x2, cn_y2, cn_x3, cn_y3); //index right
 
                 if(["developer","root"].includes(objOpts.developer.mode)){
+                  //source arrow
                   let dir = null;
                   if(marker.depth_source[1]){
                     if(marker.depth_source[1][1] !== marker.id[1]){
@@ -5243,6 +5269,12 @@ document.addEventListener("DOMContentLoaded", () => {
                       if(marker.depth_source[1][3] == connectedMarker.id[3]){
                         //connected between markers
                         dir = "left";
+                      }else{
+                        //not connected directly
+                        const sourceHole = getDataFromId(LCCore, [marker.depth_source[1][0],marker.depth_source[1][1],null,null]);
+                        if(sourceHole.order > hole.order && marker.depth_source[1][0] === marker.id[0]){
+                          dir = "left";
+                        }
                       }
                     }                                     
                   }
@@ -5253,6 +5285,12 @@ document.addEventListener("DOMContentLoaded", () => {
                       if(connectedMarker.depth_source[1][3] == marker.id[3]){
                         //connected between markers
                         dir = "right";
+                      }else{
+                        //not connected directly
+                        const sourceHole = getDataFromId(LCCore, [connectedMarker.depth_source[1][0],connectedMarker.depth_source[1][1],null,null]);
+                        if(sourceHole.order < hole.order && connectedMarker.depth_source[1][0] === connectedMarker.id[0]){
+                          dir = "right";
+                        }
                       }
                     }   
                   }
@@ -5857,9 +5895,9 @@ document.addEventListener("DOMContentLoaded", () => {
       
 
       /*
-      objOpts.plot.colour_dot = "gray";
-      objOpts.plot.colour_line = "gray";
-      objOpts.plot.colour_bar = "gray";
+      objOpts.plot.colour_dot = "#808080";
+      objOpts.plot.colour_line = "#808080";
+      objOpts.plot.colour_bar = "#808080";
       objOpts.plot.collecion_idx = 0;
       objOpts.plot.series_idx = 0;
       objOpts.plot.selected_options = null;
@@ -5916,7 +5954,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
       sketch.background(0, 0, 0, 0);
       sketch.strokeWeight(2);
-      sketch.stroke("red");
+      sketch.stroke("#ff0000");
       //sketch.noLoop();
       sketchCanvas.parent("p5measureCanvas");
       clickCount = 3;
@@ -7072,7 +7110,7 @@ async function loadPlotIcons(agePlotIcons, objOpts) {
       p,
       objOpts.age.incon_size,
       objOpts.age.alt_radius,
-      "black"
+      "#000000"
     );
     for (let key in objOpts.age.incon_list) {
       const im = objOpts.age.incon_list[key][0];
