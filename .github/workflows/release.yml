@@ -32,7 +32,7 @@ jobs:
 
       - name: Build and release on macOS
         if: runner.os == 'macOS'
-        uses: samuelmeuli/action-electron-builder@v1
+        uses: samuelmeuli/action-electron-builder@v2
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           mac_certs: ${{ secrets.MAC_CERTS }}
@@ -45,7 +45,7 @@ jobs:
 
       - name: Build and release on Windows
         if: runner.os == 'Windows'
-        uses: samuelmeuli/action-electron-builder@v1
+        uses: samuelmeuli/action-electron-builder@v2
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           release: true
