@@ -45,7 +45,7 @@
       "entitlements": "entitlements.mac.plist",
       "entitlementsInherit": "entitlements.mac.plist",
       "notarize": {
-        "teamId": "YOUR_TEAM_ID"
+        "teamId": "APPLE_TEAM_ID"
       }
     },
     "linux": {

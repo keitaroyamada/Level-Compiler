@@ -35,14 +35,13 @@ jobs:
         uses: samuelmeuli/action-electron-builder@v1
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-        env:
           mac_certs: ${{ secrets.MAC_CERTS }}
           mac_certs_password: ${{ secrets.MAC_CERTS_PASSWORD }}
-          apple_id: ${{ secrets.APPLE_ID }}
-          apple_id_password: ${{ secrets.APPLE_ID_PASSWORD }}
-          apple_team_id: ${{ secrets.APPLE_TEAM_ID }}
           release: true
-          args: '--config.publish.onTag=false --config.publish.onTagOrDraft=true'
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_ID_PASSWORD: ${{ secrets.APPLE_ID_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}          
 
       - name: Build and release on Windows
         if: runner.os == 'Windows'
@@ -50,4 +49,3 @@ jobs:
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           release: true
-          args: '--config.publish.onTag=false --config.publish.onTagOrDraft=true'
