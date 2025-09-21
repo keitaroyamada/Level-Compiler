@@ -3,6 +3,9 @@
 # git tag v1.2.0
 # git push origin v1.2.0
 
+permissions:
+  contents: write
+  
 name: 'Build and release electron installer'
 on:
   push:
@@ -32,7 +35,7 @@ jobs:
 
       - name: Build and release on macOS
         if: runner.os == 'macOS'
-        uses: samuelmeuli/action-electron-builder@v2
+        uses: samuelmeuli/action-electron-builder@v1
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           mac_certs: ${{ secrets.MAC_CERTS }}
@@ -45,7 +48,7 @@ jobs:
 
       - name: Build and release on Windows
         if: runner.os == 'Windows'
-        uses: samuelmeuli/action-electron-builder@v2
+        uses: samuelmeuli/action-electron-builder@v1
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           release: true
