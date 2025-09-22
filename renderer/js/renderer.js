@@ -182,6 +182,7 @@ document.addEventListener("DOMContentLoaded", () => {
     objOpts.edit.passwards = "admin";
 
     objOpts.developer.mode = "user"; 
+
     objOpts.pen.colour = "#ff0000";
     objOpts.image.dpcm = 24;
     objOpts.image.dpcm_high = 200;
@@ -3480,7 +3481,15 @@ document.addEventListener("DOMContentLoaded", () => {
     console.log(data);
   });
   window.LCapi.receive("SettingsMenuClicked", async () => {
+    const settings = makeSettingData();
+    await window.LCapi.sendSettings(settings, "settings");
+  });
+  window.LCapi.receive("getSettingsFromRenderer", async () => {
+    const settings = makeSettingData();
+    await window.LCapi.sendSettings(settings, "main");
+  });
 
+  function makeSettingData(){
     const canvas = objOpts.canvas;
     const project = objOpts.project;
     const hole = objOpts.hole;
@@ -3515,10 +3524,8 @@ document.addEventListener("DOMContentLoaded", () => {
         developer,
       }
     };
-      
-   await window.LCapi.sendSettings(settings, "settings");
-
-  });
+    return settings
+  }
   
   window.LCapi.receive("SettingsData", async (data) => {
     if(data == null){

@@ -65,6 +65,7 @@ let globalPath = {
   saveModelPath:null,
   dataPaths:[], //{type:[lcmodel, csvmodel, csvage, csvplot], path:""}
 };
+let mainSettings = {isAutoUpdateDownload: true};
 
 //windows
 let mainWindow = null;
@@ -3108,7 +3109,8 @@ function createMainWIndow() {
 
     }else if(to=="renderer"){
       mainWindow.webContents.send("SettingsData", data);
-      setSettings("settings", data);
+      setSettings("settingsRenderer", data);
+    }else if(to=="main"){
     }    
   });
   ipcMain.handle("saveBookmarks", (_e, data) => {
@@ -3632,11 +3634,24 @@ function createMainWIndow() {
     } 
   }
   //--------------------------------------------------------------------------------------------------
-  mainWindow.webContents.once("did-finish-load", () => {
-    const LCSettingData = getSettings("settings");
+  mainWindow.webContents.once("did-finish-load", () => {    
+    const rendererSettings = getSettings("settingsRenderer");
+
+    const tempMainSettings = getSettings("settingsMain");
+
+    //check & apply main settings
+    if(tempMainSettings){
+      mainSettings = tempMainSettings;
+      if("isAutoUpdateDownload" in mainSettings){
+        const menu = Menu.getApplicationMenu();
+        const item = menu.getMenuItemById("autoUpdateDownload");
+
+        item.checked = mainSettings.isAutoUpdateDownload
+      }
+    }
     
-    if (LCSettingData !== null) {
-      mainWindow.webContents.send("SettingsData", LCSettingData);
+    if (rendererSettings) {
+      mainWindow.webContents.send("SettingsData", rendererSettings);
     }
   });
   function buildMainMenu(){
@@ -4325,6 +4340,16 @@ function createMainWIndow() {
               submenu: [
                 { label: "About", click: createAboutWindow },
                 { label: "Check update", click: async()=>{await checkUpdate(mainWindow, "button")}},
+                { 
+                  id: "autoUpdateDownload",
+                  label: "Auto update download",
+                  type: "checkbox",
+                  checked: true,
+                  click: (menuItem) => {
+                    mainSettings.isAutoUpdateDownload = menuItem.checked;
+                    setSettings("settingsMain", mainSettings);
+                  }
+                },
                 { label: "Usage", click: ()=>{shell.openExternal('https://www.youtube.com/playlist?list=PLraahvJ2B_L7ClUMTZNnz7Fs3swqovV4y')} },
               ],
             },
@@ -4738,30 +4763,67 @@ function assignObject (obj,data){
 async function checkUpdate(window, from){
   //this process does not work in MSI app.
   //check update in the github
-  autoUpdater.allowPrerelease = true;
-  autoUpdater.autoDownload = true;
+  autoUpdater.allowPrerelease = false;
+  autoUpdater.autoDownload = false
   autoUpdater.forceDevUpdateConfig = true;
   let currentDownload = "";
+  
+  window.webContents.send("footerLeft", "Checking the latest version...");  
 
   autoUpdater.on('update-available', async(info) => {
-    try {
-      await autoUpdater.downloadUpdate();
-      currentDownload = info.files[0].url || info.files[0].name;
-      window.webContents.send("footerLeft", `A new update is available.`);
-    } catch (err) {
-      console.error("Full download failed:", err);
-      dialog.showMessageBox(window, {
-        type: "error",
-        title: "Download Failed",
-        message: "Could not download the full update. Would you like to get it manually?",
-        buttons: ["Download", "Cancel"],
+    if(mainSettings.isAutoUpdateDownload === true){
+      console.log("MAIN: Auto updater is running.")
+      //auto download
+      try {
+        currentDownload = info.version;
+
+        await autoUpdater.downloadUpdate();
+        
+        window.webContents.send("footerLeft", `A new version is available.`);
+      } catch (err) {
+        console.error("Full download failed:", err);
+        dialog.showMessageBox(window, {
+          type: "error",
+          title: "Download Failed",
+          message: "Could not download the full update. Would you like to get it manually?",
+          buttons: ["Download", "Cancel"],
+          defaultId: 1, 
+          cancelId: 1,
+        }).then((result) => {
+          if (result.response === 0) {
+            shell.openExternal("https://github.com/keitaroyamada/Level-Compiler/releases/latest");
+          }
+        });
+      } 
+    }else{
+      console.log("MAIN: Manual updater is running.")
+      //manually
+      dialog.showMessageBox(
+        window,
+        {
+        type: 'info',
+        title: 'Update Available',
+        message: `A new version (${info.version}) is available. Would you like to get the new version?`,
+        buttons: ['Get', 'Cancel']
       }).then((result) => {
         if (result.response === 0) {
-          shell.openExternal("https://github.com/keitaroyamada/Level-Compiler/releases/latest");
+          shell.openExternal('https://github.com/keitaroyamada/Level-Compiler/releases');
+        } else {
+          console.log('User canceled.');
         }
+      }).catch((err) => {
+        console.error('Error displaying message box:', err);
+        dialog.showMessageBox(
+          window,
+          {
+        type: 'info',
+        title: 'No Updates',
+        message: 'Error displaying message box:', err,
       });
-    }    
-  });
+      });
+    }
+       
+  }); 
 
   autoUpdater.on("update-downloaded", (info) => {
     window.webContents.send("footerLeft", `Version ${info.version} has been downloaded.`);
@@ -4770,6 +4832,8 @@ async function checkUpdate(window, from){
       title: "Update Ready",
       message: `Version ${info.version} has been downloaded. Install and restart now?`,
       buttons: ["Install", "Later"],
+      defaultId: 1,
+      cancelId: 1,
     }).then((result) => {
       if (result.response === 0) {
         autoUpdater.quitAndInstall();
@@ -4782,7 +4846,7 @@ async function checkUpdate(window, from){
   });
 
   autoUpdater.on("download-progress", (progressObj) => {
-    const logMsg = `New downloading ${currentDownload} - ${Math.round(progressObj.percent)}%`;
+    const logMsg = `New downloading version ${currentDownload} - ${Math.round(progressObj.percent)}%`;
     console.log(logMsg);
     window.webContents.send("footerLeft", logMsg);
   });
@@ -4799,35 +4863,6 @@ async function checkUpdate(window, from){
     }
   });
 
-  
-  /*
-  autoUpdater.on('update-available', (info) => {
-    dialog.showMessageBox(
-      window,
-      {
-      type: 'info',
-      title: 'Update Available',
-      message: `A new version (${info.version}) is available. Would you like to get the new version?`,
-      buttons: ['Get', 'Cancel']
-    }).then((result) => {
-      if (result.response === 0) {
-        shell.openExternal('https://github.com/keitaroyamada/Level-Compiler/releases');
-      } else {
-        console.log('User canceled.');
-      }
-    }).catch((err) => {
-      console.error('Error displaying message box:', err);
-      dialog.showMessageBox(
-        window,
-        {
-      type: 'info',
-      title: 'No Updates',
-      message: 'Error displaying message box:', err,
-    });
-    });
-
-  });
-
   autoUpdater.on('update-not-available', () => {
     if (from == "button"){
       dialog.showMessageBox(
@@ -4837,7 +4872,8 @@ async function checkUpdate(window, from){
       title: 'No Updates Available',
       message: 'You are already using the latest version.',
     });
-    }    
+    }  
+    window.webContents.send("footerLeft", "The latest version is already installed.");  
   });
 
   autoUpdater.on('error', (err) => {
@@ -4851,23 +4887,54 @@ async function checkUpdate(window, from){
       });
     }
   });
-  */
-
+  
   await autoUpdater.checkForUpdates();
 }
 //--------------------------------------------------------------------------------------------------
 function getSettings(type){
   let LCSettingData = null;
   let settingPath ;
-  if(type == "settings"){
-    settingPath = path.join(app.getPath('userData'), "lcsettings.json");
+  if(type == "settingsRenderer"){
+    if(fs.existsSync(path.join(app.getPath('userData'), "mainsettings.json"))){
+      //new version
+      settingPath = path.join(app.getPath('userData'), "viewsettings.json");
+    }else{
+      //legacy version (<1.1.1)
+      settingPath = path.join(app.getPath('userData'), "lcsettings.json");
+      console.log("MAIN: Restore v1.1.1 settings")
+
+      /*
+      //must be use async
+      dialog.showMessageBox(mainWindow, {
+        type: "question",
+        title: "Enable Auto Update",
+        message: "A new version now supports automatic updates.\nYou can change this setting anytime from the Help menu.\n\nWould you like to enable auto update? (Recommended)",
+        buttons: ["Enable", "Not Now"],
+        defaultId: 0,
+        cancelId: 1,
+        noLink: true
+      }).then((result) => {
+        if (result.response === 0) {
+          mainSettings.isAutoUpdateDownload = true;
+          console.log("Auto update enabled.");
+        } else {
+          mainSettings.isAutoUpdateDownload = false;
+          console.log("Auto update not enabled.");
+        }
+        setSettings("settingsMain", mainSettings);
+      });
+      */
+    }
+  }if(type == "settingsMain"){
+    settingPath = path.join(app.getPath('userData'), "mainsettings.json");
   }else if(type == "bookmarks"){
     settingPath = path.join(app.getPath('userData'), "lcbookmarks.json");
   }
 
   if(fs.existsSync(settingPath)){
-    const settingsData = fs.readFileSync(settingPath, 'utf-8');
-    LCSettingData = JSON.parse(settingsData);   
+    const settingsData = JSON.parse(fs.readFileSync(settingPath, 'utf-8'));
+    LCSettingData = settingsData;
+       
     console.log("MAIN: Restore settings")
   }else{
     console.log("MAIN: There is no setting data.")
@@ -4876,8 +4943,10 @@ function getSettings(type){
 }
 function setSettings(type, data){
   let settingPath ;
-  if(type == "settings"){
-    settingPath = path.join(app.getPath('userData'), "lcsettings.json");
+  if(type == "settingsRenderer"){
+    settingPath = path.join(app.getPath('userData'), "viewsettings.json");
+  }if(type == "settingsMain"){
+    settingPath = path.join(app.getPath('userData'), "mainsettings.json");
   }else if(type == "bookmarks"){
     settingPath = path.join(app.getPath('userData'), "lcbookmarks.json");
   }
