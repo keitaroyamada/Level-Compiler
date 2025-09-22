@@ -181,7 +181,7 @@ document.addEventListener("DOMContentLoaded", () => {
     objOpts.edit.handleMove = null;
     objOpts.edit.passwards = "admin";
 
-    objOpts.developer.mode = "root"; 
+    objOpts.developer.mode = "user"; 
     objOpts.pen.colour = "#ff0000";
     objOpts.image.dpcm = 24;
     objOpts.image.dpcm_high = 200;
