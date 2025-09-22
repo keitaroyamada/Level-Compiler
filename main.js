@@ -4359,6 +4359,16 @@ function createMainWIndow() {
               label: "Help",
               submenu: [
                 { label: "Check update", click: async()=>{await checkUpdate(mainWindow, "button")}},
+                { 
+                  id: "autoUpdateDownload",
+                  label: "Auto update download",
+                  type: "checkbox",
+                  checked: true,
+                  click: (menuItem) => {
+                    mainSettings.isAutoUpdateDownload = menuItem.checked;
+                    setSettings("settingsMain", mainSettings);
+                  }
+                },
                 { label: "Usage", click: ()=>{shell.openExternal('https://www.youtube.com/playlist?list=PLraahvJ2B_L7ClUMTZNnz7Fs3swqovV4y')} },
               ],
             },
