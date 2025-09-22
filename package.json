@@ -44,9 +44,6 @@
       "hardenedRuntime": true,
       "entitlements": "entitlements.mac.plist",
       "entitlementsInherit": "entitlements.mac.plist",
-      "notarize": {
-        "teamId": "APPLE_TEAM_ID"
-      }
     },
     "linux": {
       "icon": "./icon/levelcompiler.png"
