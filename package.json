@@ -43,7 +43,7 @@
       "icon": "./icon/levelcompiler.png",
       "hardenedRuntime": true,
       "entitlements": "entitlements.mac.plist",
-      "entitlementsInherit": "entitlements.mac.plist",
+      "entitlementsInherit": "entitlements.mac.plist"
     },
     "linux": {
       "icon": "./icon/levelcompiler.png"
