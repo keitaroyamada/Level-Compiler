@@ -3451,7 +3451,8 @@ class LevelCompilerCore extends EventEmitter{
           const targetIdx = this.search_idx_list[group[i][2].toString()];
           const targetMarkerData = this.projects[targetIdx[0]].holes[targetIdx[1]].sections[targetIdx[2]].markers[targetIdx[3]];
 
-          targetIds.push(group[i][2]);
+          targetIds.push(group[i][2]);         
+
         }
 
         //apply extrapolation
@@ -3537,13 +3538,14 @@ class LevelCompilerCore extends EventEmitter{
           reliableMarker.isMaster = true;
         }
       }
-
+     
       if(!reliableMarker.id || reliableMarker.id[3] !== targetMarkerData.id[3]){
         continue
       }
       if(targetMarkerData[calcType] && !reliableMarker.isMaster){
         continue
       }
+               
 
       //apply
       if(upperMarkerData ===null && lowerMarkerData !== null){
@@ -3551,6 +3553,12 @@ class LevelCompilerCore extends EventEmitter{
         const exDistance = this.calcMarkerDistance(targetMarkerData, lowerMarkerData, calcType);
         const depth = lowerMarkerData[calcType] + exDistance;
 
+
+        if(!depth){
+          continue
+        }
+
+        
         targetMarkerData[calcType] = depth;
         targetMarkerData.connection_rank = lowerMarkerData.connection_rank + extrapolationRank;
         targetMarkerData.depth_source = ["extrapolation", null, lowerMarkerData.id];
@@ -3576,11 +3584,18 @@ class LevelCompilerCore extends EventEmitter{
         const exDistance = this.calcMarkerDistance(targetMarkerData, upperMarkerData, calcType);
         const depth = upperMarkerData[calcType] + exDistance;
 
+        if(!depth){
+          continue
+        }
+       
         targetMarkerData[calcType] = depth;
         targetMarkerData.connection_rank = upperMarkerData.connection_rank + extrapolationRank;
         targetMarkerData.depth_source = ["extrapolation", upperMarkerData.id, null];
         
-        //transfer to h_connected marker
+        //transfer to h_connected marker]
+        if(!targetMarkerData.isMaster){
+          continue
+        }
         for(let h=0; h<targetMarkerData.h_connection.length; h++){
           const hcId  = targetMarkerData.h_connection[h];
           const hcIdx = this.search_idx_list[hcId.toString()];

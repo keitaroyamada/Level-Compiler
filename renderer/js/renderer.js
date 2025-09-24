@@ -4917,26 +4917,27 @@ document.addEventListener("DOMContentLoaded", () => {
                       const upper_source = getDataFromId(LCCore, marker.depth_source[1]);
                       if(upper_source  && section.markers[m - 1].id[1] === marker.depth_source[1][1]){
                         const before_marker_top = upper_source[objOpts.canvas.depth_scale];
+                        //sec_w - 10
                         sketch.line(
-                          (hole_x0 + shift_x) * xMag + pad_x + sec_w - 10,
+                          (hole_x0 + shift_x) * xMag + pad_x + sec_w *0.7,
                           (marker_top + shift_y) * yMag + pad_y,
-                          (hole_x0 + shift_x) * xMag + pad_x + sec_w - 10,
+                          (hole_x0 + shift_x) * xMag + pad_x + sec_w *0.7,
                           (before_marker_top + shift_y) * yMag + pad_y
                         );
                         sketch.line(
-                          (hole_x0 + shift_x) * xMag + pad_x + sec_w - 10,
+                          (hole_x0 + shift_x) * xMag + pad_x + sec_w *0.7,
                           (marker_top + shift_y) * yMag + pad_y,
-                          (hole_x0 + shift_x) * xMag + pad_x + sec_w - 10 + 5,
+                          (hole_x0 + shift_x) * xMag + pad_x + sec_w *0.7 + 5,
                           (marker_top + shift_y) * yMag + pad_y - 10
                         );
                         sketch.line(
-                          (hole_x0 + shift_x) * xMag + pad_x + sec_w - 10,
+                          (hole_x0 + shift_x) * xMag + pad_x + sec_w *0.7,
                           (marker_top + shift_y) * yMag + pad_y,
-                          (hole_x0 + shift_x) * xMag + pad_x + sec_w - 10 -5,
+                          (hole_x0 + shift_x) * xMag + pad_x + sec_w *0.7 -5,
                           (marker_top + shift_y) * yMag + pad_y - 10
                         );
                         sketch.ellipse(
-                          (hole_x0 + shift_x) * xMag + pad_x + sec_w -10,
+                          (hole_x0 + shift_x) * xMag + pad_x + sec_w *0.7,
                           (before_marker_top + shift_y) * yMag + pad_y,
                           3
                         );
@@ -4948,25 +4949,25 @@ document.addEventListener("DOMContentLoaded", () => {
                       if(lower_source && section.markers[m + 1].id[1] === marker.depth_source[2][1]){     
                         const next_marker_top = lower_source[objOpts.canvas.depth_scale];                 
                         sketch.line(
-                          (hole_x0 + shift_x) * xMag + pad_x + sec_w -10,
+                          (hole_x0 + shift_x) * xMag + pad_x + sec_w *0.7,
                           (marker_top + shift_y) * yMag + pad_y,
-                          (hole_x0 + shift_x) * xMag + pad_x + sec_w -10,
+                          (hole_x0 + shift_x) * xMag + pad_x + sec_w *0.7,
                           (next_marker_top + shift_y) * yMag + pad_y
                         );
                         sketch.line(
-                          (hole_x0 + shift_x) * xMag + pad_x + sec_w -10 + 5,
+                          (hole_x0 + shift_x) * xMag + pad_x + sec_w *0.7 + 5,
                           (marker_top + shift_y) * yMag + pad_y + 10,
-                          (hole_x0 + shift_x) * xMag + pad_x + sec_w -10,
+                          (hole_x0 + shift_x) * xMag + pad_x + sec_w *0.7,
                           (marker_top + shift_y) * yMag + pad_y
                         );
                         sketch.line(
-                          (hole_x0 + shift_x) * xMag + pad_x + sec_w -10 -5,
+                          (hole_x0 + shift_x) * xMag + pad_x + sec_w *0.7 -5,
                           (marker_top + shift_y) * yMag + pad_y + 10,
-                          (hole_x0 + shift_x) * xMag + pad_x + sec_w -10,
+                          (hole_x0 + shift_x) * xMag + pad_x + sec_w *0.7,
                           (marker_top + shift_y) * yMag + pad_y
                         );
                         sketch.ellipse(
-                          (hole_x0 + shift_x) * xMag + pad_x + sec_w -10,
+                          (hole_x0 + shift_x) * xMag + pad_x + sec_w *0.7,
                           (next_marker_top + shift_y) * yMag + pad_y,
                           3
                         );
