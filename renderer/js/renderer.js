@@ -5205,7 +5205,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     sketch.textFont(objOpts.marker.font);
                     sketch.textSize(objOpts.marker.font_size);
                     sketch.text(
-                      "("+Math.abs(cn_y0 - cn_y3).toFixed(1).toString()+")",
+                      "("+Math.abs(marker[objOpts.canvas.depth_scale] - connectedMarker[objOpts.canvas.depth_scale]).toFixed(1).toString()+")",
                       (cn_x1 + cn_x2)/2,
                       (cn_y1 + cn_y2)/2 - 10
                     )

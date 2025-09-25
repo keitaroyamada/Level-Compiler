@@ -1428,13 +1428,21 @@ class LevelCompilerCore extends EventEmitter{
         type:project.model_type,
         evaluation:false,
         is_connected_master: false,
-        cd_error_counts:0,
+        
+        cd_error_incompleted_counts:0,
+        cd_error_floating_counts:0,
         cd_confliction_counts:0,
-        efd_error_counts:0,
+        cd_confliction:[],
+
+        efd_error_incompleted_counts:0,
+        efd_error_floating_counts:0,
         efd_confliction_counts:0,
+        efd_confliction:[],
+
         rank_error_counts:0,
-        age_error_counts:0,
+        age_error_counts:0,        
         age_confliction_counts:0,
+
         max_rank:-1,  
         hole_counts: 0,
         section_counts: 0,
@@ -1464,7 +1472,11 @@ class LevelCompilerCore extends EventEmitter{
 
             if (marker.composite_depth == null) {
               //counts CD error
-              result.cd_error_counts += 1;
+              if(marker.depth_source[0]=="floating"){
+                result.cd_error_floating_counts += 1;
+              }else{
+                result.cd_error_incompleted_counts += 1;
+              }
             }else{
               marker.h_connection.forEach(hc=>{
                 const hidx = this.search_idx_list[hc.toString()];
@@ -1474,6 +1486,9 @@ class LevelCompilerCore extends EventEmitter{
                   if(marker.composite_depth !== connected_cd){
                     //counts CD confliction
                     result.cd_confliction_counts+=1;
+                    if(marker.composite_depth && connected_cd){
+                      result.cd_confliction.push(marker.composite_depth - connected_cd);
+                    }                    
                   }  
                 }
                               
@@ -1482,7 +1497,11 @@ class LevelCompilerCore extends EventEmitter{
 
             if (marker.event_free_depth == null) {
               //counts EFD
-              result.efd_error_counts += 1;
+              if(marker.depth_source[0]=="floating"){
+                result.efd_error_floating_counts += 1;
+              }else{
+                result.efd_error_incompleted_counts += 1;
+              }
             }else{
               marker.h_connection.forEach(hc=>{
                 const hidx = this.search_idx_list[hc.toString()];
@@ -1492,6 +1511,10 @@ class LevelCompilerCore extends EventEmitter{
                   if(marker.event_free_depth !== connected_efd){
                     //counts EFD confliction
                     result.efd_confliction_counts+=1;
+                    if(marker.event_free_depth && connected_efd){
+                      result.efd_confliction.push(marker.event_free_depth - connected_efd);
+                    }
+                    
                   }  
                 }                              
               })
@@ -3260,11 +3283,17 @@ class LevelCompilerCore extends EventEmitter{
       const incompletedList = polationList.filter(item => item[0] !== "floating");
       skippedList = polationList;
 
-      if(polationList.length!==0){          
+      if(polationList.length>0){        
+        if(floatingList.length>0){
+          for (const [type, upperId, targetId, lowerId] of floatingList) {
+            const targetIdx = this.search_idx_list[targetId.toString()]; 
+            this.projects[targetIdx[0]].holes[targetIdx[1]].sections[targetIdx[2]].markers[targetIdx[3]].depth_source[0] = "floating";
+          }
+        }
         
         console.log("LCCore: E033: Incompleted interpolation exist: Floating (N="+floatingList.length+") Incompleted(N="+incompletedList.length+")");
         if(incompletedList.length>0 && calcType == "composite_depth"){
-          this.setErrorAlert("","E033: Incompleted interpolations exist: Floating (N="+floatingList.length+") Incompleted(N="+incompletedList.length+")")
+          //this.setErrorAlert("","E033: Incompleted interpolations exist: Floating (N="+floatingList.length+") Incompleted(N="+incompletedList.length+")")
         }
         /*
         incompletedList.forEach(c=>{

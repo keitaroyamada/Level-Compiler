@@ -4098,13 +4098,17 @@ function createMainWIndow() {
                          `  -[Marker]: ${item.marker_counts}\n` +
                          `  -[Connection]: \n${conn}\n` +
 
-                         `  -[CD errors]: ${item.cd_error_counts}\n` +
+                         `  -[CD errors (failed)]: ${item.cd_error_incompleted_counts}\n` +
+                         `  -[CD errors (floating)]: ${item.cd_error_floating_counts}\n` +
                          `  -[CD conflictions]: ${item.cd_confliction_counts}\n` +
-                         `  -[EFD errors]: ${item.efd_error_counts}\n` +
-                         `  -[EFD conflictions]: ${item.efd_confliction_counts}\n` +
+                         `  -[CD conflictions (mean[abs])]: ${mean(item.cd_confliction).toFixed(1)} [ ${Math.abs(item.cd_confliction.reduce((a, b) => Math.abs(a) > Math.abs(b) ? a : b)).toFixed(1)} - ${Math.abs(item.cd_confliction.reduce((a, b) => Math.abs(a) < Math.abs(b) ? a : b)).toFixed(1)} ] cm\n` +
+                         `  -[EFD errors (failed)]: ${item.efd_error_incompleted_counts}\n` +
+                         `  -[EFD errors (floating)]: ${item.efd_error_floating_counts}\n` +
+                         `  -[EFD conflictions (mean[abs])]: ${mean(item.efd_confliction).toFixed(1)}  [ ${Math.abs(item.efd_confliction.reduce((a, b) => Math.abs(a) > Math.abs(b) ? a : b)).toFixed(1)} - ${Math.abs(item.efd_confliction.reduce((a, b) => Math.abs(a) < Math.abs(b) ? a : b)).toFixed(1)} ] cm\n` +
                          `  -[Age errors]: ${item.age_error_counts}\n` +
                          `  -[Age conflictions]: ${item.age_confliction_counts}\n` +
                          `  -[Max Rank]: ${item.max_rank}\n`
+                         
                 }).join('\n');
 
                 dialog.showMessageBox(
@@ -4112,7 +4116,7 @@ function createMainWIndow() {
                   {
                   type: 'info',
                   title: 'Model statistics',
-                  message: text,
+                  detail:text,
                   buttons: ['OK']
                 });
               }
@@ -4738,6 +4742,9 @@ function createNewWindow(title, htmlPath, preloadPath) {
 function round(num, digits) {
   const multiplier = Math.pow(10, digits);
   return Math.round(num * multiplier) / multiplier;
+}
+function mean(arr, useAbs = false) {
+  return arr.reduce((a, b) => a + (useAbs ? Math.abs(b) : b), 0) / arr.length;
 }
 //--------------------------------------------------------------------------------------------------
 //create about window
