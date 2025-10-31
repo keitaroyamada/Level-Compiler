@@ -1442,6 +1442,7 @@ class LevelCompilerCore extends EventEmitter{
         rank_error_counts:0,
         age_error_counts:0,        
         age_confliction_counts:0,
+        age_confliction:[],
 
         max_rank:-1,  
         hole_counts: 0,
@@ -1532,6 +1533,10 @@ class LevelCompilerCore extends EventEmitter{
                   if(marker.age !== connected_age){
                     //counts age confliction
                     result.age_confliction_counts+=1;
+                    if((marker.age && connected_age)){
+                      result.age_confliction.push(marker.age - connected_age);
+                    }
+                    
                   }  
                 }                              
               })
@@ -1581,9 +1586,9 @@ class LevelCompilerCore extends EventEmitter{
           "]" +
           project.name +
           ": Total interpolation error: CD:" +
-          result.cd_error_counts +
+          result.cd_error_incompleted_counts +
           ", EFD:" +
-          result.efd_error_counts +
+          result.efd_error_incompleted_counts +
           ", Rank:" +
           result.rank_error_counts +
           ", Max rank:" +
@@ -1598,9 +1603,9 @@ class LevelCompilerCore extends EventEmitter{
               "]" +
               project.name +
               ": Total interpolation error: CD:" +
-              result.cd_error_counts +
+              result.cd_error_incompleted_counts +
               ", EFD:" +
-              result.efd_error_counts +
+              result.efd_error_incompleted_counts +
               ", Rank:" +
               result.rank_error_counts +
               ", Max rank:" +
@@ -1611,11 +1616,16 @@ class LevelCompilerCore extends EventEmitter{
     
         }
       
-      if (result.cd_error_counts == 0 && result.efd_error_counts == 0) {
+      if (result.cd_error_incompleted_counts == 0 && result.efd_error_incompleted_counts == 0) {
         result.evaluation = true;
       } else {
         result.evaluation = false;
       }
+     
+      //show depth differences
+      //console.log(JSON.stringify(result.cd_confliction))
+      //console.log(JSON.stringify(result.efd_confliction))
+      //console.log(JSON.stringify(result.age_confliction))
       results.push(result);
     });
 
@@ -1729,26 +1739,37 @@ class LevelCompilerCore extends EventEmitter{
                 const sectionData = holeData.sections[s];
 
                 if(targetId[2] == null || targetId[2] == sectionData.id[2]){
+
+                  let tempUpperIdx = null;
+                  let tempLowerIdx = null;
+
                   for (let m = 0; m < this.projects[p].holes[h].sections[s].markers.length - 1; m++) {
 
                     //check name and distance
                     if (holeData.name === holeName) {
                       if (sectionData.name === sectionName) {
-                        if (allowExtrapolation || distance >= sectionData.markers[m].distance) {
-                          if (allowExtrapolation || distance <= sectionData.markers[m + 1].distance) {
-                            if (upperIdxs.length > 0) {
-                              //if (lowerIdxs[lowerIdxs.length - 1].toString() == [p, h, s, m].toString()) {
-                                //case the target horizon located on the marker
-                                //none
-                              //}
-                            } else {
-                              upperIdxs.push([p, h, s, m]);
-                              lowerIdxs.push([p, h, s, m + 1]);
-                            }
+                        if (allowExtrapolation){
+                          if(m == 0){
+                            tempLowerIdx = [p, h, s, m];
+                          }
+                          if(m == this.projects[p].holes[h].sections[s].markers.length -1){
+                            tempUpperIdx = [p, h, s, m + 1];
                           }
                         }
+                        if (distance >= sectionData.markers[m].distance && distance <= sectionData.markers[m + 1].distance) {
+                          tempUpperIdx = [p, h, s, m];
+                          tempLowerIdx = [p, h, s, m + 1];
+                        }
+
                       }
                     }
+                  }
+                  if(tempUpperIdx){
+                    upperIdxs.push(tempUpperIdx);
+                  }
+                  
+                  if(tempLowerIdx){
+                    lowerIdxs.push(tempLowerIdx);
                   }
                 }
               }
@@ -1759,9 +1780,10 @@ class LevelCompilerCore extends EventEmitter{
 
       //check num of detection
       if (upperIdxs.length > 1 || lowerIdxs.length > 1) {
+        console.log(upperIdxs, lowerIdxs)
         this.setError(
           "",
-          "E019: Duplicate set detected. [" +
+          "E019: Multiple inter/extrapolation sources were detected. [" +
             trinityList[t].name +
             " : " +
             trinityList[t].hole_name +
@@ -1785,6 +1807,8 @@ class LevelCompilerCore extends EventEmitter{
         output.push([null, null, null]);
       }
 
+
+      //extrapolation case
       if(upperIdxs.length == 0 || lowerIdxs.length == 0){
         if(!allowExtrapolation){
           this.setError(
@@ -1835,11 +1859,11 @@ class LevelCompilerCore extends EventEmitter{
           const d3   = this.projects[Idx[0]].holes[Idx[1]].sections[Idx[2]].markers[Idx[3]].distance;
           const d3d1 = d3 - d1;
           const D3_rank = this.projects[Idx[0]].holes[Idx[1]].sections[Idx[2]].markers[Idx[3]].connection_rank;
-          const D1   = LCCore.linearExtrap(null, D3, null, d3d1, "linear");
+          const D1   = this.linearExtrap(null, D3, null, d3d1, "linear");
 
           const new_rank = D3_rank + 2;
 
-          output.push([sectionId, D1, new_rank]);
+          output.push([sectionId, D1, new_rank,"extrapolation"]);
           continue;
         }
 
@@ -1900,11 +1924,11 @@ class LevelCompilerCore extends EventEmitter{
         const d2d1 = distance - d1;
         const d3d1 = d3 - d1;
         const interpolatedDepth = this.linearInterp(D1, D3, d2d1, d3d1);
-        const new_rank = Math.max(...[D1_rank, D3_rank]);
-        output.push([sectionId, interpolatedDepth, new_rank]);
+        const new_rank = Math.max(...[D1_rank, D3_rank]) + 1;
+        output.push([sectionId, interpolatedDepth, new_rank, "interpolation"]);
       }else{
         //case not calc depth
-        output.push([null, null, null]);
+        output.push([null, null, null, null]);
       }
 
 
@@ -3137,7 +3161,7 @@ class LevelCompilerCore extends EventEmitter{
         }
       }      
     }
-    if(c=100000){
+    if(c===100000){
       this.setError("","E074: Graph traversal limit reached.");
     }
 

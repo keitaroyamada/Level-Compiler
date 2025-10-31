@@ -5346,82 +5346,85 @@ document.addEventListener("DOMContentLoaded", () => {
         });
 
         //get age data(because age data, age series is single)
-        const ageSet = LCPlot.age_collections[age_plot_idx].datasets[0];
+        const ageSet = LCPlot.age_collections[age_plot_idx]?.datasets?.[0];        
 
         //get position & plot        
-        for (let a = 0; a < ageSet.data_series.length; a++) {    
-          let pData = {
-            type: "age", //used
-            amplification_x: 1,//used
-            amplification_y: 1, //used
-            original_depth_type: ageSet.data_series[a].original_depth_type,//used
+        if(ageSet){
+          for (let a = 0; a < ageSet.data_series.length; a++) {    
+            let pData = {
+              type: "age", //used
+              amplification_x: 1,//used
+              amplification_y: 1, //used
+              original_depth_type: ageSet.data_series[a].original_depth_type,//used
 
-            x: ageSet.data_series[a].data, //used
-            min_x:NaN,
+              x: ageSet.data_series[a].data, //used
+              min_x:NaN,
 
-            hole_name: ageSet.data_series[a].original_depth_type=="trinity" ? ageSet.data_series[a].trinity.hole_name : null, //used
-            section_name: ageSet.data_series[a].original_depth_type=="trinity" ? ageSet.data_series[a].trinity.section_name : null,
-            distance: ageSet.data_series[a].original_depth_type=="trinity" ? ageSet.data_series[a].trinity.distance : null,
-            composite_depth: ageSet.data_series[a].composite_depth,//used
-            evemnt_free_depth: ageSet.data_series[a].event_free_depth,//used
-            age: ageSet.data_series[a].age,//used
-          } 
+              hole_name: ageSet.data_series[a].original_depth_type=="trinity" ? ageSet.data_series[a].trinity.hole_name : null, //used
+              section_name: ageSet.data_series[a].original_depth_type=="trinity" ? ageSet.data_series[a].trinity.section_name : null,
+              distance: ageSet.data_series[a].original_depth_type=="trinity" ? ageSet.data_series[a].trinity.distance : null,
+              composite_depth: ageSet.data_series[a].composite_depth,//used
+              evemnt_free_depth: ageSet.data_series[a].event_free_depth,//used
+              age: ageSet.data_series[a].age,//used
+            } 
 
-          const result = getPlotPosiotion( pData, LCCore, objOpts);
+            const result = getPlotPosiotion( pData, LCCore, objOpts);
 
-          const posX = result.pos_canvas_x;
-          const posY = result.pos_canvas_y;
-          //check inside
-          const age_rect = {
-            x: posX,
-            y: posY,
-            width: objOpts.age.incon_size,
-            height: objOpts.age.incon_size,
-          };
-          if (!isInside(view_rect, age_rect, objOpts.canvas.buffer_depth * yMag)) {
-            continue;
-          }
+            const posX = result.pos_canvas_x;
+            const posY = result.pos_canvas_y;
+            //check inside
+            const age_rect = {
+              x: posX,
+              y: posY,
+              width: objOpts.age.incon_size,
+              height: objOpts.age.incon_size,
+            };
+            if (!isInside(view_rect, age_rect, objOpts.canvas.buffer_depth * yMag)) {
+              continue;
+            }
 
-          //plot main
-          if (ageSet.data_series[a].source_type == "" || agePlotIcons[ageSet.data_series[a].source_type] == undefined) {
-            sketch.image(
-              agePlotIcons["none"],
-              posX,
-              posY,
-              objOpts.age.incon_size,
-              objOpts.age.incon_size
-            );
-          } else { 
-            if(ageSet.data_series[a].enable==true){
-              if(ageSet.data_series[a].reliable == true){
-                sketch.image(
-                  agePlotIcons[ageSet.data_series[a].source_type],
-                  posX,
-                  posY,
-                  objOpts.age.incon_size,
-                  objOpts.age.incon_size
-                );
-              }else{
-                sketch.image(
-                  agePlotIcons[ageSet.data_series[a].source_type+"_unreliable"],
-                  posX,
-                  posY,
-                  objOpts.age.incon_size,
-                  objOpts.age.incon_size
-                );
-              }
-            }else{
+            //plot main
+            if (ageSet.data_series[a].source_type == "" || agePlotIcons[ageSet.data_series[a].source_type] == undefined) {
               sketch.image(
-                agePlotIcons[ageSet.data_series[a].source_type+"_disable"],
+                agePlotIcons["none"],
                 posX,
                 posY,
                 objOpts.age.incon_size,
                 objOpts.age.incon_size
               );
-            }                
-            
+            } else { 
+              if(ageSet.data_series[a].enable==true){
+                if(ageSet.data_series[a].reliable == true){
+                  sketch.image(
+                    agePlotIcons[ageSet.data_series[a].source_type],
+                    posX,
+                    posY,
+                    objOpts.age.incon_size,
+                    objOpts.age.incon_size
+                  );
+                }else{
+                  sketch.image(
+                    agePlotIcons[ageSet.data_series[a].source_type+"_unreliable"],
+                    posX,
+                    posY,
+                    objOpts.age.incon_size,
+                    objOpts.age.incon_size
+                  );
+                }
+              }else{
+                sketch.image(
+                  agePlotIcons[ageSet.data_series[a].source_type+"_disable"],
+                  posX,
+                  posY,
+                  objOpts.age.incon_size,
+                  objOpts.age.incon_size
+                );
+              }                
+              
+            }
           }
         }
+        
       }
       
       //==========================================================================================
