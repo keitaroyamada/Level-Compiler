@@ -221,7 +221,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
       //calc
       if(targetId[1] == null){
-        console.log("FInder: Target hole is exist.")
+        console.log("Finder: Target hole is exist.")
         //case changed section and distance
         await window.FinderApi.rendererLog(["", holeName, sectionName, distance]);
         const options = {
@@ -229,7 +229,7 @@ document.addEventListener("DOMContentLoaded", () => {
           polationType: "linear",  
           allowOutside: false
         };
-        calcedData = await window.FinderApi.depthConverter(["", ["", holeName, sectionName, distance], targetId], options);
+        calcedData = await window.FinderApi.depthConverter([["", ["", holeName, sectionName, distance], targetId]], options);
         await window.FinderApi.rendererLog(calcedData);
         //apply
         document.getElementById("cdInput").value        = Math.round(calcedData.cd * 10) / 10;
@@ -246,7 +246,7 @@ document.addEventListener("DOMContentLoaded", () => {
           polationType: "linear",  
           allowOutside: false
         };
-        calcedData = await window.FinderApi.depthconverter(["", cd, targetId], options);
+        calcedData = await window.FinderApi.depthConverter([["", cd, targetId]], options);
         //await window.FinderApi.rendererLog(calcedData); 
         if(calcedData.hole == holeName){
           //if selected hole exist
@@ -302,7 +302,7 @@ document.addEventListener("DOMContentLoaded", () => {
               polationType: "linear",  
               allowOutside: false
             };
-            calcedData = await window.FinderApi.depthconverter(["", ["", holeName, sectionName, topDistance], targetId], options);
+            calcedData = await window.FinderApi.depthConverter([["", ["", holeName, sectionName, topDistance], targetId]], options);
             await window.FinderApi.rendererLog(calcedData);
             //apply
             document.getElementById("distanceInput").value  = isNaN(calcedData.distance) ? "" : Math.round(calcedData.distance * 10) / 10;
@@ -326,7 +326,7 @@ document.addEventListener("DOMContentLoaded", () => {
               polationType: "linear",  
               allowOutside: false
             };
-            calcedData = await window.FinderApi.depthconverter(["", ["", holeName, sectionName, topDistance], targetId], options);
+            calcedData = await window.FinderApi.depthConverter([["", ["", holeName, sectionName, topDistance], targetId]], options);
             await window.FinderApi.rendererLog(calcedData);
             //apply
             document.getElementById("cdInput").value        = Math.round(calcedData.cd * 10) / 10;
@@ -349,7 +349,7 @@ document.addEventListener("DOMContentLoaded", () => {
               polationType: "linear",  
               allowOutside: false
             };
-            calcedData = await window.FinderApi.depthconverter(["", ["", holeName, sectionName, topDistance], targetId], options);
+            calcedData = await window.FinderApi.depthConverter([["", ["", holeName, sectionName, topDistance], targetId]], options);
             await window.FinderApi.rendererLog(calcedData);
             //apply
             document.getElementById("cdInput").value        = Math.round(calcedData.cd * 10) / 10;
@@ -376,7 +376,7 @@ document.addEventListener("DOMContentLoaded", () => {
         polationType: "linear",  
         allowOutside: false
       };
-      calcedData = await window.FinderApi.depthconverter(["finder_from_cd", cd, targetId], options);
+      calcedData = await window.FinderApi.depthConverter([["finder_from_cd", cd, targetId]], options);
       //window.FinderApi.rendererLog(calcedData);
 
       //apply//calc(data[2]);
@@ -420,7 +420,7 @@ document.addEventListener("DOMContentLoaded", () => {
         polationType: "linear",  
         allowOutside: false
       };
-      calcedData = await window.FinderApi.depthconverter(["finder_from_efd", efd, targetId], options);
+      calcedData = await window.FinderApi.depthConverter([["finder_from_efd", efd, targetId]], options);
       //await window.FinderApi.rendererLog(calcedData);
 
       //apply
@@ -463,7 +463,7 @@ document.addEventListener("DOMContentLoaded", () => {
         polationType: "linear",  
         allowOutside: false
       };
-      calcedData = await window.FinderApi.depthconverter(["", age, targetId], options);
+      calcedData = await window.FinderApi.depthConverter([["", age, targetId]], options);
       await window.FinderApi.rendererLog(calcedData);
 
       //apply

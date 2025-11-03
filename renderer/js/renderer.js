@@ -3083,7 +3083,22 @@ document.addEventListener("DOMContentLoaded", () => {
   //load correlation model
   window.LCapi.receive("ExportCorrelationAsLCMenuClicked", async () => {
     console.log(LCCore.projects.length)
-    await window.LCapi.ExportCorrelationAsCsv();
+    //check model
+    await loadModel(false, false);
+    const projectData = getDataFromId(LCCore, LCCore.base_project_id);
+    if(projectData.model_type == "duo"){
+      const response = await window.LCapi.askdialog(
+        "Export model",
+        "Connections to the main model will not be exported because the main model is not loaded.\n"+      
+        "Are you sure you want to export?"
+      );
+
+      if(response.response){
+        await window.LCapi.ExportCorrelationAsCsv();
+      }
+    }
+
+    
   });
   window.LCapi.receive("ExportCorrelationAsLFMenuClicked", async () => {
     const response = await window.LCapi.askdialog(
@@ -4666,7 +4681,7 @@ document.addEventListener("DOMContentLoaded", () => {
             sketch.pop();
             
             //make marker objects=================================================================================
-            let msaterDirection = "non";
+            let msaterDirection = "none";
             for (let m = 0; m < section.markers.length; m++) {
               //load marker data
               const marker = section.markers[m];
@@ -4853,23 +4868,25 @@ document.addEventListener("DOMContentLoaded", () => {
 
               //add master section-----------------------------------------
               const curreM = countMaster(LCCore, marker, "project");   
-              const lowerM = countMaster(LCCore, section.markers[m + 1], "project");             
+              const lowerM = countMaster(LCCore, section.markers[m + 1], "project");   
 
               if(curreM.own == 1){
-                if(curreM.total==1){
+                if(curreM.horizontal==0){
                   //horizontal marker is NOT master
                   if(lowerM.own == 1){
                     msaterDirection = "vertical";
                   }else{
                     msaterDirection = "none";
                   }
-                }else if(curreM.total==2){
+                }else if(curreM.horizontal==1){
                   //horizontal marker is master
                   if(lowerM.own == 0){
                     //lower marker is NOT master
                     msaterDirection = "horizontal";
                   }else{
                     //lower marker is also master
+
+
                     if(msaterDirection=="none" || msaterDirection=="horizontal"){
                       //master come from hconnection or startpoint or parallel section
                       msaterDirection = "vertical";
@@ -6070,8 +6087,8 @@ document.addEventListener("DOMContentLoaded", () => {
       polationType: "linear",  
       allowOutside: false
     };
-    const upperData = await window.LCapi.depthConverter(["", y0, upperTargetId], options);
-    const lowerData = await window.LCapi.depthConverter(["", y1, upperTargetId], options);
+    const upperData = await window.LCapi.depthConverter([["", y0, upperTargetId]], options);
+    const lowerData = await window.LCapi.depthConverter([["", y1, upperTargetId]], options);
 
     //calc stat
     const meanAge = (lowerData.age_mid + upperData.age_mid) / 2;
@@ -7059,7 +7076,7 @@ async function getFooterInfo(LCCore, hittest, objOpts) {
       polationType: "linear",  
       allowOutside: false
     };
-    const calcedData = await window.LCapi.depthConverter(["", hittest.y, targetId], options);
+    const calcedData = await window.LCapi.depthConverter([["", hittest.y, targetId]], options);
     age = calcedData !== null ? calcedData.age_mid.toFixed(objOpts.canvas.age_precision) + " calBP)" : "---)";
   }
 

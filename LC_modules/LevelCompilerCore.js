@@ -5533,10 +5533,11 @@ class LevelCompilerCore extends EventEmitter{
     return idx;
   }
   constructModelMap(){
+    // Set status
     this.setStatus("running","start constructCSVModel");
     const isIgnoreWithoutCD = true;
-    //NOT RECOMMENDED, becase all descriptions are not saved.
-    //check model
+
+    // Check model integrity
     const results = this.checkModel();
     let isError = false;
     results.forEach(r=>{
@@ -5554,123 +5555,153 @@ class LevelCompilerCore extends EventEmitter{
       }      
     }
 
-    //Initialise
+    // Initialise
     this.sortModel();
-    this.updateSearchIdx();
+    this.updateSearchIdx(); // Make search_idx_list available
 
-    //get row id list
-    let resultIds = [];
-    let visited = new Set();
+    // --- STEP 1: Create Horizon List (Data Transformation) ---
+
+    // 'resultIds'  [cd, markerIds]
+    let resultIds = []; 
+    let visitedMarkers = new Set();
      
     for(let p=0; p<this.projects.length;p++){
       for(let h=0;h<this.projects[p].holes.length;h++){
+        const holeData = this.projects[p].holes[h];
         for(let s=0;s<this.projects[p].holes[h].sections.length;s++){
+          const sectionData = this.projects[p].holes[h].sections[s];
           for(let m=0;m<this.projects[p].holes[h].sections[s].markers.length;m++){
             const markerData = this.projects[p].holes[h].sections[s].markers[m];
+            
             if(isIgnoreWithoutCD){
               if(markerData.composite_depth == null) continue
             }
             
-            if(!visited.has(markerData.id.toString())){              
-              //Initialise
-              let horizontalMarkers = [];
+            if(!visitedMarkers.has(markerData.id.toString())){       
+              let markerGroup = [];
               let cd = null;
 
-              //set cd
-              //Sometimes extrapolared CD is reversal, so use tempolary very thin CD for extrapolation row. 
-              if(markerData.depth_source[0] == "extrapolate"){
-                //case "extrapolate"
-                if(markerData.depth_source[1] !== null){
-                  //downward extrapolation
-                  let sourceId = markerData.depth_source[1];
-                  //count layers between target and source               
-                  const pathIds = this.measurePerformance(this.searchShortestVerticalPath,sourceId,markerData.id);
-                  let numIds = pathIds.length - 1;
-                  pathIds.forEach((pid, n)=>{
-                    if(visited.has(pid.toString())){
-                      //search nearest calced row
-                      sourceId = pid;
-                      numIds = n;
-                    }
-                  })
+              cd = markerData.composite_depth;
 
-                  if(numIds == pathIds.length - 1){
-                    cd = this.getDataByIdx(this.search_idx_list[sourceId.toString()]).composite_depth + 0.01 * (numIds);
-                  }else{
-                    resultIds.forEach(r=>{
-                      r[1].forEach(id=>{
-                        if(id.toString() == sourceId.toString()){
-                          //get previous hole temp CD
-                          cd = r[0] + 0.01 * (numIds);
-                        }
-                      })
-                    })
-                  }
-                }else if(markerData.depth_source[2] !== null){
-                  //upward extrapolation
-                  let sourceId = markerData.depth_source[2];
-                  //count layers between target and source               
-                  const pathIds = this.measurePerformance(this.searchShortestVerticalPath,markerData.id, sourceId);
-                  let numIds = pathIds.length - 1;
-                  pathIds.forEach((pid, n)=>{
-                    if(visited.has(pid.toString())==true){
-                      //search nearest calced row
-                      sourceId = pid;
-                      numIds = n;
-                    }
-                  })
-
-                  if(numIds == pathIds.length - 1){
-                    cd = this.getDataByIdx(this.search_idx_list[sourceId.toString()]).composite_depth - 0.01 * (numIds);
-                  }else{
-                    resultIds.forEach(r=>{
-                      r[1].forEach(id=>{
-                        if(id.toString() == sourceId.toString()){
-                          //get previous hole temp CD
-                          cd = r[0] - 0.01 * (numIds);
-                        }
-                      })
-                    })
-                  }
-                }                
-              }else{
-                //case "master","master-transfer","duo-master","duo-master-transfer","interpolate","transfer"
-                cd = markerData.composite_depth;
-              }
-
-              //set vigited id 
-              visited.add(markerData.id.toString());
-
-              //get row ids
-              horizontalMarkers.push(markerData.id);
+              visitedMarkers.add(markerData.id.toString());
+              markerGroup.push(markerData.id);
 
               for(let h=0;h<markerData.h_connection.length;h++){
-                //set visited flag
-                visited.add(markerData.h_connection[h].toString());
-                //set row data
-                horizontalMarkers.push(markerData.h_connection[h]);
+                visitedMarkers.add(markerData.h_connection[h].toString());
+                markerGroup.push(markerData.h_connection[h]);
               }
 
-              //add row data
-              resultIds.push([cd, horizontalMarkers]);
+              // format: [cd, markerIds]
+              resultIds.push([cd, markerGroup]);
             }
           }
         }
       }   
     }    
 
-    //sort by composite depth
-    resultIds.sort((a,b)=>{
-      return a[0] - b[0];
-    })
+    // --- STEP 2: Sort by CD ---
+
+    // Sort the resultIds array
+    resultIds.sort((rowA, rowB) => {
+      // 1. Helper function to get physical location details
+      const getMarkerDetails = (markerIds) => {
+        const details = [];
+        markerIds.forEach(id => {
+          const idx = this.search_idx_list[id.toString()];
+          if (!idx) return;
+
+          const p_idx = idx[0]; // Project index
+          const h_idx = idx[1]; // Hole index
+          const s_idx = idx[2]; // Section index
+          const m_idx = idx[3]; // Marker index
+
+          try {
+            const mData    = this.projects[p_idx].holes[h_idx].sections[s_idx].markers[m_idx];
+            const secData  = this.projects[p_idx].holes[h_idx].sections[s_idx];
+            const holeData = this.projects[p_idx].holes[h_idx];
+            
+            details.push({
+              holeName: holeData.name,    // Key 1: Hole name
+              sectionRank: secData.order, // Key 2: Section order
+              distance: mData.distance    // Key 3: Distance within section
+            });
+          } catch (e) {
+            console.error("Failed to retrieve marker data during sort:", id, idx, e);
+          }
+        });
+        return details;
+      };
+
+      // Access using index [0] (for cd) and [1] (for markers)
+      const cd_A = rowA[0];
+      const cd_B = rowB[0];
+      const aDetails = getMarkerDetails(rowA[1]); // Pass rowA[1] (markerIds)
+      const bDetails = getMarkerDetails(rowB[1]); // Pass rowB[1] (markerIds)
+
+      // 2. Constraint Comparison
+      let physicalDecision = 0; // 0: Undecided, -1: A is upper, 1: B is upper, 99: Conflict
+
+      for (const detailA of aDetails) {
+        for (const detailB of bDetails) {
+          if (detailA.holeName === detailB.holeName) {
+            let currentDecision = 0;
+
+            // 2a. Compare section order
+            if (detailA.sectionRank < detailB.sectionRank) {
+              currentDecision = -1; // A is in an upper section
+            } else if (detailA.sectionRank > detailB.sectionRank) {
+              currentDecision = 1;  // B is in an upper section
+            
+            // 2b. Compare distance (if same section)
+            } else if (detailA.distance < detailB.distance) {
+              currentDecision = -1; // A is upper
+            } else if (detailA.distance > detailB.distance) {
+              currentDecision = 1;  // B is upper
+            }
+
+            if (currentDecision !== 0) {
+              if (physicalDecision === 0) {
+                physicalDecision = currentDecision;
+              } else if (physicalDecision !== currentDecision) {
+                console.warn(`Sorting conflict detected. Rows contain physically crossed data: `, detailA,detailB);
+                physicalDecision = 99; // Set conflict flag
+                break; 
+            }
+            }
+          }
+        }
+        if (physicalDecision === 99) break;
+      }
+
+      // 3. Final Decision
+      // Case 1: Physically decided
+      if (physicalDecision === -1) return -1; // A is upper
+      if (physicalDecision === 1) return 1;  // B is upper
+
+      // Case 2: Fallback to Composite Depth (using cd_A, cd_B from above)      
+      if (cd_A === null && cd_B === null) return 0;
+      if (cd_A === null) return 1;  // A is null, so B comes first
+      if (cd_B === null) return -1; // B is null, so A comes first
+      
+      return cd_A - cd_B; // Normal CD comparison
+    });
     
+    // Return the sorted list in the original format [ [cd, markerIds], ... ]
     return resultIds; 
   }
-  constructCSVforLC(resultIds, baseProjectID=this.base_project_id){
+  constructCSVforLC(resultIds, targetProjectID=this.base_project_id){
     this.setStatus("running","construct csv for LC");
     //resultIds: [cd, [horizontalMarkers...]]
     //type: "lc", "lf"
     //make output data
+    
+    //check duo
+    let isMain = true;
+    const targetIdx = this.search_idx_list[targetProjectID.toString()];
+    if(this.projects[targetIdx[0]].model_type==="duo"){
+      isMain = false;
+    }
+
     let prevMasterHole = "";
     let output = [];
     for(let i=0;i<resultIds.length;i++){
@@ -5682,10 +5713,11 @@ class LevelCompilerCore extends EventEmitter{
       let curMasterHole = [];
       let masterConnections = [null,null,null,null];
       for(let p=0; p<this.projects.length;p++){
-        for(let h=0; h<this.projects[p].holes.length; h++){
-          const holeData = this.projects[p].holes[h];
+        const projectData = this.projects[p];
+        for(let h=0; h<projectData.holes.length; h++){
+          const holeData = projectData.holes[h];
           let cellsData = []; //[name, distance, drilling depth, event]
-          if(this.projects[p].id.toString() == baseProjectID.toString()){
+          if(this.projects[p].id.toString() == targetProjectID.toString()){
             cellsData = [null,null,null,null];
           }
         
@@ -5696,7 +5728,7 @@ class LevelCompilerCore extends EventEmitter{
             const markerData  = this.getDataByIdx(idx);
 
             if(holeData.id.toString() == [id[0],id[1],null,null].toString()){
-              if(this.projects[p].id.toString() == baseProjectID.toString()){
+              if(this.projects[p].id.toString() == targetProjectID.toString()){
                 //if target project   
                 //get marker data
                 cellsData[0] = markerData.name;
@@ -5765,27 +5797,25 @@ class LevelCompilerCore extends EventEmitter{
               }
               
               //get master connections
-              if(baseProjectID.toLocaleString() == this.projects[p].id.toString() && markerData.isMaster == true){
+              if(targetProjectID.toLocaleString() == this.projects[p].id.toString() && markerData.isMaster == true){
                 curMasterHole.push(this.getDataByIdx(this.search_idx_list[[markerData.id[0],markerData.id[1],null,null].toString()]).name);
               }        
              
-              if(baseProjectID.toLocaleString() == this.projects[p].id.toString() && markerData.isZeroPoint !== false){
+              if(targetProjectID.toLocaleString() == this.projects[p].id.toString() && markerData.isZeroPoint !== false){
                 zeroMarker  = "(" + markerData.isZeroPoint + ")";
               }
 
-              //get workspace master connections
+              //get workspace master (MAIN) connections
               for(let hc=0;hc<markerData.h_connection.length; hc++){
-                const connectedId = markerData.h_connection[hc];
-                if([connectedId[0], null,null,null].toString() == this.base_project_id.toString()){
-                  //if connected base project
-                  const connectedMarkerData = this.getDataByIdx(this.search_idx_list[connectedId.toString()]);
-                  if((connectedMarkerData.id.toString() == this.base_project_id.toString() && connectedMarkerData.isMaster )|| masterConnections[0] == null){
+                const connectedId  = markerData.h_connection[hc];
+                if(projectData.model_type === "correlation"){
+                  if(masterConnections[0] == null || markerData.isMaster){
                     masterConnections[0] = holeData.name;
                     masterConnections[1] = sectionData.name;
                     masterConnections[2] = markerData.distance.toFixed(1);
-                    masterConnections[3] = holeData.name+"-"+sectionData.name+"-"+markerData.name;
-                  }
-                }                
+                    masterConnections[3] = holeData.name+"-"+sectionData.name+"-"+markerData.name; 
+                  }                                   
+                }                              
               } 
             }
           }
@@ -5819,26 +5849,23 @@ class LevelCompilerCore extends EventEmitter{
         return;
       }
 
-
-      //add header
+      //add header      
       if(i==0){
         //header
         let header = ["Master hole"];
 
-        //if duo
-        if(baseProjectID.toString() !== this.base_project_id.toString()){
+        //if duo        
+        if(isMain == false){
           header  = [...header, "Master hole",	"Master section",	"Master distance (cm)", "Master lamina name"];
         }
 
         for(let p=0; p<this.projects.length; p++){
-          if(this.projects[p].id.toString() == baseProjectID.toString()){
+          if(this.projects[p].id.toString() == targetProjectID.toString()){
             for(let h=0; h<this.projects[p].holes.length; h++){
               const hole = this.projects[p].holes[h];
-
               header = [...header, "Laminaname(" + hole.name + ")[" + hole.type + "]", "Distance from core top (cm)", "Drilling depth (cm)", "Event"];
             }
           }
-          
         }
         output.push(header);
       }
@@ -5850,7 +5877,7 @@ class LevelCompilerCore extends EventEmitter{
       }
 
       //add master info
-      if(baseProjectID.toString() !== this.base_project_id.toString()){
+      if(isMain==false){
         //if duo
         rowData.unshift(...masterConnections);
         rowData.unshift(masterHole + zeroMarker);
@@ -5869,7 +5896,7 @@ class LevelCompilerCore extends EventEmitter{
     this.setStatus("completed","");
     return output;
   }
-  constructCSVforLF(resultIds, baseProjectID=this.base_project_id){
+  constructCSVforLF(resultIds, targetProjectID=this.base_project_id){
     this.setStatus("running","construct csv for LF");
     //resultIds: [cd, [horizontalMarkers...]]
     //type: "lc", "lf"
@@ -5896,7 +5923,7 @@ class LevelCompilerCore extends EventEmitter{
         for(let h=0; h<this.projects[p].holes.length; h++){
           const holeData = this.projects[p].holes[h];
           let cellsData = []; //[name, distance, drilling depth]
-          if(this.projects[p].id.toString() == baseProjectID.toString()){
+          if(this.projects[p].id.toString() == targetProjectID.toString()){
             cellsData[0] = "@9999";
             cellsData[1] = "@9999";
             cellsData[2] = "@9999";
@@ -5909,7 +5936,7 @@ class LevelCompilerCore extends EventEmitter{
             const markerData  = this.getDataByIdx(idx);
             if(holeData.id.toString() == [id[0],id[1],null,null].toString()){              
               //get marker data
-              if(baseProjectID.toString() == this.projects[p].id.toString()){
+              if(targetProjectID.toString() == this.projects[p].id.toString()){
                 //if target project
                 
                 cellsData[0] = "@"+markerData.name.replace(/-(top|bottom)/g, " $1");
@@ -5924,7 +5951,7 @@ class LevelCompilerCore extends EventEmitter{
                 targetData.section_name = sectionData.name;
                 targetData.distance     = markerData.distance;
                 const cd = this.getDepthFromTrinity(id, [targetData], "composite_depth");
-                if(cd[0][1]){
+                if(cd[0][1]!==null){
                   compositeDepth = "@"+cd[0][1].toFixed(1);
                 }
 
@@ -6007,7 +6034,7 @@ class LevelCompilerCore extends EventEmitter{
               }
 
               //get project master connections
-              if((baseProjectID.toString() == this.projects[p].id.toString()) && markerData.isMaster == true){
+              if((targetProjectID.toString() == this.projects[p].id.toString()) && markerData.isMaster == true){
                 curMasterHole.push(this.getDataByIdx(this.search_idx_list[[markerData.id[0],markerData.id[1],null,null].toString()]).name);
               }  
               
@@ -6080,7 +6107,7 @@ class LevelCompilerCore extends EventEmitter{
         for(let p=0; p<this.projects.length; p++){
           for(let h=0; h<this.projects[p].holes.length; h++){
             const hole = this.projects[p].holes[h];
-            if(baseProjectID.toString() == this.projects[p].id.toString()){
+            if(targetProjectID.toString() == this.projects[p].id.toString()){
               //if target id
               header = [...header, "@Lamina name (" + hole.name + ")", "@Position on the Scale in the Photo (PSP) (cm)", "@Drilling depth (cm)"];
             }            
@@ -6104,7 +6131,7 @@ class LevelCompilerCore extends EventEmitter{
         header = [...header, "@Compsite depth (cm)"];
 
         //if duo
-        if(baseProjectID.toString() !== this.base_project_id.toString()){
+        if(targetProjectID.toString() !== this.base_project_id.toString()){
           header  = [...header, "@Master core hole name",	"@Master core number",	"@Master core distance from core top (cm)", "@Master core lamina name"];
         }
 
@@ -6122,7 +6149,7 @@ class LevelCompilerCore extends EventEmitter{
       rowData.push(compositeDepth);
 
       //if duo
-      if(baseProjectID !== this.base_project_id){
+      if(targetProjectID !== this.base_project_id){
         rowData = [...rowData, ...masterConnections];
       }
 

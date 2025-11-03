@@ -372,17 +372,16 @@ document.addEventListener("DOMContentLoaded", () => {
         const options = {
           sourceType: sourceType,
           polationType: "linear",  
-          allowOutside: allowOutside
+          allowOutside: allowOutside,
+          callFrom: "converter"
         };
 
-        await window.ConverterApi.progressbar("Depth Converter", "Now converting...", false, "converterWindow");
+        const calcedDataList = await window.ConverterApi.depthConverter(indataList, options);
 
-        for(let i=0; i<indataList.length; i++){
-          await window.ConverterApi.updateProgressbar(i, indataList.length);
-
+        for(let i=0; i<calcedDataList.length; i++){
           //calc depth
-          const indata = indataList[i];
-          const calcedData = await window.ConverterApi.depthConverter(indata, options);
+          const calcedData = calcedDataList[i];
+          
           if(!calcedData){
             console.log("Conversion was skipped at line: "+i+".");
             continue
@@ -443,7 +442,8 @@ document.addEventListener("DOMContentLoaded", () => {
         const options = {
           sourceType: sourceType,
           polationType: "linear",  
-          allowOutside: allowOutside
+          allowOutside: allowOutside,
+          callFrom: "converter"
         };
 
         //main calc
@@ -494,7 +494,6 @@ document.addEventListener("DOMContentLoaded", () => {
         console.log("Unkown convert type.")
       }
 
-      await window.ConverterApi.clearProgressbar();
       document.body.style.cursor = "default"; 
       //console.log(convertedData);
   });

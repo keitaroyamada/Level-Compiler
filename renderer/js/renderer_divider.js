@@ -248,14 +248,14 @@ document.addEventListener("DOMContentLoaded", () => {
         polationType: "linear",  
         allowOutside: true
       };
-      const resultUpper = await window.DividerApi.depthConverter(["NoUse", ["NoUse", holeName, sectionName, start], sectionId], options);
+      const resultUpper = await window.DividerApi.depthConverter([["NoUse", ["NoUse", holeName, sectionName, start], sectionId]], options);
       posUpper = resultUpper.efd;
       options = {
         sourceType: "event_free_depth",
         polationType: "linear",  
         allowOutside: true
       };
-      const resultLower = await window.DividerApi.depthConverter(["NoUse", posUpper+interval, sectionId], options);
+      const resultLower = await window.DividerApi.depthConverter([["NoUse", posUpper+interval, sectionId]], options);
       distUpper = resultUpper.distance;
       distLower = resultLower.distance;
     }else if(type == "Age"){
@@ -264,14 +264,14 @@ document.addEventListener("DOMContentLoaded", () => {
         polationType: "linear",  
         allowOutside: true
       };
-      const result = await window.DividerApi.depthConverter(["NoUse", ["NoUse", holeName, sectionName, start], sectionId], options);
+      const result = await window.DividerApi.depthConverter([["NoUse", ["NoUse", holeName, sectionName, start], sectionId]], options);
       posUpper = result.age_mid;
       options = {
         sourceType: "age",
         polationType: "linear",  
         allowOutside: true
       };
-      const resultLower = await window.DividerApi.depthConverter(["NoUse", posUpper+interval, sectionId], options);
+      const resultLower = await window.DividerApi.depthConverter([["NoUse", posUpper+interval, sectionId]], options);
       distUpper = resultUpper.distance;
       distLower = resultLower.distance;
     }
@@ -318,7 +318,7 @@ document.addEventListener("DOMContentLoaded", () => {
           polationType: "linear",  
           allowOutside: true
         };
-        const resultLower = await window.DividerApi.depthConverter(["NoUse", posUpper, sectionId], options);
+        const resultLower = await window.DividerApi.depthConverter([["NoUse", posUpper, sectionId]], options);
         
         distUpper = distLower;
         distLower = resultLower.distance;
@@ -329,7 +329,7 @@ document.addEventListener("DOMContentLoaded", () => {
           polationType: "linear",  
           allowOutside: true
         };
-        const resultLower = await window.DividerApi.depthConverter(["NoUse", posUpper, sectionId], options);
+        const resultLower = await window.DividerApi.depthConverter([["NoUse", posUpper, sectionId]], options);
         
         distUpper = distLower;
         distLower = resultLower.distance;
