@@ -908,9 +908,13 @@ function createMainWIndow() {
       return "fail_to_add"
     }
   });
-  ipcMain.handle("progressbar", async (_e, tit, txt, indeterminate) => {
+  ipcMain.handle("progressbar", async (_e, tit, txt, indeterminate, window="mainWindow") => {
     progressBar = null;
-    progressBar = progressDialog(mainWindow, tit, txt, indeterminate);
+    let targetWindow = mainWindow;
+    if(window == "converterWindow"){
+      targetWindow = converterWindow;
+    }
+    progressBar = progressDialog(targetWindow, tit, txt, indeterminate);
 
     if(progressBar){
       await new Promise(resolve => setTimeout(resolve, 100));

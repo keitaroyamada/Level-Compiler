@@ -335,7 +335,6 @@ document.addEventListener("DOMContentLoaded", () => {
         }
       }
 
-
       //output     
       if(output_type == "export"){
         //calc
@@ -376,13 +375,16 @@ document.addEventListener("DOMContentLoaded", () => {
           allowOutside: allowOutside
         };
 
+        await window.ConverterApi.progressbar("Depth Converter", "Now converting...", false, "converterWindow");
+
         for(let i=0; i<indataList.length; i++){
+          await window.ConverterApi.updateProgressbar(i, indataList.length);
+
           //calc depth
           const indata = indataList[i];
           const calcedData = await window.ConverterApi.depthConverter(indata, options);
           if(!calcedData){
             console.log("Conversion was skipped at line: "+i+".");
-            document.body.style.cursor = "default"; 
             continue
           }
 
@@ -446,13 +448,16 @@ document.addEventListener("DOMContentLoaded", () => {
 
         //main calc
         let output = [];
+        await window.ConverterApi.progressbar("Depth Converter", "Now converting...", false,"converterWindow");
+
         for(let i=0; i<indataList.length; i++){
+          await window.ConverterApi.updateProgressbar(i, indataList.length);
+
           //calc depth
           const indata = indataList[i];
           const calcedData = await window.ConverterApi.depthConverter(indata, options);
           if(!calcedData){
             console.log("Conversion was skipped at line: "+i+".");
-            document.body.style.cursor = "default"; 
             continue
           }
 
@@ -489,6 +494,7 @@ document.addEventListener("DOMContentLoaded", () => {
         console.log("Unkown convert type.")
       }
 
+      await window.ConverterApi.clearProgressbar();
       document.body.style.cursor = "default"; 
       //console.log(convertedData);
   });

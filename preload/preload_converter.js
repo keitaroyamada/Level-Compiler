@@ -17,6 +17,10 @@ contextBridge.exposeInMainWorld("ConverterApi", {
   terminalLog: (args1) => ipcRenderer.invoke("terminalLog", args1),
   rendererLog: (args1) => ipcRenderer.invoke("rendererLog", args1),
 
+  progressbar: (args1, args2, args3, args4) => ipcRenderer.invoke("progressbar", args1, args2, args3, args4),
+  updateProgressbar: (args1, args2) => ipcRenderer.invoke("updateProgressbar", args1, args2),
+  clearProgressbar: () => ipcRenderer.invoke("clearProgressbar"),
+
   //main -> renderer
   receive: (channel, func) => {
     ipcRenderer.on(channel, (event, ...args) => func(...args));
