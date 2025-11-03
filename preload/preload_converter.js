@@ -9,7 +9,7 @@ contextBridge.exposeInMainWorld("ConverterApi", {
   cvtGetCorrelationModelList: () => ipcRenderer.invoke("cvtGetCorrelationModelList"),
   cvtLoadCsv: (args1, args2, args3) => ipcRenderer.invoke("cvtLoadCsv", args1, args2, args3),
   cvtConvert: (args1, args2, args3, args4) => ipcRenderer.invoke("cvtConvert", args1, args2, args3, args4),
-  depthConverter: (args1, args2, args3, args4) => ipcRenderer.invoke("depthConverter", args1, args2, args3, args4),
+  depthConverter: (args1, args2) => ipcRenderer.invoke("depthConverter", args1, args2),
   cvtExport: (args1) => ipcRenderer.invoke("cvtExport", args1),
   dataImport: (args1) => ipcRenderer.invoke("dataImport", args1),
   toggleDevTools: (args1) => ipcRenderer.send('toggle-devtools',args1),

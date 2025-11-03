@@ -8,7 +8,7 @@ contextBridge.exposeInMainWorld("DividerApi", {
 
   changeFix: (args) => ipcRenderer.invoke("changeFix", args),
 
-  depthConverter: (args1, args2, args3) => ipcRenderer.invoke("depthConverter", args1, args2, args3),
+  depthConverter: (args1, args2) => ipcRenderer.invoke("depthConverter", args1, args2),
 
   getSectionLimit: (args1, args2) => ipcRenderer.invoke("getSectionLimit", args1, args2),
 

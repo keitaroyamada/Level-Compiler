@@ -40,7 +40,7 @@ contextBridge.exposeInMainWorld("LCapi", {
   //tools
   OpenFinder: () => ipcRenderer.invoke("OpenFinder"),
   CloseFinder: () => ipcRenderer.invoke("CloseFinder"),
-  depthConverter: (args0, args1, args2) =>  ipcRenderer.invoke("depthConverter", args0, args1, args2),
+  depthConverter: (args0, args1) =>  ipcRenderer.invoke("depthConverter", args0, args1),
   SendDepthToFinder: (args) => ipcRenderer.invoke("SendDepthToFinder", args),
   OpenDivider: () => ipcRenderer.invoke("OpenDivider"),
   CloseDivider: () => ipcRenderer.invoke("CloseDivider"),

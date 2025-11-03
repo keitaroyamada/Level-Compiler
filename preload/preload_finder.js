@@ -6,7 +6,7 @@ contextBridge.exposeInMainWorld("FinderApi", {
   finderGetCoreList: () => ipcRenderer.invoke("finderGetCoreList"),
   changeFix: (args) => ipcRenderer.invoke("changeFix", args),
 
-  finderConvert: (args1, args2, args3, args4) => ipcRenderer.invoke("depthConverter", args1, args2, args3, args4),
+  depthConverter: (args1, args2) => ipcRenderer.invoke("depthConverter", args1, args2),
 
   getSectionLimit: (args1, args2, args3) => ipcRenderer.invoke("getSectionLimit", args1, args2, args3),
 

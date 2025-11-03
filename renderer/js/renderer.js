@@ -6065,8 +6065,13 @@ document.addEventListener("DOMContentLoaded", () => {
     //get click position
     const upperTargetId = [startPoint.project, startPoint.hole, startPoint.section, null];
     const lowerTargetId = [endPoint.project, endPoint.hole, endPoint.section, null];
-    const upperData = await window.LCapi.depthConverter(["", y0, upperTargetId], objOpts.canvas.depth_scale, "linear");
-    const lowerData = await window.LCapi.depthConverter(["", y1, upperTargetId], objOpts.canvas.depth_scale, "linear");
+    const options = {
+      sourceType: objOpts.canvas.depth_scale,
+      polationType: "linear",  
+      allowOutside: false
+    };
+    const upperData = await window.LCapi.depthConverter(["", y0, upperTargetId], options);
+    const lowerData = await window.LCapi.depthConverter(["", y1, upperTargetId], options);
 
     //calc stat
     const meanAge = (lowerData.age_mid + upperData.age_mid) / 2;
@@ -7049,7 +7054,12 @@ async function getFooterInfo(LCCore, hittest, objOpts) {
       return txt;
     }
 
-    const calcedData = await window.LCapi.depthConverter(["", hittest.y, targetId], objOpts.canvas.depth_scale, "linear");
+    const options = {
+      sourceType: objOpts.canvas.depth_scale,
+      polationType: "linear",  
+      allowOutside: false
+    };
+    const calcedData = await window.LCapi.depthConverter(["", hittest.y, targetId], options);
     age = calcedData !== null ? calcedData.age_mid.toFixed(objOpts.canvas.age_precision) + " calBP)" : "---)";
   }
 

@@ -224,7 +224,12 @@ document.addEventListener("DOMContentLoaded", () => {
         console.log("FInder: Target hole is exist.")
         //case changed section and distance
         await window.FinderApi.rendererLog(["", holeName, sectionName, distance]);
-        calcedData = await window.FinderApi.finderConvert(["", ["", holeName, sectionName, distance], targetId], "trinity", "linear");
+        const options = {
+          sourceType: "trinity",
+          polationType: "linear",  
+          allowOutside: false
+        };
+        calcedData = await window.FinderApi.depthConverter(["", ["", holeName, sectionName, distance], targetId], options);
         await window.FinderApi.rendererLog(calcedData);
         //apply
         document.getElementById("cdInput").value        = Math.round(calcedData.cd * 10) / 10;
@@ -236,7 +241,12 @@ document.addEventListener("DOMContentLoaded", () => {
         console.log("FInder: There is no target hole.")
         //case changed hole
         //try to find same CD in selected hole
-        calcedData = await window.FinderApi.finderConvert(["", cd, targetId], "composite_depth", "linear");
+        const options = {
+          sourceType: "composite_depth",
+          polationType: "linear",  
+          allowOutside: false
+        };
+        calcedData = await window.FinderApi.depthconverter(["", cd, targetId], options);
         //await window.FinderApi.rendererLog(calcedData); 
         if(calcedData.hole == holeName){
           //if selected hole exist
@@ -287,7 +297,12 @@ document.addEventListener("DOMContentLoaded", () => {
 
             //calc
             await window.FinderApi.rendererLog(["", holeName, sectionName, distance]);
-            calcedData = await window.FinderApi.finderConvert(["", ["", holeName, sectionName, topDistance], targetId], "trinity", "linear");
+            const options = {
+              sourceType: "trinity",
+              polationType: "linear",  
+              allowOutside: false
+            };
+            calcedData = await window.FinderApi.depthconverter(["", ["", holeName, sectionName, topDistance], targetId], options);
             await window.FinderApi.rendererLog(calcedData);
             //apply
             document.getElementById("distanceInput").value  = isNaN(calcedData.distance) ? "" : Math.round(calcedData.distance * 10) / 10;
@@ -306,7 +321,12 @@ document.addEventListener("DOMContentLoaded", () => {
 
             //calc
             await window.FinderApi.rendererLog(["", holeName, sectionName, distance]);
-            calcedData = await window.FinderApi.finderConvert(["", ["", holeName, sectionName, topDistance], targetId], "trinity", "linear");
+            const options = {
+              sourceType: "trinity",
+              polationType: "linear",  
+              allowOutside: false
+            };
+            calcedData = await window.FinderApi.depthconverter(["", ["", holeName, sectionName, topDistance], targetId], options);
             await window.FinderApi.rendererLog(calcedData);
             //apply
             document.getElementById("cdInput").value        = Math.round(calcedData.cd * 10) / 10;
@@ -324,7 +344,12 @@ document.addEventListener("DOMContentLoaded", () => {
 
             //calc
             await window.FinderApi.rendererLog(["", holeName, sectionName, distance]);
-            calcedData = await window.FinderApi.finderConvert(["", ["", holeName, sectionName, topDistance], targetId], "trinity", "linear");
+            const options = {
+              sourceType: "trinity",
+              polationType: "linear",  
+              allowOutside: false
+            };
+            calcedData = await window.FinderApi.depthconverter(["", ["", holeName, sectionName, topDistance], targetId], options);
             await window.FinderApi.rendererLog(calcedData);
             //apply
             document.getElementById("cdInput").value        = Math.round(calcedData.cd * 10) / 10;
@@ -346,7 +371,12 @@ document.addEventListener("DOMContentLoaded", () => {
       let cd = parseFloat(document.getElementById("cdInput").value);
 
       //calc 
-      calcedData = await window.FinderApi.finderConvert(["finder_from_cd", cd, targetId], "composite_depth", "linear");
+      const options = {
+        sourceType: "composite_depth",
+        polationType: "linear",  
+        allowOutside: false
+      };
+      calcedData = await window.FinderApi.depthconverter(["finder_from_cd", cd, targetId], options);
       //window.FinderApi.rendererLog(calcedData);
 
       //apply//calc(data[2]);
@@ -385,7 +415,12 @@ document.addEventListener("DOMContentLoaded", () => {
       let efd = parseFloat(document.getElementById("efdInput").value);
 
       //calc
-      calcedData = await window.FinderApi.finderConvert(["finder_from_efd", efd, targetId], "event_free_depth", "linear");
+      const options = {
+        sourceType: "event_free_depth",
+        polationType: "linear",  
+        allowOutside: false
+      };
+      calcedData = await window.FinderApi.depthconverter(["finder_from_efd", efd, targetId], options);
       //await window.FinderApi.rendererLog(calcedData);
 
       //apply
@@ -423,7 +458,12 @@ document.addEventListener("DOMContentLoaded", () => {
       let age = parseFloat(document.getElementById("ageInput").value);
 
       //calc
-      calcedData = await window.FinderApi.finderConvert(["", age, targetId], "age", "linear");
+      const options = {
+        sourceType: "age",
+        polationType: "linear",  
+        allowOutside: false
+      };
+      calcedData = await window.FinderApi.depthconverter(["", age, targetId], options);
       await window.FinderApi.rendererLog(calcedData);
 
       //apply

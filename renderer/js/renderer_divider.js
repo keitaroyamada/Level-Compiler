@@ -243,15 +243,35 @@ document.addEventListener("DOMContentLoaded", () => {
       distUpper = start;
       distLower = start + interval;
     }else if(type == "Event free depth"){
-      const resultUpper = await window.DividerApi.depthConverter(["NoUse", ["NoUse", holeName, sectionName, start], sectionId], "trinity", "linear");
+      let options = {
+        sourceType: "trinity",
+        polationType: "linear",  
+        allowOutside: true
+      };
+      const resultUpper = await window.DividerApi.depthConverter(["NoUse", ["NoUse", holeName, sectionName, start], sectionId], options);
       posUpper = resultUpper.efd;
-      const resultLower = await window.DividerApi.depthConverter(["NoUse", posUpper+interval, sectionId], "event_free_depth", "linear");
+      options = {
+        sourceType: "event_free_depth",
+        polationType: "linear",  
+        allowOutside: true
+      };
+      const resultLower = await window.DividerApi.depthConverter(["NoUse", posUpper+interval, sectionId], options);
       distUpper = resultUpper.distance;
       distLower = resultLower.distance;
     }else if(type == "Age"){
-      const result = await window.DividerApi.depthConverter(["NoUse", ["NoUse", holeName, sectionName, start], sectionId], "trinity", "linear");
+      let options = {
+        sourceType: "trinity",
+        polationType: "linear",  
+        allowOutside: true
+      };
+      const result = await window.DividerApi.depthConverter(["NoUse", ["NoUse", holeName, sectionName, start], sectionId], options);
       posUpper = result.age_mid;
-      const resultLower = await window.DividerApi.depthConverter(["NoUse", posUpper+interval, sectionId], "age", "linear");
+      options = {
+        sourceType: "age",
+        polationType: "linear",  
+        allowOutside: true
+      };
+      const resultLower = await window.DividerApi.depthConverter(["NoUse", posUpper+interval, sectionId], options);
       distUpper = resultUpper.distance;
       distLower = resultLower.distance;
     }
@@ -293,13 +313,23 @@ document.addEventListener("DOMContentLoaded", () => {
         distLower = distLower + interval;
       }else if(type == "Event free depth"){
         posUpper += interval;
-        const resultLower = await window.DividerApi.depthConverter(["NoUse", posUpper, sectionId], "event_free_depth", "linear");
+        const options = {
+          sourceType: "event_free_depth",
+          polationType: "linear",  
+          allowOutside: true
+        };
+        const resultLower = await window.DividerApi.depthConverter(["NoUse", posUpper, sectionId], options);
         
         distUpper = distLower;
         distLower = resultLower.distance;
       }else if(type == "Age"){
         posUpper += interval;
-        const resultLower = await window.DividerApi.depthConverter(["NoUse", posUpper, sectionId], "age", "linear");
+        const options = {
+          sourceType: "age",
+          polationType: "linear",  
+          allowOutside: true
+        };
+        const resultLower = await window.DividerApi.depthConverter(["NoUse", posUpper, sectionId], options);
         
         distUpper = distLower;
         distLower = resultLower.distance;
