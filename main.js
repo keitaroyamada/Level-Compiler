@@ -2797,318 +2797,288 @@ function createMainWIndow() {
       mainWindow.webContents.send("PlotDataOptions", data);
     }    
   });
-  ipcMain.handle("depthConverter", async (_e, dataList, type, allowExtrapolation, method) => {
+  ipcMain.handle("depthConverter", async (_e, data, options) => {
+    //main
+    //data: ["name","depth_data","target_id"] e.g. ["name",[projectName(no use),holeName, sectionName, distance],[null, null, null, null]]
+    //type: "trinity", "composite_depth", "event_free_depth","age"
+    //method(age): "linear"
+    const type = options.sourceType
+    const method = options.polationType;
+    const allowExtrapolation = options.allowOutside;
+
+    let results = {
+      name: null,
+      project: null,
+      hole: null,
+      section: null,
+      distance: null,
+      cd: null,
+      efd: null,
+      dd:null,
+      age_mid: null,
+      age_upper: null,
+      age_lower: null,
+      correlation_rank: null,
+      correlation_model_version: null,
+      event_model_version: null,
+      age_model_version: null,
+      description: null,
+      source_type:null,
+      is_master_depth: false
+    };
 
     if(LCCore.base_project_id){
-      const options = {
-        type: "question",
-        buttons: ["No", "Yes"],
-        defaultId: 0,
-        title: "Converter",
-        message: "Do you really want to convert it? Only the Duo model is loaded. The CD will follow the Duo model.",
-      };
+      const baseIdx = LCCore.search_idx_list[LCCore.base_project_id.toString()];
+      if(LCCore.projects[baseIdx[0]].model_type == "model_type"){
+        results.is_master_depth = true;
+      }        
+    }
 
-      const { response } = await dialog.showMessageBox(converterWindow, options);
+    if (type == "trinity") {
+      //calc each depth 
+      let send_data = [];
+      let td = new Trinity();
+      td.name         = data[0];
+      td.project_name = data[1][0];
+      td.hole_name    = data[1][1];
+      td.section_name = data[1][2];
+      td.distance     = parseFloat(data[1][3]);
+      if(td.hole_name==null||td.section_name==null||td.distance==null) return null;
+      send_data.push(td);
+      let targetId    = data[2];
+
+      //convert depth (listed for function)
+      const cd_list = LCCore.getDepthFromTrinity(targetId, send_data, "composite_depth", allowExtrapolation); //output:[sec id, cd, rank]
+
+      const cd = [];
+      cd.push(cd_list[0][1]);
+      let calcedId = cd_list[0][0];
       
-      if(response===0){
-        console.log(response)
-        return null;
-      }
-    }
-    
-    //main
-    let output = [];
-    progressBar   = progressDialog(converterWindow, "Depth converter", "Now converting...", false);
-    await new Promise(resolve => progressBar.on('ready', resolve));
-    progressBar   = await updateProgress(progressBar, 0, dataList.length);
+      //
+      const efd_list = LCCore.getDepthFromTrinity(targetId, send_data, "event_free_depth", allowExtrapolation); //output:[sec id, efd, rank]
+      const efd = efd_list[0][1];
+      const new_rank = efd_list[0][2];
 
-    for (let i=0; i<dataList.length;i++){
-      progressBar   = await updateProgress(progressBar, i, dataList.length);
-      const data = dataList[i];
+      const dd_list = LCCore.getDepthFromTrinity(targetId, send_data, "drilling_depth", allowExtrapolation); //output:[sec id, efd, rank]
+      const dd = dd_list[0][1];
 
-      //data: ["name","depth_data","target_id"] e.g. ["name",[projectName(no use),holeName, sectionName, distance],[null, null, null, null]]
-      //type: "trinity", "composite_depth", "event_free_depth","age"
-      //method(age): "linear"
-      let results = {
-        name: null,
-        project: null,
-        hole: null,
-        section: null,
-        distance: null,
-        cd: null,
-        efd: null,
-        dd:null,
-        age_mid: null,
-        age_upper: null,
-        age_lower: null,
-        correlation_rank: null,
-        correlation_model_version: null,
-        event_model_version: null,
-        age_model_version: null,
-        description: null,
-        source_type:null,
-        is_master_depth: false
-      };
+      //calc age
+      const age = LCAge.getAgeFromEFD(efd, method);
 
-      if(LCCore.base_project_id){
-        const baseIdx = LCCore.search_idx_list[LCCore.base_project_id.toString()];
-        if(LCCore.projects[baseIdx[0]].model_type == "model_type"){
-          results.is_master_depth = true;
-        }        
-      }
-
-      if (type == "trinity") {
-        //calc each depth 
-        let send_data = [];
-        let td = new Trinity();
-        td.name         = data[0];
-        td.project_name = data[1][0];
-        td.hole_name    = data[1][1];
-        td.section_name = data[1][2];
-        td.distance     = parseFloat(data[1][3]);
-        if(td.hole_name==null||td.section_name==null||td.distance==null) return null;
-        send_data.push(td);
-        let targetId    = data[2];
-
-        //convert depth (listed for function)
-        const cd_list = LCCore.getDepthFromTrinity(targetId, send_data, "composite_depth", allowExtrapolation); //output:[sec id, cd, rank]
-
-        const cd = [];
-        cd.push(cd_list[0][1]);
-        let calcedId = cd_list[0][0];
-        
-        //
-        const efd_list = LCCore.getDepthFromTrinity(targetId, send_data, "event_free_depth", allowExtrapolation); //output:[sec id, efd, rank]
-        const efd = efd_list[0][1];
-        const new_rank = efd_list[0][2];
-
-        const dd_list = LCCore.getDepthFromTrinity(targetId, send_data, "drilling_depth", allowExtrapolation); //output:[sec id, efd, rank]
-        const dd = dd_list[0][1];
-
-        //calc age
-        const age = LCAge.getAgeFromEFD(efd, method);
-
-        //get age model idx
-        let ageIdx = null;
-        LCAge.AgeModels.forEach((a, s) => {
-          if (a.id == LCAge.selected_id) {
-            ageIdx = s;
-          }
-        });
-
-        //get idex
-        let calcedIdx;
-        if(calcedId == null){
-          calcedIdx = null;
-          console.log("MAIN: "+ send_data[0].hole_name +"-"+send_data[0].section_name+"-"+send_data[0].distance+"cm is out of section.");
-        } else {
-          calcedIdx = LCCore.search_idx_list[calcedId.toString()];
-        }       
-
-        //stack
-        results.name     = send_data[0] !== undefined ? send_data[0].name : NaN;
-        results.project  = calcedIdx !== null && calcedIdx !== undefined ? LCCore.projects[calcedIdx[0]].name : NaN;
-        results.hole     = send_data[0] !== undefined ? send_data[0].hole_name : NaN;
-        results.section  = send_data[0] !== undefined ? send_data[0].section_name : NaN;
-        results.distance = send_data[0] !== undefined ? send_data[0].distance : NaN;
-        results.cd  = cd !== null ? cd[0] : NaN;
-        results.efd = efd !== null ? efd : NaN;
-        results.dd  = dd !== null ? dd : NaN;
-        results.age_mid   = age.age.mid   !== null ? age.age.mid   : NaN;
-        results.age_upper = age.age.upper !== null ? age.age.upper : NaN;
-        results.age_lower = age.age.lower !== null ? age.age.lower : NaN;
-        results.correlation_rank = new_rank !== null ? new_rank : NaN;
-        results.correlation_model_version = calcedIdx !== null ? LCCore.projects[calcedIdx[0]].correlation_version : NaN;
-        results.event_model_version       = calcedIdx !== null ? LCCore.projects[calcedIdx[0]].correlation_version : NaN;
-        results.age_model_version         = LCAge.AgeModels[ageIdx] !== undefined ? LCAge.AgeModels[ageIdx].version : NaN;
-        results.description               = "Converted from trinity.";
-        results.source_type = type;
-        results.calc_type = cd_list[0][3];
-      } else if (type == "composite_depth") {
-        //get cd
-        const name     = data[0];
-        const cd       = data[1];
-        const targetId = data[2];
-
-        //get nearest trinity return: [index: , project: , hole: , section: , distance: ]
-        const paseudoTrinity = LCCore.getNearestTrinity(targetId, cd, "composite_depth");
-
-        //calc efd
-        const efd = LCCore.getEFDfromCD(cd);
-
-        //calc age
-        const ageData = LCAge.getAgeFromEFD(efd, method);
-        const age = ageData.age;
-        const ageIdx = ageData.age_idx;
-
-        //stack
-        results.name = name;
-        results.project = paseudoTrinity.project !== null ? paseudoTrinity.project : NaN;
-        results.hole = paseudoTrinity.hole !== null ? paseudoTrinity.hole : NaN;
-        results.section = paseudoTrinity.section !== null ? paseudoTrinity.section : NaN;
-        results.distance = paseudoTrinity.distance !== null ? paseudoTrinity.distance : NaN;
-        results.cd = cd !== null ? cd : NaN;
-        results.efd = efd !== null ? efd : NaN;
-        results.dd  = NaN;
-        results.age_mid = age.mid !== null ? age.mid : NaN;
-        results.age_upper = age.upper !== null ? age.upper : NaN;
-        results.age_lower = age.lower !== null ? age.lower : NaN;
-        results.correlation_rank = 3;
-        results.correlation_model_version = paseudoTrinity.index[0] !== null ? LCCore.projects[paseudoTrinity.index[0]].correlation_version : NaN;
-        results.event_model_version       = paseudoTrinity.index[0] !== null ? LCCore.projects[paseudoTrinity.index[0]].correlation_version : NaN;
-        results.age_model_version         = LCAge.AgeModels[ageIdx] !== undefined ? LCAge.AgeModels[ageIdx].version : NaN;
-        results.description               = "Converted from Composite depth. The trinity is paseudo data.";
-        results.source_type = type;
-        results.calc_type = "paseudo-depth";
-      } else if (type == "event_free_depth") {
-        //get efd
-        const name = data[0];
-        const efd = data[1];
-        const targetId = data[2];
-
-        //get nearest trinity
-        const paseudoTrinity = LCCore.getNearestTrinity(targetId, efd, "event_free_depth");
-
-        //get paseudo cd
-        const cd = LCCore.getCDfromEFD(efd);
-
-        //calc age
-        const ageData = LCAge.getAgeFromEFD(efd, method);
-        const age = ageData.age;
-        const ageIdx = ageData.age_idx;
-
-        //stack
-        results.name = name;
-        results.project = paseudoTrinity.project !== null ? paseudoTrinity.project : NaN;
-        results.hole = paseudoTrinity.hole !== null ? paseudoTrinity.hole : NaN;
-        results.section = paseudoTrinity.section !== null ? paseudoTrinity.section : NaN;
-        results.distance = paseudoTrinity.distance !== null ? paseudoTrinity.distance : NaN;
-        results.cd = cd !== null ? cd : NaN;
-        results.efd = efd !== null ? efd : NaN;
-        results.dd  = NaN;
-        results.age_mid = age.mid !== null ? age.mid : NaN;
-        results.age_upper = age.upper !== null ? age.upper : NaN;
-        results.age_lower = age.lower !== null ? age.lower : NaN;
-        results.correlation_rank = 3;
-        results.correlation_model_version = paseudoTrinity.index[0] !== null ? LCCore.projects[paseudoTrinity.index[0]].correlation_version : NaN;
-        results.event_model_version       = paseudoTrinity.index[0] !== null ? LCCore.projects[paseudoTrinity.index[0]].correlation_version : NaN;
-        results.age_model_version         = LCAge.AgeModels[ageIdx] !== undefined ? LCAge.AgeModels[ageIdx].version : NaN;
-        results.description               = "Converted from Event Free Depth. The trinity and CD are paseudo data.";
-        results.source_type = type;
-        results.calc_type = "paseudo-depth";
-      } else if (type == "drilling_depth") {
-        //NOT RECOMMENDED!!
-        //get cd
-        const name = data[0];
-        const dd = data[1];
-        const targetId = data[2];
-
-        //convertion from drilling depth must be targetId.
-        if (targetId[0] == null || targetId[1] == null || targetId[2] == null){
-          return results;
+      //get age model idx
+      let ageIdx = null;
+      LCAge.AgeModels.forEach((a, s) => {
+        if (a.id == LCAge.selected_id) {
+          ageIdx = s;
         }
+      });
 
-        //get nearest trinity
-        const paseudoTrinity = LCCore.getNearestTrinity(targetId, dd, "drilling_depth");
-        let send_data = [];
-        let td = new Trinity();
-        td.name         = name;
-        td.project_name = paseudoTrinity.project;
-        td.hole_name    = paseudoTrinity.hole;
-        td.section_name = paseudoTrinity.section;
-        td.distance     = paseudoTrinity.distance;
-        send_data.push(td);
-
-        //calc cd
-        const cd_list = LCCore.getDepthFromTrinity(targetId, send_data, "composite_depth"); //output:[sec id, cd]
-        const cd = cd_list[0][1];
-
-        //calc efd
-        const efd_list = LCCore.getDepthFromTrinity(targetId, send_data, "event_free_depth"); //output:[sec id, efd]
-        const efd = efd_list[0][1];
-        const new_rank = efd_list[0][2];
-
-        //calc age
-        const ageData = LCAge.getAgeFromEFD(efd, method);
-        const age = ageData.age;
-        const ageIdx = ageData.age_idx;
-
-        //stack
-        results.name = name;
-        results.hole = paseudoTrinity[0] !== null ? paseudoTrinity[0] : NaN;
-        results.section = paseudoTrinity[1] !== null ? paseudoTrinity[1] : NaN;
-        results.distance = paseudoTrinity[2] !== null ? paseudoTrinity[2] : NaN;
-        results.cd = cd !== null ? cd : NaN;
-        results.efd = efd !== null ? efd : NaN;
-        results.dd  = dd !== null ? dd : NaN;
-        results.age_mid = age.mid !== null ? age.mid : NaN;
-        results.age_upper = age.upper !== null ? age.upper : NaN;
-        results.age_lower = age.lower !== null ? age.lower : NaN;
-        results.correlation_rank = 3;
-        results.correlation_model_version = paseudoTrinity.index[0] !== null ? LCCore.projects[paseudoTrinity.index[0]].correlation_version : NaN;
-        results.event_model_version       = paseudoTrinity.index[0] !== null ? LCCore.projects[paseudoTrinity.index[0]].correlation_version : NaN;
-        results.age_model_version         = LCAge.AgeModels[ageIdx] !== undefined ? LCAge.AgeModels[ageIdx].version : NaN;
-        results.description               = "NOT RECOMMENDED! Converted from Drilling Depth. The trinity, CD, EFD amd Age are paseudo data.";
-        results.source_type = type;
-        results.calc_type = "paseudo-depth";
-      } else if (type == "age") {
-        //get efd
-        const name = data[0];
-        const age = data[1];
-        const targetId = data[2];
-
-        //calc efd
-        const efdData = LCAge.getEFDFromAge(age, method);
-        const efd = efdData.efd.mid;
-
-        //get paseudo cd
-        const cd = LCCore.getCDfromEFD(efd);
-
-        //re-calc age
-        const rage = LCAge.getAgeFromEFD(efd, method);
-
-        //get nearest trinity
-        const paseudoTrinity = LCCore.getNearestTrinity(targetId, efd, "composite_depth");
-
-        //get age model idx
-        let ageIdx = null;
-        LCAge.AgeModels.forEach((a, s) => {
-          if (a.id == LCAge.selected_id) {
-            ageIdx = s;
-          }
-        });
-
-        //stack
-        results.name = name;
-        results.project = paseudoTrinity.project !== null ? paseudoTrinity.project : NaN;
-        results.hole = paseudoTrinity.hole !== null ? paseudoTrinity.hole : NaN;
-        results.section = paseudoTrinity.section !== null ? paseudoTrinity.section : NaN;
-        results.distance = paseudoTrinity.distance !== null ? paseudoTrinity.distance : NaN;
-        results.cd = cd !== null ? cd : NaN;
-        results.efd = efd !== null ? efd : NaN;
-        results.dd  = NaN;
-        results.age_mid = rage.age.mid !== null ? rage.age.mid : NaN;
-        results.age_upper = rage.age.upper !== null ? rage.age.upper : NaN;
-        results.age_lower = rage.age.lower !== null ? rage.age.lower : NaN;
-        results.correlation_rank = 3;
-        results.correlation_model_version = paseudoTrinity.index[0] !== null ? LCCore.projects[paseudoTrinity.index[0]].correlation_version : NaN;
-        results.event_model_version       = paseudoTrinity.index[0] !== null ? LCCore.projects[paseudoTrinity.index[0]].correlation_version : NaN;
-        results.age_model_version         = LCAge.AgeModels[ageIdx] !== undefined ? LCAge.AgeModels[ageIdx].version : NaN;
-        results.description               = "Converted from Age. The trinity and CD are paseudo data.";
-        results.source_type = type;
-        results.calc_type = "paseudo-depth";
+      //get idex
+      let calcedIdx;
+      if(calcedId == null){
+        calcedIdx = null;
+        console.log("MAIN: "+ send_data[0].hole_name +"-"+send_data[0].section_name+"-"+send_data[0].distance+"cm is out of section.");
       } else {
-        results = null;
+        calcedIdx = LCCore.search_idx_list[calcedId.toString()];
+      }       
+
+      //stack
+      results.name     = send_data[0] !== undefined ? send_data[0].name : NaN;
+      results.project  = calcedIdx !== null && calcedIdx !== undefined ? LCCore.projects[calcedIdx[0]].name : NaN;
+      results.hole     = send_data[0] !== undefined ? send_data[0].hole_name : NaN;
+      results.section  = send_data[0] !== undefined ? send_data[0].section_name : NaN;
+      results.distance = send_data[0] !== undefined ? send_data[0].distance : NaN;
+      results.cd  = cd !== null ? cd[0] : NaN;
+      results.efd = efd !== null ? efd : NaN;
+      results.dd  = dd !== null ? dd : NaN;
+      results.age_mid   = age.age.mid   !== null ? age.age.mid   : NaN;
+      results.age_upper = age.age.upper !== null ? age.age.upper : NaN;
+      results.age_lower = age.age.lower !== null ? age.age.lower : NaN;
+      results.correlation_rank = new_rank !== null ? new_rank : NaN;
+      results.correlation_model_version = calcedIdx !== null ? LCCore.projects[calcedIdx[0]].correlation_version : NaN;
+      results.event_model_version       = calcedIdx !== null ? LCCore.projects[calcedIdx[0]].correlation_version : NaN;
+      results.age_model_version         = LCAge.AgeModels[ageIdx] !== undefined ? LCAge.AgeModels[ageIdx].version : NaN;
+      results.description               = "Converted from trinity.";
+      results.source_type = type;
+      results.calc_type = cd_list[0][3];
+    } else if (type == "composite_depth") {
+      //get cd
+      const name     = data[0];
+      const cd       = data[1];
+      const targetId = data[2];
+
+      //get nearest trinity return: [index: , project: , hole: , section: , distance: ]
+      const paseudoTrinity = LCCore.getNearestTrinity(targetId, cd, "composite_depth");
+
+      //calc efd
+      const efd = LCCore.getEFDfromCD(cd);
+
+      //calc age
+      const ageData = LCAge.getAgeFromEFD(efd, method);
+      const age = ageData.age;
+      const ageIdx = ageData.age_idx;
+
+      //stack
+      results.name = name;
+      results.project = paseudoTrinity.project !== null ? paseudoTrinity.project : NaN;
+      results.hole = paseudoTrinity.hole !== null ? paseudoTrinity.hole : NaN;
+      results.section = paseudoTrinity.section !== null ? paseudoTrinity.section : NaN;
+      results.distance = paseudoTrinity.distance !== null ? paseudoTrinity.distance : NaN;
+      results.cd = cd !== null ? cd : NaN;
+      results.efd = efd !== null ? efd : NaN;
+      results.dd  = NaN;
+      results.age_mid = age.mid !== null ? age.mid : NaN;
+      results.age_upper = age.upper !== null ? age.upper : NaN;
+      results.age_lower = age.lower !== null ? age.lower : NaN;
+      results.correlation_rank = 3;
+      results.correlation_model_version = paseudoTrinity.index[0] !== null ? LCCore.projects[paseudoTrinity.index[0]].correlation_version : NaN;
+      results.event_model_version       = paseudoTrinity.index[0] !== null ? LCCore.projects[paseudoTrinity.index[0]].correlation_version : NaN;
+      results.age_model_version         = LCAge.AgeModels[ageIdx] !== undefined ? LCAge.AgeModels[ageIdx].version : NaN;
+      results.description               = "Converted from Composite depth. The trinity is paseudo data.";
+      results.source_type = type;
+      results.calc_type = "paseudo-depth";
+    } else if (type == "event_free_depth") {
+      //get efd
+      const name = data[0];
+      const efd = data[1];
+      const targetId = data[2];
+
+      //get nearest trinity
+      const paseudoTrinity = LCCore.getNearestTrinity(targetId, efd, "event_free_depth");
+
+      //get paseudo cd
+      const cd = LCCore.getCDfromEFD(efd);
+
+      //calc age
+      const ageData = LCAge.getAgeFromEFD(efd, method);
+      const age = ageData.age;
+      const ageIdx = ageData.age_idx;
+
+      //stack
+      results.name = name;
+      results.project = paseudoTrinity.project !== null ? paseudoTrinity.project : NaN;
+      results.hole = paseudoTrinity.hole !== null ? paseudoTrinity.hole : NaN;
+      results.section = paseudoTrinity.section !== null ? paseudoTrinity.section : NaN;
+      results.distance = paseudoTrinity.distance !== null ? paseudoTrinity.distance : NaN;
+      results.cd = cd !== null ? cd : NaN;
+      results.efd = efd !== null ? efd : NaN;
+      results.dd  = NaN;
+      results.age_mid = age.mid !== null ? age.mid : NaN;
+      results.age_upper = age.upper !== null ? age.upper : NaN;
+      results.age_lower = age.lower !== null ? age.lower : NaN;
+      results.correlation_rank = 3;
+      results.correlation_model_version = paseudoTrinity.index[0] !== null ? LCCore.projects[paseudoTrinity.index[0]].correlation_version : NaN;
+      results.event_model_version       = paseudoTrinity.index[0] !== null ? LCCore.projects[paseudoTrinity.index[0]].correlation_version : NaN;
+      results.age_model_version         = LCAge.AgeModels[ageIdx] !== undefined ? LCAge.AgeModels[ageIdx].version : NaN;
+      results.description               = "Converted from Event Free Depth. The trinity and CD are paseudo data.";
+      results.source_type = type;
+      results.calc_type = "paseudo-depth";
+    } else if (type == "drilling_depth") {
+      //NOT RECOMMENDED!!
+      //get cd
+      const name = data[0];
+      const dd = data[1];
+      const targetId = data[2];
+
+      //convertion from drilling depth must be targetId.
+      if (targetId[0] == null || targetId[1] == null || targetId[2] == null){
+        return results;
       }
 
-      output.push(results);
-    }
-    if(progressBar!==null){
-      progressBar = await updateProgress(progressBar, dataList.length,dataList.length);
-      progressBar = null;
+      //get nearest trinity
+      const paseudoTrinity = LCCore.getNearestTrinity(targetId, dd, "drilling_depth");
+      let send_data = [];
+      let td = new Trinity();
+      td.name         = name;
+      td.project_name = paseudoTrinity.project;
+      td.hole_name    = paseudoTrinity.hole;
+      td.section_name = paseudoTrinity.section;
+      td.distance     = paseudoTrinity.distance;
+      send_data.push(td);
+
+      //calc cd
+      const cd_list = LCCore.getDepthFromTrinity(targetId, send_data, "composite_depth"); //output:[sec id, cd]
+      const cd = cd_list[0][1];
+
+      //calc efd
+      const efd_list = LCCore.getDepthFromTrinity(targetId, send_data, "event_free_depth"); //output:[sec id, efd]
+      const efd = efd_list[0][1];
+      const new_rank = efd_list[0][2];
+
+      //calc age
+      const ageData = LCAge.getAgeFromEFD(efd, method);
+      const age = ageData.age;
+      const ageIdx = ageData.age_idx;
+
+      //stack
+      results.name = name;
+      results.hole = paseudoTrinity[0] !== null ? paseudoTrinity[0] : NaN;
+      results.section = paseudoTrinity[1] !== null ? paseudoTrinity[1] : NaN;
+      results.distance = paseudoTrinity[2] !== null ? paseudoTrinity[2] : NaN;
+      results.cd = cd !== null ? cd : NaN;
+      results.efd = efd !== null ? efd : NaN;
+      results.dd  = dd !== null ? dd : NaN;
+      results.age_mid = age.mid !== null ? age.mid : NaN;
+      results.age_upper = age.upper !== null ? age.upper : NaN;
+      results.age_lower = age.lower !== null ? age.lower : NaN;
+      results.correlation_rank = 3;
+      results.correlation_model_version = paseudoTrinity.index[0] !== null ? LCCore.projects[paseudoTrinity.index[0]].correlation_version : NaN;
+      results.event_model_version       = paseudoTrinity.index[0] !== null ? LCCore.projects[paseudoTrinity.index[0]].correlation_version : NaN;
+      results.age_model_version         = LCAge.AgeModels[ageIdx] !== undefined ? LCAge.AgeModels[ageIdx].version : NaN;
+      results.description               = "NOT RECOMMENDED! Converted from Drilling Depth. The trinity, CD, EFD amd Age are paseudo data.";
+      results.source_type = type;
+      results.calc_type = "paseudo-depth";
+    } else if (type == "age") {
+      //get efd
+      const name = data[0];
+      const age = data[1];
+      const targetId = data[2];
+
+      //calc efd
+      const efdData = LCAge.getEFDFromAge(age, method);
+      const efd = efdData.efd.mid;
+
+      //get paseudo cd
+      const cd = LCCore.getCDfromEFD(efd);
+
+      //re-calc age
+      const rage = LCAge.getAgeFromEFD(efd, method);
+
+      //get nearest trinity
+      const paseudoTrinity = LCCore.getNearestTrinity(targetId, efd, "composite_depth");
+
+      //get age model idx
+      let ageIdx = null;
+      LCAge.AgeModels.forEach((a, s) => {
+        if (a.id == LCAge.selected_id) {
+          ageIdx = s;
+        }
+      });
+
+      //stack
+      results.name = name;
+      results.project = paseudoTrinity.project !== null ? paseudoTrinity.project : NaN;
+      results.hole = paseudoTrinity.hole !== null ? paseudoTrinity.hole : NaN;
+      results.section = paseudoTrinity.section !== null ? paseudoTrinity.section : NaN;
+      results.distance = paseudoTrinity.distance !== null ? paseudoTrinity.distance : NaN;
+      results.cd = cd !== null ? cd : NaN;
+      results.efd = efd !== null ? efd : NaN;
+      results.dd  = NaN;
+      results.age_mid = rage.age.mid !== null ? rage.age.mid : NaN;
+      results.age_upper = rage.age.upper !== null ? rage.age.upper : NaN;
+      results.age_lower = rage.age.lower !== null ? rage.age.lower : NaN;
+      results.correlation_rank = 3;
+      results.correlation_model_version = paseudoTrinity.index[0] !== null ? LCCore.projects[paseudoTrinity.index[0]].correlation_version : NaN;
+      results.event_model_version       = paseudoTrinity.index[0] !== null ? LCCore.projects[paseudoTrinity.index[0]].correlation_version : NaN;
+      results.age_model_version         = LCAge.AgeModels[ageIdx] !== undefined ? LCAge.AgeModels[ageIdx].version : NaN;
+      results.description               = "Converted from Age. The trinity and CD are paseudo data.";
+      results.source_type = type;
+      results.calc_type = "paseudo-depth";
+    } else {
+      results = null;
     }
 
-    return output;
+    return results;
   });
   ipcMain.handle("changeEditMode", (_e,mode) => {
     

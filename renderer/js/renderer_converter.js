@@ -260,10 +260,9 @@ document.addEventListener("DOMContentLoaded", () => {
       //get source type
       const sourceType = document.getElementById("cvt_source_type").value;
       let depthMaxIdx = 0;
-      const allowType = document.getElementById("allow_outside_data").checked;
+      const allowOutside = document.getElementById("allow_outside_data").checked;
       
-
-      //make data
+      //make indata
       let indataList = [];
       if (sourceType == "trinity") {
         const nameIdx     = document.getElementById("depth_chooser0").value;
@@ -337,7 +336,7 @@ document.addEventListener("DOMContentLoaded", () => {
       }
 
 
-      //output
+      //output     
       if(output_type == "export"){
         //calc
         let convertedData = [];
@@ -369,105 +368,121 @@ document.addEventListener("DOMContentLoaded", () => {
         convertedData.push(header);
 
         //main
-        if (source_data !== null) {
-          const calcedDataList = await window.ConverterApi.depthConverter(indataList, sourceType, allowType, "linear")
-          if(!calcedDataList){
-            console.log("Conversion was cancelled.");
+        if (source_data === null) {return}
+        //cal depth in main
+        const options = {
+          sourceType: sourceType,
+          polationType: "linear",  
+          allowOutside: allowOutside
+        };
+
+        for(let i=0; i<indataList.length; i++){
+          //calc depth
+          const indata = indataList[i];
+          const calcedData = await window.ConverterApi.depthConverter(indata, options);
+          if(!calcedData){
+            console.log("Conversion was skipped at line: "+i+".");
             document.body.style.cursor = "default"; 
-            return
+            continue
           }
 
-          if(calcedDataList[0].is_master_depth===false){
-            header[5]+=" [DUO]";
-            header[6]+=" [DUO]";
-            header[13]+=" [DUO]";
-            header[14]+=" [DUO]";
-          }else{
-            header[5]+=" [MAIN]";
-            header[6]+=" [MAIN]";
-            header[13]+=" [MAIN]";
-            header[14]+=" [MAIN]";
+          //update header
+          if(i==0){
+            if(calcedData.is_master_depth===false){
+              header[5]+=" [DUO]";
+              header[6]+=" [DUO]";
+              header[13]+=" [DUO]";
+              header[14]+=" [DUO]";
+            }else{
+              header[5]+=" [MAIN]";
+              header[6]+=" [MAIN]";
+              header[13]+=" [MAIN]";
+              header[14]+=" [MAIN]";
+            }
+            if(sourceType !== "trinity"){
+              header[1]+="[PASEUDO]";
+              header[2]+="[PASEUDO]";
+              header[3]+="[PASEUDO]";
+              header[4]+="[PASEUDO]";
+            }
           }
-          if(sourceType !== "trinity"){
-            header[1]+="[PASEUDO]";
-            header[2]+="[PASEUDO]";
-            header[3]+="[PASEUDO]";
-            header[4]+="[PASEUDO]";
-          }
-          
-          for(let i=0;i<calcedDataList.length;i++){
-            const calcedData = calcedDataList[i];
 
-            if(!calcedData){continue}
-
-            //make output array
-            let rowData = [
-              calcedData.name, //data name
-              calcedData.project, //project name
-              calcedData.hole, //hole name
-              calcedData.section, //section name
-              parseFloat(calcedData.distance).toFixed(1), //distance
-              parseFloat(calcedData.cd).toFixed(1), //composite depth
-              parseFloat(calcedData.efd).toFixed(1), //event free depth
-              parseFloat(calcedData.dd).toFixed(1), //drilling depth
-              parseFloat(calcedData.age_mid).toFixed(1), //age mid
-              parseFloat(calcedData.age_upper).toFixed(1), //age upper
-              parseFloat(calcedData.age_lower).toFixed(1), //age lower
-              calcedData.correlation_rank,  //connection rank
-              calcedData.source_type,
-              calcedData.calc_type,
-              calcedData.is_master_depth ? calcedData.correlation_model_version+"[MAIN]":calcedData.correlation_model_version+"[DUO]",
-              calcedData.is_master_depth ? calcedData.event_model_version+"[MAIN]":calcedData.event_model_version+"[DUO]",
-              calcedData.age_model_version,
-              calcedData.description
-            ];
-            
-            
-            convertedData.push(rowData);
-          }
-        }        
-
+          //make output array
+          let rowData = [
+            calcedData.name, //data name
+            calcedData.project, //project name
+            calcedData.hole, //hole name
+            calcedData.section, //section name
+            parseFloat(calcedData.distance).toFixed(1), //distance
+            parseFloat(calcedData.cd).toFixed(1), //composite depth
+            parseFloat(calcedData.efd).toFixed(1), //event free depth
+            parseFloat(calcedData.dd).toFixed(1), //drilling depth
+            parseFloat(calcedData.age_mid).toFixed(1), //age mid
+            parseFloat(calcedData.age_upper).toFixed(1), //age upper
+            parseFloat(calcedData.age_lower).toFixed(1), //age lower
+            calcedData.correlation_rank,  //connection rank
+            calcedData.source_type,
+            calcedData.calc_type,
+            calcedData.is_master_depth ? calcedData.correlation_model_version+"[MAIN]":calcedData.correlation_model_version+"[DUO]",
+            calcedData.is_master_depth ? calcedData.event_model_version+"[MAIN]":calcedData.event_model_version+"[DUO]",
+            calcedData.age_model_version,
+            calcedData.description
+          ];
+                    
+          convertedData.push(rowData);
+        }
+        
         //export
         await window.ConverterApi.cvtExport(convertedData);
         console.log("[Converter]: Converted data is exported.");
       } else if (output_type == "import"){
+        //main convertion
+        if (source_data === null) {return}
+        const options = {
+          sourceType: sourceType,
+          polationType: "linear",  
+          allowOutside: allowOutside
+        };
 
-        if (source_data !== null) {
-          const calcedDataList = await window.ConverterApi.depthConverter(indataList, sourceType, allowType, "linear");
+        //main calc
+        let output = [];
+        for(let i=0; i<indataList.length; i++){
+          //calc depth
+          const indata = indataList[i];
+          const calcedData = await window.ConverterApi.depthConverter(indata, options);
+          if(!calcedData){
+            console.log("Conversion was skipped at line: "+i+".");
+            document.body.style.cursor = "default"; 
+            continue
+          }
 
-          let output = [];
-          for(let i=0;i<calcedDataList.length;i++){
-            let calcedData = calcedDataList[i];
-
-            let header = [];
-            for(let d=depthMaxIdx+1; d<n_c; d++){
-              header.push(source_data[0][d]); //remove header
-            }
-            let values = [];
-            for(let d=depthMaxIdx+1; d<n_c; d++){
-              values.push(source_data[i+1][d]); //remove header
-            }
-            
-            calcedData.data_header = header;
-            calcedData.data_values = values;
-
-            output.push(calcedData);
+          let header = [];
+          for(let d=depthMaxIdx+1; d<n_c; d++){
+            header.push(source_data[0][d]); //remove header
+          }
+          let values = [];
+          for(let d=depthMaxIdx+1; d<n_c; d++){
+            values.push(source_data[i+1][d]); //remove header
           }
           
-          const sendData = {
-            name:"",
-            path:source_path,
-            data:output,
-            send_to:called_from,
-            send_from:"Converter",
-          };
-          console.log(sendData)
+          calcedData.data_header = header;
+          calcedData.data_values = values;
 
-          await window.ConverterApi.sendImportedData(sendData);
-          console.log("[Converter]: Converted data is imported.");
+          output.push(calcedData);
         }
 
-        //colose window
+        const sendData = {
+          name:"",
+          path:source_path,
+          data:output,
+          send_to:called_from,
+          send_from:"Converter",
+        };
+
+        await window.ConverterApi.sendImportedData(sendData);
+        console.log("[Converter]: Converted data is imported.");
+        
+        //colse window
         window.close();
 
       } else {
@@ -476,7 +491,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
       document.body.style.cursor = "default"; 
       //console.log(convertedData);
-    });
+  });
 
   //-------------------------------------------------------------------------------------------
   //-------------------------------------------------------------------------------------------
