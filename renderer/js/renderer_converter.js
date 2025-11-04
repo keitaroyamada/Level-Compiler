@@ -447,15 +447,13 @@ document.addEventListener("DOMContentLoaded", () => {
         };
 
         //main calc
+        const calcedDataList = await window.ConverterApi.depthConverter(indataList, options);
         let output = [];
-        await window.ConverterApi.progressbar("Depth Converter", "Now converting...", false,"converterWindow");
 
-        for(let i=0; i<indataList.length; i++){
-          await window.ConverterApi.updateProgressbar(i, indataList.length);
-
+        for(let i=0; i<calcedDataList.length; i++){
           //calc depth
-          const indata = indataList[i];
-          const calcedData = await window.ConverterApi.depthConverter(indata, options);
+          const calcedData = calcedDataList[i];
+          
           if(!calcedData){
             console.log("Conversion was skipped at line: "+i+".");
             continue
