@@ -207,33 +207,36 @@ class LevelCompilerAge {
       for(let i=0; i<model.ages.length; i++){
         const ageData = model.ages[i];
         num_total_ages ++;
-        if (isNaN(ageData.event_free_depth) || ageData.event_free_depth == null || ageData.event_free_depth == undefined) {
+        
+        if (!Number.isFinite(ageData.event_free_depth)) {
           num_error_efds += 1;
           //console.log(ageData);
         }
-        if (isNaN(ageData.age_mid) || ageData.age_mid == null || ageData.age_mid == undefined) {
-          num_error_ages += 1;
-        }else{
-          //check Contradiction
-          if(i<model.ages.length-1 && model.ages[i+1].age_mid!==null && isNaN(model.ages[i+1].age_mid)==false && model.ages[i+1].age_mid!==undefined){
-            if(ageData.age_mid > model.ages[i+1].age_mid){
-              num_contradiction += 1;
-              model.ages[i+1].reliable = false;
-              this.unreliable_ids.push(model.ages[i+1].id);
 
-              if(this.use_unreliable_data===true){
-                model.ages[i+1].enable = true;
-              }else{
-                model.ages[i+1].enable = false;
-              }
-              //console.log("LCAge: Contradiction is detected between: ",model.ages[i+1].enable,"==", model.ages[i+1].reliable);
-              console.log("LCAge: Contradiction is detected between: ",ageData.name,"==", model.ages[i+1].name);
-            }else{
+        if (!Number.isFinite(ageData.age_mid)) {
+          num_error_ages += 1;
+        }
+        
+        //check Contradiction
+        if(i<model.ages.length-1 && Number.isFinite(ageData.event_free_depth) && Number.isFinite(ageData.age_mid) && Number.isFinite(model.ages[i+1].age_mid)){
+          if(ageData.age_mid > model.ages[i+1].age_mid){
+            num_contradiction += 1;
+            model.ages[i+1].reliable = false;
+            this.unreliable_ids.push(model.ages[i+1].id);
+
+            if(this.use_unreliable_data===true){
               model.ages[i+1].enable = true;
-              model.ages[i+1].reliable = true;
+            }else{
+              model.ages[i+1].enable = false;
             }
+            //console.log("LCAge: Contradiction is detected between: ",model.ages[i+1].enable,"==", model.ages[i+1].reliable);
+            console.log("LCAge: Contradiction is detected between: ",ageData.name,"(",ageData.age_mid,")==", model.ages[i+1].name,"(",model.ages[i+1].age_mid,")");
+          }else{
+            model.ages[i+1].enable = true;
+            model.ages[i+1].reliable = true;
           }
         }
+        
         if (isNaN(ageData.age_upper_1std) || ageData.age_upper_1std == null || ageData.age_upper_1std == undefined) {
           num_error_ages_u += 1;
         }

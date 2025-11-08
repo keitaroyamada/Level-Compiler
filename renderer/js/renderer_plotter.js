@@ -14,6 +14,8 @@ document.addEventListener("DOMContentLoaded", () => {
     const isGrid = true;
     let canvasBaseSize = [100,100]; 
     let depthScale = "composite_depth";
+    let _inDraw = false;
+    let _updateQueued = false;
 
     //-------------------------------------------------------------------------------------------
     //initialise
@@ -313,6 +315,7 @@ document.addEventListener("DOMContentLoaded", () => {
     window.PlotterApi.receive("importedData", async (data) => {
         document.body.style.cursor = "wait"; 
         console.log("[Plotter]: Imported data recieved.");
+
         //unzip
         const cs = new DecompressionStream('gzip');
         const decompressedStream = new Response(
@@ -424,17 +427,18 @@ document.addEventListener("DOMContentLoaded", () => {
     })    
     //============================================================================
     function updateView() {
-        if (vectorObjects == null) {
-          vectorObjects = new p5(p5Sketch);
-          document.getElementById("p5Canvas").style.display = "block";
-          makeP5CanvasBase();
-          vectorObjects.redraw();
-        }else{
-          document.getElementById("p5Canvas").style.display = "block";
-          makeP5CanvasBase();
-          vectorObjects.clear();
-          vectorObjects.redraw();
-        } 
+    if (vectorObjects == null) {
+        vectorObjects = new p5(p5Sketch);
+        vectorObjects.noLoop();
+        requestAnimationFrame(() => {
+        if (vectorObjects && !vectorObjects._inDraw) { vectorObjects.clear(); vectorObjects.redraw(); }
+        });
+        return;
+    }
+    if (vectorObjects._inDraw) return;
+    requestAnimationFrame(() => {
+        if (vectorObjects && !vectorObjects._inDraw) { vectorObjects.clear(); vectorObjects.redraw(); }
+    });
     }
     async function initialiseLCPlotDataCollection(){
         await window.PlotterApi.initialisePlotDataCollection();
@@ -526,6 +530,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
         //draw data vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
         sketch.draw = () => {
+            sketch.clear();
             if(LCPlot !== null ){  
                 sketch.push(); //save
                 sketch.translate(-canvasPos[0], -canvasPos[1]);
@@ -638,8 +643,18 @@ document.addEventListener("DOMContentLoaded", () => {
                     //calc zoom rate                 
                     const x = x0;
                     const y = y0;
-                    const xmin = Math.min(...x.filter(Number.isFinite));
-                    const xmax = Math.max(...x.filter(Number.isFinite));
+                    // Avoid Math.min(...array) / Math.max(...array) for large datasets to prevent
+                    // stack overflow caused by argument spreading. Compute min/max in a single　iteration instead.
+                    //const xmin = Math.min(...x.filter(Number.isFinite));
+                    //const xmax = Math.max(...x.filter(Number.isFinite));
+                    let xmin = Infinity, xmax = -Infinity;
+                    for (let v, i = 0; i < x.length; i++) {
+                    v = x[i];
+                    if (!Number.isFinite(v)) continue;
+                    if (v < xmin) xmin = v;
+                    if (v > xmax) xmax = v;
+                    }
+                    if (xmin === Infinity) { xmin = 0; xmax = 1; } 
                     let dataWidth = xmax-xmin;
                     if(dataWidth==0){
                         dataWidth = 1;
@@ -837,7 +852,13 @@ document.addEventListener("DOMContentLoaded", () => {
         }    
         //draw data ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
         sketch.windowResized = () => {
-            sketch.resizeCanvas(scroller.clientWidth, scroller.clientHeight);
+            //sketch.resizeCanvas(scroller.clientWidth, scroller.clientHeight);
+            if (sketch._resizing) return;
+            const w = scroller.clientWidth, h = scroller.clientHeight;
+            if (w === sketch.width && h === sketch.height) return;
+            sketch._resizing = true;
+            sketch.resizeCanvas(w, h);
+            sketch._resizing = false;
         };
     }
     function sendToRenderer(type){

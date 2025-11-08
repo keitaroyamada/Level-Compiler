@@ -1,5 +1,5 @@
 document.addEventListener("DOMContentLoaded", () => {
- 
+
   //============================================================================================xxxxxxxxxx
   //base properties
   const scroller = document.getElementById("scroller");
@@ -73,7 +73,7 @@ document.addEventListener("DOMContentLoaded", () => {
     objOpts.canvas.shift_x = 0; //[cm]
     objOpts.canvas.shift_y = 100; //[cm]
     objOpts.canvas.bottom_pad = 100; //[cm]
-    objOpts.canvas.buffer_depth = 200; //[cm]
+    objOpts.canvas.buffer_depth = 100; //[cm]
     objOpts.canvas.background_colour = "#ffffff";//"#f4f5f7";//"#f7f7f7"//"#f8fbff";//"#fffdfa";//""white
     objOpts.canvas.target_horizon = false;
     objOpts.canvas.is_grid = false;
@@ -796,13 +796,222 @@ document.addEventListener("DOMContentLoaded", () => {
   //============================================================================================
   window.LCapi.receive("PlotDataOptions", async (data) => {
     console.log("[Renderer]: Plot options are received.",data)
+    LCPlot.draw_collections = [];
     if(data.emitType=="new"){
       //await loadPlotData();//latest ver is load plot data at the same time of loading plotter
     }
 
+    //get plotter options
     objOpts.plot.selected_options = data.data;
     objOpts.plot.isVisible = true;
     document.getElementById("bt_chart").style.backgroundColor = "#ccc";
+
+    //calc plotvaluse
+    if(objOpts.plot.selected_options !== null && LCPlot.data_collections.length>0){
+      // clac each datasets
+      const selectedList = objOpts.plot.selected_options;
+      for(let t=0; t< selectedList.length;t++){
+        const target = selectedList[t];           
+            
+        //check draw
+        if(target.isDraw == false){
+          continue
+        }
+
+        //main
+        //get idx
+        let colIdx = null;
+        LCPlot.data_collections.forEach((c,i)=>{
+          if(c.id == target.collectionId){
+              colIdx = i;
+          }
+        })
+        if(colIdx==null){
+          continue
+        }
+
+        //get data
+        let nIdx = null;
+        let dIdx = null;
+        LCPlot.data_collections[colIdx].datasets.forEach((d,i)=>{
+          if(d.id == target.numeratorId){
+            nIdx = i;
+          }
+          if(d.id == target.denominatorId){
+            dIdx = i;
+          }
+        })
+        
+        if(nIdx==null && dIdx==null){
+          continue
+        }
+
+        //calc values        
+        const numeratorDataSeries   = (nIdx !== null) ? LCPlot.data_collections[colIdx].datasets[nIdx] : null;
+        const denominatorDataSeries = (dIdx !== null) ? LCPlot.data_collections[colIdx].datasets[dIdx] : null;    
+
+        const checkIdx = (nIdx!==null ) ? nIdx:dIdx;    
+        let minNumDno = Infinity;
+        let maxNumDno = -Infinity;
+
+        //initiarize
+        let drawDataset = {
+          name:"",
+          unit:"",
+          x_max_global: -Infinity,
+          x_min_global: Infinity,
+          
+          options: target,
+          data: {},
+        };
+        LCCore.projects.forEach(p=>{
+          p.holes.forEach(h=>{
+            drawDataset.data[h.name] = {
+              data:[],
+              x_max_hole: null,
+              x_min_hole: null,
+              x_max_hole_idx: null,
+              x_min_hole_idx: null,
+              x_zero_hole: null,
+              pos_x_max_hole: null,
+              pos_x_min_hole: null,
+            };
+          })
+        })
+
+        for(let d=0; d<LCPlot.data_collections[colIdx].datasets[checkIdx].data_series.length; d++){          
+          //get target data
+          const drawData = {      
+            type: "data", //used            
+            x: NaN,  //used  
+            min_x: NaN, //global min
+            max_x: NaN, //global max
+            original_depth_type: "",//used
+            hole_name: null,
+            section_name: null,
+
+            amplification_x: 1,//used
+            amplification_y: 1, //used 
+
+            trinity: null,
+            drilling_depth:null,
+            composite_depth:null,
+            event_free_depth: null,
+            age: null,
+
+            pos_canvas_x: null,
+            pos_canvas_y: null,
+          };
+          
+          //calc
+          let numeratorData = null;
+          let denominatorData = null;
+          let numdenoData = null;
+          let holeName = null;
+          let sectionName = null;
+          if(nIdx !== null){              
+            if(dIdx !== null){
+              //case n/d
+              numeratorData   = numeratorDataSeries.data_series[d];
+              denominatorData = denominatorDataSeries.data_series[d];
+              const numeratorValue  = (Number.isFinite(numeratorData.data)&&numeratorData.data!==null) ? numeratorData.data : NaN;
+              const denominatorValue= (Number.isFinite(denominatorData.data)&&denominatorData.data!==null) ? denominatorData.data : NaN;
+             
+              numdenoData = numeratorValue/denominatorValue;       
+              holeName =  numeratorData.original_depth_type=="trinity" ? numeratorData.trinity.hole_name : null; 
+              sectionName =  numeratorData.original_depth_type=="trinity" ? numeratorData.trinity.section_name : null;                          
+            }else{
+              // case n/1
+              numeratorData   = numeratorDataSeries.data_series[d];
+              const numeratorValue  = (Number.isFinite(numeratorData.data)&&numeratorData.data!==null) ? numeratorData.data : NaN;
+              
+              numdenoData = numeratorValue/1;  
+              holeName =  numeratorData.original_depth_type=="trinity" ? numeratorData.trinity.hole_name : null;
+              sectionName =  numeratorData.original_depth_type=="trinity" ? numeratorData.trinity.section_name : null; 
+            }
+          }else{
+            //case 1/d
+            denominatorData = denominatorDataSeries.data_series[d];
+            const denominatorValue= (Number.isFinite(denominatorData.data)&&denominatorData.data!==null) ? denominatorData.data : NaN;
+            
+            numdenoData = 1/denominatorValue;  
+            holeName =  denominatorData.original_depth_type=="trinity" ? denominatorData.trinity.hole_name : null;
+            sectionName =  numeratorData.original_depth_type=="trinity" ? numeratorData.trinity.section_name : null; 
+          }
+
+          //apply values
+          drawData.x = numdenoData;
+          drawData.original_depth_type = numeratorData.original_depth_type
+          drawData.trinity  = numeratorData.trinity;
+          drawData.drilling_depth   = numeratorData.drilling_depth;
+          drawData.composite_depth  = numeratorData.composite_depth;
+          drawData.event_free_depth = numeratorData.event_free_depth;
+          drawData.age = numeratorData.age;
+          drawData.hole_name = holeName;
+          drawData.section_name = sectionName;
+
+          if(numdenoData>drawDataset.x_max_global){
+            drawDataset.x_max_global = numdenoData;
+          }
+
+          if(numdenoData<drawDataset.x_min_global){
+            drawDataset.x_min_global = numdenoData;
+          }
+
+          //add
+          
+          drawDataset.data[holeName].data.push(drawData);
+        }
+        //update unit
+        drawDataset.unit  = numeratorDataSeries !== null ? numeratorDataSeries.unit : "" + "/" + denominatorDataSeries !== null ? denominatorDataSeries.unit : "";
+        drawDataset.name  = numeratorDataSeries !== null ? numeratorDataSeries.name : "" + "/" + denominatorDataSeries !== null ? denominatorDataSeries.name : "";   
+        
+        //search max/min
+        let globalMax = -Infinity;
+        let globalMin = Infinity;
+        for (const holeName in drawDataset.data) {
+          let holeMax = -Infinity;
+          let holeMin = Infinity;
+          let holeMaxIdx = 0;
+          let holeMinIdx = 0;
+          drawDataset.data[holeName].data.forEach((d, idx)=>{
+            if(d.x>holeMax){
+              holeMax = d.x;
+              holeMaxIdx = idx;
+            }
+            if(d.x<holeMin){
+              holeMin = d.x;
+              holeMinIdx = idx;
+            }
+          });
+
+          drawDataset.data[holeName].x_max_hole = Number.isFinite(holeMax) ? holeMax : null;
+          drawDataset.data[holeName].x_min_hole = Number.isFinite(holeMin) ? holeMin : null;
+          drawDataset.data[holeName].x_max_hole_idx = holeMaxIdx;
+          drawDataset.data[holeName].x_min_hole_idx = holeMinIdx;
+
+          if(holeMax>globalMax){
+            globalMax = holeMax;
+          }
+          if(holeMin<globalMin){
+            globalMin = holeMin;
+          }
+        }
+        
+        drawDataset.x_max_global = globalMax;
+        drawDataset.x_min_global = globalMin;
+        for (const holeName in drawDataset.data) {
+          drawDataset.data[holeName].data.forEach(d=>{
+            d.min_x = globalMin;
+            d.max_x = globalMax;
+          })
+        }
+
+        LCPlot.draw_collections.push(drawDataset);
+      }
+    }
+          
+    console.log("[Renderer]: Plot data is loaded.")
     updateView();
   });
   //============================================================================================
@@ -5353,7 +5562,7 @@ document.addEventListener("DOMContentLoaded", () => {
       }
 
       //==========================================================================================
-      //draw age points
+      //draw age points      
       if (LCPlot !== null && LCPlot.age_collections.length > 0) {
         let age_plot_idx = null;
         LCPlot.age_collections.forEach((a, idx) => {
@@ -5389,6 +5598,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
             const posX = result.pos_canvas_x;
             const posY = result.pos_canvas_y;
+
             //check inside
             const age_rect = {
               x: posX,
@@ -5446,497 +5656,170 @@ document.addEventListener("DOMContentLoaded", () => {
       
       //==========================================================================================
       //==========================================================================================
-      //draw data points
+      //draw data points     //0000000000000000000000000000
       if(objOpts.plot.isVisible == true){
         if(objOpts.plot.selected_options !== null){
           sketch.push();
 
-          const selectedList = objOpts.plot.selected_options;
-          for(let t=0; t< selectedList.length;t++){
-            const target = selectedList[t];           
+          for(let t=0; t<LCPlot.draw_collections.length; t++){
+            const drawDataset = LCPlot.draw_collections[t];
+            if(!drawDataset.options.isDraw) continue
+
+            //get inside data
+            const scrollerTopRealScale   = (scroller.scrollTop - pad_y) / yMag - shift_y;//cm
+            const scrollerBotRealScale   = (scroller.scrollTop + window.innerHeight - pad_y) / yMag - shift_y;//cm
+            //const scrollerLeftRealScale  = (scroller.scrollLeft - pad_x) / xMag - shift_x;
+            //const scrollerRightRealScale = (scroller.scrollLeft + window.innerWidth - pad_x) / xMag - shift_x;            
             
-            //check draw
-            if(target.isDraw == false){
+            //draw plot--------------------------------------------------------------------------------------------
+            for(let holeName in drawDataset.data){
+              const pDataList = drawDataset.data[holeName].data;
+              
+              if(pDataList.length==0){
                 continue
-            }
-  
-            //main
-            //get idx
-            let colIdx = null;
-            LCPlot.data_collections.forEach((c,i)=>{
-                if(c.id == target.collectionId){
-                    colIdx = i;
-                }
-            })
-            if(colIdx==null){
-                continue
-            }
-  
-            //get data
-            let nIdx = null;
-            let dIdx = null;
-            LCPlot.data_collections[colIdx].datasets.forEach((d,i)=>{
-                if(d.id == target.numeratorId){
-                    nIdx = i;
-                }
-                if(d.id == target.denominatorId){
-                    dIdx = i;
-                }
-            })
-            
-            if(nIdx==null && dIdx==null){
-                continue
-            }
+              }                
 
-            //calc draw positions
-            let xoffset = 0;
-            if(objOpts.plot.on_section == false){
-              xoffset = objOpts.section.width;
-            };
+              //get position
+              const holeMaxPos = getPlotPosiotion( pDataList[drawDataset.data[holeName].x_max_hole_idx], LCCore, objOpts);
+              const holeMinPos = getPlotPosiotion( pDataList[drawDataset.data[holeName].x_min_hole_idx], LCCore, objOpts);
 
-            let drawPositions = {
-              name:"",
-              unit:"",
-              max_x:NaN,
-              min_x:NaN,
-              pos_max_x:NaN,
-              pos_min_x:NaN,            
-              data:{
-                global:{
-                  data:[],
-                  max_x:NaN,
-                  min_x:NaN,
-                  hole_max_x:NaN,
-                  hole_min_x:NaN,
-                  hole_zero_x:NaN,
-                },
-              },//stack each hole data
-            };
-            LCCore.projects.forEach(tempp=>{
-              tempp.holes.forEach(temph=>{
-                drawPositions.data[temph.id.toString()] = {data:[],max_x:NaN,min_x:NaN,hole_max_x:NaN,hole_min_x:NaN,hole_zero_x:NaN};
-              })
-            })
-
-            if(nIdx!==null && dIdx!==null){
-              //case numerator/denominator
-
-              //get original data
-              const numeratorData   = LCPlot.data_collections[colIdx].datasets[nIdx];
-              const denominatorData = LCPlot.data_collections[colIdx].datasets[dIdx];
-              const numdenoData = numeratorData.data_series.map((val,idx)=>val.data / denominatorData.data_series[idx].data);
-              const minNumDno = Math.min(...numdenoData.filter(val=>val!==null&&!isNaN(val)&&val!==Infinity&&val!==-Infinity));
-              const maxNumDno = Math.max(...numdenoData.filter(val=>val!==null&&!isNaN(val)&&val!==Infinity&&val!==-Infinity));
-                            
-              const dataMin = minNumDno;
-              const dataMax = maxNumDno;
-              drawPositions.max_x = dataMax;
-              drawPositions.min_x = dataMin;
-              drawPositions.unit  = numeratorData.unit + "/" + denominatorData.unit;
-              drawPositions.name  = numeratorData.name + "/" + denominatorData.name;
-              
-              for(let i=0; i<numeratorData.data_series.length;i++){
-                //get hole name
-                let holeName = "global";
-                if(numeratorData.data_series[i].original_depth_type=="trinity"){
-                  LCCore.projects.forEach(tempp=>{tempp.holes.forEach(temph=>{
-                    if(temph.name == numeratorData.data_series[i].trinity.hole_name){
-                      holeName = temph.id.toString();//at this point, different prroject but same hole is not supported
-                    }
-                  })})                  
-                }
-
-                //get plot position
-                let pData = {
-                  type: "data", //used
-                  amplification_x: (objOpts.hole.width / 2) * target.amplification / (dataMax - dataMin),//used
-                  amplification_y: 1, //used
-                  original_depth_type: numeratorData.data_series[i].original_depth_type,//used
-      
-                  x: numeratorData.data_series[i].data / denominatorData.data_series[i].data, //used
-                  min_x: dataMin,
-      
-                  hole_name: numeratorData.data_series[i].original_depth_type=="trinity" ? numeratorData.data_series[i].trinity.hole_name : null, //used
-                  section_name: numeratorData.data_series[i].original_depth_type=="trinity" ? numeratorData.data_series[i].trinity.section_name : null,
-                  distance: numeratorData.data_series[i].original_depth_type=="trinity" ? numeratorData.data_series[i].trinity.distance : null,
-                  composite_depth: numeratorData.data_series[i].composite_depth,//used
-                  evemnt_free_depth: numeratorData.data_series[i].event_free_depth,//used
-                  age: numeratorData.data_series[i].age,//used
-                }  
-
-                //get position
-                let result = getPlotPosiotion( pData, LCCore, objOpts);
-
-                if(isNaN(drawPositions.data[holeName].hole_max_x) || drawPositions.data[holeName].hole_max_x < result.pos_canvas_x){
-                  drawPositions.data[holeName].hole_max_x = result.pos_canvas_x;
-                  drawPositions.data[holeName].max_x      = result.original_x;
-                }
-                if(isNaN(drawPositions.data[holeName].hole_min_x) || drawPositions.data[holeName].hole_min_x > result.pos_canvas_x){
-                  drawPositions.data[holeName].hole_min_x = result.pos_canvas_x;
-                  drawPositions.data[holeName].min_x      = result.original_x;
-                }
-                //get 0 position
-                if(isNaN(drawPositions.data[holeName].hole_zero_x)){
-                  pData.x = 0;
-                  const zeroResult = getPlotPosiotion( pData, LCCore, objOpts);
-                  drawPositions.data[holeName].hole_zero_x = zeroResult.pos_canvas_x;
-                }
-
-                //add plot list
-                drawPositions.data[holeName].data.push(result);
-
-                //
-                if(drawPositions.data[holeName].data.length>1){
-                  const prevSectionName = drawPositions.data[holeName].data[drawPositions.data[holeName].data.length-2].section_name;
-
-                  if(prevSectionName !== pData.section_name){
-                    //different section, add separator
-                    result.original_x = NaN;
-                    result.original_y = NaN;
-                    result.pos_canvas_x = NaN;
-                    result.pos_canvas_y = NaN;
-                    drawPositions.data[holeName].data.push(result);
-                  }
-                }
-              }
-             
-              
-            }else if(nIdx!==null){
-              //case numerator
-              //get original data
-              const numeratorData   = LCPlot.data_collections[colIdx].datasets[nIdx];
-
-              const minNum = Math.min(...numeratorData.data_series.filter(value => (!isNaN(value.data) && value.data!==null)).map(value => value.data));
-              const maxNum = Math.max(...numeratorData.data_series.filter(value => (!isNaN(value.data) && value.data!==null)).map(value => value.data));
-              const dataMin = minNum;
-              const dataMax = maxNum;
-              drawPositions.max_x = dataMax;
-              drawPositions.min_x = dataMin;
-              drawPositions.unit  = numeratorData.unit;
-              drawPositions.name  = numeratorData.name;
-              
-              for(let i=0; i<numeratorData.data_series.length;i++){
-                //get hole name
-                let holeName = "global";
-                if(numeratorData.data_series[i].original_depth_type=="trinity"){
-                  LCCore.projects.forEach(tempp=>{tempp.holes.forEach(temph=>{
-                    if(temph.name == numeratorData.data_series[i].trinity.hole_name){
-                      holeName = temph.id.toString();//at this point, different prroject but same hole is not supported
-                    }
-                  })})                  
-                }
-
-                //get plot position
-                let pData = {
-                  type: "data", //used
-                  amplification_x: (objOpts.hole.width / 2) * target.amplification / (dataMax - dataMin),//used
-                  amplification_y: 1, //used
-                  original_depth_type: numeratorData.data_series[i].original_depth_type,//used
-      
-                  x: numeratorData.data_series[i].data, //used
-                  min_x: dataMin,
-      
-                  hole_name: numeratorData.data_series[i].original_depth_type=="trinity" ? numeratorData.data_series[i].trinity.hole_name : null, //used
-                  section_name: numeratorData.data_series[i].original_depth_type=="trinity" ? numeratorData.data_series[i].trinity.section_name : null,
-                  distance: numeratorData.data_series[i].original_depth_type=="trinity" ? numeratorData.data_series[i].trinity.distance : null,
-                  composite_depth: numeratorData.data_series[i].composite_depth,//used
-                  evemnt_free_depth: numeratorData.data_series[i].event_free_depth,//used
-                  age: numeratorData.data_series[i].age,//used
-                }  
-
-                //get position
-                let result = getPlotPosiotion( pData, LCCore, objOpts);
-
-                if(isNaN(drawPositions.data[holeName].hole_max_x) || drawPositions.data[holeName].hole_max_x < result.pos_canvas_x){
-                  drawPositions.data[holeName].hole_max_x = result.pos_canvas_x;
-                  drawPositions.data[holeName].max_x      = result.original_x;
-                }
-                if(isNaN(drawPositions.data[holeName].hole_min_x) || drawPositions.data[holeName].hole_min_x > result.pos_canvas_x){
-                  drawPositions.data[holeName].hole_min_x = result.pos_canvas_x;
-                  drawPositions.data[holeName].min_x      = result.original_x;
-                }
-
-                //get 0 position
-                if(isNaN(drawPositions.data[holeName].hole_zero_x)){
-                  pData.x = 0;
-                  const zeroResult = getPlotPosiotion( pData, LCCore, objOpts);
-                  drawPositions.data[holeName].hole_zero_x = zeroResult.pos_canvas_x;
-                }
-
-                //add plot list
-                drawPositions.data[holeName].data.push(result);
-
-                //
-                if(drawPositions.data[holeName].data.length>1){
-                  const prevSectionName = drawPositions.data[holeName].data[drawPositions.data[holeName].data.length-2].section_name;
-
-                  if(prevSectionName !== pData.section_name){
-                    //different section, add separator
-                    result.original_x = NaN;
-                    result.original_y = NaN;
-                    result.pos_canvas_x = NaN;
-                    result.pos_canvas_y = NaN;
-                    drawPositions.data[holeName].data.push(result);
-                  }
-                }
-              }
-            }else if(dIdx!==null){
-              //case 1/denominator
-
-              //get original data
-              const denominatorData = LCPlot.data_collections[colIdx].datasets[dIdx];
-
-              const minDno = Math.min(...denominatorData.data_series.filter(value => (!isNaN(value.data) && value.data!==null)).map(value => 1 / value.data));
-              const maxDno = Math.max(...denominatorData.data_series.filter(value => (!isNaN(value.data) && value.data!==null)).map(value => 1 / value.data));
-
-              const dataMin = minDno;
-              const dataMax = maxDno;
-              drawPositions.max_x = dataMax;
-              drawPositions.min_x = dataMin;
-              drawPositions.unit  = denominatorData.unit;
-              drawPositions.name  = denominatorData.name;
-              
-              for(let i=0; i<denominatorData.data_series.length;i++){
-                //get hole name
-                let holeName = "global";
-                if(denominatorData.data_series[i].original_depth_type=="trinity"){
-                  LCCore.projects.forEach(tempp=>{tempp.holes.forEach(temph=>{
-                    if(temph.name == denominatorData.data_series[i].trinity.hole_name){
-                      holeName = temph.id.toString();//at this point, different prroject but same hole is not supported
-                    }
-                  })})                  
-                }
-
-                //get plot position
-                let pData = {
-                  type: "data", //used
-                  amplification_x: (objOpts.hole.width / 2) * target.amplification / (dataMax - dataMin),//used
-                  amplification_y: 1, //used
-                  original_depth_type: denominatorData.data_series[i].original_depth_type,//used
-      
-                  x: 1 / denominatorData.data_series[i].data, //used
-                  min_x: dataMin,
-      
-                  hole_name: denominatorData.data_series[i].original_depth_type=="trinity" ? denominatorData.data_series[i].trinity.hole_name : null, //used
-                  section_name: denominatorData.data_series[i].original_depth_type=="trinity" ? denominatorData.data_series[i].trinity.section_name : null,
-                  distance: denominatorData.data_series[i].original_depth_type=="trinity" ? denominatorData.data_series[i].trinity.distance : null,
-                  composite_depth: denominatorData.data_series[i].composite_depth,//used
-                  evemnt_free_depth: denominatorData.data_series[i].event_free_depth,//used
-                  age: denominatorData.data_series[i].age,//used
-                }  
-
-                //get position
-                let result = getPlotPosiotion( pData, LCCore, objOpts);
-
-                if(isNaN(drawPositions.data[holeName].hole_max_x) || drawPositions.data[holeName].hole_max_x < result.pos_canvas_x){
-                  drawPositions.data[holeName].hole_max_x = result.pos_canvas_x;
-                  drawPositions.data[holeName].max_x      = result.original_x;
-                }
-                if(isNaN(drawPositions.data[holeName].hole_min_x) || drawPositions.data[holeName].hole_min_x > result.pos_canvas_x){
-                  drawPositions.data[holeName].hole_min_x = result.pos_canvas_x;
-                  drawPositions.data[holeName].min_x      = result.original_x;
-                }
-                //get 0 position
-                if(isNaN(drawPositions.data[holeName].hole_zero_x)){
-                  pData.x = 0;
-                  const zeroResult = getPlotPosiotion( pData, LCCore, objOpts);
-                  drawPositions.data[holeName].hole_zero_x = zeroResult.pos_canvas_x;
-                }
-
-                //add plot list
-                drawPositions.data[holeName].data.push(result);
-
-                //
-                if(drawPositions.data[holeName].data.length>1){
-                  const prevSectionName = drawPositions.data[holeName].data[drawPositions.data[holeName].data.length-2].section_name;
-
-                  if(prevSectionName !== pData.section_name){
-                    //different section, add separator
-                    result.original_x = NaN;
-                    result.original_y = NaN;
-                    result.pos_canvas_x = NaN;
-                    result.pos_canvas_y = NaN;
-                    drawPositions.data[holeName].data.push(result);
-                  }
-                }
-              }
-
-
-
-            }
-
-            drawPositions.pos_max_x = Math.max(...Object.values(drawPositions.data).map(item=>item.hole_max_x).filter(value => !isNaN(value)));
-            drawPositions.pos_min_x = Math.min(...Object.values(drawPositions.data).map(item=>item.hole_min_x).filter(value => !isNaN(value)));
-
-            //draw plot
-            if(target.plotType =="line"){
-              for(let holeKey in drawPositions.data){
-                const posData = drawPositions.data[holeKey].data;
-                if(posData.length==0){
+              for(let i=0; i<pDataList.length;i++){
+                if((drawDataset.options.plotType =="line" || drawDataset.options.plotType =="bar") && i==pDataList.length-1){
                   continue
                 }
 
-                //if data exist
-                sketch.strokeWeight(1);
-                sketch.stroke(target.colour);
-                for(let i=0; i<posData.length-1;i++){
-                  //check is draw
-                  const data_rect = {
-                    x: posData[i].pos_canvas_x,
-                    y: posData[i].pos_canvas_y,
-                    width: posData[i+1].pos_canvas_x-posData[i].pos_canvas_x,
-                    height: posData[i+1].pos_canvas_y-posData[i].pos_canvas_y,
-                  };
-                  if (!isInside(view_rect, data_rect, objOpts.canvas.buffer_depth * yMag)) {
-                    continue;
-                  } 
-                  //draw
+                //check inside
+                if (scrollerTopRealScale > pDataList[i].composite_depth + objOpts.canvas.buffer_depth * yMag || scrollerBotRealScale < pDataList[i].composite_depth - objOpts.canvas.buffer_depth * yMag) {
+                  continue;
+                } 
+
+                //calc plot positions
+                //current 
+                pDataList[i].amplification_x   = (objOpts.hole.width / 2) * drawDataset.options.amplification / (drawDataset.x_max_global - drawDataset.x_min_global);
+                pDataList[i].amplification_y   = 1;
+                const resUpper = getPlotPosiotion( pDataList[i], LCCore, objOpts);
+                pDataList[i].pos_canvas_x = resUpper.pos_canvas_x;
+                pDataList[i].pos_canvas_y = resUpper.pos_canvas_y; 
+
+                //next(for line)
+                if(i<pDataList.length-1){
+                  pDataList[i+1].amplification_x = (objOpts.hole.width / 2) * drawDataset.options.amplification / (drawDataset.x_max_global - drawDataset.x_min_global);
+                  pDataList[i+1].amplification_y = 1;
+                  const resLower = getPlotPosiotion( pDataList[i+1], LCCore, objOpts);
+                  if(pDataList[i].section_name == pDataList[i+1].section_name){
+                    pDataList[i+1].pos_canvas_x = resLower.pos_canvas_x;
+                    pDataList[i+1].pos_canvas_y = resLower.pos_canvas_y;
+                  }else{
+                    pDataList[i+1].pos_canvas_x = NaN;
+                    pDataList[i+1].pos_canvas_y = NaN;
+                  }    
+                }              
+
+                //draw
+                if(drawDataset.options.plotType == "line"){
+                  sketch.strokeWeight(1);
+                  sketch.stroke(drawDataset.options.colour);
                   sketch.line(
-                    posData[i].pos_canvas_x,
-                    posData[i].pos_canvas_y,
-                    posData[i+1].pos_canvas_x,
-                    posData[i+1].pos_canvas_y,
-                  )
-                }
-
-              }
-            }else if(target.plotType == "scatter"){
-              sketch.push();
-              sketch.noStroke();
-              sketch.fill(target.colour);
-               
-              for(let holeKey in drawPositions.data){
-                const posData = drawPositions.data[holeKey].data;
-                if(posData.length==0){
-                  continue
-                }
-
-                //if data exist
-                sketch.strokeWeight(1);
-                sketch.stroke(target.colour);
-                for(let i=0; i<posData.length-1;i++){
-                  //check is draw
-                  const data_rect = {
-                    x: posData[i].pos_canvas_x,
-                    y: posData[i].pos_canvas_y,
-                    width: posData[i+1].pos_canvas_x-posData[i].pos_canvas_x,
-                    height: posData[i+1].pos_canvas_y-posData[i].pos_canvas_y,
-                  };
-                  if (!isInside(view_rect, data_rect, objOpts.canvas.buffer_depth * yMag)) {
-                    continue;
-                  } 
-                  //draw
+                    pDataList[i].pos_canvas_x,
+                    pDataList[i].pos_canvas_y,
+                    pDataList[i+1].pos_canvas_x,
+                    pDataList[i+1].pos_canvas_y,
+                  )              
+                }else if(drawDataset.options.plotType == "scatter"){
+                  sketch.noStroke();
+                  sketch.fill(drawDataset.options.colour);
                   sketch.ellipse(
-                    posData[i].pos_canvas_x,
-                    posData[i].pos_canvas_y,
+                    pDataList[i].pos_canvas_x,
+                    pDataList[i].pos_canvas_y,
                     3
-                ); 
-                }
-              }
-              sketch.pop();              
-            }else if(target.plotType == "bar"){
-              sketch.push()
-              const binWidth = 4;
+                  );
+                }else if(drawDataset.options.plotType == "bar"){
+                  //get 0 position
+                  if(drawDataset.data[holeName].x_zero_hole == null){
+                    const zeroData = drawDataset.data[holeName].data[0];
+                    zeroData.x = 0;
+                    const zeroResult = getPlotPosiotion(zeroData, LCCore, objOpts);
+                    drawDataset.data[holeName].x_zero_hole = zeroResult.pos_canvas_x;
+                  }
 
-              for(let holeKey in drawPositions.data){
-                const posHoleData = drawPositions.data[holeKey];
-                const posData = posHoleData.data;
-                if(posData.length==0){
-                  continue
-                }
+                  sketch.strokeWeight(1);
+                  sketch.stroke(drawDataset.options.colour);
+                  sketch.fill(drawDataset.options.colour);
 
-                //if data exist
-                sketch.noStroke();
-                sketch.fill(target.colour);
-                for(let i=0; i<posData.length;i++){
-                  //check is draw
-                  const data_rect = {
-                    x: posData[i].pos_canvas_x,
-                    y: posData[i].pos_canvas_y,
-                    width: posHoleData.hole_max_x - posHoleData.hole_min_x,
-                    height: binWidth,
-                  };
+                  let rectX0 = drawDataset.data[holeName].x_zero_hole;//hole_min_x
 
-                  if (!isInside(view_rect, data_rect, objOpts.canvas.buffer_depth * yMag)) {
-                    continue;
-                  } 
-
-                  let rectX0 = drawPositions.data[holeKey].hole_zero_x;//hole_min_x
-
-                  if(drawPositions.max_x < 0){
-                    rectX0 = drawPositions.data[holeKey].hole_max_x;
+                  if(drawDataset.x_max_global < 0){
+                    rectX0 = drawDataset.data[holeName].x_max_hole;
                   }
                   /*
-                  if(drawPositions.min_x > 0){
-                    rectX0 = drawPositions.data[holeKey].hole_min_x;
+                  if(drawDataset.x_min_global > 0){
+                    rectX0 = drawDataset.data[holeName].x_min_hole;
                   }
-                    */
-
-                  let rectX1 = posData[i].pos_canvas_x;
-                  let rectY0 = posData[i].pos_canvas_y - binWidth/2;
-                  let rectY1 = posData[i].pos_canvas_y + binWidth/2;
+                  */
+                  const binWidth = 4;
+                  let rectX1 = pDataList[i].pos_canvas_x;
+                  let rectY0 = pDataList[i].pos_canvas_y - binWidth/2;
+                  let rectY1 = pDataList[i].pos_canvas_y + binWidth/2;
 
                   //draw
+                  sketch.line(
+                    rectX0,
+                    scrollerTopRealScale,
+                    rectX0,
+                    scrollerBotRealScale
+                  )    
+                  
                   sketch.rect(
                     rectX0,
                     rectY0,
                     rectX1 - rectX0,
                     rectY1 - rectY0,
                   );
-                }
 
+                }                
               }
-              sketch.pop()
-            }
 
-            //x scale
-            sketch.push()
-            for(const plotKey in drawPositions.data){
-              if(drawPositions.data[plotKey].data.length>0){
+              //X scale
+              const isDrawAxis = true;
+              if(isDrawAxis){
+                sketch.push()
                 sketch.strokeWeight(1);
-                sketch.stroke(target.colour);    
-                sketch.line(
-                  drawPositions.data[plotKey].hole_min_x,
+                sketch.stroke(drawDataset.options.colour);    
+                sketch.line(                  
+                  holeMinPos.pos_canvas_x,
                   100    + scroller.scrollTop,
-                  drawPositions.data[plotKey].hole_max_x,
+                  holeMaxPos.pos_canvas_x,
                   100    + scroller.scrollTop,
                 )
+
                 sketch.textSize(12);
                 sketch.noStroke();
-                sketch.fill(target.colour)
+                sketch.fill(drawDataset.options.colour)
                 sketch.text(
-                  autoRound(drawPositions.data[plotKey].min_x).toString(),
-                  drawPositions.data[plotKey].hole_min_x - sketch.textWidth(autoRound(drawPositions.data[plotKey].min_x).toString()),
+                  autoRound(drawDataset.data[holeName].x_min_hole).toString(),
+                  holeMinPos.pos_canvas_x - sketch.textWidth(autoRound(drawDataset.data[holeName].x_min_hole).toString()),
                   90    + scroller.scrollTop,
                 )
+
                 sketch.text(
-                  autoRound(drawPositions.data[plotKey].max_x).toString(),
-                  drawPositions.data[plotKey].hole_max_x,
+                  autoRound(drawDataset.data[holeName].x_max_hole).toString(),
+                  holeMaxPos.pos_canvas_x,
                   90    + scroller.scrollTop,
                 )
-                const title = drawPositions.name + " [" +drawPositions.unit+"]";
+                const title = drawDataset.name + " [" +drawDataset.unit+"]";
+
                 sketch.text(
                   title,
-                  drawPositions.data[plotKey].hole_min_x + (drawPositions.data[plotKey].hole_max_x - drawPositions.data[plotKey].hole_min_x)/2 - sketch.textSize(title),
+                  holeMinPos.pos_canvas_x + (holeMaxPos.pos_canvas_x - holeMinPos.pos_canvas_x)/2 - sketch.textSize(title)/2,
                   70    + scroller.scrollTop,
                 )
+                sketch.pop()
               }
             }
-            sketch.pop()
           }
-          sketch.pop();
+          sketch.pop();          
         }
       }
-      
-
-      /*
-      objOpts.plot.colour_dot = "#808080";
-      objOpts.plot.colour_line = "#808080";
-      objOpts.plot.colour_bar = "#808080";
-      objOpts.plot.collecion_idx = 0;
-      objOpts.plot.series_idx = 0;
-      objOpts.plot.selected_options = null;
-      */
 
       //==========================================================================================
 
@@ -5990,7 +5873,7 @@ document.addEventListener("DOMContentLoaded", () => {
       sketch.background(0, 0, 0, 0);
       sketch.strokeWeight(2);
       sketch.stroke("#ff0000");
-      //sketch.noLoop();
+      sketch.noLoop();
       sketchCanvas.parent("p5measureCanvas");
       clickCount = 3;
     };
@@ -6602,7 +6485,7 @@ document.addEventListener("DOMContentLoaded", () => {
       document.getElementById("rasterCanvas").style.display = "none";
 
       makeP5CanvasBase();
-      //vectorObjects.clear();
+      vectorObjects.clear();
       vectorObjects.redraw();
     }
 
@@ -7202,6 +7085,7 @@ async function unzip(result){
       new Blob([result]).stream().pipeThrough(cs)
     );
     const decompressed = await decompressedStream.text();
+    
     return JSON.parse(decompressed);
   }else{
     return null
@@ -7723,6 +7607,10 @@ function getPlotPosiotion(data, LCCore, objOpts){
     pos_canvas_x: NaN,
     pos_canvas_y: NaN,      
   };
+
+  if(data[objOpts.canvas.depth_scale]==null){
+    return result
+  }
   
   //get hole
   let hole = null;

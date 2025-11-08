@@ -16,8 +16,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
     if(output_type == "export"){
       document.getElementById("cvt_bt_convert").textContent = "Export";
+      document.querySelectorAll('.check_outside, .precision_output').forEach(el => el.style.display = 'flex');
     } else if (output_type == "import"){
       document.getElementById("cvt_bt_convert").textContent = "Import";
+      document.querySelectorAll('.check_outside, .precision_output').forEach(el => el.style.display = 'none');
     }
 
     //make model chooser
@@ -249,8 +251,14 @@ document.addEventListener("DOMContentLoaded", () => {
   //-------------------------------------------------------------------------------------------
   //convert
   document.getElementById("cvt_bt_convert").addEventListener("click", async (event) => {
+    try{
+      document.getElementById("cvt_bt_convert").disabled = true;
+      await window.ConverterApi.progressbar("Depth converter", "Now chacking...", true, "converterWindow");
+
       console.log("[Converter]: Converting...");
       document.body.style.cursor = "wait"; 
+
+      const precision = parseInt(document.getElementById("precision").value, 10);
 
       //get model ids
       const corId = parseInt(document.getElementById("cvt_correlation_model").value.split(",")[0]);
@@ -373,10 +381,16 @@ document.addEventListener("DOMContentLoaded", () => {
           sourceType: sourceType,
           polationType: "linear",  
           allowOutside: allowOutside,
-          callFrom: "converter"
+          callFrom: "converter",
+          isZip: true,
         };
 
-        const calcedDataList = await window.ConverterApi.depthConverter(indataList, options);
+        const calcedDataList = await unzip(await window.ConverterApi.depthConverter(indataList, options));
+
+        if(calcedDataList===null) {
+          document.body.style.cursor = "default"; 
+          return
+        }
 
         for(let i=0; i<calcedDataList.length; i++){
           //calc depth
@@ -414,13 +428,13 @@ document.addEventListener("DOMContentLoaded", () => {
             calcedData.project, //project name
             calcedData.hole, //hole name
             calcedData.section, //section name
-            parseFloat(calcedData.distance).toFixed(1), //distance
-            parseFloat(calcedData.cd).toFixed(1), //composite depth
-            parseFloat(calcedData.efd).toFixed(1), //event free depth
-            parseFloat(calcedData.dd).toFixed(1), //drilling depth
-            parseFloat(calcedData.age_mid).toFixed(1), //age mid
-            parseFloat(calcedData.age_upper).toFixed(1), //age upper
-            parseFloat(calcedData.age_lower).toFixed(1), //age lower
+            parseFloat(calcedData.distance).toFixed(precision), //distance
+            parseFloat(calcedData.cd).toFixed(precision), //composite depth
+            parseFloat(calcedData.efd).toFixed(precision), //event free depth
+            parseFloat(calcedData.dd).toFixed(precision), //drilling depth
+            parseFloat(calcedData.age_mid).toFixed(precision), //age mid
+            parseFloat(calcedData.age_upper).toFixed(precision), //age upper
+            parseFloat(calcedData.age_lower).toFixed(precision), //age lower
             calcedData.correlation_rank,  //connection rank
             calcedData.source_type,
             calcedData.calc_type,
@@ -443,11 +457,17 @@ document.addEventListener("DOMContentLoaded", () => {
           sourceType: sourceType,
           polationType: "linear",  
           allowOutside: allowOutside,
-          callFrom: "converter"
+          callFrom: "converter",
+          isZip: true,
         };
 
         //main calc
-        const calcedDataList = await window.ConverterApi.depthConverter(indataList, options);
+        const calcedDataList = await unzip(await window.ConverterApi.depthConverter(indataList, options));
+        
+        if(calcedDataList===null) {
+          document.body.style.cursor = "default"; 
+          return
+        }
         let output = [];
 
         for(let i=0; i<calcedDataList.length; i++){
@@ -492,8 +512,19 @@ document.addEventListener("DOMContentLoaded", () => {
         console.log("Unkown convert type.")
       }
 
+      //save
+      await window.ConverterApi.progressbar("Depth converter", "Now saving...", true, "converterWindow");
+
       document.body.style.cursor = "default"; 
+      document.getElementById("cvt_bt_convert").disabled = false;
+
+      window.ConverterApi.clearProgressbar();
       //console.log(convertedData);
+
+      alert("Conversion completed successfully.")
+    }catch(err){
+      console.log(err);
+    }      
   });
 
   //-------------------------------------------------------------------------------------------
@@ -611,4 +642,18 @@ document.addEventListener("DOMContentLoaded", () => {
       document.getElementById("num_rows").textContent  = "Rows = "+source_data.length;
     }
   }
+  async function unzip(result){
+  if(result !== null){
+    //unzip
+    const cs = new DecompressionStream('gzip');
+    const decompressedStream = new Response(
+      new Blob([result]).stream().pipeThrough(cs)
+    );
+    const decompressed = await decompressedStream.text();
+    
+    return JSON.parse(decompressed);
+  }else{
+    return null
+  }
+}
 });

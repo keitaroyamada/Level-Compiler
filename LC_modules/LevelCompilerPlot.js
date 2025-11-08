@@ -16,6 +16,8 @@ class LevelCompilerPlot {
 
     this.data_collections = []; //dataRepository > dataCollection > dataset > data
     this.data_selected_id = null;
+
+    this.draw_collections = []; //temporary dataset for renderer
   }
 
   //from new csv

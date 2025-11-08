@@ -21,9 +21,17 @@
           <button class="bt" id="cvt_bt_convert" title="convert">Convert</button>
         </div>
       </div>
-      <div class="id_check_row">
-        <label><input type="checkbox" id="allow_outside_data"> Allow data outside sections</label>
-      </div>
+        <div class="id_check_row">
+          <div class="check_outside">
+            <input type="checkbox" id="allow_outside_data">
+            <label for="allow_outside_data">Allow data outside sections</label>
+          </div>
+
+          <div class="precision_output">
+            <label for="precision">Output precision:</label>
+            <input type="number" id="precision" min="0" max="10" step="1" value="1">
+          </div>
+        </div>        
       <div>
         <p id="num_rows">...</p>
       </div>

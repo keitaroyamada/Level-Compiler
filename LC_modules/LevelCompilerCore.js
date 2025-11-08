@@ -492,8 +492,8 @@ class LevelCompilerCore extends EventEmitter{
                 const model_r = projectData._model_data[marker_r];
                 if (model_r[1] !== "") {
                   const duo_connected_hole = lcfnc.zeroPadding(model_r[1]);
-                  const duo_connected_sec = lcfnc.zeroPadding(model_r[2]);
-                  const duo_connected_dist = Math.round(parseFloat(model_r[3]) * 10) / 10;
+                  const duo_connected_sec  = lcfnc.zeroPadding(model_r[2]);
+                  const duo_connected_dist = lcfnc.round(parseFloat(model_r[3]), 1);
                   this.projects[projectIdx[0]]._duo_connection[correlated_marker_id.toString()] = [
                     duo_connected_hole,
                     duo_connected_sec,
@@ -636,6 +636,7 @@ class LevelCompilerCore extends EventEmitter{
     //if old id, update to new id
     this.replaceNewId();
           
+    this.updateSearchIdx();
   }
   loadEventListFromCsv(filepath){
     if(this.projects.length==0) return false;
@@ -1428,21 +1429,27 @@ class LevelCompilerCore extends EventEmitter{
         type:project.model_type,
         evaluation:false,
         is_connected_master: false,
+        distance_confliction_counts:0,
+        distance_confliction:[],
+        distance_confliction_name:[],
         
         cd_error_incompleted_counts:0,
         cd_error_floating_counts:0,
         cd_confliction_counts:0,
         cd_confliction:[],
+        cd_confliction_name:[],
 
         efd_error_incompleted_counts:0,
         efd_error_floating_counts:0,
         efd_confliction_counts:0,
         efd_confliction:[],
+        efd_confliction_name:[],
 
         rank_error_counts:0,
         age_error_counts:0,        
         age_confliction_counts:0,
         age_confliction:[],
+        age_confliction_name:[],
 
         max_rank:-1,  
         hole_counts: 0,
@@ -1467,9 +1474,30 @@ class LevelCompilerCore extends EventEmitter{
         hole.sections.forEach((section) => {
           //counts sections
           result.section_counts += 1;
-          section.markers.forEach((marker) => {
+          const epsilon = 1e-3;
+          let inDuplicateGroup = false;
+          section.markers.forEach((marker, index) => {
             //counts markers
             result.marker_counts += 1;
+
+            if (index > 0) {
+              const prevMarker = section.markers[index - 1];
+
+              if (Math.abs(marker.distance - prevMarker.distance) < epsilon) {
+                  if (!inDuplicateGroup) {
+                      result.distance_confliction_counts += 1; 
+                      inDuplicateGroup = true;
+                  }
+                  result.distance_confliction_counts += 1;
+                  result.distance_confliction.push(marker.id);
+                  result.distance_confliction_name.push(hole.name+"-"+section.name+"-"+marker.distance+"cm");
+
+                  console.log("LCCore: Duplicate distances detected at: "+hole.name+"-"+section.name+"-"+marker.distance+"cm")
+              } else {
+                  inDuplicateGroup = false;
+              }
+            }
+
 
             if (marker.composite_depth == null) {
               //counts CD error
@@ -1489,6 +1517,7 @@ class LevelCompilerCore extends EventEmitter{
                     result.cd_confliction_counts+=1;
                     if(marker.composite_depth && connected_cd){
                       result.cd_confliction.push(marker.composite_depth - connected_cd);
+                      result.cd_confliction_name.push(hole.name+"-"+section.name+"-"+marker.distance+"cm");
                     }                    
                   }  
                 }
@@ -1514,6 +1543,7 @@ class LevelCompilerCore extends EventEmitter{
                     result.efd_confliction_counts+=1;
                     if(marker.event_free_depth && connected_efd){
                       result.efd_confliction.push(marker.event_free_depth - connected_efd);
+                      result.efd_confliction_name.push(hole.name+"-"+section.name+"-"+marker.distance+"cm");
                     }
                     
                   }  
@@ -1535,6 +1565,7 @@ class LevelCompilerCore extends EventEmitter{
                     result.age_confliction_counts+=1;
                     if((marker.age && connected_age)){
                       result.age_confliction.push(marker.age - connected_age);
+                      result.age_confliction_name.push(hole.name+"-"+section.name+"-"+marker.distance+"cm");
                     }
                     
                   }  
@@ -1756,6 +1787,7 @@ class LevelCompilerCore extends EventEmitter{
                             tempUpperIdx = [p, h, s, m + 1];
                           }
                         }
+
                         if (distance >= sectionData.markers[m].distance && distance <= sectionData.markers[m + 1].distance) {
                           tempUpperIdx = [p, h, s, m];
                           tempLowerIdx = [p, h, s, m + 1];
@@ -1872,6 +1904,10 @@ class LevelCompilerCore extends EventEmitter{
       //get section data
       let sectionId = this.projects[upperIdxs[0][0]].holes[upperIdxs[0][1]].sections[upperIdxs[0][2]].id;
       const masterIdx = this.search_idx_list[this.base_project_id.toString()];
+      if(masterIdx){
+      }else{
+        console.log(this.base_project_id, masterIdx)
+      }
 
       //check duo connection
       let isMasterExist = false;
@@ -2440,11 +2476,11 @@ class LevelCompilerCore extends EventEmitter{
                 if (event[0]=="erosion"){
                   event_border_drilling_depth = this.projects[projectIdx[0]].holes[h].sections[s].markers[m].drilling_depth;
                   event_border_distance = event_start_distance;
-                  event_border_distance_for_check = Math.round(event_border_distance * 10) / 10;
+                  event_border_distance_for_check = lcfnc.round(event_border_distance, 1);
                 } else if (event[0]=="deposition" || event[0]=="markup"){
                   event_border_drilling_depth = this.projects[projectIdx[0]].holes[h].sections[s].markers[m].drilling_depth + event[2];
                   event_border_distance = event_start_distance + event[2];
-                  event_border_distance_for_check = Math.round(event_border_distance * 10) / 10;
+                  event_border_distance_for_check = lcfnc.round(event_border_distance,1);
                 }
                 const startIdx = this.search_idx_list[this.projects[projectIdx[0]].holes[h].sections[s].markers[m].id.toString()];
                 const targetSectionData = this.projects[projectIdx[0]].holes[startIdx[1]].sections[startIdx[2]];
@@ -2458,7 +2494,7 @@ class LevelCompilerCore extends EventEmitter{
                     //get current data
                     const currentMarkerData = targetSectionData.markers[m2];
                     currentIdx = this.search_idx_list[currentMarkerData.id.toString()];
-                    const current_distance = Math.round(currentMarkerData.distance * 10) / 10;
+                    const current_distance = lcfnc.round(currentMarkerData.distance, 1);
                     if (current_distance > event_border_distance_for_check) {
                       //case through(layer exist between current and event border)
                       if (m2 == startIdx[3] - 1) {
@@ -2540,7 +2576,7 @@ class LevelCompilerCore extends EventEmitter{
                     //get current data
                     const currentMarkerData = targetSectionData.markers[m2];
                     currentIdx = this.search_idx_list[currentMarkerData.id.toString()];
-                    const current_distance = Math.round(currentMarkerData.distance * 10) / 10;
+                    const current_distance = lcfnc.round(currentMarkerData.distance,1);
 
                     if (current_distance < event_border_distance_for_check) {
                       //case through(layer exist between current and event border)
@@ -5498,7 +5534,7 @@ class LevelCompilerCore extends EventEmitter{
     this.setStatus("completed","");
     return output;
   }
-  getIdxFromTrinity(projectId, [holeName, sectionName, distance]) {
+  getIdxFromTrinity(projectId, [holeName, sectionName, distance],epsilon = 1e-1) {
     this.setStatus("running","getIdxFromTrinity");
     //get idx
     let projectIdx = null;
@@ -5521,7 +5557,7 @@ class LevelCompilerCore extends EventEmitter{
             idx[2] = s;
             for (let m = 0; m < section.markers.length; m++) {
               const marker = section.markers[m];
-              if (Math.round(marker.distance * 10) / 10 == Math.round(parseFloat(distance) * 10) / 10) {
+              if(Math.abs(marker.distance - parseFloat(distance)) < epsilon){
                 idx[3] = m;
               }
             }
@@ -5950,10 +5986,12 @@ class LevelCompilerCore extends EventEmitter{
                 targetData.hole_name    = holeData.name;
                 targetData.section_name = sectionData.name;
                 targetData.distance     = markerData.distance;
-                const cd = this.getDepthFromTrinity(id, [targetData], "composite_depth");
-                if(cd[0][1]!==null){
-                  compositeDepth = "@"+cd[0][1].toFixed(1);
-                }
+                const cd = resultIds[i][0];
+                compositeDepth = "@"+cd.toFixed(1);
+                //const cd = this.getDepthFromTrinity(id, [targetData], "composite_depth");
+                //if(cd[0][1]!==null){
+                //  compositeDepth = "@"+cd[0][1].toFixed(1);
+                //}
 
                 //get event list
                 //Bore_hole	core_number	Event_top	Event_bottom	ID
@@ -6275,7 +6313,7 @@ class LevelCompilerCore extends EventEmitter{
 
       //add zero point
       if(r==1){
-        masterHole += "("+modelData[1][13].slice(1)+")";
+        masterHole += "("+modelData[1][13].slice(1)+")";        
       }
 
       toRow.push(masterHole);

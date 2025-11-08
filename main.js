@@ -25,13 +25,14 @@ const ProgressBar = require("electron-progressbar");
 const prompt = require("electron-prompt");
 const JSZip = require('jszip');
 const zlib = require('zlib');
+const { PassThrough } = require('stream');
 const https = require('https');
 const { autoUpdater} = require('electron-updater');
 
 const { app, BrowserWindow, Menu, ipcMain, dialog, shell, screen, session } = require("electron");
 const { LevelCompilerCore } = require("./LC_modules/LevelCompilerCore.js");
 const { Project } = require("./LC_modules/Project.js");
-const { lcfnc } = require("./LC_modules/lcfnc.js");
+const lcfnc  = require("./LC_modules/lcfnc.js");
 const { LevelCompilerAge } = require("./LC_modules/LevelCompilerAge.js");
 const { LevelCompilerPlot } = require("./LC_modules/LevelCompilerPlot.js");
 const { UndoManager } = require("./LC_modules/UndoManager.js");
@@ -489,7 +490,7 @@ function createMainWIndow() {
       console.log("MAIN: Load images: N = "+loadOptions.targetIds.length+"; Operations: ["+loadOptions.operations+"]");
 
       //make tasks
-      const NUM_WORKERS = Math.min(Math.round(os.cpus().length/2,0), loadOptions.targetIds.length);
+      const NUM_WORKERS = Math.min(Math.round(os.cpus().length/2), loadOptions.targetIds.length);
       const tasks = []; // Task queue
       const idleWorkers = []; // Idle worker list
 
@@ -528,7 +529,7 @@ function createMainWIndow() {
   
           //calc new image size
           const coreLength = targetSectionData.markers[targetSectionData.markers.length-1].distance - targetSectionData.markers[0].distance;
-          let new_height = Math.round(200 * 100, 0); //max
+          let new_height = Math.round(200 * 100); //max
           const dpcm = loadOptions.dpcm[imBaseName] ? loadOptions.dpcm[imBaseName] : loadOptions.dpcm;
           if(new_height > dpcm * coreLength){
             new_height = Math.round(dpcm * coreLength);
@@ -926,7 +927,7 @@ function createMainWIndow() {
   });
   ipcMain.handle("clearProgressbar", async (_e) => {
     if(progressBar){
-      progressBar.close()
+      progressBar.close();
       progressBar = null; 
     }         
   });
@@ -1539,6 +1540,29 @@ function createMainWIndow() {
     //exportLCCore <- MD
     exportLCCore.loadModelFromLcmodel(MD);
 
+    //check
+    const results = exportLCCore.checkModel();
+    let dist_error = 0;
+    results.forEach(r=>{
+      dist_error += r.distance_confliction_counts;
+    })
+    
+    if(dist_error>0){
+      const options = {
+        type: "question",
+        buttons: ["No", "Yes"],
+        defaultId: 0,
+        title: "Export",
+        message: "Duplicate marker positions were found (N="+dist_error+"). This may result in incorrect data or processing errors.Do you want to continue exporting anyway?",
+      };
+
+      const { response } = await dialog.showMessageBox(mainWindow, options);
+
+      if(response===0){
+        return null
+      }
+    }
+
     //make export array
     let dataMap = exportLCCore.constructModelMap()
     for(let i=0; i<exportLCCore.projects.length;i++){
@@ -1556,7 +1580,7 @@ function createMainWIndow() {
       }
       saveName += exportLCCore.projects[idx[0]].name+"("+version+").csv"; 
       
-      putcsvfile(mainWindow, saveName, outputArray);
+      await putcsvfile(mainWindow, saveName, outputArray);
       console.log("MAIN: Export ", saveName);
     }
     history.saveState(LCCore.exportSerialisedModel(), "export csvmodel");
@@ -1570,6 +1594,29 @@ function createMainWIndow() {
     
     //exportLCCore <- MD
     exportLCCore.loadModelFromLcmodel(MD);
+
+    //check
+    const results = exportLCCore.checkModel();
+    let dist_error = 0;
+    results.forEach(r=>{
+      dist_error += r.distance_confliction_counts;
+    })
+    
+    if(dist_error>0){
+      const options = {
+        type: "question",
+        buttons: ["No", "Yes"],
+        defaultId: 0,
+        title: "Export",
+        message: "Duplicate marker positions were found (N="+dist_error+"). This may result in incorrect data or processing errors.Do you want to continue exporting anyway?",
+      };
+
+      const { response } = await dialog.showMessageBox(mainWindow, options);
+
+      if(response===0){
+        return
+      }
+    }
 
     //make export array
     let dataMap = exportLCCore.constructModelMap()
@@ -1814,6 +1861,7 @@ function createMainWIndow() {
 
     //create finder window
     converterWindow = new BrowserWindow({
+      parent: plotWindow, 
       title: "Converter",
       width: 700,
       height: 800,
@@ -1850,7 +1898,7 @@ function createMainWIndow() {
     plotWindow.close();
     plotWindow = null;
     mainWindow.webContents.send("PlotterClosed", "");
-    isPlotterClose = true;
+    isPlotterClose = false;
   });
   ipcMain.handle("OpenImporter", async (_e) => {
     if (importerWindow) {
@@ -2199,10 +2247,10 @@ function createMainWIndow() {
         const actDist= parseFloat(depthData[2][c][3]); //correlation actural distance 
 
         if(defDist >= result.definition_distance_upper && defDist <= result.definition_distance_lower){
-          const diffDefUpper = Math.round((defDist - result.definition_distance_upper)*10)/10;
-          const diffActUpper = Math.round((actDist - result.actual_distance_upper)*10)/10;
-          const diffDefLower = Math.round((result.definition_distance_lower - defDist)*10)/10;
-          const diffActLower = Math.round((result.actual_distance_lower - actDist)*10)/10;
+          const diffDefUpper = lcfnc.round((defDist - result.definition_distance_upper),1);
+          const diffActUpper = lcfnc.round((actDist - result.actual_distance_upper),1);
+          const diffDefLower = lcfnc.round((result.definition_distance_lower - defDist),1);
+          const diffActLower = lcfnc.round((result.actual_distance_lower - actDist),1);
 
           descriptions += depthData[2][c][1] + " is " + diffDefUpper +" cm[definition] (" + diffActUpper + " cm[actual]) below the sample upper.";
         }
@@ -2794,8 +2842,20 @@ function createMainWIndow() {
         })
         .catch((err) => {
           console.error("MAIN: Failed to zip: ", err);
+           dialog.showMessageBox(
+            mainWindow,
+            {
+            type: 'info',
+            title: 'Failed to load',
+            message: 'Failed to load data:', err,
+            }
+          );
         });
     }
+    if(progressBar){
+      progressBar.close()
+      progressBar = null; 
+    } 
     
   });
   ipcMain.handle("sendPlotOptions", (_e,data, to) => {
@@ -2813,18 +2873,46 @@ function createMainWIndow() {
     const allowExtrapolation = options.allowOutside;
     let callWindow;
     let showProgress = false;
+    let distance_duplicate = 0;
+
     if (options.callFrom === "converter") {
       callWindow = converterWindow;
       showProgress = true;
+      const cm = LCCore.checkModel();
+      cm.forEach(r=>{
+        distance_duplicate += r.distance_confliction_counts;
+      })
+      if(distance_duplicate>0){
+        const options = {
+          type: "question",
+          buttons: ["No", "Yes"],
+          defaultId: 0,
+          title: "Export",
+          message: "Duplicate marker positions were found (N="+distance_duplicate+"). This may result in incorrect data or processing errors.Do you want to continue exporting anyway?",
+        };
+
+        const { response } = await dialog.showMessageBox(callWindow, options);
+
+        if(response===0){
+          return null;
+        }
+      }
     } else {
       callWindow = mainWindow;
     }
     
     let resultList = [];
     if(showProgress){
-      progressBar   = progressDialog(callWindow, "Depth Converter", "Now converting...", false);
+      if(progressBar!==null){
+        //new
+        progressBar.close();
+        progressBar=null;
+      }
+
+      progressBar   = progressDialog(callWindow, "Depth Converter", "Now converting...", false);        
       await new Promise(resolve => progressBar.on('ready', resolve));
     }    
+
     for(let i=0; i<dataList.length; i++){
       if(showProgress){
         progressBar   = await updateProgress(progressBar, i, dataList.length);
@@ -2849,7 +2937,8 @@ function createMainWIndow() {
         age_model_version: null,
         description: null,
         source_type:null,
-        is_master_depth: false
+        is_master_depth: false,
+        distance_confrictionduplicate: false
       };
 
       if(LCCore.base_project_id){
@@ -3112,12 +3201,17 @@ function createMainWIndow() {
     }
 
     if(progressBar!==null){
-      progressBar = await updateProgress(progressBar, dataList.length,dataList.length);
+      //progressBar   = await updateProgress(progressBar, 1, 1);
+      progressBar.close();
       progressBar = null;
     }
 
-    if(dataList.length>1){
-      return resultList;
+    if(resultList.length>1){
+      if(options.isZip){
+        return  await zipData(resultList);
+      }else{
+        return  resultList;
+      }
     }else{
       return resultList[0];
     }
@@ -3796,6 +3890,9 @@ function createMainWIndow() {
                   const fullpath = await getfile(mainWindow, "Please chose Correlation model CSV file", [{name: "CSV file", extensions: ["csv"]}]);
                   if(fullpath){
                     registerModelFromCsv(fullpath);
+                    //calc
+                    LCCore.calcCompositeDepth();
+                    LCCore.calcEventFreeDepth();
                     mainWindow.webContents.send("UpdateViewFromMain");
                   }
                 },
@@ -3853,7 +3950,11 @@ function createMainWIndow() {
                   if(fullpath){
                     console.log("MAIN: Import correlation model for Level Finder from", fullpath)
                     registerModelFromCsv(fullpath, "forLF");
+                    //calc
+                    LCCore.calcCompositeDepth();
+                    LCCore.calcEventFreeDepth();
                     mainWindow.webContents.send("UpdateViewFromMain");
+                    
                     //mainWindow.webContents.send("ImportCorrelationModelForLFMenuClicked");
                   }
                 },
@@ -4158,6 +4259,7 @@ function createMainWIndow() {
                          `  -[Marker]: ${item.marker_counts}\n` +
                          `  -[Connection]: \n${conn}\n` +
 
+                         `  -[Distance errors (duplicate)]: ${item.distance_confliction_counts}\n` +
                          `  -[CD errors (failed)]: ${item.cd_error_incompleted_counts}\n` +
                          `  -[CD errors (floating)]: ${item.cd_error_floating_counts}\n` +
                          `  -[CD conflictions]: ${item.cd_confliction_counts}\n` +
@@ -4167,8 +4269,9 @@ function createMainWIndow() {
                          `  -[EFD conflictions (mean[abs])]: ${mean(item.efd_confliction).toFixed(1)}  [ ${Math.abs(item.efd_confliction.reduce((a, b) => Math.abs(a) > Math.abs(b) ? a : b)).toFixed(1)} - ${Math.abs(item.efd_confliction.reduce((a, b) => Math.abs(a) < Math.abs(b) ? a : b)).toFixed(1)} ] cm\n` +
                          `  -[Age errors]: ${item.age_error_counts}\n` +
                          `  -[Age conflictions]: ${item.age_confliction_counts}\n` +
-                         `  -[Max Rank]: ${item.max_rank}\n`
-                         
+                         `  -[Max Rank]: ${item.max_rank}\n`+
+
+                         `For more details, please check the log in the developer tools (F12).`
                 }).join('\n');
 
                 dialog.showMessageBox(
@@ -4179,6 +4282,8 @@ function createMainWIndow() {
                   detail:text,
                   buttons: ['OK']
                 });
+                mainWindow.webContents.send("rendererLog", "Check results:");
+                mainWindow.webContents.send("rendererLog", results);
               }
             }
           },
@@ -4315,6 +4420,8 @@ function createMainWIndow() {
                 return;
               }
           
+              isPlotterClose = false;
+
               //create finder window
               plotWindow = new BrowserWindow({
                 title: "Plotter",
@@ -4340,7 +4447,6 @@ function createMainWIndow() {
                 if (mainWindow && !mainWindow.isDestroyed()){
                   mainWindow.webContents.send("LabelerClosed", "");
                 }
-                isPlotterClose = true;
               });
 
               const customMenu = Menu.buildFromTemplate([
@@ -4472,32 +4578,38 @@ function progressDialog(window, tit, txt, indeterminate){
   return progress;
 }
 async function updateProgress(progress, n, N){
-  if (!progress || progress.isCompleted()) {
-    return null;                       
-  } 
-  
-  try{
-    if (progress) {
-      progress.value = (n / N) * 100;
-      progress.detail ="Please wait..." + n + "/" + N + "  (" + round((n / N) * 100, 2) + "%)";
+  if (!progress) return null;
 
-      if (n / N >= 1) {
+  const winOk = progress._window && progress._window.webContents && !progress._window.isDestroyed();
+
+  if (!winOk || progress.isCompleted()) {
+    return null;
+  }
+
+  try {
+    const pct = (n / N) * 100;
+    progress.value = pct;
+    progress.detail = "Please wait..." + n + "/" + N + "  (" + lcfnc.round(pct, 2) + "%)";
+
+    if (n >= N) {
+      if (!progress.isCompleted()) {
         progress.setCompleted();
-        progress.close();
-        return null;
       }
+      return null;
     }
+
     return progress;
-  }catch(err){
+  } catch (err) {
     console.error("MAIN: In progressbar", err);
-
-    if (progress && !progress.isCompleted()) {
-      progress.close();  
-    } 
-
+    try {
+      if (progress && progress._window && !progress._window.isDestroyed()) {
+        progress.close();
+      }
+    } catch (e) { /* ignore */ }
     return null;
   }
 }
+
 async function getfile(window=null, title, ext) {
   const options = {
     title: title,
@@ -4516,18 +4628,29 @@ async function getfile(window=null, title, ext) {
     return null;
   }
 }
+
 async function zipData(data) {
   return new Promise((resolve, reject) => {
     console.time("zipped")
-    let jsonData;
-    if(typeof data !== "string"){
-      jsonData = JSON.stringify(data);
-    }else{
-      jsonData = data;
+
+    let inputData;
+    try{
+      //inputData = msgpack.encode(data);
+
+      if(typeof data !== "string"){
+        inputData = JSON.stringify(data);
+      }else{
+        inputData = data;
+      }
+    } catch(serializeError){
+      console.error("[zipData] stringify encoding failed:", serializeError);
+      reject(serializeError);
+      return null;
     }
-    
-    zlib.gzip(jsonData, (err, buffer) => {
+
+    zlib.gzip(inputData, (err, buffer) => {
       if (err) {
+        console.error("[zipData] Gzip compression failed:", err);
         reject(err);
       } else {
         console.timeEnd("zipped")
@@ -4536,6 +4659,58 @@ async function zipData(data) {
     });
   });
 }
+
+/*
+async function zipData(data) {
+  console.time("zipped");
+  return new Promise((resolve, reject) => {
+    const gz = zlib.createGzip({ level: 1, chunkSize: 1<<20, memLevel: 9 });
+    const out = [];
+    gz.on('data', c => out.push(c));
+    gz.on('end', () => { console.timeEnd("zipped"); resolve(Buffer.concat(out)); });
+    gz.on('error', reject);
+
+    // 直接圧縮できる型は即終了
+    if (Buffer.isBuffer(data)) { gz.end(data); return; }
+    if (typeof data === 'string') { gz.end(Buffer.from(data, 'utf8')); return; }
+
+    const FLUSH = 256 * 1024; // 256KB
+    let sb = '';
+    const flush = () => { if (sb.length) { gz.write(Buffer.from(sb, 'utf8')); sb = ''; } };
+    const write = (s) => { sb += s; if (sb.length >= FLUSH) flush(); };
+
+    // 循環検出（不要ならコメントアウト）
+    const seen = new WeakSet();
+
+    const dump = (v) => {
+      if (v === null || typeof v !== 'object') { write(JSON.stringify(v)); return; }
+      if (seen.has(v)) { write(JSON.stringify('[Circular]')); return; }
+      seen.add(v);
+
+      if (Array.isArray(v)) {
+        write('[');
+        for (let i=0;i<v.length;i++){ if(i) write(','); dump(v[i]); }
+        write(']');
+      } else {
+        write('{');
+        const keys = Object.keys(v);
+        for (let i=0;i<keys.length;i++){
+          if(i) write(',');
+          const k = keys[i];
+          write(JSON.stringify(k)+':');
+          dump(v[k]);
+        }
+        write('}');
+      }
+    };
+
+    try { dump(data); flush(); gz.end(); } catch (e) { reject(e); }
+  });
+}
+*/
+
+
+
 //--------------------------------------------------------------------------------------------------
 async function getDirectory(window=null, title) {
   const options = {
@@ -4799,10 +4974,6 @@ function createNewWindow(title, htmlPath, preloadPath) {
   return newWindow;
 }
 //--------------------------------------------------------------------------------------------------
-function round(num, digits) {
-  const multiplier = Math.pow(10, digits);
-  return Math.round(num * multiplier) / multiplier;
-}
 function mean(arr, useAbs = false) {
   return arr.reduce((a, b) => a + (useAbs ? Math.abs(b) : b), 0) / arr.length;
 }

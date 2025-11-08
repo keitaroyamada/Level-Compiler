@@ -145,7 +145,10 @@ function randNormal(mean, std, n) {
 
   return output;
 }
-
+function round(val, order=4){
+  const rounded = Math.round(val * 10**order) / 10**order;
+  return rounded;
+}
 
 module.exports = {
   readcsv,
@@ -157,4 +160,5 @@ module.exports = {
   makeMarkerIdBase,
   zeroPadding,
   randNormal,
+  round,
 };
