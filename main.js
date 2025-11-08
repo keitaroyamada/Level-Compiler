@@ -5101,6 +5101,7 @@ async function checkUpdate(window, from){
 
 
   autoUpdater.on("error", (err) => {
+    mainWindow.webContents.send("rendererLog", err);
     if (from === "button") {
       dialog.showMessageBox(window, {
         type: "error",
@@ -5109,6 +5110,7 @@ async function checkUpdate(window, from){
       });
       window.webContents.send("footerLeft", "An error occured in auto updater.");
     }
+    
   });
 
   autoUpdater.on('update-not-available', () => {
@@ -5122,18 +5124,6 @@ async function checkUpdate(window, from){
     });
     }  
     window.webContents.send("footerLeft", "The latest version is already installed.");  
-  });
-
-  autoUpdater.on('error', (err) => {
-    if (from == "button"){
-      dialog.showMessageBox(
-        window,
-        {
-        type: 'error',
-        title: 'Update Error',
-        message: `An error occurred: ${err.message}`,
-      });
-    }
   });
   
   await autoUpdater.checkForUpdates();
