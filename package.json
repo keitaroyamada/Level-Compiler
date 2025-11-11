@@ -1,7 +1,7 @@
 {
   "name": "levelcompiler",
   "productName": "Level-Compiler",
-  "version": "1.2.1",
+  "version": "1.2.2",
   "description": "Stratigraphic Correlation Viewer and Compiler",
   "main": "main.js",
   "scripts": {
@@ -39,7 +39,7 @@
       "icon": "./icon/levelcompiler.png"
     },
     "mac": {
-      "target": "dmg",
+      "target": ["dmg","zip"],
       "icon": "./icon/levelcompiler.png",
       "hardenedRuntime": true,
       "entitlements": "entitlements.mac.plist",

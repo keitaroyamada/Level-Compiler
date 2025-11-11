@@ -1842,6 +1842,7 @@ class LevelCompilerCore extends EventEmitter{
 
       //extrapolation case
       if(upperIdxs.length == 0 || lowerIdxs.length == 0){
+        console.log(upperIdxs, lowerIdxs)
         if(!allowExtrapolation){
           this.setError(
             "",
@@ -5465,6 +5466,7 @@ class LevelCompilerCore extends EventEmitter{
       //get best nearestData
       for(let s=0; s<nearestSectionList.length; s++){
         tempSectionData = nearestSectionList[s][1];
+        if(!tempSectionData){continue}
         const tempUpperDepth = tempSectionData.markers[0][calcType];
         const tempLowerDepth = tempSectionData.markers[tempSectionData.markers.length - 1][calcType];
         if(tempSectionData.id[0] == targetId[0] && tempSectionData.id[1] == targetId[1] && targetId[0] !==null && targetId[1] !== null){

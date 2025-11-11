@@ -795,7 +795,7 @@ document.addEventListener("DOMContentLoaded", () => {
   });
   //============================================================================================
   window.LCapi.receive("PlotDataOptions", async (data) => {
-    console.log("[Renderer]: Plot options are received.",data)
+    console.log("[Renderer]: Plot options are received.")
     LCPlot.draw_collections = [];
     if(data.emitType=="new"){
       //await loadPlotData();//latest ver is load plot data at the same time of loading plotter
@@ -811,6 +811,7 @@ document.addEventListener("DOMContentLoaded", () => {
       // clac each datasets
       const selectedList = objOpts.plot.selected_options;
       for(let t=0; t< selectedList.length;t++){
+        //each Plot list in plotter
         const target = selectedList[t];           
             
         //check draw
@@ -845,7 +846,7 @@ document.addEventListener("DOMContentLoaded", () => {
         if(nIdx==null && dIdx==null){
           continue
         }
-
+        
         //calc values        
         const numeratorDataSeries   = (nIdx !== null) ? LCPlot.data_collections[colIdx].datasets[nIdx] : null;
         const denominatorDataSeries = (dIdx !== null) ? LCPlot.data_collections[colIdx].datasets[dIdx] : null;    
@@ -860,22 +861,26 @@ document.addEventListener("DOMContentLoaded", () => {
           unit:"",
           x_max_global: -Infinity,
           x_min_global: Infinity,
+          x_max_global_pos: {holeName:null, idx:null},
+          x_min_global_pos: {holeName:null, idx:null},
           
           options: target,
           data: {},
         };
+        const vals = {
+          data:[],
+          x_max_hole: null,
+          x_min_hole: null,
+          x_max_hole_idx: null,
+          x_min_hole_idx: null,
+          x_zero_hole: null,
+          pos_x_max_hole: null,
+          pos_x_min_hole: null,
+        };;
+        drawDataset.data["global"] = vals;
         LCCore.projects.forEach(p=>{
           p.holes.forEach(h=>{
-            drawDataset.data[h.name] = {
-              data:[],
-              x_max_hole: null,
-              x_min_hole: null,
-              x_max_hole_idx: null,
-              x_min_hole_idx: null,
-              x_zero_hole: null,
-              pos_x_max_hole: null,
-              pos_x_min_hole: null,
-            };
+            drawDataset.data[h.name] = vals;
           })
         })
 
@@ -902,7 +907,6 @@ document.addEventListener("DOMContentLoaded", () => {
             pos_canvas_x: null,
             pos_canvas_y: null,
           };
-          
           //calc
           let numeratorData = null;
           let denominatorData = null;
@@ -914,29 +918,37 @@ document.addEventListener("DOMContentLoaded", () => {
               //case n/d
               numeratorData   = numeratorDataSeries.data_series[d];
               denominatorData = denominatorDataSeries.data_series[d];
+
               const numeratorValue  = (Number.isFinite(numeratorData.data)&&numeratorData.data!==null) ? numeratorData.data : NaN;
               const denominatorValue= (Number.isFinite(denominatorData.data)&&denominatorData.data!==null) ? denominatorData.data : NaN;
-             
+
               numdenoData = numeratorValue/denominatorValue;       
-              holeName =  numeratorData.original_depth_type=="trinity" ? numeratorData.trinity.hole_name : null; 
-              sectionName =  numeratorData.original_depth_type=="trinity" ? numeratorData.trinity.section_name : null;                          
+              holeName =  numeratorData.original_depth_type=="trinity" ? numeratorData.trinity.hole_name : "global"; 
+              sectionName =  numeratorData.original_depth_type=="trinity" ? numeratorData.trinity.section_name : "global";                          
             }else{
               // case n/1
               numeratorData   = numeratorDataSeries.data_series[d];
               const numeratorValue  = (Number.isFinite(numeratorData.data)&&numeratorData.data!==null) ? numeratorData.data : NaN;
               
               numdenoData = numeratorValue/1;  
-              holeName =  numeratorData.original_depth_type=="trinity" ? numeratorData.trinity.hole_name : null;
-              sectionName =  numeratorData.original_depth_type=="trinity" ? numeratorData.trinity.section_name : null; 
+              holeName =  numeratorData.original_depth_type=="trinity" ? numeratorData.trinity.hole_name : "global";
+              sectionName =  numeratorData.original_depth_type=="trinity" ? numeratorData.trinity.section_name : "global"; 
             }
           }else{
-            //case 1/d
-            denominatorData = denominatorDataSeries.data_series[d];
-            const denominatorValue= (Number.isFinite(denominatorData.data)&&denominatorData.data!==null) ? denominatorData.data : NaN;
-            
-            numdenoData = 1/denominatorValue;  
-            holeName =  denominatorData.original_depth_type=="trinity" ? denominatorData.trinity.hole_name : null;
-            sectionName =  numeratorData.original_depth_type=="trinity" ? numeratorData.trinity.section_name : null; 
+            if(dIdx !== null){
+              //case 1/d
+              denominatorData = denominatorDataSeries.data_series[d];
+              const denominatorValue= (Number.isFinite(denominatorData.data)&&denominatorData.data!==null) ? denominatorData.data : NaN;
+              
+              numdenoData = 1/denominatorValue;  
+              holeName =  denominatorData.original_depth_type=="trinity" ? denominatorData.trinity.hole_name : "global";
+              sectionName =  numeratorData.original_depth_type=="trinity" ? numeratorData.trinity.section_name : "global"; 
+            }else{
+              //1/1
+              numdenoData = 1;  
+              holeName    =  denominatorData.original_depth_type=="trinity" ? denominatorData.trinity.hole_name : "global";
+              sectionName =  numeratorData.original_depth_type=="trinity" ? numeratorData.trinity.section_name : "global"; 
+            }            
           }
 
           //apply values
@@ -950,68 +962,115 @@ document.addEventListener("DOMContentLoaded", () => {
           drawData.hole_name = holeName;
           drawData.section_name = sectionName;
 
-          if(numdenoData>drawDataset.x_max_global){
-            drawDataset.x_max_global = numdenoData;
-          }
-
-          if(numdenoData<drawDataset.x_min_global){
-            drawDataset.x_min_global = numdenoData;
-          }
-
           //add
+          if(holeName){
+            drawDataset.data[holeName].data.push(drawData);
+          }else{  
+            //cd, efd. age
+          }
           
-          drawDataset.data[holeName].data.push(drawData);
         }
+
         //update unit
-        drawDataset.unit  = numeratorDataSeries !== null ? numeratorDataSeries.unit : "" + "/" + denominatorDataSeries !== null ? denominatorDataSeries.unit : "";
-        drawDataset.name  = numeratorDataSeries !== null ? numeratorDataSeries.name : "" + "/" + denominatorDataSeries !== null ? denominatorDataSeries.name : "";   
+        if(nIdx !== null){              
+            if(dIdx !== null){
+              //n/d
+              drawDataset.unit  = numeratorDataSeries.unit + "/" + denominatorDataSeries.unit;
+              drawDataset.name  = numeratorDataSeries.name + "/" + denominatorDataSeries.name;  
+            }else{
+              //d/1
+              drawDataset.unit  = numeratorDataSeries.unit;
+              drawDataset.name  = numeratorDataSeries.name;  
+            }
+        }else{
+          if(dIdx !== null){
+            //1/d
+            drawDataset.unit  = "1/" + denominatorDataSeries.unit;
+            drawDataset.name  = "1/" + denominatorDataSeries.name;  
+          }else{
+            //1/1
+            drawDataset.unit  = "";
+            drawDataset.name  = "";  
+          }
+        }
         
         //search max/min
         let globalMax = -Infinity;
         let globalMin = Infinity;
-        for (const holeName in drawDataset.data) {
-          let holeMax = -Infinity;
-          let holeMin = Infinity;
-          let holeMaxIdx = 0;
-          let holeMinIdx = 0;
-          drawDataset.data[holeName].data.forEach((d, idx)=>{
-            if(d.x>holeMax){
-              holeMax = d.x;
-              holeMaxIdx = idx;
-            }
-            if(d.x<holeMin){
-              holeMin = d.x;
-              holeMinIdx = idx;
-            }
-          });
+        let globalMaxHoleName = null;
+        let globalMaxIdx = null;
+        let globalMinHoleName = null;
+        let globalMinIdx = null;
 
-          drawDataset.data[holeName].x_max_hole = Number.isFinite(holeMax) ? holeMax : null;
-          drawDataset.data[holeName].x_min_hole = Number.isFinite(holeMin) ? holeMin : null;
-          drawDataset.data[holeName].x_max_hole_idx = holeMaxIdx;
-          drawDataset.data[holeName].x_min_hole_idx = holeMinIdx;
+        for(let n=0; n<2;n++){
+          for (const holeName in drawDataset.data) {
+            if(n==0 && holeName == "global"){
+              continue
+            }
 
-          if(holeMax>globalMax){
-            globalMax = holeMax;
+            let holeMax = -Infinity;
+            let holeMin = Infinity;
+            let holeMaxIdx = null;
+            let holeMinIdx = null;
+
+            drawDataset.data[holeName].data.forEach((d, idx)=>{
+              if (!isFinite(d.x)) return
+              if(d.x>holeMax || holeMaxIdx == null){
+                holeMax = d.x;
+                holeMaxIdx = idx;
+              }
+              if(d.x<holeMin || holeMinIdx == null){
+                holeMin = d.x;
+                holeMinIdx = idx;
+              }
+            });
+
+            drawDataset.data[holeName].x_max_hole = Number.isFinite(holeMax) ? holeMax : null;
+            drawDataset.data[holeName].x_min_hole = Number.isFinite(holeMin) ? holeMin : null;
+            drawDataset.data[holeName].x_max_hole_idx = holeMaxIdx;
+            drawDataset.data[holeName].x_min_hole_idx = holeMinIdx;
+
+            if(holeMax>globalMax){
+              globalMax = holeMax;
+              globalMaxHoleName = holeName;
+              globalMaxIdx = holeMaxIdx;
+            }
+            if(holeMin<globalMin){
+              globalMin = holeMin;
+              globalMinHoleName = holeName;
+              globalMinIdx = holeMinIdx;
+            }
           }
-          if(holeMin<globalMin){
-            globalMin = holeMin;
+
+          if(Number.isFinite(globalMax) && (drawDataset.x_max_global == null || drawDataset.x_max_global < globalMax)){
+            drawDataset.x_max_global = globalMax;
+            drawDataset.x_max_global_pos.holeName = globalMaxHoleName;
+            drawDataset.x_max_global_pos.idx = globalMaxIdx;
           }
+          if(Number.isFinite(globalMin) && (drawDataset.x_min_global == null || drawDataset.x_min_global > globalMin)){
+            drawDataset.x_min_global = globalMin;
+            drawDataset.x_min_global_pos.holeName = globalMinHoleName;
+            drawDataset.x_min_global_pos.idx = globalMinIdx;
+          }
+                    
+          for (const holeName in drawDataset.data) {
+            drawDataset.data[holeName].data?.forEach(d=>{
+              d.min_x = globalMin;
+              d.max_x = globalMax;
+            })
+          }
+
+          LCPlot.draw_collections.push(drawDataset);
+                  
         }
         
-        drawDataset.x_max_global = globalMax;
-        drawDataset.x_min_global = globalMin;
-        for (const holeName in drawDataset.data) {
-          drawDataset.data[holeName].data.forEach(d=>{
-            d.min_x = globalMin;
-            d.max_x = globalMax;
-          })
-        }
-
-        LCPlot.draw_collections.push(drawDataset);
       }
+    }else{
+      console.log(objOpts.plot.selected_options, LCPlot.data_collections)
     }
-          
-    console.log("[Renderer]: Plot data is loaded.")
+
+    
+    console.log("[Renderer]: Plot data is loaded.", LCPlot.draw_collections)
     updateView();
   });
   //============================================================================================
@@ -5679,10 +5738,6 @@ document.addEventListener("DOMContentLoaded", () => {
                 continue
               }                
 
-              //get position
-              const holeMaxPos = getPlotPosiotion( pDataList[drawDataset.data[holeName].x_max_hole_idx], LCCore, objOpts);
-              const holeMinPos = getPlotPosiotion( pDataList[drawDataset.data[holeName].x_min_hole_idx], LCCore, objOpts);
-
               for(let i=0; i<pDataList.length;i++){
                 if((drawDataset.options.plotType =="line" || drawDataset.options.plotType =="bar") && i==pDataList.length-1){
                   continue
@@ -5700,13 +5755,13 @@ document.addEventListener("DOMContentLoaded", () => {
                 const resUpper = getPlotPosiotion( pDataList[i], LCCore, objOpts);
                 pDataList[i].pos_canvas_x = resUpper.pos_canvas_x;
                 pDataList[i].pos_canvas_y = resUpper.pos_canvas_y; 
-
+                
                 //next(for line)
                 if(i<pDataList.length-1){
                   pDataList[i+1].amplification_x = (objOpts.hole.width / 2) * drawDataset.options.amplification / (drawDataset.x_max_global - drawDataset.x_min_global);
                   pDataList[i+1].amplification_y = 1;
                   const resLower = getPlotPosiotion( pDataList[i+1], LCCore, objOpts);
-                  if(pDataList[i].section_name == pDataList[i+1].section_name){
+                  if(pDataList[i].hole_name == pDataList[i+1].hole_name && pDataList[i].section_name == pDataList[i+1].section_name){
                     pDataList[i+1].pos_canvas_x = resLower.pos_canvas_x;
                     pDataList[i+1].pos_canvas_y = resLower.pos_canvas_y;
                   }else{
@@ -5726,12 +5781,12 @@ document.addEventListener("DOMContentLoaded", () => {
                     pDataList[i+1].pos_canvas_y,
                   )              
                 }else if(drawDataset.options.plotType == "scatter"){
-                  sketch.noStroke();
-                  sketch.fill(drawDataset.options.colour);
-                  sketch.ellipse(
+                  sketch.stroke(drawDataset.options.colour);
+                  sketch.strokeWeight(3); 
+
+                  sketch.point(
                     pDataList[i].pos_canvas_x,
-                    pDataList[i].pos_canvas_y,
-                    3
+                    pDataList[i].pos_canvas_y
                   );
                 }else if(drawDataset.options.plotType == "bar"){
                   //get 0 position
@@ -5779,6 +5834,16 @@ document.addEventListener("DOMContentLoaded", () => {
                 }                
               }
 
+              //get position
+              const pDataMax = drawDataset.data[drawDataset.x_max_global_pos.holeName].data[drawDataset.x_max_global_pos.idx];
+              const pDataMin = drawDataset.data[drawDataset.x_min_global_pos.holeName].data[drawDataset.x_min_global_pos.idx];
+              pDataMax.amplification_x   = (objOpts.hole.width / 2) * drawDataset.options.amplification / (drawDataset.x_max_global - drawDataset.x_min_global);
+              pDataMin.amplification_x   = (objOpts.hole.width / 2) * drawDataset.options.amplification / (drawDataset.x_max_global - drawDataset.x_min_global);
+
+              const holeMaxPos = getPlotPosiotion( pDataMax, LCCore, objOpts);
+              const holeMinPos = getPlotPosiotion( pDataMin, LCCore, objOpts);
+
+
               //X scale
               const isDrawAxis = true;
               if(isDrawAxis){
@@ -5795,6 +5860,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 sketch.textSize(12);
                 sketch.noStroke();
                 sketch.fill(drawDataset.options.colour)
+
                 sketch.text(
                   autoRound(drawDataset.data[holeName].x_min_hole).toString(),
                   holeMinPos.pos_canvas_x - sketch.textWidth(autoRound(drawDataset.data[holeName].x_min_hole).toString()),
@@ -5834,17 +5900,18 @@ document.addEventListener("DOMContentLoaded", () => {
   //============================================================================================
   function autoRound(num, { precision = 2, decimalPlaces = null, significantFigures = null } = {}) {
     if (!isFinite(num)) return num;
-  
+    if (num === 0) return 0;
+
     if (significantFigures !== null) {
       const factor = Math.pow(10, significantFigures - Math.ceil(Math.log10(Math.abs(num))));
       return Math.round(num * factor) / factor;
     }
-  
+
     if (decimalPlaces !== null) {
       const factor = Math.pow(10, decimalPlaces);
       return Math.round(num * factor) / factor;
     }
-  
+
     const decimalPlacesForAuto = Math.max(0, Math.floor(-Math.log10(Math.abs(num)) + precision));
     const factor = Math.pow(10, decimalPlacesForAuto);
     return Math.round(num * factor) / factor;

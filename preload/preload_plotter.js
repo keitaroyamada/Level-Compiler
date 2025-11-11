@@ -18,6 +18,7 @@ contextBridge.exposeInMainWorld("PlotterApi", {
   sendPlotOptions:(args1,args2) => ipcRenderer.invoke("sendPlotOptions",args1,args2),
   clearProgressbar:() => ipcRenderer.invoke("clearProgressbar"),
   PlotterClose:() => ipcRenderer.invoke("PlotterClose"),
+  ConverterClose:() => ipcRenderer.invoke("ConverterClose"),
   windowCloseButton:() => ipcRenderer.send("windowCloseButton"),
   
   //main -> renderer

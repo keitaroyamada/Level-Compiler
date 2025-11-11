@@ -504,9 +504,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
         await window.ConverterApi.sendImportedData(sendData);
         console.log("[Converter]: Converted data is imported.");
-        
+        console.log(output)
+
         //colse window
-        window.close();
+        //window.close();
 
       } else {
         console.log("Unkown convert type.")
@@ -521,7 +522,10 @@ document.addEventListener("DOMContentLoaded", () => {
       window.ConverterApi.clearProgressbar();
       //console.log(convertedData);
 
-      alert("Conversion completed successfully.")
+      if(output_type == "export"){
+        alert("Conversion completed successfully.")
+      }
+      
     }catch(err){
       console.log(err);
     }      

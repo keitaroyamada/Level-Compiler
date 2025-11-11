@@ -344,6 +344,7 @@ document.addEventListener("DOMContentLoaded", () => {
         });
         document.body.style.cursor = "default"; 
         window.PlotterApi.clearProgressbar();
+        window.PlotterApi.ConverterClose();
     }); 
     function getSelectedData(){
         const children = document.getElementById("plot_list").children;

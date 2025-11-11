@@ -916,10 +916,14 @@ function createMainWIndow() {
       targetWindow = converterWindow;
     }
     progressBar = progressDialog(targetWindow, tit, txt, indeterminate);
+    //await new Promise(resolve => setTimeout(resolve, 100));
 
-    if(progressBar){
-      await new Promise(resolve => setTimeout(resolve, 100));
-      progressBar.detail = "Processing...";
+    if(progressBar){      
+      progressBar.on('ready', () => {
+        if(progressBar._window && !progressBar._window.isDestroyed()){
+          progressBar.detail = 'Processing...';
+        }
+      });
     }    
   });
   ipcMain.handle("updateProgressbar", async (_e, n, N) => {
@@ -1553,7 +1557,7 @@ function createMainWIndow() {
         buttons: ["No", "Yes"],
         defaultId: 0,
         title: "Export",
-        message: "Duplicate marker positions were found (N="+dist_error+"). This may result in incorrect data or processing errors.Do you want to continue exporting anyway?",
+        message: "Duplicate marker positions were found (N="+dist_error+") in the correlation model. This may result in incorrect data or processing errors.Do you want to continue exporting anyway?",
       };
 
       const { response } = await dialog.showMessageBox(mainWindow, options);
@@ -1884,6 +1888,14 @@ function createMainWIndow() {
       //converterWindow.setAlwaysOnTop(true, "normal");
       converterWindow.webContents.send("ConverterMenuClicked", data);
     });   
+  });
+  ipcMain.handle("ConverterClose", (_e, data) => {
+    if(converterWindow){
+      document.body.style.cursor = "default"; 
+      converterWindow.removeAllListeners("close");
+      converterWindow.close();
+      converterWindow = null;
+    }    
   });
   ipcMain.handle("PlotterClose", (_e, data) => {
     isPlotterClose = true;
@@ -2852,6 +2864,7 @@ function createMainWIndow() {
           );
         });
     }
+    
     if(progressBar){
       progressBar.close()
       progressBar = null; 
@@ -3023,7 +3036,7 @@ function createMainWIndow() {
       } else if (type == "composite_depth") {
         //get cd
         const name     = data[0];
-        const cd       = data[1];
+        const cd       = parseFloat(data[1]);
         const targetId = data[2];
 
         //get nearest trinity return: [index: , project: , hole: , section: , distance: ]
@@ -3059,7 +3072,7 @@ function createMainWIndow() {
       } else if (type == "event_free_depth") {
         //get efd
         const name = data[0];
-        const efd = data[1];
+        const efd = parseFloat(data[1]);
         const targetId = data[2];
 
         //get nearest trinity
@@ -3096,7 +3109,7 @@ function createMainWIndow() {
         //NOT RECOMMENDED!!
         //get cd
         const name = data[0];
-        const dd = data[1];
+        const dd = parseFloat(data[1]);
         const targetId = data[2];
 
         //convertion from drilling depth must be targetId.
@@ -3150,7 +3163,7 @@ function createMainWIndow() {
       } else if (type == "age") {
         //get efd
         const name = data[0];
-        const age = data[1];
+        const age = parseFloat(data[1]);
         const targetId = data[2];
 
         //calc efd
