@@ -149,6 +149,9 @@ document.addEventListener("DOMContentLoaded", () => {
       cell7.textContent = null; //definition age of target lower
       var cell8 = row.insertCell();
       cell8.textContent = null; //polation type
+      var cell9 = row.insertCell();
+      cell9.textContent = null; //description
+      cell9.setAttribute("contenteditable", "true");
     }else{
       var cell0 = row.insertCell();
       var checkbox = document.createElement("input");
@@ -177,6 +180,9 @@ document.addEventListener("DOMContentLoaded", () => {
       cell7.textContent = null; //definition age of target lower
       var cell8 = row.insertCell();
       cell8.textContent = null; //polation type
+      var cell9 = row.insertCell();
+      cell9.textContent = null; //description
+      cell9.setAttribute("contenteditable", "true");
     }
  
     
@@ -334,7 +340,6 @@ document.addEventListener("DOMContentLoaded", () => {
         distUpper = distLower;
         distLower = resultLower.distance;
       }
-      
       i += 1;
     }
 
@@ -376,6 +381,9 @@ document.addEventListener("DOMContentLoaded", () => {
       cell7.textContent = target[6]; //definition age of target lower
       var cell8 = row.insertCell();
       cell8.textContent = target[7]; //polation type
+      var cell9 = row.insertCell();
+      cell9.textContent = null; //description
+      cell9.setAttribute("contenteditable", "true");
     }
     
     
@@ -1073,8 +1081,11 @@ document.getElementById("exportButton").addEventListener("click", () => {
       "Definition Age lower (cm)", 
       "Calc method upper", 
       "Calc method lower",
-      "Descriptions"
+      "Descriptions (system)",
+      "Descriptions (user)",
     ]];
+
+    const [targetData, targetIdx] = getTableData("target_table");
 
     for(let i=0; i<interpolatedData.length; i++){
       const data = [
@@ -1093,9 +1104,10 @@ document.getElementById("exportButton").addEventListener("click", () => {
         Math.round(interpolatedData[i].definition_efd_lower*100)/100,
         Math.round(interpolatedData[i].age_mid_upper*100)/100,
         Math.round(interpolatedData[i].age_mid_lower*100)/100,
-        Math.round(interpolatedData[i].calc_type_upper*100)/100,
-        Math.round(interpolatedData[i].calc_type_upper*100)/100,
-        interpolatedData[i].descriptions
+        interpolatedData[i].calc_type_upper,
+        interpolatedData[i].calc_type_upper,
+        interpolatedData[i].descriptions,
+        targetData[i][9]
       ];
       
       output.push(data);

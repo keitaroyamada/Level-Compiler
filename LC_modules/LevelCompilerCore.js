@@ -1751,7 +1751,7 @@ class LevelCompilerCore extends EventEmitter{
       let lowerIdxs = [];
 
       if(trinityList[t].hole_name==null || trinityList[t].section_name==null || trinityList[t].distance==null){
-        output.push([null, null, null]);
+        output.push([null, null, null, null, null]);
         continue;
       } 
       const holeName    = lcfnc.zeroPadding(trinityList[t].hole_name);
@@ -1836,14 +1836,14 @@ class LevelCompilerCore extends EventEmitter{
             trinityList[t].distance +
             " cm]"
         );
-        output.push([null, null, null]);
+        output.push([null, null, null, null, null]);
       }
 
 
       //extrapolation case
-      if(upperIdxs.length == 0 || lowerIdxs.length == 0){
-        console.log(upperIdxs, lowerIdxs)
+      if(upperIdxs.length == 0 || lowerIdxs.length == 0){        
         if(!allowExtrapolation){
+          //console.log(upperIdxs, lowerIdxs)
           this.setError(
             "",
             "E018: Nearest unique marker set does not exist. [" +
@@ -1868,7 +1868,7 @@ class LevelCompilerCore extends EventEmitter{
               " cm]. Point is probably out of section."
           );
           
-          output.push([null, null, null]);
+          output.push([null, null, null, null, null]);
           continue;
         }else{
           //extrapolation
@@ -1880,7 +1880,7 @@ class LevelCompilerCore extends EventEmitter{
           }
 
           if(!Idx){
-            output.push([null, null, null]);
+            output.push([null, null, null, null, null]);
             continue;
           }
 
@@ -1896,7 +1896,7 @@ class LevelCompilerCore extends EventEmitter{
 
           const new_rank = D3_rank + 2;
 
-          output.push([sectionId, D1, new_rank,"extrapolation"]);
+          output.push([sectionId, D1, new_rank,"extrapolation", "Parallel Section"]);
           continue;
         }
 
@@ -1905,10 +1905,7 @@ class LevelCompilerCore extends EventEmitter{
       //get section data
       let sectionId = this.projects[upperIdxs[0][0]].holes[upperIdxs[0][1]].sections[upperIdxs[0][2]].id;
       const masterIdx = this.search_idx_list[this.base_project_id.toString()];
-      if(masterIdx){
-      }else{
-        console.log(this.base_project_id, masterIdx)
-      }
+
 
       //check duo connection
       let isMasterExist = false;
@@ -1948,12 +1945,16 @@ class LevelCompilerCore extends EventEmitter{
         const D1_rank = this.projects[upperIdxs[0][0]].holes[upperIdxs[0][1]].sections[upperIdxs[0][2]].markers[upperIdxs[0][3]].connection_rank;
         const D3_rank = this.projects[lowerIdxs[0][0]].holes[lowerIdxs[0][1]].sections[lowerIdxs[0][2]].markers[lowerIdxs[0][3]].connection_rank;
 
+        //check master
+        const D1_master = this.projects[upperIdxs[0][0]].holes[upperIdxs[0][1]].sections[upperIdxs[0][2]].markers[upperIdxs[0][3]].isMaster;
+        const D3_master = this.projects[lowerIdxs[0][0]].holes[lowerIdxs[0][1]].sections[lowerIdxs[0][2]].markers[lowerIdxs[0][3]].isMaster;
+
         if (D1 == null || D3 == null) {
           this.setError("","E020: "+ calcType + " is empty.");
           //console.log("ERROR: " + calcType + " of value is empty.");
           //console.log("D1:" + D1 + "/D3:" + D3 + "/d1:" + d1 + "/d3:" + d3);
 
-          output.push([null, null, null]);
+          output.push([null, null, null, null, null]);
           continue;
         }
 
@@ -1962,10 +1963,15 @@ class LevelCompilerCore extends EventEmitter{
         const d3d1 = d3 - d1;
         const interpolatedDepth = this.linearInterp(D1, D3, d2d1, d3d1);
         const new_rank = Math.max(...[D1_rank, D3_rank]) + 1;
-        output.push([sectionId, interpolatedDepth, new_rank, "interpolation"]);
+        if(D1_master && D3_master){
+          output.push([sectionId, interpolatedDepth, new_rank, "interpolation", "Master Section"]);
+        }else{
+          output.push([sectionId, interpolatedDepth, new_rank, "interpolation", "Parallel Section"]);
+        }
+        
       }else{
         //case not calc depth
-        output.push([null, null, null, null]);
+        output.push([null, null, null, null, null]);
       }
 
 
@@ -3004,7 +3010,7 @@ class LevelCompilerCore extends EventEmitter{
   }
   updateSearchIdx() {
     this.setStatus("running","start updateSearchIdx");
-    this.search_idx_list = [];
+    this.search_idx_list = {};
     for (let p = 0; p < this.projects.length; p++) {
       this.search_idx_list[this.projects[p].id.toString()] = [
         p,
@@ -5427,7 +5433,7 @@ class LevelCompilerCore extends EventEmitter{
     this.setStatus("completed","start getNearestTrinity");
     //search in target
     //this method returns paseudo result because multiple sections matched, but returns most goood sections based on centre of sections.
-    let output = {index:[null,null,null,null], project:null, hole:null, section: null, distance: null};
+    let output = {index:[null,null,null,null], project:null, hole:null, section: null, distance: null, section_type: false};
     let nearestSectionData = null;
     let nearestSectionList = [];
     let tempSectionData = null;
@@ -5522,7 +5528,7 @@ class LevelCompilerCore extends EventEmitter{
     const d2 = depth;
     const d3 = lowerMarkerData[calcType];
     const d2d1 = d2 - d1;
-    const d3d1 = d3 - d1;
+    const d3d1 = d3 - d1;    
 
     const interpDistance = this.linearInterp(D1, D3, d2d1, d3d1);
 
@@ -5532,6 +5538,11 @@ class LevelCompilerCore extends EventEmitter{
     output.hole    = this.projects[idx[0]].holes[idx[1]].name;
     output.section = this.projects[idx[0]].holes[idx[1]].sections[idx[2]].name;
     output.distance= interpDistance;
+    if(upperMarkerData.isMaster && lowerMarkerData.isMaster){
+      output.section_type = "Paseudo Master Section";
+    }else{
+      output.section_type = "Paseudo Parallel Section";
+    };
 
     this.setStatus("completed","");
     return output;
@@ -6230,11 +6241,16 @@ class LevelCompilerCore extends EventEmitter{
     return result;
   }
   exportSerialisedModel() {
-  return JSON.parse(JSON.stringify(this, (key, value) => {
-    if (typeof value === "function") return undefined;
-    if (key && key[0] === "_") return undefined;
-    return value;
-  }));
+    return JSON.parse(JSON.stringify(this, (key, value) => {
+      
+      if (typeof value === "function") return undefined;
+
+      if (key && key[0] === "_") return undefined;
+
+
+
+      return value;
+    }));
   }
   convertLF2LC(filepath){
     //this function is converting correlation model csv for Level Finder to correlation model csv for Level Compiler

@@ -215,9 +215,9 @@ document.addEventListener("DOMContentLoaded", () => {
       //get trinity data
       let holeName    = holeList[document.getElementById("holeOptions").value][2];
       let sectionName = sectionList[document.getElementById("holeOptions").value][document.getElementById("sectionOptions").value][2];
-      const distance    = parseFloat(document.getElementById("distanceInput").value);
+      const distance  = parseFloat(document.getElementById("distanceInput").value);
       let sectionId   = sectionList[document.getElementById("holeOptions").value][document.getElementById("sectionOptions").value][1];
-      const cd          = parseFloat(document.getElementById("cdInput").value);
+      const cd        = parseFloat(document.getElementById("cdInput").value);
 
       //calc
       if(targetId[1] == null){
@@ -716,5 +716,6 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
   //-------------------------------------------------------------------------------------------
+  
   //-------------------------------------------------------------------------------------------
 });

@@ -253,7 +253,7 @@ document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("cvt_bt_convert").addEventListener("click", async (event) => {
     try{
       document.getElementById("cvt_bt_convert").disabled = true;
-      await window.ConverterApi.progressbar("Depth converter", "Now chacking...", true, "converterWindow");
+      await window.ConverterApi.progressbar("Depth converter", "Now checking...", true, "converterWindow");
 
       console.log("[Converter]: Converting...");
       document.body.style.cursor = "wait"; 
@@ -342,6 +342,7 @@ document.addEventListener("DOMContentLoaded", () => {
           ]);
         }
       }
+      console.log("[Converter]: Finish making input data list.")
 
       //output     
       if(output_type == "export"){
@@ -359,6 +360,8 @@ document.addEventListener("DOMContentLoaded", () => {
             "Age mid (calBP)",
             "Age upper (calBP)",
             "Age lower (calBP)",
+
+            "Connection",
             "Connection Rank",
             "Source Type",
             "Calc Type",
@@ -385,10 +388,13 @@ document.addEventListener("DOMContentLoaded", () => {
           isZip: true,
         };
 
-        const calcedDataList = await unzip(await window.ConverterApi.depthConverter(indataList, options));
+        const zipInData = await zip(indataList);
+
+        const calcedDataList = await unzip(await window.ConverterApi.depthConverter(zipInData, options));
 
         if(calcedDataList===null) {
           document.body.style.cursor = "default"; 
+          window.ConverterApi.clearProgressbar();
           return
         }
 
@@ -403,7 +409,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
           //update header
           if(i==0){
-            if(calcedData.is_master_depth===false){
+            if(calcedData.is_main_model===false){
               header[5]+=" [DUO]";
               header[6]+=" [DUO]";
               header[13]+=" [DUO]";
@@ -435,28 +441,50 @@ document.addEventListener("DOMContentLoaded", () => {
             parseFloat(calcedData.age_mid).toFixed(precision), //age mid
             parseFloat(calcedData.age_upper).toFixed(precision), //age upper
             parseFloat(calcedData.age_lower).toFixed(precision), //age lower
+
+            calcedData.is_main_model ? "MAIN " + calcedData.section_type : "DUO " + calcedData.section_type, // MAIN master section/parallel section
             calcedData.correlation_rank,  //connection rank
+
             calcedData.source_type,
             calcedData.calc_type,
-            calcedData.is_master_depth ? calcedData.correlation_model_version+"[MAIN]":calcedData.correlation_model_version+"[DUO]",
-            calcedData.is_master_depth ? calcedData.event_model_version+"[MAIN]":calcedData.event_model_version+"[DUO]",
-            calcedData.age_model_version,
-            calcedData.description
+            calcedData.is_main_model ? "[MAIN]" + calcedData.correlation_model_version : "[DUO]" + calcedData.correlation_model_version,
+            calcedData.is_main_model ? "[MAIN]" + calcedData.event_model_version : "[DUO]" + calcedData.event_model_version,
+            calcedData.age_model_version ? "[MAIN]" + calcedData.age_model_version : "",
+            calcedData.description, 
           ];
+
+          //add data
+          if(n_c>depthMaxIdx+1){
+            for(let d=depthMaxIdx+1; d<n_c; d++){
+              rowData.push(source_data[i+1][d]);//remove header
+            }
+          }
                     
           convertedData.push(rowData);
         }
         
         //export
-        await window.ConverterApi.cvtExport(convertedData);
-        console.log("[Converter]: Converted data is exported.");
+        await window.ConverterApi.progressbar("Depth converter", "Now saving...", true, "converterWindow");
+
+        const exRes = await window.ConverterApi.cvtExport(await zip(convertedData));
+
+        if(exRes){
+          console.log("[Converter]: Converted data is exported.");
+          window.ConverterApi.clearProgressbar();
+          alert("Conversion completed successfully.");
+        }else{
+          window.ConverterApi.clearProgressbar();
+          console.log("[Converter]: Failed to export.");
+          alert("Failed to convert data.");
+        }
+        
       } else if (output_type == "import"){
         //main convertion
         if (source_data === null) {return}
         const options = {
           sourceType: sourceType,
           polationType: "linear",  
-          allowOutside: allowOutside,
+          allowOutside: true,
           callFrom: "converter",
           isZip: true,
         };
@@ -466,8 +494,10 @@ document.addEventListener("DOMContentLoaded", () => {
         
         if(calcedDataList===null) {
           document.body.style.cursor = "default"; 
+          window.ConverterApi.clearProgressbar();
           return
         }
+
         let output = [];
 
         for(let i=0; i<calcedDataList.length; i++){
@@ -502,9 +532,8 @@ document.addEventListener("DOMContentLoaded", () => {
           send_from:"Converter",
         };
 
-        await window.ConverterApi.sendImportedData(sendData);
+        await window.ConverterApi.sendImportedData(await zip(sendData));
         console.log("[Converter]: Converted data is imported.");
-        console.log(output)
 
         //colse window
         //window.close();
@@ -513,18 +542,11 @@ document.addEventListener("DOMContentLoaded", () => {
         console.log("Unkown convert type.")
       }
 
-      //save
-      await window.ConverterApi.progressbar("Depth converter", "Now saving...", true, "converterWindow");
-
       document.body.style.cursor = "default"; 
       document.getElementById("cvt_bt_convert").disabled = false;
 
       window.ConverterApi.clearProgressbar();
       //console.log(convertedData);
-
-      if(output_type == "export"){
-        alert("Conversion completed successfully.")
-      }
       
     }catch(err){
       console.log(err);
@@ -544,6 +566,7 @@ document.addEventListener("DOMContentLoaded", () => {
   });
   document.getElementById('container').addEventListener("drop", async (e) => {
       e.preventDefault(e);
+
       //get file paths
       let dataList = [];
       for(const file of e.dataTransfer.files){
@@ -570,18 +593,28 @@ document.addEventListener("DOMContentLoaded", () => {
         await loadCsv(dataList[d].fullpath);
       }
 
+      
+
     });
   async function loadCsv(path){
-    [source_data, loadedpath] = await window.ConverterApi.cvtLoadCsv(
-      "Please select the conversion target data",
-      [
-        {
-          name: "CSV file",
-          extensions: ["csv"],
-        },
-      ],
-      path
-    );
+    const result = await window.ConverterApi.progressbar("Depth converter", "Now loading...", true, "converterWindow");
+
+    if(result){
+      let data;
+      [data, loadedpath] = await window.ConverterApi.cvtLoadCsv(
+        "Please select the conversion target data",
+        [
+          {
+            name: "CSV file",
+            extensions: ["csv"],
+          },
+        ],
+        path
+      );
+      source_data = await unzip(data);
+    }
+     await window.ConverterApi.clearProgressbar();
+
 
     if (source_data !== null) {
       source_path = loadedpath;
@@ -645,19 +678,59 @@ document.addEventListener("DOMContentLoaded", () => {
       document.getElementById("data_path").textContent = loadedpath.match(/[^\\\/]*$/)[0];
       document.getElementById("num_rows").textContent  = "Rows = "+source_data.length;
     }
+   
   }
-  async function unzip(result){
-  if(result !== null){
-    //unzip
-    const cs = new DecompressionStream('gzip');
-    const decompressedStream = new Response(
-      new Blob([result]).stream().pipeThrough(cs)
-    );
-    const decompressed = await decompressedStream.text();
+  async function unzip(result) {
+  if (result == null) {
+    return null;
+  }
+
+  try {
+    // 1. Gunzip
+    const ds = new DecompressionStream('gzip');
+    const blob = new Blob([result]);
+    const stream = blob.stream().pipeThrough(ds);
+    const response = new Response(stream);
     
-    return JSON.parse(decompressed);
-  }else{
-    return null
+    const arrayBuffer = await response.arrayBuffer();
+
+    // 2. MessagePack decode
+    const decodedData = msgpack.decode(new Uint8Array(arrayBuffer));
+    
+    return decodedData;
+
+  } catch (e) {
+    console.error("[renderer] Gzip is failed to unzip:", e);
+    return null; 
   }
-}
+  }
+  async function zip(data) {
+    // Return null if input is invalid
+    if (data == null) {
+      return null;
+    }
+
+    try {
+      // 1. Encode to MessagePack (using msgpack-lite)
+      const encoded = msgpack.encode(data);
+
+      // 2. Compress with Gzip (using standard browser API)
+      const cs = new CompressionStream('gzip');
+      
+      // Create a stream from the encoded data and pipe it through the compressor
+      const blob = new Blob([encoded]);
+      const stream = blob.stream().pipeThrough(cs);
+      const response = new Response(stream);
+      
+      // Wait for the compression to finish and get the buffer
+      const arrayBuffer = await response.arrayBuffer();
+
+      // Return as Uint8Array
+      return new Uint8Array(arrayBuffer);
+
+    } catch (e) {
+      console.error("[renderer] Failed to zip:", e);
+      return null;
+    }
+  }
 });

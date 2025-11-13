@@ -5727,8 +5727,6 @@ document.addEventListener("DOMContentLoaded", () => {
             //get inside data
             const scrollerTopRealScale   = (scroller.scrollTop - pad_y) / yMag - shift_y;//cm
             const scrollerBotRealScale   = (scroller.scrollTop + window.innerHeight - pad_y) / yMag - shift_y;//cm
-            //const scrollerLeftRealScale  = (scroller.scrollLeft - pad_x) / xMag - shift_x;
-            //const scrollerRightRealScale = (scroller.scrollLeft + window.innerWidth - pad_x) / xMag - shift_x;            
             
             //draw plot--------------------------------------------------------------------------------------------
             for(let holeName in drawDataset.data){
@@ -5736,30 +5734,72 @@ document.addEventListener("DOMContentLoaded", () => {
               
               if(pDataList.length==0){
                 continue
-              }                
+              }       
+              
+              //check inside
+              const bufferVal = objOpts.canvas.buffer_depth * yMag;
+              const searchTop = scrollerTopRealScale - bufferVal;
+              const searchBot = scrollerBotRealScale + bufferVal;
+              let startIndex = binarySearchIndex(pDataList, searchTop, (d) => d.composite_depth);
+              let endIndex   = binarySearchIndex(pDataList, searchBot, (d) => d.composite_depth);
+              
+              //calc values
+              const amp = [(objOpts.hole.width / 2) * drawDataset.options.amplification / (drawDataset.x_max_global - drawDataset.x_min_global), 1];
 
-              for(let i=0; i<pDataList.length;i++){
+              //draw              
+              if (drawDataset.options.plotType == "line") {
+                sketch.strokeWeight(1); 
+                sketch.stroke(drawDataset.options.colour); 
+                sketch.noFill();
+                sketch.beginShape();
+              }else if(drawDataset.options.plotType == "bar"){
+                // Calculate zero position if not yet calculated
+                if(drawDataset.data[holeName].x_zero_hole == null){
+                  const zeroData = drawDataset.data[holeName].data[0];
+                  // Create a temporary object to calculate the zero position
+                  // Note: Ensure deep copy if necessary depending on your data structure
+                  const tempZero = { ...zeroData, x: 0 }; 
+                  const zeroResult = getPlotPosiotion(tempZero, LCCore, objOpts);
+                  drawDataset.data[holeName].x_zero_hole = zeroResult.pos_canvas_x;
+                }
+
+                const rectX0 = drawDataset.data[holeName].x_zero_hole; 
+                
+                // Draw the vertical reference line ONLY ONCE
+                sketch.strokeWeight(1); 
+                sketch.stroke("black"); 
+                sketch.noFill();
+                sketch.line(
+                  rectX0,
+                  searchTop, // Screen Top
+                  rectX0,
+                  searchBot  // Screen Bottom
+                );
+                
+                // Start Batch Drawing for Bars (Using QUADS)
+                sketch.fill(drawDataset.options.colour);
+                sketch.noStroke(); // Disable stroke for individual bars to improve performance
+                sketch.beginShape(sketch.QUADS);
+
+              }
+
+              for(let i=startIndex; i<endIndex; i++){
                 if((drawDataset.options.plotType =="line" || drawDataset.options.plotType =="bar") && i==pDataList.length-1){
                   continue
                 }
 
-                //check inside
-                if (scrollerTopRealScale > pDataList[i].composite_depth + objOpts.canvas.buffer_depth * yMag || scrollerBotRealScale < pDataList[i].composite_depth - objOpts.canvas.buffer_depth * yMag) {
-                  continue;
-                } 
-
                 //calc plot positions
                 //current 
-                pDataList[i].amplification_x   = (objOpts.hole.width / 2) * drawDataset.options.amplification / (drawDataset.x_max_global - drawDataset.x_min_global);
-                pDataList[i].amplification_y   = 1;
+                pDataList[i].amplification_x   = amp[0];
+                pDataList[i].amplification_y   = amp[1];
                 const resUpper = getPlotPosiotion( pDataList[i], LCCore, objOpts);
                 pDataList[i].pos_canvas_x = resUpper.pos_canvas_x;
                 pDataList[i].pos_canvas_y = resUpper.pos_canvas_y; 
                 
                 //next(for line)
                 if(i<pDataList.length-1){
-                  pDataList[i+1].amplification_x = (objOpts.hole.width / 2) * drawDataset.options.amplification / (drawDataset.x_max_global - drawDataset.x_min_global);
-                  pDataList[i+1].amplification_y = 1;
+                  pDataList[i+1].amplification_x = amp[0];
+                  //DataList[i+1].amplification_y = 1;
                   const resLower = getPlotPosiotion( pDataList[i+1], LCCore, objOpts);
                   if(pDataList[i].hole_name == pDataList[i+1].hole_name && pDataList[i].section_name == pDataList[i+1].section_name){
                     pDataList[i+1].pos_canvas_x = resLower.pos_canvas_x;
@@ -5772,14 +5812,22 @@ document.addEventListener("DOMContentLoaded", () => {
 
                 //draw
                 if(drawDataset.options.plotType == "line"){
-                  sketch.strokeWeight(1);
-                  sketch.stroke(drawDataset.options.colour);
-                  sketch.line(
-                    pDataList[i].pos_canvas_x,
-                    pDataList[i].pos_canvas_y,
-                    pDataList[i+1].pos_canvas_x,
-                    pDataList[i+1].pos_canvas_y,
-                  )              
+                  // ---------------------------------------------------------
+                  // Line Plot: Use vertex() instead of line()
+                  // ---------------------------------------------------------
+                  
+                  // Add a vertex to the current shape batch (sends to GPU memory, doesn't draw yet)
+                  sketch.vertex(pDataList[i].pos_canvas_x, pDataList[i].pos_canvas_y);
+
+                  // Handle data discontinuity (e.g., different hole or section)
+                  // We must break the line if the next point belongs to a different group
+                  if (i < pDataList.length - 1) {
+                    const nextData = pDataList[i+1];
+                    if (pDataList[i].hole_name !== nextData.hole_name || pDataList[i].section_name !== nextData.section_name) {
+                        sketch.endShape();   // Draw the current segment
+                        sketch.beginShape(); // Start a new segment
+                    }
+                  }             
                 }else if(drawDataset.options.plotType == "scatter"){
                   sketch.stroke(drawDataset.options.colour);
                   sketch.strokeWeight(3); 
@@ -5789,49 +5837,51 @@ document.addEventListener("DOMContentLoaded", () => {
                     pDataList[i].pos_canvas_y
                   );
                 }else if(drawDataset.options.plotType == "bar"){
-                  //get 0 position
-                  if(drawDataset.data[holeName].x_zero_hole == null){
-                    const zeroData = drawDataset.data[holeName].data[0];
-                    zeroData.x = 0;
-                    const zeroResult = getPlotPosiotion(zeroData, LCCore, objOpts);
-                    drawDataset.data[holeName].x_zero_hole = zeroResult.pos_canvas_x;
-                  }
-
-                  sketch.strokeWeight(1);
-                  sketch.stroke(drawDataset.options.colour);
-                  sketch.fill(drawDataset.options.colour);
-
-                  let rectX0 = drawDataset.data[holeName].x_zero_hole;//hole_min_x
-
-                  if(drawDataset.x_max_global < 0){
-                    rectX0 = drawDataset.data[holeName].x_max_hole;
-                  }
-                  /*
-                  if(drawDataset.x_min_global > 0){
-                    rectX0 = drawDataset.data[holeName].x_min_hole;
-                  }
-                  */
-                  const binWidth = 4;
-                  let rectX1 = pDataList[i].pos_canvas_x;
-                  let rectY0 = pDataList[i].pos_canvas_y - binWidth/2;
-                  let rectY1 = pDataList[i].pos_canvas_y + binWidth/2;
-
-                  //draw
-                  sketch.line(
-                    rectX0,
-                    scrollerTopRealScale,
-                    rectX0,
-                    scrollerBotRealScale
-                  )    
+                  // ---------------------------------------------------------
+                  // Bar Plot Logic (Dynamic Width)
+                  // ---------------------------------------------------------
                   
-                  sketch.rect(
-                    rectX0,
-                    rectY0,
-                    rectX1 - rectX0,
-                    rectY1 - rectY0,
-                  );
+                  const rectX0 = drawDataset.data[holeName].x_zero_hole;
+                  
+                  // 1. Calculate dynamic height based on the distance to the next data point
+                  let depthDiff = 0;
 
+                  if (i < pDataList.length - 1) {
+                      // Calculate distance to the NEXT point
+                      depthDiff = Math.abs(pDataList[i+1].composite_depth - pDataList[i].composite_depth);
+                  } else if (i > 0) {
+                      // For the LAST point, use the distance from the PREVIOUS point
+                      depthDiff = Math.abs(pDataList[i].composite_depth - pDataList[i-1].composite_depth);
+                  } else {
+                      // Fallback if there is only 1 data point
+                      depthDiff = 1.0; 
+                  }
+
+                  // 2. Convert depth difference to pixels (using yMag)
+                  // Multiply by 0.9 or similar to leave a small gap (optional)
+                  let binWidth = (depthDiff * yMag) * 0.9; 
+                  
+                  // Safety: ensure minimum visibility (e.g., at least 1px)
+                  if(binWidth < 1) binWidth = 1;
+
+
+                  // Define rectangle coordinates
+                  const rectX1 = pDataList[i].pos_canvas_x;
+                  // Center the bar on the data point
+                  const rectY0 = pDataList[i].pos_canvas_y - binWidth/2;
+                  const rectY1 = pDataList[i].pos_canvas_y + binWidth/2;
+
+                  // Register the 4 corners (QUADS)
+                  sketch.vertex(rectX0, rectY0);
+                  sketch.vertex(rectX1, rectY0);
+                  sketch.vertex(rectX1, rectY1);
+                  sketch.vertex(rectX0, rectY1);
                 }                
+              }
+
+              // Finish and render the final batch of lines
+              if (drawDataset.options.plotType == "line" || drawDataset.options.plotType == "bar") {
+                sketch.endShape();
               }
 
               //get position
@@ -6234,8 +6284,8 @@ document.addEventListener("DOMContentLoaded", () => {
       }
 
       //sort
-      LCCore = sortProjectByOrder(LCCore);
-      LCCore = sortHoleByOrder(LCCore);
+      //LCCore = sortProjectByOrder(LCCore);
+      //LCCore = sortHoleByOrder(LCCore);
 
       //initialise hole list
       while (document.getElementById("hole_list").firstChild) {
@@ -6642,6 +6692,24 @@ document.addEventListener("DOMContentLoaded", () => {
 //subfunctions
 //============================================================================================
 //============================================================================================
+function binarySearchIndex(arr, target, getValueFn = (item) => item) {
+  let low = 0;
+  let high = arr.length - 1;
+
+  while (low <= high) {
+    const mid = (low + high) >>> 1; 
+    const midVal = getValueFn(arr[mid]);
+
+    if (midVal < target) {
+      low = mid + 1;
+    } else if (midVal > target) {
+      high = mid - 1;
+    } else {
+      return mid;
+    }
+  }
+  return low; 
+}
 function includesString(obj, target) {
   if (obj === null || obj === undefined) return false;
 
@@ -7030,7 +7098,7 @@ async function getFooterInfo(LCCore, hittest, objOpts) {
     age = calcedData !== null ? calcedData.age_mid.toFixed(objOpts.canvas.age_precision) + " calBP)" : "---)";
   }
 
-  let trinityData = "[]";
+  let trinityData = "[----]";
   if(hittest.sectionName){
     trinityData = " ["+hittest.holeName+"-"+hittest.sectionName+"]";
   }
@@ -7061,9 +7129,6 @@ async function getFooterInfo(LCCore, hittest, objOpts) {
   } else if (objOpts.canvas.depth_scale == "real_position") {
     txt = "Canvas Position: [x: " + hittest.x.toFixed(2) + ",y: " + hittest.y.toFixed(2) + "]";
   }
-  
-    
-
 
   return txt;
 }
@@ -7144,6 +7209,7 @@ function sortHoleByOrder(LCCore) {
   });
   return LCCore;
 }
+/*
 async function unzip(result){
   if(result !== null){
     //unzip
@@ -7156,6 +7222,60 @@ async function unzip(result){
     return JSON.parse(decompressed);
   }else{
     return null
+  }
+}
+  */
+async function unzip(result) {
+  if (result == null) {
+    return null;
+  }
+
+  try {
+    // 1. Gunzip
+    const ds = new DecompressionStream('gzip');
+    const blob = new Blob([result]);
+    const stream = blob.stream().pipeThrough(ds);
+    const response = new Response(stream);
+    
+    const arrayBuffer = await response.arrayBuffer();
+
+    // 2. MessagePack decode
+    const decodedData = msgpack.decode(new Uint8Array(arrayBuffer));
+    
+    return decodedData;
+
+  } catch (e) {
+    console.error("[renderer] Gzip is failed to unzip:", e);
+    return null; 
+  }
+}
+async function zip(data) {
+  // Return null if input is invalid
+  if (data == null) {
+    return null;
+  }
+
+  try {
+    // 1. Encode to MessagePack (using msgpack-lite)
+    const encoded = msgpack.encode(data);
+
+    // 2. Compress with Gzip (using standard browser API)
+    const cs = new CompressionStream('gzip');
+    
+    // Create a stream from the encoded data and pipe it through the compressor
+    const blob = new Blob([encoded]);
+    const stream = blob.stream().pipeThrough(cs);
+    const response = new Response(stream);
+    
+    // Wait for the compression to finish and get the buffer
+    const arrayBuffer = await response.arrayBuffer();
+
+    // Return as Uint8Array
+    return new Uint8Array(arrayBuffer);
+
+  } catch (e) {
+    console.error("[renderer] Failed to zip:", e);
+    return null;
   }
 }
 //--------------------------------------------------------------------------------------------------
@@ -7636,6 +7756,7 @@ function getClickedItemIdx(mouseX, mouseY, LCCore, objOpts){
   
   return results;
 }
+
 function getPlotPosiotion(data, LCCore, objOpts){
   /*
   data = {

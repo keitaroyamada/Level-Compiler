@@ -317,12 +317,13 @@ document.addEventListener("DOMContentLoaded", () => {
         console.log("[Plotter]: Imported data recieved.");
 
         //unzip
-        const cs = new DecompressionStream('gzip');
-        const decompressedStream = new Response(
-            new Blob([data]).stream().pipeThrough(cs)
-        );
-        const decompressed = await decompressedStream.text();
-        const originalData = JSON.parse(decompressed);
+        const originalData = await unzip(data);
+        //const cs = new DecompressionStream('gzip');
+        //const decompressedStream = new Response(
+        //    new Blob([data]).stream().pipeThrough(cs)
+        //);
+        //const decompressed = await decompressedStream.text();
+        //const originalData = JSON.parse(decompressed);
 
         //load LCPlot
         LCPlot = originalData;
@@ -422,7 +423,7 @@ document.addEventListener("DOMContentLoaded", () => {
             await initialiseLCPlotDataCollection();
             getSelectedData();
             updateView();
-            await window.PlotterApi.PlotterClose();
+            //await window.PlotterApi.PlotterClose();
         } 
 
     })    
@@ -865,6 +866,59 @@ document.addEventListener("DOMContentLoaded", () => {
     function sendToRenderer(type){
         let selectedList = getSelectedData();
         window.PlotterApi.sendPlotOptions({data:selectedList, emitType:type}, "renderer");
+    }
+    async function unzip(result) {
+        if (result == null) {
+            return null;
+        }
+
+        try {
+            // 1. Gunzip
+            const ds = new DecompressionStream('gzip');
+            const blob = new Blob([result]);
+            const stream = blob.stream().pipeThrough(ds);
+            const response = new Response(stream);
+            
+            const arrayBuffer = await response.arrayBuffer();
+
+            // 2. MessagePack decode
+            const decodedData = msgpack.decode(new Uint8Array(arrayBuffer));
+            
+            return decodedData;
+
+        } catch (e) {
+            console.error("[renderer] Gzip is failed to unzip:", e);
+            return null; 
+        }
+    }
+    async function zip(data) {
+    // Return null if input is invalid
+    if (data == null) {
+        return null;
+    }
+
+    try {
+        // 1. Encode to MessagePack (using msgpack-lite)
+        const encoded = msgpack.encode(data);
+
+        // 2. Compress with Gzip (using standard browser API)
+        const cs = new CompressionStream('gzip');
+        
+        // Create a stream from the encoded data and pipe it through the compressor
+        const blob = new Blob([encoded]);
+        const stream = blob.stream().pipeThrough(cs);
+        const response = new Response(stream);
+        
+        // Wait for the compression to finish and get the buffer
+        const arrayBuffer = await response.arrayBuffer();
+
+        // Return as Uint8Array
+        return new Uint8Array(arrayBuffer);
+
+    } catch (e) {
+        console.error("[renderer] Failed to zip:", e);
+        return null;
+    }
     }
     //============================================================================
 

@@ -116,9 +116,9 @@ class LevelCompilerPlot {
     newCollection.name = collectionName;
     for(let v=0; v<data[0].data_header.length; v++){
       let newDataset = new PlotDataset();
-      let data_max = null;
-      let data_min = null;
-      newDataset.id        = v + 1;
+      let data_max   = null;
+      let data_min   = null;
+      newDataset.id  = v + 1;
       const headerParts = data[0].data_header[v].split(/[\[\]]/);
       if(headerParts.length ==1){
         //without unit
@@ -265,7 +265,6 @@ class LevelCompilerPlot {
     if(this.data_collections.length == 0){
       return
     }
-
     const targetProjectId = LCCore.base_project_id;
 
     for (let c = 0; c < this.data_collections.length; c++) {

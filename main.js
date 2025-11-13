@@ -39,12 +39,14 @@ const { UndoManager } = require("./LC_modules/UndoManager.js");
 const { Trinity } = require("./LC_modules/Trinity.js");
 const { Section } = require("./LC_modules/Section.js");
 const { Marker } = require("./LC_modules/Marker.js");
-const { send, availableMemory } = require("process");
+const { send, availableMemory, contextIsolated } = require("process");
 const { Worker } = require('worker_threads');
 const { isString } = require("util");
 const { resolve } = require("dns");
 const { rejects } = require("assert");
 const { resolveObjectURL } = require("buffer");
+const { encode, decode } = require("@msgpack/msgpack");
+
 
 //mode properties
 const isMac = process.platform === "darwin";
@@ -917,6 +919,9 @@ function createMainWIndow() {
     }
     progressBar = progressDialog(targetWindow, tit, txt, indeterminate);
     //await new Promise(resolve => setTimeout(resolve, 100));
+    if (progressBar && typeof progressBar.once === 'function') {
+      await new Promise(resolve => progressBar.once('ready', resolve));
+    }
 
     if(progressBar){      
       progressBar.on('ready', () => {
@@ -924,15 +929,18 @@ function createMainWIndow() {
           progressBar.detail = 'Processing...';
         }
       });
+      return true
     }    
   });
   ipcMain.handle("updateProgressbar", async (_e, n, N) => {
     progressBar = await updateProgress(progressBar, n, N);
+    return true
   });
   ipcMain.handle("clearProgressbar", async (_e) => {
     if(progressBar){
       progressBar.close();
       progressBar = null; 
+      return true
     }         
   });
   ipcMain.handle("askdialog", (_e, tit, txt) => {
@@ -1891,7 +1899,6 @@ function createMainWIndow() {
   });
   ipcMain.handle("ConverterClose", (_e, data) => {
     if(converterWindow){
-      document.body.style.cursor = "default"; 
       converterWindow.removeAllListeners("close");
       converterWindow.close();
       converterWindow = null;
@@ -2751,7 +2758,7 @@ function createMainWIndow() {
           columns: false,
           delimiter: ",",
         });
-        return [csvData, result];
+        return [await zipData(csvData), result];
       } catch (error) {
         console.log(error);
         console.error(
@@ -2766,7 +2773,15 @@ function createMainWIndow() {
   ipcMain.handle("cvtExport", async (_e, data) => {
     //from converter
     //console.log(data);
-    putcsvfile(converterWindow, null, data);
+    try{
+
+      data = await unzipData(data);
+      
+      putcsvfile(converterWindow, null, data);
+      return true
+    }catch(err){
+      return false
+    }
   });
   //--------------------------------------------------------------------------------------------------
  
@@ -2833,36 +2848,45 @@ function createMainWIndow() {
     await new Promise(resolve => setTimeout(resolve, 100));
     progressBar.detail = "Processing...";
 
+    data = await unzipData(data);
+
     data.name = path.basename(data.path);
+
     if(data.send_to == "main"){
       LCPlot.addDataset(data.name, data.data);
-      zipData(LCPlot)
-        .then((zipped) => {
-          mainWindow.webContents.send("importedData", zipped);
-        })
-        .catch((err) => {
-          console.error("MAIN: Failed to zip: ", err);
-        }); 
+
+      LCPlot.addDataset(data.name, data.data);        
+      try {
+        const zipped = await zipData(LCPlot);
+        mainWindow.webContents.send("importedData", zipped);
+      } catch (err) {
+        console.error("MAIN: Failed to zip:", err);
+      }
+
     }else if(data.send_to == "plotter"){      
       LCPlot.addDataset(data.name, data.data);
       LCPlot.sortDataBy("composite_depth")
-      zipData(LCPlot)
-        .then((zipped) => {
-          plotWindow.webContents.send("importedData", zipped);
-          mainWindow.webContents.send("importedData", zipped);
-          console.log("MAIN: Plot Data is imported into Plotter.")
-        })
-        .catch((err) => {
-          console.error("MAIN: Failed to zip: ", err);
-           dialog.showMessageBox(
-            mainWindow,
-            {
-            type: 'info',
-            title: 'Failed to load',
-            message: 'Failed to load data:', err,
-            }
-          );
+      try {
+         console.log(2870)
+        const zipped = await zipData({...LCPlot});
+        console.log(2872)
+        const test01 = await zipData(LCPlot.data_collections);
+
+        const test02 = await zipData(new LevelCompilerPlot());
+
+
+        //plotWindow.webContents.send("importedData", zipped);
+        //mainWindow.webContents.send("importedData", zipped);
+        console.log("MAIN: Plot Data is imported into Plotter.");
+      } catch (err) {
+        console.error("MAIN: Failed to zip:", err);
+        dialog.showMessageBox(mainWindow, {
+          type: "info",
+          title: "Failed to load",
+          message: "Failed to load data",
+          detail: String(err),
         });
+      }
     }
     
     if(progressBar){
@@ -2881,9 +2905,13 @@ function createMainWIndow() {
     //data: ["name","depth_data","target_id"] e.g. ["name",[projectName(no use),holeName, sectionName, distance],[null, null, null, null]]
     //type: "trinity", "composite_depth", "event_free_depth","age"
     //method(age): "linear"
+    
     const type = options.sourceType
     const method = options.polationType;
     const allowExtrapolation = options.allowOutside;
+
+    dataList = await unzipData(dataList);//check&unzip
+
     let callWindow;
     let showProgress = false;
     let distance_duplicate = 0;
@@ -2944,20 +2972,25 @@ function createMainWIndow() {
         age_mid: null,
         age_upper: null,
         age_lower: null,
+        project_id: null,
+        hole_id: null,
+        section_id: null,
+        marker_id: null,
+        section_type: null,
         correlation_rank: null,
         correlation_model_version: null,
         event_model_version: null,
         age_model_version: null,
         description: null,
         source_type:null,
-        is_master_depth: false,
+        is_main_model: false,
         distance_confrictionduplicate: false
       };
 
       if(LCCore.base_project_id){
         const baseIdx = LCCore.search_idx_list[LCCore.base_project_id.toString()];
-        if(LCCore.projects[baseIdx[0]].model_type == "model_type"){
-          results.is_master_depth = true;
+        if(LCCore.projects[baseIdx[0]].model_type == "correlation"){
+          results.is_main_model = true;
         }        
       }
 
@@ -3026,11 +3059,13 @@ function createMainWIndow() {
         results.age_mid   = age.age.mid   !== null ? age.age.mid   : NaN;
         results.age_upper = age.age.upper !== null ? age.age.upper : NaN;
         results.age_lower = age.age.lower !== null ? age.age.lower : NaN;
+        results.section_id =  cd_list[0][0][0] !== null ? [cd_list[0][0][0], cd_list[0][0][1], cd_list[0][0][2], null] : [null, null, null, null];
+        results.section_type = cd_list[0][4] !== null ? cd_list[0][4] : "";
         results.correlation_rank = new_rank !== null ? new_rank : NaN;
         results.correlation_model_version = calcedIdx !== null ? LCCore.projects[calcedIdx[0]].correlation_version : NaN;
         results.event_model_version       = calcedIdx !== null ? LCCore.projects[calcedIdx[0]].correlation_version : NaN;
         results.age_model_version         = LCAge.AgeModels[ageIdx] !== undefined ? LCAge.AgeModels[ageIdx].version : NaN;
-        results.description               = "Converted from trinity.";
+        results.description               = "";
         results.source_type = type;
         results.calc_type = cd_list[0][3];
       } else if (type == "composite_depth") {
@@ -3062,11 +3097,12 @@ function createMainWIndow() {
         results.age_mid = age.mid !== null ? age.mid : NaN;
         results.age_upper = age.upper !== null ? age.upper : NaN;
         results.age_lower = age.lower !== null ? age.lower : NaN;
+        results.section_type = paseudoTrinity.section_type !== null ? paseudoTrinity.section_type : "";
         results.correlation_rank = 3;
         results.correlation_model_version = paseudoTrinity.index[0] !== null ? LCCore.projects[paseudoTrinity.index[0]].correlation_version : NaN;
         results.event_model_version       = paseudoTrinity.index[0] !== null ? LCCore.projects[paseudoTrinity.index[0]].correlation_version : NaN;
         results.age_model_version         = LCAge.AgeModels[ageIdx] !== undefined ? LCAge.AgeModels[ageIdx].version : NaN;
-        results.description               = "Converted from Composite depth. The trinity is paseudo data.";
+        results.description               = "The trinity is paseudo data.";
         results.source_type = type;
         results.calc_type = "paseudo-depth";
       } else if (type == "event_free_depth") {
@@ -3098,6 +3134,7 @@ function createMainWIndow() {
         results.age_mid = age.mid !== null ? age.mid : NaN;
         results.age_upper = age.upper !== null ? age.upper : NaN;
         results.age_lower = age.lower !== null ? age.lower : NaN;
+        results.section_type = paseudoTrinity.section_type !== null ? paseudoTrinity.section_type : "";
         results.correlation_rank = 3;
         results.correlation_model_version = paseudoTrinity.index[0] !== null ? LCCore.projects[paseudoTrinity.index[0]].correlation_version : NaN;
         results.event_model_version       = paseudoTrinity.index[0] !== null ? LCCore.projects[paseudoTrinity.index[0]].correlation_version : NaN;
@@ -3153,6 +3190,7 @@ function createMainWIndow() {
         results.age_mid = age.mid !== null ? age.mid : NaN;
         results.age_upper = age.upper !== null ? age.upper : NaN;
         results.age_lower = age.lower !== null ? age.lower : NaN;
+        results.section_type = paseudoTrinity.section_type !== null ? paseudoTrinity.section_type : "";
         results.correlation_rank = 3;
         results.correlation_model_version = paseudoTrinity.index[0] !== null ? LCCore.projects[paseudoTrinity.index[0]].correlation_version : NaN;
         results.event_model_version       = paseudoTrinity.index[0] !== null ? LCCore.projects[paseudoTrinity.index[0]].correlation_version : NaN;
@@ -3199,6 +3237,7 @@ function createMainWIndow() {
         results.age_mid = rage.age.mid !== null ? rage.age.mid : NaN;
         results.age_upper = rage.age.upper !== null ? rage.age.upper : NaN;
         results.age_lower = rage.age.lower !== null ? rage.age.lower : NaN;
+        results.section_type = paseudoTrinity.section_type !== null ? paseudoTrinity.section_type : "";
         results.correlation_rank = 3;
         results.correlation_model_version = paseudoTrinity.index[0] !== null ? LCCore.projects[paseudoTrinity.index[0]].correlation_version : NaN;
         results.event_model_version       = paseudoTrinity.index[0] !== null ? LCCore.projects[paseudoTrinity.index[0]].correlation_version : NaN;
@@ -4315,6 +4354,7 @@ function createMainWIndow() {
         submenu: [
           {
             label: "Converter",
+            accelerator: "CmdOrCtrl+K",
             click: () => {
               if (isDev == false){
                 if(LCCore.base_project_id==null){
@@ -4362,6 +4402,7 @@ function createMainWIndow() {
           },
           {
             label:"Divider",
+            accelerator: "CmdOrCtrl+D",
             click: () =>{
               if (isDev == false){
                 if(LCCore.base_project_id==null){
@@ -4464,7 +4505,7 @@ function createMainWIndow() {
 
               const customMenu = Menu.buildFromTemplate([
                   {
-                    label: "Release and close",
+                    label: "Release loaded data",
                     click: () => {
                       plotWindow.webContents.send("PlotterCleared", "");    
                     },
@@ -4580,6 +4621,7 @@ function progressDialog(window, tit, txt, indeterminate){
       parent: window,
       modal: false,
       resizable: true,
+      sandbox: true,
       webPreferences: {
         nodeIntegration: true,
         contextIsolation: false,
@@ -4643,35 +4685,110 @@ async function getfile(window=null, title, ext) {
 }
 
 async function zipData(data) {
+  try {
+    const v = new Uint8Array(data);
+    if (v[0] === 0x1f && v[1] === 0x8b && v[2] === 0x08) {
+      return data; // if gzip
+    }
+  } catch {}
+
   return new Promise((resolve, reject) => {
-    console.time("zipped")
+    console.time("zipped");
 
     let inputData;
-    try{
-      //inputData = msgpack.encode(data);
-
-      if(typeof data !== "string"){
-        inputData = JSON.stringify(data);
-      }else{
-        inputData = data;
-      }
-    } catch(serializeError){
-      console.error("[zipData] stringify encoding failed:", serializeError);
+    try {
+      // MessagePack encode
+      inputData = encode(data); // Uint8Array
+    } catch (serializeError) {
+      console.error("[zipData] msgpack encoding failed:", serializeError);
+      mainWindow.webContents.send("AlertRenderer", serializeError);
       reject(serializeError);
-      return null;
+      return;
     }
 
-    zlib.gzip(inputData, (err, buffer) => {
+    const buf = Buffer.from(inputData); // Uint8Array → Buffer
+
+    zlib.gzip(buf, (err, buffer) => {
       if (err) {
         console.error("[zipData] Gzip compression failed:", err);
+        mainWindow.webContents.send("AlertRenderer", err);
         reject(err);
       } else {
-        console.timeEnd("zipped")
+        console.timeEnd("zipped");
         resolve(buffer);
       }
     });
   });
 }
+
+async function unzipData(buffer) {
+  // Guard: Return null if buffer is empty
+  if (!buffer || buffer.length === 0) return null;
+
+  if (!Buffer.isBuffer(buffer) && !(buffer instanceof Uint8Array)) {
+    if (typeof buffer !== 'string') {
+      return buffer; 
+    }
+  }
+
+  console.time("unzipped");
+
+  const v = new Uint8Array(buffer);
+  // Check Gzip magic numbers (1F 8B 08) to detect if it is compressed
+  const isGzip = v[0] === 0x1f && v[1] === 0x8b && v[2] === 0x08;
+
+  let buf;
+  if (isGzip) {
+    // 1. Decompress Gzip
+    try {
+      buf = await new Promise((resolve, reject) => {
+        // console.time("unzipped");
+        zlib.gunzip(buffer, (err, decompressed) => {
+          if (err) {
+            console.error("[unzipData] Gzip decompression failed:", err);
+            reject(err);
+          } else {
+            // console.timeEnd("unzipped");
+            resolve(decompressed);
+          }
+        });
+      });
+    } catch (e) {
+      // Return original buffer or null on decompression failure
+      console.timeEnd("unzipped");
+      return buffer; 
+    }
+  } else {
+    // Use the buffer as is if not compressed
+    buf = Buffer.from(buffer);
+  }
+
+  // 2. Try decoding as MessagePack
+  try {
+    const u8 = new Uint8Array(buf);
+    console.timeEnd("unzipped");
+    return decode(u8);
+  } catch (e) {
+    // Failed to decode as MessagePack; proceed to fallback
+  }
+
+  // 3. Try parsing as JSON (Fallback)
+  const str = buf.toString('utf-8');
+  try {
+    console.timeEnd("unzipped");
+    return JSON.parse(str);
+  } catch (e) {
+    // Failed to parse as JSON
+  }
+
+  // 4. Return as plain string (Final fallback)
+  console.timeEnd("unzipped");
+  return str;
+}
+
+
+
+
 
 /*
 async function zipData(data) {
@@ -4972,6 +5089,7 @@ function isZipFile(filepath) {
       fileBuffer[3] === 0x04
   );
 }
+
 //--------------------------------------------------------------------------------------------------
 //create sub window
 function createNewWindow(title, htmlPath, preloadPath) {
