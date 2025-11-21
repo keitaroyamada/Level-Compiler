@@ -22,7 +22,7 @@ contextBridge.exposeInMainWorld("LCapi", {
   RegisterLCmodel:(args1) => ipcRenderer.invoke("RegisterLCmodel", webUtils.getPathForFile(args1)),
   LoadModelFromLCCore: () => ipcRenderer.invoke("LoadModelFromLCCore"),
   LoadAgeFromLCAge: (args) => ipcRenderer.invoke("LoadAgeFromLCAge", args),
-  LoadPlotFromLCPlot: () => ipcRenderer.invoke("LoadPlotFromLCPlot"),
+  LoadPlotData: (args) => ipcRenderer.invoke("LoadPlotData", args),
   MirrorAgeList: () => ipcRenderer.invoke("MirrorAgeList"),
   Reregister: () => ipcRenderer.invoke("Reregister"),
 

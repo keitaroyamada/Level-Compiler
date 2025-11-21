@@ -178,13 +178,7 @@ function createMainWIndow() {
     console.log("MAIN: Project age data is initialised.");
     return;
   });
-  ipcMain.handle("InitialisePlotAgeCollection", async (_e) => {
-    //import modeln
-    LCPlot.age_collections = [];
-    LCPlot.age_selected_id = null;
-    console.log("MAIN: Project age plot data is initialised.");
-    return;
-  });
+
   ipcMain.handle("initialisePlotDataCollection", async (_e) => {
     //import modeln
     LCPlot.data_collections = [];
@@ -279,15 +273,13 @@ function createMainWIndow() {
     LCAge.selected_id = age_id;
 
     //get model name
-    LCAge.AgeModels.forEach((model) => {
-      if (model.id == LCAge.selected_id) {
-        model_name = model.name;
-      }
-    });
-
-    if (model_name == null) {
+    const ageModel = LCAge.getModelData();
+    if (ageModel == null) {
       return null;
     }
+
+    //load
+    model_name = ageModel.name;
 
     //load ages into LCCore
     LCCore.calcMarkerAges(LCAge);
@@ -828,6 +820,7 @@ function createMainWIndow() {
     //create finder window
     imageViewerWindow = new BrowserWindow({
       title: "imageViewer",
+      parent: mainWindow,
       frame: false,
       width: 300,//metadata.width,
       height: 800,
@@ -845,7 +838,7 @@ function createMainWIndow() {
 
     imageViewerWindow.once("ready-to-show", () => {
       imageViewerWindow.show();
-      imageViewerWindow.setAlwaysOnTop(true, "floating");
+      //imageViewerWindow.setAlwaysOnTop(true, "floating");
       //imageViewerWindow.webContents.openDevTools();
       //converterWindow.setAlwaysOnTop(true, "normal");
       imageViewerWindow.webContents.send("ImageViewerMenuClicked", sectionImage);
@@ -1891,7 +1884,7 @@ function createMainWIndow() {
 
     converterWindow.once("ready-to-show", () => {
       converterWindow.show();
-      converterWindow.setAlwaysOnTop(true, "floating");
+      //converterWindow.setAlwaysOnTop(true, "floating");
       //converterWindow.webContents.openDevTools();
       //converterWindow.setAlwaysOnTop(true, "normal");
       converterWindow.webContents.send("ConverterMenuClicked", data);
@@ -1929,6 +1922,7 @@ function createMainWIndow() {
     //create finder window
     importerWindow = new BrowserWindow({
       title: "Finder",
+      parent: mainWindow,
       width: 700,
       height: 700,
       webPreferences: {
@@ -1947,7 +1941,7 @@ function createMainWIndow() {
     importerWindow.once("ready-to-show", () => {
       importerWindow.show();
       //importerWindow.webContents.openDevTools();
-      importerWindow.setAlwaysOnTop(true, "floating");
+      //importerWindow.setAlwaysOnTop(true, "floating");
       importerWindow.webContents.send("ImporterToolClicked", "");
     });
   });
@@ -1958,25 +1952,43 @@ function createMainWIndow() {
       return;
     }
   });
-  ipcMain.handle("LoadPlotFromLCPlot", async (_e) => {
+  ipcMain.handle("LoadPlotData", async (_e, type) => {
     //calc latest age and depth
-    //LCPlot.calcAgeCollectionPosition(LCCore, LCAge);
-    //LCPlot.calcDataCollectionPosition(LCCore, LCAge);
-
     //LC plot age_collection id is as same as LCAge id
-    LCPlot.age_selected_id = LCAge.selected_id;
 
+    if(type == "age"){
+      //age plot point data
+      const ageModel = LCAge.getModelData(); //get current sellected model data
 
-    if (LCPlot) {
-      try{
-        const zipped = await zipData(LCPlot);
-        console.log("MAIN: Send LCPlot to renderer.")
-        return zipped;
+      if (ageModel) {
+        try{
+          const zipped = await zipData(ageModel);
+          console.log("MAIN: Send age point data to renderer.")
+          return {type: "age", data: zipped};
+        }catch(err){
+          console.error("MAIN: Failed to zip: ", err);
+          return null;
+        }
+      }
+    }else if(type == "data"){
+      try{       
+        const res = LCPlot.calcDataCollectionPosition(LCCore, LCAge);
+
+        if(res){
+          const zipped = await zipData(LCPlot);
+          console.log("MAIN: Send data points to renderer.")
+          return {type: "data", data: zipped};
+        }else{
+          console.log("MAIN: Faild to recalc plot position")
+          return {type: "data", data: null};
+        }
+        
       }catch(err){
         console.error("MAIN: Failed to zip: ", err);
         return null;
       }
     }
+    
     return null;
   });
   ipcMain.handle("CalcCompositeDepth", async (_e) => {
@@ -2305,6 +2317,7 @@ function createMainWIndow() {
     //create finder window
     dividerWindow = new BrowserWindow({
       title: "Divider",
+      parent:mainWindow,
       width: 1300,
       height: 800,
       webPreferences: {
@@ -2323,7 +2336,7 @@ function createMainWIndow() {
     dividerWindow.once("ready-to-show", () => {
       dividerWindow.show();
       //dividerWindow.webContents.openDevTools();
-      dividerWindow.setAlwaysOnTop(true, "floating");
+      //dividerWindow.setAlwaysOnTop(true, "floating");
       dividerWindow.webContents.send("DividerToolClicked", "");
     });
   });
@@ -2356,6 +2369,7 @@ function createMainWIndow() {
     //create finder window
     finderWindow = new BrowserWindow({
       title: "Finder",
+      parent:mainWindow,
       width: 230,
       height: 580,
       webPreferences: {
@@ -2374,7 +2388,7 @@ function createMainWIndow() {
     finderWindow.once("ready-to-show", () => {
       finderWindow.show();
       //finderWindow.webContents.openDevTools();
-      finderWindow.setAlwaysOnTop(true, "floating");
+      //finderWindow.setAlwaysOnTop(true, "floating");
       finderWindow.webContents.send("FinderToolClicked", "");
 
       const LCBookmarkSet= getSettings("bookmarks");
@@ -2820,10 +2834,16 @@ function createMainWIndow() {
     return [projectList, holeList, sectionList];
   });
   ipcMain.handle("changeFix", async (_e, isFix) => {
+    if (!finderWindow || finderWindow.isDestroyed()) {
+      return;
+    }
     if (isFix) {
+      finderWindow.setParentWindow(mainWindow);
       finderWindow.setAlwaysOnTop(true, "floating");
     } else {
+      finderWindow.setParentWindow(null);
       finderWindow.setAlwaysOnTop(false);
+      
     }
   });
   ipcMain.handle("getSectionLimit", async (_e, projectId, holeName, sectionName) => {
@@ -2844,51 +2864,52 @@ function createMainWIndow() {
     mainWindow.webContents.send("rendererLog", data);
   });
   ipcMain.handle("sendImportedData", async (_e, data) => {
-    progressBar = progressDialog(mainWindow, "Please wait", "Sending data", true);
-    await new Promise(resolve => setTimeout(resolve, 100));
-    progressBar.detail = "Processing...";
-
-    data = await unzipData(data);
-
-    data.name = path.basename(data.path);
-
-    if(data.send_to == "main"){
-      LCPlot.addDataset(data.name, data.data);
-
-      LCPlot.addDataset(data.name, data.data);        
-      try {
-        const zipped = await zipData(LCPlot);
-        mainWindow.webContents.send("importedData", zipped);
-      } catch (err) {
-        console.error("MAIN: Failed to zip:", err);
-      }
-
-    }else if(data.send_to == "plotter"){      
-      LCPlot.addDataset(data.name, data.data);
-      LCPlot.sortDataBy("composite_depth")
-      try {
-         console.log(2870)
-        const zipped = await zipData({...LCPlot});
-        console.log(2872)
-        const test01 = await zipData(LCPlot.data_collections);
-
-        const test02 = await zipData(new LevelCompilerPlot());
-
-
-        //plotWindow.webContents.send("importedData", zipped);
-        //mainWindow.webContents.send("importedData", zipped);
-        console.log("MAIN: Plot Data is imported into Plotter.");
-      } catch (err) {
-        console.error("MAIN: Failed to zip:", err);
-        dialog.showMessageBox(mainWindow, {
-          type: "info",
-          title: "Failed to load",
-          message: "Failed to load data",
-          detail: String(err),
-        });
-      }
+    //call from ""
+    if(plotWindow){
+      progressBar   = progressDialog(plotWindow, "", "Now sending...", true);
+    }else{
+      progressBar   = progressDialog(mainWindow, "", "Now sending...", true);
     }
-    
+    await new Promise(resolve => setTimeout(resolve, 100));
+           
+    try{
+      //unzip data
+      const recievedData = await unzipData(data);
+      recievedData.name = path.basename(recievedData.path);
+      recievedData.data.name = path.basename(recievedData.path);
+
+      //set data into lcplot
+      LCPlot.addDataset(recievedData.data);
+      //LCCore.emit('update_depth')
+      const zipped = await zipData(LCPlot);
+      
+      //send data
+      if(recievedData.send_to == "main"){
+        try {          
+          mainWindow.webContents.send("importedData", true);
+          console.log("MAIN: Plot Data is imported into renderer.");
+        } catch (err) {
+          console.error("MAIN: Failed to zip:", err);
+        }
+      }else if(recievedData.send_to == "plotter"){              
+        try {
+          plotWindow.webContents.send("importedData", zipped);
+          mainWindow.webContents.send("importedData", true); //loadplotdata
+          console.log("MAIN: Plot Data is imported into Plotter & renderer.");
+        } catch (err) {
+          console.error("MAIN: Failed to zip:", err);
+          dialog.showMessageBox(mainWindow, {
+            type: "info",
+            title: "Failed to load",
+            message: "Failed to load data",
+            detail: String(err),
+          });
+        }
+      }
+    }catch(er){
+      console.log(er)
+    }
+
     if(progressBar){
       progressBar.close()
       progressBar = null; 
@@ -3042,6 +3063,7 @@ function createMainWIndow() {
         let calcedIdx;
         if(calcedId == null){
           calcedIdx = null;
+          console.log(cd)
           console.log("MAIN: "+ send_data[0].hole_name +"-"+send_data[0].section_name+"-"+send_data[0].distance+"cm is out of section.");
         } else {
           calcedIdx = LCCore.search_idx_list[calcedId.toString()];
@@ -3053,13 +3075,13 @@ function createMainWIndow() {
         results.hole     = send_data[0] !== undefined ? send_data[0].hole_name : NaN;
         results.section  = send_data[0] !== undefined ? send_data[0].section_name : NaN;
         results.distance = send_data[0] !== undefined ? send_data[0].distance : NaN;
-        results.cd  = cd !== null ? cd[0] : NaN;
+        results.cd  = cd[0] !== null ? cd[0] : NaN;
         results.efd = efd !== null ? efd : NaN;
         results.dd  = dd !== null ? dd : NaN;
         results.age_mid   = age.age.mid   !== null ? age.age.mid   : NaN;
         results.age_upper = age.age.upper !== null ? age.age.upper : NaN;
         results.age_lower = age.age.lower !== null ? age.age.lower : NaN;
-        results.section_id =  cd_list[0][0][0] !== null ? [cd_list[0][0][0], cd_list[0][0][1], cd_list[0][0][2], null] : [null, null, null, null];
+        results.section_id =  calcedIdx !== null ?  [cd_list[0][0][0], cd_list[0][0][1], cd_list[0][0][2], null] : [null, null, null, null];
         results.section_type = cd_list[0][4] !== null ? cd_list[0][4] : "";
         results.correlation_rank = new_rank !== null ? new_rank : NaN;
         results.correlation_model_version = calcedIdx !== null ? LCCore.projects[calcedIdx[0]].correlation_version : NaN;
@@ -3716,8 +3738,7 @@ function createMainWIndow() {
     newLCCore.on('update_depth', () => {
       LCAge.updateAgeDepth(newLCCore);
       newLCCore.calcMarkerAges(LCAge);
-      LCPlot.calcAgeCollectionPosition(newLCCore, LCAge);
-      LCPlot.calcDataCollectionPosition(newLCCore,LCAge);
+      LCPlot.calcDataCollectionPosition(newLCCore, LCAge);
     });  
 
     return newLCCore;
@@ -3753,11 +3774,6 @@ function createMainWIndow() {
       globalPath.dataPaths.push({type:"csvage",path:fullpath});
       console.log("MAIN: Registered age model from " + fullpath);
 
-      //register all LCAge models
-      LCPlot.initialiseAgeCollection();
-      //register dage data from LCAge
-      registerLCPlot();
-      
       return true
     }catch(err){
       console.log(err)
@@ -3780,9 +3796,6 @@ function createMainWIndow() {
         assignObject(LCAge, inData.LCAge);
       }
 
-      //register all LCAge models     
-      registerLCPlot();
-
       //get age list
       let registeredAgeList = []; 
       for (let i = 0; i < LCAge.AgeModels.length; i++) {
@@ -3799,31 +3812,7 @@ function createMainWIndow() {
       return false
     }
   }
-  function registerLCPlot(){
-    for (let i = 0; i < LCAge.AgeModels.length; i++) {
-      //make new collection
-      const model_name = LCAge.AgeModels[i].name;
-      const model_id = LCAge.AgeModels[i].id;
-      LCPlot.addNewAgeCollection(model_name, model_id);
 
-      //get idx
-      let age_idx = null;
-      LCAge.AgeModels.forEach((a, idx) => {
-        if (a.id == model_id) {
-          age_idx = idx;
-        }
-      });
-
-      //register dage data from LCAge
-      LCPlot.addAgesetFromLCAgeModel(
-        LCPlot.age_selected_id, //new made lotdata id
-        LCAge.AgeModels[age_idx]
-      );
-      LCPlot.calcAgeCollectionPosition(LCCore, LCAge);
-      console.log("MAIN: Registered age plot data from " + LCAge.AgeModels[age_idx].name);
-    }
-    
-  }
   function initialiseGlobalPath(){
     globalPath = {
       saveModelPath:null,
@@ -4479,6 +4468,7 @@ function createMainWIndow() {
               //create finder window
               plotWindow = new BrowserWindow({
                 title: "Plotter",
+                parent:mainWindow,
                 width: 340,//full: 900
                 height: 600,
                 webPreferences: {preload: path.join(__dirname, "preload", "preload_plotter.js"),},
@@ -4535,7 +4525,7 @@ function createMainWIndow() {
           
               plotWindow.once("ready-to-show", () => {
                 plotWindow.show();
-                plotWindow.setAlwaysOnTop(true, "floating");
+                //plotWindow.setAlwaysOnTop(true, "floating");
                 //plotWindow.webContents.openDevTools();
                 plotWindow.webContents.send("PlotterMenuClicked", isData);
               });
@@ -4785,10 +4775,6 @@ async function unzipData(buffer) {
   console.timeEnd("unzipped");
   return str;
 }
-
-
-
-
 
 /*
 async function zipData(data) {
@@ -5114,6 +5100,7 @@ function createAboutWindow() {
   // make window
   const aboutWindow = new BrowserWindow({
     title: "About Level Compiler",
+    parent: mainWindow,
     width: 500,
     height: 300,
     webPreferences: {preload: path.join(__dirname, "preload", "preload_about.js"),},
@@ -5125,8 +5112,8 @@ function createAboutWindow() {
 
   aboutWindow.once("ready-to-show", () => {
     aboutWindow.show();
-    aboutWindow.setAlwaysOnTop(true, "floating");
-   //aboutWindow.webContents.openDevTools();
+    //aboutWindow.setAlwaysOnTop(true, "floating");
+    //aboutWindow.webContents.openDevTools();
     //converterWindow.setAlwaysOnTop(true, "normal");
     aboutWindow.webContents.send("Version", app.getVersion());
   });

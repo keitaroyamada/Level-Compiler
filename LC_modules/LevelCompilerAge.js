@@ -173,6 +173,15 @@ class LevelCompilerAge {
     this.sortAges();
     //this.checkAges();
   }
+  getModelData(){
+    let model = null;
+    this.AgeModels.forEach(ml=>{
+      if(ml.id == this.selected_id){
+        model = ml;
+      }
+    })
+    return model
+  }
   sortAges() {
     //sort age model by efd
     for (let m = 0; m < this.AgeModels.length; m++) {
@@ -278,7 +287,7 @@ class LevelCompilerAge {
     this.checkAges();
   }
   updateAgeDepth(LCCore){
-    
+    //update CD/EFD of age points
     if(this.AgeModels.length==0){
       return;
     }
@@ -286,17 +295,23 @@ class LevelCompilerAge {
       for(let a=0;a<this.AgeModels[m].ages.length;a++){
         const ageData = this.AgeModels[m].ages[a];
         if(ageData.original_depth_type == "trinity"){
+          //case trinity data
+          const efdData = LCCore.getDepthFromTrinity([null,null,null,null], [ageData.trinityData], "event_free_depth");
+          const cdData  = LCCore.getDepthFromTrinity([null,null,null,null], [ageData.trinityData], "composite_depth");
 
-          const result = LCCore.getDepthFromTrinity([null,null,null,null], [ageData.trinityData], "event_free_depth");
-          const [sectionId, efd, rank] = result[0];
+          const [sectionId, efd, rank, polationType, sectionType]  = efdData[0];
+          const [sectionId2,cd,  rank2,polationType2,sectionType2] = cdData[0];
+
           if (sectionId == null) {
             console.log("Could not determine the position of " + ageData.trinityData.name);
             continue;
           } else {
             ageData.event_free_depth = efd;
+            ageData.composite_depth  = cd;
             ageData.section_id = sectionId;
           }
         }else if(ageData.original_depth_type == "composite_depth"){
+          //case composite depth
           const efdval = LCCore.getEFDfromCD(ageData.composite_depth);
           if (efdval !== NaN) {
             ageData.event_free_depth = efdval;
@@ -304,7 +319,8 @@ class LevelCompilerAge {
             console.log("Comsposite depth is out of model definition. :" + csv_data[r][0]);
           }
         }else if(ageData.original_depth_type == "event_free_depth"){
-
+          //case event free depth
+          console.log("LCAge: Unsuspected depth type depetected",ageData.name, ageData.original_depth_type)
         }else{
           console.log("LCAge: Unsuspected depth type depetected",ageData.name, ageData.original_depth_type)
         }    
@@ -524,6 +540,7 @@ class LevelCompilerAge {
     output.efd = interpolatedEFD;
     return output;
   }
+
 }
 
 module.exports = { LevelCompilerAge };

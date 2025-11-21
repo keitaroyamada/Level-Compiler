@@ -19,7 +19,9 @@ document.addEventListener("DOMContentLoaded", () => {
       document.querySelectorAll('.check_outside, .precision_output').forEach(el => el.style.display = 'flex');
     } else if (output_type == "import"){
       document.getElementById("cvt_bt_convert").textContent = "Import";
-      document.querySelectorAll('.check_outside, .precision_output').forEach(el => el.style.display = 'none');
+      document.querySelectorAll('.precision_output').forEach(el => el.style.display = 'none');
+      document.querySelectorAll('.check_outside').forEach(el => el.style.display = 'flex');
+      document.querySelectorAll('.check_outside').forEach(el => el.checked = true);
     }
 
     //make model chooser
@@ -287,7 +289,11 @@ document.addEventListener("DOMContentLoaded", () => {
             //case number
             holeName = holeName.toString().padStart(2, "0");
           }
-          const sectionName = source_data[i][sectionIdx];
+          let sectionName = source_data[i][sectionIdx];
+          if (/^\d+$/.test(sectionName.toString()) == true) {
+            //case number
+            sectionName = sectionName.toString().padStart(2, "0");
+          }
           const distance = parseFloat(source_data[i][distanceIdx]);
 
           indataList.push([
@@ -490,8 +496,9 @@ document.addEventListener("DOMContentLoaded", () => {
         };
 
         //main calc
-        const calcedDataList = await unzip(await window.ConverterApi.depthConverter(indataList, options));
-        
+        const calcedDataList = await unzip(await window.ConverterApi.depthConverter(await zip(indataList), options));
+        console.log("[Converter]: Receive convereted depth datalist.")
+
         if(calcedDataList===null) {
           document.body.style.cursor = "default"; 
           window.ConverterApi.clearProgressbar();
@@ -510,28 +517,39 @@ document.addEventListener("DOMContentLoaded", () => {
           }
 
           let header = [];
+          let units  = [];
           for(let d=depthMaxIdx+1; d<n_c; d++){
-            header.push(source_data[0][d]); //remove header
+            const m = source_data[0][d].match(/^(.+?)(?:\[(.+)\])?$/) || [];
+            const name = m[1] || "";
+            const unit = m[2] || "";
+
+            header.push(name); //remove header
+            units.push(unit);
           }
           let values = [];
           for(let d=depthMaxIdx+1; d<n_c; d++){
-            values.push(source_data[i+1][d]); //remove header
+            values.push(parseFloat(source_data[i+1][d])); //remove header
           }
           
           calcedData.data_header = header;
           calcedData.data_values = values;
+          calcedData.data_units  = units;
 
           output.push(calcedData);
         }
 
+        const cvtData = cvt2flat(output);
+        cvtData.name = source_path.name;
+
         const sendData = {
           name:"",
-          path:source_path,
-          data:output,
+          path: source_path,
+          data: cvtData,
           send_to:called_from,
           send_from:"Converter",
         };
 
+        
         await window.ConverterApi.sendImportedData(await zip(sendData));
         console.log("[Converter]: Converted data is imported.");
 
@@ -732,5 +750,75 @@ document.addEventListener("DOMContentLoaded", () => {
       console.error("[renderer] Failed to zip:", e);
       return null;
     }
+  }
+  function cvt2flat(depthConverterDataList){
+    const flatData = {
+      id: null,
+      name: null,
+      correlation_model_version:null,
+      age_model_version: null,
+      descriptions: null,
+      
+      header: [],
+      units: [],
+      rows: [],
+    };
+
+    //initiarise
+    flatData.id   = null;
+    flatData.name = null;
+    flatData.correlation_model_version = depthConverterDataList[0].correlation_model_version;
+    flatData.age_model_version         = depthConverterDataList[0].age_model_version;
+    flatData.descriptions              = "";
+    
+    const dataHeader = depthConverterDataList[0].data_header;
+    flatData.header  = ["id","name","project","hole","section","distance","composite_depth","event_free_depth","drilling_depth","age","age_upper","age_lower", "source_depth_type",...dataHeader];
+    const dataUnits  = depthConverterDataList[0].data_units;
+    flatData.units   = ["","","","","","","","","","","","","",...dataUnits];
+
+    //data
+    for(let r=0; r<depthConverterDataList.length; r++){
+      const dt = depthConverterDataList[r];
+      const row = [
+        r,
+        dt.name,
+        dt.project,
+        dt.hole,
+        dt.section,
+        dt.distance,
+        dt.cd,
+        dt.efd,
+        dt.dd,
+        dt.age_mid,
+        dt.age_upper,
+        dt.age_lower,
+        dt.source_type,
+        ...dt.data_values//spread
+      ];
+
+      flatData.rows.push(row);
+    }
+
+    //unit
+
+    return flatData;
+  }
+
+  function getPathInfo(path) {
+    const filename = path.replace(/\\/g, '/').split('/').pop();
+
+    const lastDotIndex = filename.lastIndexOf('.');
+
+    if (lastDotIndex < 1) { 
+      return {
+        name: filename, 
+        ext: ""         
+      };
+    }
+
+    return {
+      name: filename.substring(0, lastDotIndex), 
+      ext: filename.substring(lastDotIndex)    
+    };
   }
 });

@@ -75,6 +75,7 @@ document.addEventListener("DOMContentLoaded", () => {
         sendToRenderer("update");
     });
     document.getElementById('bt_add').addEventListener("click", async (e) => {
+        console.log("[Plotter]: Add process called")
         if(LCPlot !== null ){ 
             numSeries += 1;
             //get selected collection
@@ -86,6 +87,8 @@ document.addEventListener("DOMContentLoaded", () => {
                 }
             })
 
+            if(selectedIdx===null) return
+
             //make data
             const container = document.getElementById("plot_list");
             const seriesDiv = document.createElement("div");
@@ -93,8 +96,8 @@ document.addEventListener("DOMContentLoaded", () => {
             //is plot
             const seriesCheck = document.createElement("input");
             seriesDiv.style.paddingLeft = "0px";
-            seriesCheck.type = "checkbox";
-            seriesCheck.id = numSeries;
+            seriesCheck.type    = "checkbox";
+            seriesCheck.id      = numSeries;
             seriesCheck.checked = true;            
 
             //data No
@@ -116,40 +119,44 @@ document.addEventListener("DOMContentLoaded", () => {
             separatorlabel.textContent = "/";
             
             //numerator
-            const numeratorDropdown = document.createElement("select");
-            numeratorDropdown.style.width = "80px";
+            const numeratorDropdown             = document.createElement("select");
+            numeratorDropdown.style.width       = "80px";
             numeratorDropdown.style.marginRight = "5px";
-            numeratorDropdown.id = numSeries;
-            numeratorDropdown.title = "Numerator";
+            numeratorDropdown.id                = numSeries;
+            numeratorDropdown.title             = "Numerator";
 
-            const option1 = document.createElement("option");
-            option1.value = 0;
+            const option1       = document.createElement("option");
+            option1.value       = 0;
             option1.textContent = "1";
             numeratorDropdown.appendChild(option1);
-            LCPlot.data_collections[selectedIdx].datasets.forEach(dataset=>{
-                const option = document.createElement("option");
-                option.value = dataset.id;
-                option.textContent = dataset.name;
-                numeratorDropdown.appendChild(option);
+            LCPlot.data_collections[selectedIdx].header.forEach((hd, i)=>{
+                if(i>12){
+                    const option       = document.createElement("option");
+                    option.value       = i-12;//id
+                    option.textContent = hd;//name
+                    numeratorDropdown.appendChild(option);
+                }                
             })
             numeratorDropdown.selectedIndex = 1; 
 
             //denominator
-            const denominatorDropdown = document.createElement("select");
-            denominatorDropdown.style.width = "80px";
+            const denominatorDropdown            = document.createElement("select");
+            denominatorDropdown.style.width      = "80px";
             denominatorDropdown.style.marginLeft = "5px";
-            denominatorDropdown.id = numSeries;
-            denominatorDropdown.title = "Denominator";
+            denominatorDropdown.id               = numSeries;
+            denominatorDropdown.title            = "Denominator";
 
-            const option0 = document.createElement("option");
-            option0.value = 0;
+            const option0       = document.createElement("option");
+            option0.value       = 0;
             option0.textContent = "1";
             denominatorDropdown.appendChild(option0);
-            LCPlot.data_collections[selectedIdx].datasets.forEach(dataset=>{
-                const option = document.createElement("option");
-                option.value = dataset.id;
-                option.textContent = dataset.name;
-                denominatorDropdown.appendChild(option);
+            LCPlot.data_collections[selectedIdx].header.forEach((hd, i)=>{
+                if(i>12){
+                    const option       = document.createElement("option");
+                    option.value       = i-12;//id
+                    option.textContent = hd;//name
+                    denominatorDropdown.appendChild(option);
+                }  
             })
 
             //plot colour options
@@ -167,8 +174,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
             //amplification options
             const amplification = document.createElement("input");
-            amplification.type = "number";
-            amplification.id = numSeries;
+            amplification.type  = "number";
+            amplification.id    = numSeries;
             amplification.placeholder = 1;
             amplification.value = 1;
             amplification.style.width = "40px";
@@ -318,16 +325,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
         //unzip
         const originalData = await unzip(data);
-        //const cs = new DecompressionStream('gzip');
-        //const decompressedStream = new Response(
-        //    new Blob([data]).stream().pipeThrough(cs)
-        //);
-        //const decompressed = await decompressedStream.text();
-        //const originalData = JSON.parse(decompressed);
 
         //load LCPlot
         LCPlot = originalData;
-        console.log(LCPlot)
+        console.log("Plot data: ", LCPlot)
 
         //initialise
         const parentElement = document.getElementById("c_collection");
@@ -336,10 +337,10 @@ document.addEventListener("DOMContentLoaded", () => {
         }
 
         //show
-        LCPlot.data_collections.forEach(collection=>{
-            const option = document.createElement("option");
-            option.value = collection.id;
-            option.textContent = collection.name;
+        LCPlot.data_collections.forEach(dataset=>{
+            const option       = document.createElement("option");
+            option.value       = dataset.id;
+            option.textContent = dataset.name;
 
             document.getElementById("c_collection").appendChild(option);
         });
@@ -370,14 +371,14 @@ document.addEventListener("DOMContentLoaded", () => {
             const plotTypeDropdown    = child.querySelector("select:nth-of-type(3)");
             const noLabel             = child.querySelector("label:nth-of-type(1)");
             const splitLabel          = child.querySelector("label:nth-of-type(2)");
-          
-            const checkboxValue = checkbox ? checkbox.checked : null;
-            const numeratorId   = numeratorDropdown ? numeratorDropdown.value : null;
-            const denominatorId = denominatorDropdown ? denominatorDropdown.value : null;
-            const collectionId  = parentCollection ? parentCollection.dataset.value : null;
-            const colourValue   = plotColour ? plotColour.value : "gray";
+            
+            const checkboxValue      = checkbox ? checkbox.checked : null;
+            const numeratorId        = numeratorDropdown ? numeratorDropdown.value : null;
+            const denominatorId      = denominatorDropdown ? denominatorDropdown.value : null;
+            const collectionId       = parentCollection ? parentCollection.dataset.value : null;
+            const colourValue        = plotColour ? plotColour.value : "gray";
             const amplificationValue = amplification ? amplification.value : null;
-            const plotType = plotTypeDropdown ? plotTypeDropdown.value : "line";
+            const plotType           = plotTypeDropdown ? plotTypeDropdown.value : "line";
 
             //set colour value
             numeratorDropdown.style.color   = colourValue;
@@ -390,13 +391,13 @@ document.addEventListener("DOMContentLoaded", () => {
             //plotColour.style.color = colourValue;
 
             result.isDraw = checkboxValue;
-            result.collectionId = parseInt(collectionId);
-            result.numeratorId = parseInt(numeratorId);
+            result.collectionId  = collectionId;
+            result.numeratorId   = parseInt(numeratorId);
             result.denominatorId = parseInt(denominatorId);
-            result.colour = colourValue;
-            result.order = i;
+            result.colour        = colourValue;
+            result.order         = i;
             result.amplification = parseFloat(amplificationValue);
-            result.plotType = plotType;
+            result.plotType      = plotType;
             results.push(result);
         });
         return results;
@@ -536,6 +537,7 @@ document.addEventListener("DOMContentLoaded", () => {
             if(LCPlot !== null ){  
                 sketch.push(); //save
                 sketch.translate(-canvasPos[0], -canvasPos[1]);
+                
                 //check plot data exist
                 const selectedList = getSelectedData();
                 if(selectedList.length==0){
@@ -567,7 +569,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     //get data
                     let nIdx = null;
                     let dIdx = null;
-                    LCPlot.data_collections[colIdx].datasets.forEach((d,i)=>{
+                    LCPlot.data_collections[colIdx].rows.forEach((d,i)=>{
                         if(d.id == target.numeratorId){
                             nIdx = i;
                         }

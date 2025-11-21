@@ -956,6 +956,7 @@ class LevelCompilerCore extends EventEmitter{
     this.convertDepthDuo2Master("composite_depth");
     
     console.log("LCCore: Calced composite depth.");
+    this.setUpdateDepth();//LCAge, LCPlot
     this.setStatus("completed","Calced composite depth.")
     console.timeEnd("        Calc CD")
   }
@@ -968,7 +969,7 @@ class LevelCompilerCore extends EventEmitter{
     this.convertDepthDuo2Master("event_free_depth");
  
     console.log("LCCore: Calced event free depth.");
-    this.setUpdateDepth();
+    this.setUpdateDepth();//LCAge, LCPlot 
     this.setStatus("completed","Calced Event Free Depth.")
     console.timeEnd("        Calc EFD")
   }

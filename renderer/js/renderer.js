@@ -9,19 +9,20 @@ document.addEventListener("DOMContentLoaded", () => {
 
   //model
   let LCCore = null;
-  let LCPlot = null;
+  let LCPlotAge  = null;
+  let LCPlotData = null;
 
   //model source path
   let age_model_list = []; //for reload
 
   //p5(vector) canvas
   let vectorObjects = null; //p5 instance data
-  document.getElementById("p5Canvas").style.display = "none"; //disable
+  document.getElementById("p5Canvas").style.display = "block"; //disable
 
   //raster canvas
   let canvas = document.getElementById("rasterCanvas");
   let ctx = canvas.getContext("2d");
-  document.getElementById("rasterCanvas").style.display = "block"; //enable
+  document.getElementById("rasterCanvas").style.display = "none"; //enable
 
   //pen canvas
   let penObject = { isPen: false, penCanvas: null, penData: null };
@@ -73,7 +74,7 @@ document.addEventListener("DOMContentLoaded", () => {
     objOpts.canvas.shift_x = 0; //[cm]
     objOpts.canvas.shift_y = 100; //[cm]
     objOpts.canvas.bottom_pad = 100; //[cm]
-    objOpts.canvas.buffer_depth = 100; //[cm]
+    objOpts.canvas.buffer_depth = 0; //[cm]
     objOpts.canvas.background_colour = "#ffffff";//"#f4f5f7";//"#f7f7f7"//"#f8fbff";//"#fffdfa";//""white
     objOpts.canvas.target_horizon = false;
     objOpts.canvas.is_grid = false;
@@ -167,6 +168,7 @@ document.addEventListener("DOMContentLoaded", () => {
     objOpts.plot.series_idx = 0;
     objOpts.plot.selected_options = null;
     objOpts.plot.on_section = true;
+    objOpts.plot.useResampleByScale = true;
   
     objOpts.edit.editable = false;
     objOpts.edit.contextmenu_enable = false;
@@ -377,7 +379,8 @@ document.addEventListener("DOMContentLoaded", () => {
           const selected_age_model_id = document.getElementById("AgeModelSelect").value; 
           await loadAge(selected_age_model_id);//load age data included LCCore
 
-          await loadPlotData();
+          await loadPlotData("age");
+          await loadPlotData("data")
         }else if(droppedData.type == "csv"){
           if(droppedData.name.includes("[correlation]") || droppedData.name.includes("[duo]") ){
             //case model file
@@ -398,7 +401,8 @@ document.addEventListener("DOMContentLoaded", () => {
             if(age_model_list.length >0){
               document.getElementById("AgeModelSelect").value = age_model_list[age_model_list.length-1].id;
               await loadAge(age_model_list[age_model_list.length-1].id);
-              await loadPlotData();//age plot
+              await loadPlotData("age");//age plot
+              await loadPlotData("data")
             }
             updateView();
           }
@@ -618,7 +622,8 @@ document.addEventListener("DOMContentLoaded", () => {
       //load age model
       selected_age_model_id = ageId;
       await loadAge(selected_age_model_id);
-      await loadPlotData();
+      await loadPlotData("age");
+      await loadPlotData("data")
 
       //update photo
       if(Object.keys(modelImages.drilling_depth).length>0){
@@ -726,10 +731,11 @@ document.addEventListener("DOMContentLoaded", () => {
    //============================================================================================
    //import plot data
   window.LCapi.receive("importedData", async (data) => {
-    console.log("[Renderer]: Imported data received.");
-    
-    //load renderer
-    await loadPlotData()
+    if(data){
+      console.log("[Renderer]: Imported data received.");
+      //load renderer
+      await loadPlotData("data")
+    }  
   });
   
   //============================================================================================
@@ -741,7 +747,8 @@ document.addEventListener("DOMContentLoaded", () => {
     const selected_age_model_id = document.getElementById("AgeModelSelect").value; 
     await loadAge(selected_age_model_id);//load age data included LCCore
 
-    await loadPlotData();
+    await loadPlotData("age");
+    await loadPlotData("data")
 
     //update photo
     if(Object.keys(modelImages.drilling_depth).length>0){
@@ -779,7 +786,8 @@ document.addEventListener("DOMContentLoaded", () => {
     const selected_age_model_id = document.getElementById("AgeModelSelect").value; 
     await loadAge(selected_age_model_id);//load age data included LCCore
 
-    await loadPlotData();
+    await loadPlotData("age");
+    await loadPlotData("data")
 
     updateView();    
     await window.LCapi.clearProgressbar();
@@ -795,283 +803,193 @@ document.addEventListener("DOMContentLoaded", () => {
   });
   //============================================================================================
   window.LCapi.receive("PlotDataOptions", async (data) => {
-    console.log("[Renderer]: Plot options are received.")
-    LCPlot.draw_collections = [];
-    if(data.emitType=="new"){
-      //await loadPlotData();//latest ver is load plot data at the same time of loading plotter
-    }
+    try{
+      console.log("[Renderer]: Plot options are received.")
 
-    //get plotter options
-    objOpts.plot.selected_options = data.data;
-    objOpts.plot.isVisible = true;
-    document.getElementById("bt_chart").style.backgroundColor = "#ccc";
+      LCPlotData.draw_collections = [];
 
-    //calc plotvaluse
-    if(objOpts.plot.selected_options !== null && LCPlot.data_collections.length>0){
-      // clac each datasets
-      const selectedList = objOpts.plot.selected_options;
-      for(let t=0; t< selectedList.length;t++){
-        //each Plot list in plotter
-        const target = selectedList[t];           
-            
-        //check draw
-        if(target.isDraw == false){
-          continue
-        }
-
-        //main
-        //get idx
-        let colIdx = null;
-        LCPlot.data_collections.forEach((c,i)=>{
-          if(c.id == target.collectionId){
-              colIdx = i;
-          }
-        })
-        if(colIdx==null){
-          continue
-        }
-
-        //get data
-        let nIdx = null;
-        let dIdx = null;
-        LCPlot.data_collections[colIdx].datasets.forEach((d,i)=>{
-          if(d.id == target.numeratorId){
-            nIdx = i;
-          }
-          if(d.id == target.denominatorId){
-            dIdx = i;
-          }
-        })
-        
-        if(nIdx==null && dIdx==null){
-          continue
-        }
-        
-        //calc values        
-        const numeratorDataSeries   = (nIdx !== null) ? LCPlot.data_collections[colIdx].datasets[nIdx] : null;
-        const denominatorDataSeries = (dIdx !== null) ? LCPlot.data_collections[colIdx].datasets[dIdx] : null;    
-
-        const checkIdx = (nIdx!==null ) ? nIdx:dIdx;    
-        let minNumDno = Infinity;
-        let maxNumDno = -Infinity;
-
-        //initiarize
-        let drawDataset = {
-          name:"",
-          unit:"",
-          x_max_global: -Infinity,
-          x_min_global: Infinity,
-          x_max_global_pos: {holeName:null, idx:null},
-          x_min_global_pos: {holeName:null, idx:null},
-          
-          options: target,
-          data: {},
-        };
-        const vals = {
-          data:[],
-          x_max_hole: null,
-          x_min_hole: null,
-          x_max_hole_idx: null,
-          x_min_hole_idx: null,
-          x_zero_hole: null,
-          pos_x_max_hole: null,
-          pos_x_min_hole: null,
-        };;
-        drawDataset.data["global"] = vals;
-        LCCore.projects.forEach(p=>{
-          p.holes.forEach(h=>{
-            drawDataset.data[h.name] = vals;
-          })
-        })
-
-        for(let d=0; d<LCPlot.data_collections[colIdx].datasets[checkIdx].data_series.length; d++){          
-          //get target data
-          const drawData = {      
-            type: "data", //used            
-            x: NaN,  //used  
-            min_x: NaN, //global min
-            max_x: NaN, //global max
-            original_depth_type: "",//used
-            hole_name: null,
-            section_name: null,
-
-            amplification_x: 1,//used
-            amplification_y: 1, //used 
-
-            trinity: null,
-            drilling_depth:null,
-            composite_depth:null,
-            event_free_depth: null,
-            age: null,
-
-            pos_canvas_x: null,
-            pos_canvas_y: null,
-          };
-          //calc
-          let numeratorData = null;
-          let denominatorData = null;
-          let numdenoData = null;
-          let holeName = null;
-          let sectionName = null;
-          if(nIdx !== null){              
-            if(dIdx !== null){
-              //case n/d
-              numeratorData   = numeratorDataSeries.data_series[d];
-              denominatorData = denominatorDataSeries.data_series[d];
-
-              const numeratorValue  = (Number.isFinite(numeratorData.data)&&numeratorData.data!==null) ? numeratorData.data : NaN;
-              const denominatorValue= (Number.isFinite(denominatorData.data)&&denominatorData.data!==null) ? denominatorData.data : NaN;
-
-              numdenoData = numeratorValue/denominatorValue;       
-              holeName =  numeratorData.original_depth_type=="trinity" ? numeratorData.trinity.hole_name : "global"; 
-              sectionName =  numeratorData.original_depth_type=="trinity" ? numeratorData.trinity.section_name : "global";                          
-            }else{
-              // case n/1
-              numeratorData   = numeratorDataSeries.data_series[d];
-              const numeratorValue  = (Number.isFinite(numeratorData.data)&&numeratorData.data!==null) ? numeratorData.data : NaN;
-              
-              numdenoData = numeratorValue/1;  
-              holeName =  numeratorData.original_depth_type=="trinity" ? numeratorData.trinity.hole_name : "global";
-              sectionName =  numeratorData.original_depth_type=="trinity" ? numeratorData.trinity.section_name : "global"; 
-            }
-          }else{
-            if(dIdx !== null){
-              //case 1/d
-              denominatorData = denominatorDataSeries.data_series[d];
-              const denominatorValue= (Number.isFinite(denominatorData.data)&&denominatorData.data!==null) ? denominatorData.data : NaN;
-              
-              numdenoData = 1/denominatorValue;  
-              holeName =  denominatorData.original_depth_type=="trinity" ? denominatorData.trinity.hole_name : "global";
-              sectionName =  numeratorData.original_depth_type=="trinity" ? numeratorData.trinity.section_name : "global"; 
-            }else{
-              //1/1
-              numdenoData = 1;  
-              holeName    =  denominatorData.original_depth_type=="trinity" ? denominatorData.trinity.hole_name : "global";
-              sectionName =  numeratorData.original_depth_type=="trinity" ? numeratorData.trinity.section_name : "global"; 
-            }            
-          }
-
-          //apply values
-          drawData.x = numdenoData;
-          drawData.original_depth_type = numeratorData.original_depth_type
-          drawData.trinity  = numeratorData.trinity;
-          drawData.drilling_depth   = numeratorData.drilling_depth;
-          drawData.composite_depth  = numeratorData.composite_depth;
-          drawData.event_free_depth = numeratorData.event_free_depth;
-          drawData.age = numeratorData.age;
-          drawData.hole_name = holeName;
-          drawData.section_name = sectionName;
-
-          //add
-          if(holeName){
-            drawDataset.data[holeName].data.push(drawData);
-          }else{  
-            //cd, efd. age
-          }
-          
-        }
-
-        //update unit
-        if(nIdx !== null){              
-            if(dIdx !== null){
-              //n/d
-              drawDataset.unit  = numeratorDataSeries.unit + "/" + denominatorDataSeries.unit;
-              drawDataset.name  = numeratorDataSeries.name + "/" + denominatorDataSeries.name;  
-            }else{
-              //d/1
-              drawDataset.unit  = numeratorDataSeries.unit;
-              drawDataset.name  = numeratorDataSeries.name;  
-            }
-        }else{
-          if(dIdx !== null){
-            //1/d
-            drawDataset.unit  = "1/" + denominatorDataSeries.unit;
-            drawDataset.name  = "1/" + denominatorDataSeries.name;  
-          }else{
-            //1/1
-            drawDataset.unit  = "";
-            drawDataset.name  = "";  
-          }
-        }
-        
-        //search max/min
-        let globalMax = -Infinity;
-        let globalMin = Infinity;
-        let globalMaxHoleName = null;
-        let globalMaxIdx = null;
-        let globalMinHoleName = null;
-        let globalMinIdx = null;
-
-        for(let n=0; n<2;n++){
-          for (const holeName in drawDataset.data) {
-            if(n==0 && holeName == "global"){
-              continue
-            }
-
-            let holeMax = -Infinity;
-            let holeMin = Infinity;
-            let holeMaxIdx = null;
-            let holeMinIdx = null;
-
-            drawDataset.data[holeName].data.forEach((d, idx)=>{
-              if (!isFinite(d.x)) return
-              if(d.x>holeMax || holeMaxIdx == null){
-                holeMax = d.x;
-                holeMaxIdx = idx;
-              }
-              if(d.x<holeMin || holeMinIdx == null){
-                holeMin = d.x;
-                holeMinIdx = idx;
-              }
-            });
-
-            drawDataset.data[holeName].x_max_hole = Number.isFinite(holeMax) ? holeMax : null;
-            drawDataset.data[holeName].x_min_hole = Number.isFinite(holeMin) ? holeMin : null;
-            drawDataset.data[holeName].x_max_hole_idx = holeMaxIdx;
-            drawDataset.data[holeName].x_min_hole_idx = holeMinIdx;
-
-            if(holeMax>globalMax){
-              globalMax = holeMax;
-              globalMaxHoleName = holeName;
-              globalMaxIdx = holeMaxIdx;
-            }
-            if(holeMin<globalMin){
-              globalMin = holeMin;
-              globalMinHoleName = holeName;
-              globalMinIdx = holeMinIdx;
-            }
-          }
-
-          if(Number.isFinite(globalMax) && (drawDataset.x_max_global == null || drawDataset.x_max_global < globalMax)){
-            drawDataset.x_max_global = globalMax;
-            drawDataset.x_max_global_pos.holeName = globalMaxHoleName;
-            drawDataset.x_max_global_pos.idx = globalMaxIdx;
-          }
-          if(Number.isFinite(globalMin) && (drawDataset.x_min_global == null || drawDataset.x_min_global > globalMin)){
-            drawDataset.x_min_global = globalMin;
-            drawDataset.x_min_global_pos.holeName = globalMinHoleName;
-            drawDataset.x_min_global_pos.idx = globalMinIdx;
-          }
-                    
-          for (const holeName in drawDataset.data) {
-            drawDataset.data[holeName].data?.forEach(d=>{
-              d.min_x = globalMin;
-              d.max_x = globalMax;
-            })
-          }
-
-          LCPlot.draw_collections.push(drawDataset);
-                  
-        }
-        
+      if(data.emitType=="new"){
+        //await loadPlotData();//latest ver is load plot data at the same time of loading plotter
       }
-    }else{
-      console.log(objOpts.plot.selected_options, LCPlot.data_collections)
-    }
 
-    
-    console.log("[Renderer]: Plot data is loaded.", LCPlot.draw_collections)
-    updateView();
+      //get plotter options
+      objOpts.plot.selected_options = data.data;
+      objOpts.plot.isVisible = true;
+      document.getElementById("bt_chart").style.backgroundColor = "#ccc";
+
+      //calc plotvaluse
+      if(objOpts.plot.selected_options !== null && LCPlotData.data_collections.length>0){
+        // clac each datasets
+        const selectedList = objOpts.plot.selected_options;
+        for(let t=0; t< selectedList.length; t++){
+          //each Plot list in plotter
+          const target = selectedList[t];           
+              
+          //check draw
+          if(target.isDraw == false){
+            continue
+          }
+
+          //main
+          //get idx
+          let colIdx = null;
+          LCPlotData.data_collections.forEach((c, i)=>{
+            if(c.id == target.collectionId){
+                colIdx = i;
+            }
+          })
+
+          if(colIdx==null){
+            continue
+          }
+
+          //get data
+          let nIdx = null;
+          let dIdx = null;
+          const numInfoData = 12;
+
+          if(LCPlotData.data_collections[colIdx].rows.length > 0){
+            //if row data exist
+            
+            if(target.numeratorId>0){
+              nIdx = target.numeratorId   + numInfoData;
+            }
+            if(target.denominatorId>0){
+              dIdx = target.denominatorId + numInfoData;
+            }
+          }
+
+          if(nIdx==null && dIdx==null){
+            continue
+          }
+
+          //calc values
+          const dispPix = scroller.clientHeight * objOpts.canvas.dpir;     
+          let th = [0.010, 0.025, 0.050, 0.075, 0.10, 0.25, 0.50, 0.75, 1.0, 2.5, 5.0, 7.5, 10]; //cm
+          
+          //-------numerator--------   
+          const numeratorDataSeries   = [];          
+          if(nIdx!==null){            
+            const numeratorDataset0     = drawPointDataset();     
+            numeratorDataset0.zoom_level = 0;     
+            let val_min = Infinity;
+            let val_max = - Infinity;
+
+            LCPlotData.data_collections[colIdx].rows.forEach(row=>{     
+              const drawPoint  = drawPointData(row, LCCore);
+              drawPoint.type   = "data";
+              drawPoint.header = LCPlotData.data_collections[colIdx].header[nIdx] ? LCPlotData.data_collections[colIdx].header[nIdx] : "";
+              drawPoint.unit   = LCPlotData.data_collections[colIdx].units[nIdx]  ? LCPlotData.data_collections[colIdx].units[nIdx]  : "";
+              drawPoint.val    = Number.isFinite(row[nIdx]) ? row[nIdx] : NaN;
+
+              numeratorDataset0.data.push(drawPoint);     
+              if(drawPoint.val < val_min){
+                val_min = drawPoint.val;
+              }
+              if(drawPoint.val > val_max){
+                val_max = drawPoint.val;
+              }       
+            })
+            
+            //set values
+            if(Number.isFinite(val_min)){
+              numeratorDataset0.min = val_min;
+            }
+            if(Number.isFinite(val_max)){
+              numeratorDataset0.max = val_max;
+            }
+
+            //sunbmit
+            numeratorDataSeries.push(numeratorDataset0);
+            
+            //zoom level1   
+            for (let t=0; t<th.length; t++){
+              
+              if(objOpts.canvas.depth_scale == "age"){
+                th[t] = th[t] * objOpts.canvas.age_zoom_correction[0];
+              }
+
+              if(objOpts.plot.useResampleByScale ){
+                //calc
+                const numeratorDataset1 = resamplePointData(numeratorDataset0, th[t], objOpts)
+                numeratorDataset1.zoom_level = t + 1;
+                //submit
+                numeratorDataSeries.push(numeratorDataset1);
+              } else{
+                //submit
+                const numeratorDataset1 = structuredClone(numeratorDataset0);
+                numeratorDataSeries.push(numeratorDataset1);
+              }               
+            }
+          }
+          //-------denominator--------
+          const denominatorDataSeries = [];
+          if(dIdx!==null){            
+            const denominatorDataset0     = drawPointDataset();     
+            denominatorDataset0.zoom_level = 0;     
+            let val_min = Infinity;
+            let val_max = - Infinity;
+
+            LCPlotData.data_collections[colIdx].rows.forEach(row=>{     
+              const drawPoint  = drawPointData(row, LCCore);
+              drawPoint.type   = "data";
+              drawPoint.header = LCPlotData.data_collections[colIdx].header[dIdx] ? LCPlotData.data_collections[colIdx].header[dIdx] : "";
+              drawPoint.unit   = LCPlotData.data_collections[colIdx].units[dIdx]  ? LCPlotData.data_collections[colIdx].units[dIdx]  : "";
+              drawPoint.val    = Number.isFinite(row[dIdx]) ? row[dIdx] : NaN;
+
+              denominatorDataset0.data.push(drawPoint);     
+
+              if(drawPoint.val < val_min){
+                val_min = drawPoint.val;
+              }
+              if(drawPoint.val > val_max){
+                val_max = drawPoint.val;
+              }       
+            })
+            
+            //set values
+            if(Number.isFinite(val_min)){
+              denominatorDataset0.min = val_min;
+            }
+            if(Number.isFinite(val_max)){
+              denominatorDataset0.max = val_max;
+            }
+
+            //sunbmit
+            denominatorDataSeries.push(denominatorDataset0);
+            
+            //zoom level1          
+            for (let t=0; t<th.length; t++){
+              
+              if(objOpts.canvas.depth_scale == "age"){
+                th[t] = th[t] * objOpts.canvas.age_zoom_correction[0];
+              }
+
+              //calc
+              const denominatorDataset1 = resamplePointData(denominatorDataset0, th[t], objOpts)
+              denominatorDataset1.zoom_level = t + 1;
+
+              //submit
+              denominatorDataSeries.push(denominatorDataset1);
+            }
+          }
+
+          //calc divided values
+          const dividedDataSeries = dividePlotData(numeratorDataSeries, denominatorDataSeries);
+
+          //submit
+          LCPlotData.draw_collections.push(dividedDataSeries);
+
+        }
+      }else{
+        console.log("[Renderer]: There is no plot data or information: ", objOpts.plot.selected_options, LCPlotData.data_collections)
+      }
+      
+      console.log("[Renderer]: Plot data is loaded.",LCPlotData)
+      updateView();
+    }catch(er){
+      console.log(er)
+    }    
   });
   //============================================================================================
   //Edit correlation model
@@ -1644,7 +1562,8 @@ document.addEventListener("DOMContentLoaded", () => {
           //await registerAgeFromLCAge();
           const selected_age_model_id = document.getElementById("AgeModelSelect").value;
           await loadAge(selected_age_model_id)
-          await loadPlotData();
+          await loadPlotData("age");
+          await loadPlotData("data")
           updateView();   
 
         }else if (result == "duplicate_holes"){
@@ -2203,7 +2122,8 @@ document.addEventListener("DOMContentLoaded", () => {
           await undo("save","Set Master");//undo
           await loadModel(false, false);
           await loadAge(document.getElementById("AgeModelSelect").value);
-          await loadPlotData();
+          await loadPlotData("age");
+          await loadPlotData("data")
           
           const changedData = await getUpdatedSectionIds("depth");          
           console.log("[Renderer]: Affected sections:",changedData);
@@ -2228,7 +2148,8 @@ document.addEventListener("DOMContentLoaded", () => {
           await undo("save","Unset Master");//undo
           await loadModel(false,false);
           await loadAge(document.getElementById("AgeModelSelect").value);
-          await loadPlotData();
+          await loadPlotData("age");
+          await loadPlotData("data")
           updateView();
           console.log("[Renderer]: Delete master.");
         }else{
@@ -2278,7 +2199,8 @@ document.addEventListener("DOMContentLoaded", () => {
             await undo("save","Set Zero Point");//undo
             await loadModel(false,false);
             await loadAge(document.getElementById("AgeModelSelect").value);
-            await loadPlotData();
+            await loadPlotData("age");
+            await loadPlotData("data")
             updateView();
             console.log("[Renderer]: Set a new Zero point.");
           }else{
@@ -2604,7 +2526,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
             await loadModel(false,false);
             await loadAge(document.getElementById("AgeModelSelect").value);
-            await loadPlotData();
+            await loadPlotData("age");
+            await loadPlotData("data")
             const changedData = await getUpdatedSectionIds("depth");          
             console.log("[Renderer]: Affected sections:",changedData);
             //const affectedSections = getConnectedSectionIds([upperId, lowerId]);
@@ -2635,7 +2558,8 @@ document.addEventListener("DOMContentLoaded", () => {
           await undo("save","Delete Event");//undo
           await loadModel(false,false);
           await loadAge(document.getElementById("AgeModelSelect").value);
-          await loadPlotData();
+          await loadPlotData("age");
+          await loadPlotData("data")
           const changedData = await getUpdatedSectionIds("depth");
           console.log("[Renderer]: Affected sections:",changedData);
           //const affectedSections = getConnectedSectionIds([upperId, lowerId]);
@@ -2759,7 +2683,8 @@ document.addEventListener("DOMContentLoaded", () => {
           await undo("save","Delete Section");//undo
           await loadModel(false,false);
           await loadAge(document.getElementById("AgeModelSelect").value);
-          await loadPlotData();
+          await loadPlotData("age");
+          await loadPlotData("data")
           updateView();
         }
       }
@@ -2842,7 +2767,8 @@ document.addEventListener("DOMContentLoaded", () => {
             await undo("save","Add Section");//undo
             await loadModel(false,false);
             await loadAge(document.getElementById("AgeModelSelect").value);
-            await loadPlotData();
+            await loadPlotData("age");
+            await loadPlotData("data")
           }else{
             console.log("[Renderer]: Failed to add section.")
           }
@@ -3107,7 +3033,8 @@ document.addEventListener("DOMContentLoaded", () => {
           console.log("[Renderer]: Delete hole.")
           await loadModel(false,false);
           await loadAge(document.getElementById("AgeModelSelect").value);
-          await loadPlotData();
+          await loadPlotData("age");
+          await loadPlotData("data")
           updateView();
         }
       }
@@ -3151,7 +3078,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
 
           await loadAge(document.getElementById("AgeModelSelect").value);
-          await loadPlotData();
+          await loadPlotData("age");
+          await loadPlotData("data")
           updateView();
         }else if(result=="used"){
           console.log("[Renderer]: "+response+" has already been used. Please input a unique name that has not been used.");
@@ -3230,7 +3158,8 @@ document.addEventListener("DOMContentLoaded", () => {
           console.log("[Renderer]: Add project.")
           await loadModel(false,false);
           await loadAge(document.getElementById("AgeModelSelect").value);
-          await loadPlotData();
+          await loadPlotData("age");
+          await loadPlotData("data")
           updateView();
         }else if(result=="used"){
           console.log("[Renderer]: "+response+" has already been used. Please input a unique name that has not been used.");
@@ -3281,7 +3210,8 @@ document.addEventListener("DOMContentLoaded", () => {
           await loadModel(false,false);
 
           await loadAge(document.getElementById("AgeModelSelect").value);
-          await loadPlotData();
+          await loadPlotData("age");
+          await loadPlotData("data")
           updateView();
         }
       }
@@ -3300,7 +3230,7 @@ document.addEventListener("DOMContentLoaded", () => {
           console.log("[Renderer]: Chnage project name.")
           await loadModel(false,false);
           //await loadAge(document.getElementById("AgeModelSelect").value);
-          //await loadPlotData();
+          //await loadPlotData("age");
           updateView();
         }else if(result=="used"){
           console.log("[Renderer]: "+response+" has already been used. Please input a unique name that has not been used.");
@@ -3326,7 +3256,8 @@ document.addEventListener("DOMContentLoaded", () => {
           console.log("[Renderer]: Move the selected hole to this project.")
           await loadModel(false,false);
           await loadAge(document.getElementById("AgeModelSelect").value);
-          await loadPlotData();
+          await loadPlotData("age");
+          await loadPlotData("data")
           updateView();
         }else if(result==false){
           console.log("[Renderer]: Failed to move hole to this project.");
@@ -3498,8 +3429,8 @@ document.addEventListener("DOMContentLoaded", () => {
       const selected_age_model_id = document.getElementById("AgeModelSelect").value; 
       await loadAge(selected_age_model_id);//load age data included LCCore
 
-      await loadPlotData();
-      console.log(LCPlot)
+      await loadPlotData("age");
+      await loadPlotData("data")
 
       //modelImages = initialiseImages();
       modelImages = await updateImageRegistration(modelImages, LCCore);
@@ -3882,7 +3813,7 @@ document.addEventListener("DOMContentLoaded", () => {
       //get location
     let pos_y = data[objOpts.canvas.depth_scale];
     objOpts.canvas.finder_y = pos_y;
-    console.log("[Renderer]: Recieved data from Finder: ", pos_y, objOpts.canvas.depth_scale);
+    console.log("[Renderer]: Received data from Finder: ", pos_y, objOpts.canvas.depth_scale);
     if(data.isMove){
       if (objOpts.canvas.depth_scale !== "drilling_depth") {
         let rect = document.getElementById("p5Canvas").getBoundingClientRect(); // Canvas position and size
@@ -4106,7 +4037,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
         await loadModel(false,false);
         await loadAge(selected_age_model_id);
-        await loadPlotData();
+        await loadPlotData("age");
+        await loadPlotData("data")
           
         console.log("[Renderer]: Undo model");
         console.log(LCCore);
@@ -4125,7 +4057,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
         await loadModel(false, false);
         await loadAge(selected_age_model_id);
-        await loadPlotData();
+        await loadPlotData("age");
+        await loadPlotData("data")
           
         console.log("[Renderer]: Redo model");
         console.log(LCCore);
@@ -5620,37 +5553,43 @@ document.addEventListener("DOMContentLoaded", () => {
         num_disable.total += project.holes.length + objOpts.project.interval;
       }
 
-      //==========================================================================================
+      //==========================================================================================      
       //draw age points      
-      if (LCPlot !== null && LCPlot.age_collections.length > 0) {
-        let age_plot_idx = null;
-        LCPlot.age_collections.forEach((a, idx) => {
-          if (a.id == LCPlot.age_selected_id) {
-            age_plot_idx = idx;
-          }
-        });
-
+      if (LCPlotAge !== null &&  LCPlotAge.ages.length > 0) {
+        //if(LCPlotAge.id == document.getElementById("AgeModelSelect").value) //if check id
+        
         //get age data(because age data, age series is single)
-        const ageSet = LCPlot.age_collections[age_plot_idx]?.datasets?.[0];        
+        const ageList = LCPlotAge.ages;        
 
         //get position & plot        
-        if(ageSet){
-          for (let a = 0; a < ageSet.data_series.length; a++) {    
+        if(ageList){
+
+          //check inside
+          //result.pos_canvas_y  = (data[objOpts.canvas.depth_scale] * data.amplification_y + shift_y) * yMag + pad_y;
+          const scrollerTopRealScale   = (scroller.scrollTop - pad_y) / yMag - shift_y;//cm
+          const scrollerBotRealScale   = (scroller.scrollTop + window.innerHeight - pad_y) / yMag - shift_y;//cm
+          const bufferVal = objOpts.canvas.buffer_depth * yMag;
+          const searchTop = scrollerTopRealScale - bufferVal;
+          const searchBot = scrollerBotRealScale + bufferVal;
+          let startIndex = binarySearchIndex(ageList, searchTop, (d) => d[objOpts.canvas.depth_scale]);
+          let endIndex   = binarySearchIndex(ageList, searchBot, (d) => d[objOpts.canvas.depth_scale]);
+
+          for (let a = startIndex; a < endIndex + 1; a++) {    
             let pData = {
-              type: "age", //used
+              type: ageList[a].data_type, //used
               amplification_x: 1,//used
               amplification_y: 1, //used
-              original_depth_type: ageSet.data_series[a].original_depth_type,//used
+              original_depth_type: ageList[a].original_depth_type,//used
 
-              x: ageSet.data_series[a].data, //used
+              x: ageList[a].age_mid, //used
               min_x:NaN,
 
-              hole_name: ageSet.data_series[a].original_depth_type=="trinity" ? ageSet.data_series[a].trinity.hole_name : null, //used
-              section_name: ageSet.data_series[a].original_depth_type=="trinity" ? ageSet.data_series[a].trinity.section_name : null,
-              distance: ageSet.data_series[a].original_depth_type=="trinity" ? ageSet.data_series[a].trinity.distance : null,
-              composite_depth: ageSet.data_series[a].composite_depth,//used
-              evemnt_free_depth: ageSet.data_series[a].event_free_depth,//used
-              age: ageSet.data_series[a].age,//used
+              hole_name:    ageList[a].original_depth_type=="trinity" ? ageList[a].trinityData.hole_name    : null, //used
+              section_name: ageList[a].original_depth_type=="trinity" ? ageList[a].trinityData.section_name : null,
+              distance:     ageList[a].original_depth_type=="trinity" ? ageList[a].trinityData.distance     : null,
+              composite_depth: ageList[a].composite_depth,//used
+              evemnt_free_depth: ageList[a].event_free_depth,//used
+              age: ageList[a].age_mid,//used
             } 
 
             const result = getPlotPosiotion( pData, LCCore, objOpts);
@@ -5658,19 +5597,8 @@ document.addEventListener("DOMContentLoaded", () => {
             const posX = result.pos_canvas_x;
             const posY = result.pos_canvas_y;
 
-            //check inside
-            const age_rect = {
-              x: posX,
-              y: posY,
-              width: objOpts.age.incon_size,
-              height: objOpts.age.incon_size,
-            };
-            if (!isInside(view_rect, age_rect, objOpts.canvas.buffer_depth * yMag)) {
-              continue;
-            }
-
             //plot main
-            if (ageSet.data_series[a].source_type == "" || agePlotIcons[ageSet.data_series[a].source_type] == undefined) {
+            if (ageList[a].source_type == "" || agePlotIcons[ageList[a].source_type] == undefined) {
               sketch.image(
                 agePlotIcons["none"],
                 posX,
@@ -5679,10 +5607,10 @@ document.addEventListener("DOMContentLoaded", () => {
                 objOpts.age.incon_size
               );
             } else { 
-              if(ageSet.data_series[a].enable==true){
-                if(ageSet.data_series[a].reliable == true){
+              if(ageList[a].enable==true){
+                if(ageList[a].reliable == true){
                   sketch.image(
-                    agePlotIcons[ageSet.data_series[a].source_type],
+                    agePlotIcons[ageList[a].source_type],
                     posX,
                     posY,
                     objOpts.age.incon_size,
@@ -5690,7 +5618,7 @@ document.addEventListener("DOMContentLoaded", () => {
                   );
                 }else{
                   sketch.image(
-                    agePlotIcons[ageSet.data_series[a].source_type+"_unreliable"],
+                    agePlotIcons[ageList[a].source_type+"_unreliable"],
                     posX,
                     posY,
                     objOpts.age.incon_size,
@@ -5699,7 +5627,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 }
               }else{
                 sketch.image(
-                  agePlotIcons[ageSet.data_series[a].source_type+"_disable"],
+                  agePlotIcons[ageList[a].source_type+"_disable"],
                   posX,
                   posY,
                   objOpts.age.incon_size,
@@ -5717,223 +5645,266 @@ document.addEventListener("DOMContentLoaded", () => {
       //==========================================================================================
       //draw data points     //0000000000000000000000000000
       if(objOpts.plot.isVisible == true){
-        if(objOpts.plot.selected_options !== null){
-          sketch.push();
-
-          for(let t=0; t<LCPlot.draw_collections.length; t++){
-            const drawDataset = LCPlot.draw_collections[t];
-            if(!drawDataset.options.isDraw) continue
-
+        if(objOpts.plot.selected_options !== null){          
+          sketch.drawingContext.setLineDash([]);
+          for(let t=0; t<LCPlotData.draw_collections.length; t++){
             //get inside data
             const scrollerTopRealScale   = (scroller.scrollTop - pad_y) / yMag - shift_y;//cm
-            const scrollerBotRealScale   = (scroller.scrollTop + window.innerHeight - pad_y) / yMag - shift_y;//cm
-            
-            //draw plot--------------------------------------------------------------------------------------------
-            for(let holeName in drawDataset.data){
-              const pDataList = drawDataset.data[holeName].data;
-              
-              if(pDataList.length==0){
-                continue
-              }       
-              
-              //check inside
-              const bufferVal = objOpts.canvas.buffer_depth * yMag;
-              const searchTop = scrollerTopRealScale - bufferVal;
-              const searchBot = scrollerBotRealScale + bufferVal;
-              let startIndex = binarySearchIndex(pDataList, searchTop, (d) => d.composite_depth);
-              let endIndex   = binarySearchIndex(pDataList, searchBot, (d) => d.composite_depth);
-              
-              //calc values
-              const amp = [(objOpts.hole.width / 2) * drawDataset.options.amplification / (drawDataset.x_max_global - drawDataset.x_min_global), 1];
+            const scrollerBotRealScale   = (scroller.scrollTop + window.innerHeight - pad_y) / yMag - shift_y;//cm            
 
-              //draw              
-              if (drawDataset.options.plotType == "line") {
-                sketch.strokeWeight(1); 
-                sketch.stroke(drawDataset.options.colour); 
-                sketch.noFill();
-                sketch.beginShape();
-              }else if(drawDataset.options.plotType == "bar"){
-                // Calculate zero position if not yet calculated
-                if(drawDataset.data[holeName].x_zero_hole == null){
-                  const zeroData = drawDataset.data[holeName].data[0];
-                  // Create a temporary object to calculate the zero position
-                  // Note: Ensure deep copy if necessary depending on your data structure
-                  const tempZero = { ...zeroData, x: 0 }; 
-                  const zeroResult = getPlotPosiotion(tempZero, LCCore, objOpts);
-                  drawDataset.data[holeName].x_zero_hole = zeroResult.pos_canvas_x;
-                }
-
-                const rectX0 = drawDataset.data[holeName].x_zero_hole; 
-                
-                // Draw the vertical reference line ONLY ONCE
-                sketch.strokeWeight(1); 
-                sketch.stroke("black"); 
-                sketch.noFill();
-                sketch.line(
-                  rectX0,
-                  searchTop, // Screen Top
-                  rectX0,
-                  searchBot  // Screen Bottom
-                );
-                
-                // Start Batch Drawing for Bars (Using QUADS)
-                sketch.fill(drawDataset.options.colour);
-                sketch.noStroke(); // Disable stroke for individual bars to improve performance
-                sketch.beginShape(sketch.QUADS);
-
-              }
-
-              for(let i=startIndex; i<endIndex; i++){
-                if((drawDataset.options.plotType =="line" || drawDataset.options.plotType =="bar") && i==pDataList.length-1){
-                  continue
-                }
-
-                //calc plot positions
-                //current 
-                pDataList[i].amplification_x   = amp[0];
-                pDataList[i].amplification_y   = amp[1];
-                const resUpper = getPlotPosiotion( pDataList[i], LCCore, objOpts);
-                pDataList[i].pos_canvas_x = resUpper.pos_canvas_x;
-                pDataList[i].pos_canvas_y = resUpper.pos_canvas_y; 
-                
-                //next(for line)
-                if(i<pDataList.length-1){
-                  pDataList[i+1].amplification_x = amp[0];
-                  //DataList[i+1].amplification_y = 1;
-                  const resLower = getPlotPosiotion( pDataList[i+1], LCCore, objOpts);
-                  if(pDataList[i].hole_name == pDataList[i+1].hole_name && pDataList[i].section_name == pDataList[i+1].section_name){
-                    pDataList[i+1].pos_canvas_x = resLower.pos_canvas_x;
-                    pDataList[i+1].pos_canvas_y = resLower.pos_canvas_y;
-                  }else{
-                    pDataList[i+1].pos_canvas_x = NaN;
-                    pDataList[i+1].pos_canvas_y = NaN;
-                  }    
-                }              
-
-                //draw
-                if(drawDataset.options.plotType == "line"){
-                  // ---------------------------------------------------------
-                  // Line Plot: Use vertex() instead of line()
-                  // ---------------------------------------------------------
-                  
-                  // Add a vertex to the current shape batch (sends to GPU memory, doesn't draw yet)
-                  sketch.vertex(pDataList[i].pos_canvas_x, pDataList[i].pos_canvas_y);
-
-                  // Handle data discontinuity (e.g., different hole or section)
-                  // We must break the line if the next point belongs to a different group
-                  if (i < pDataList.length - 1) {
-                    const nextData = pDataList[i+1];
-                    if (pDataList[i].hole_name !== nextData.hole_name || pDataList[i].section_name !== nextData.section_name) {
-                        sketch.endShape();   // Draw the current segment
-                        sketch.beginShape(); // Start a new segment
-                    }
-                  }             
-                }else if(drawDataset.options.plotType == "scatter"){
-                  sketch.stroke(drawDataset.options.colour);
-                  sketch.strokeWeight(3); 
-
-                  sketch.point(
-                    pDataList[i].pos_canvas_x,
-                    pDataList[i].pos_canvas_y
-                  );
-                }else if(drawDataset.options.plotType == "bar"){
-                  // ---------------------------------------------------------
-                  // Bar Plot Logic (Dynamic Width)
-                  // ---------------------------------------------------------
-                  
-                  const rectX0 = drawDataset.data[holeName].x_zero_hole;
-                  
-                  // 1. Calculate dynamic height based on the distance to the next data point
-                  let depthDiff = 0;
-
-                  if (i < pDataList.length - 1) {
-                      // Calculate distance to the NEXT point
-                      depthDiff = Math.abs(pDataList[i+1].composite_depth - pDataList[i].composite_depth);
-                  } else if (i > 0) {
-                      // For the LAST point, use the distance from the PREVIOUS point
-                      depthDiff = Math.abs(pDataList[i].composite_depth - pDataList[i-1].composite_depth);
-                  } else {
-                      // Fallback if there is only 1 data point
-                      depthDiff = 1.0; 
-                  }
-
-                  // 2. Convert depth difference to pixels (using yMag)
-                  // Multiply by 0.9 or similar to leave a small gap (optional)
-                  let binWidth = (depthDiff * yMag) * 0.9; 
-                  
-                  // Safety: ensure minimum visibility (e.g., at least 1px)
-                  if(binWidth < 1) binWidth = 1;
-
-
-                  // Define rectangle coordinates
-                  const rectX1 = pDataList[i].pos_canvas_x;
-                  // Center the bar on the data point
-                  const rectY0 = pDataList[i].pos_canvas_y - binWidth/2;
-                  const rectY1 = pDataList[i].pos_canvas_y + binWidth/2;
-
-                  // Register the 4 corners (QUADS)
-                  sketch.vertex(rectX0, rectY0);
-                  sketch.vertex(rectX1, rectY0);
-                  sketch.vertex(rectX1, rectY1);
-                  sketch.vertex(rectX0, rectY1);
-                }                
-              }
-
-              // Finish and render the final batch of lines
-              if (drawDataset.options.plotType == "line" || drawDataset.options.plotType == "bar") {
-                sketch.endShape();
-              }
-
-              //get position
-              const pDataMax = drawDataset.data[drawDataset.x_max_global_pos.holeName].data[drawDataset.x_max_global_pos.idx];
-              const pDataMin = drawDataset.data[drawDataset.x_min_global_pos.holeName].data[drawDataset.x_min_global_pos.idx];
-              pDataMax.amplification_x   = (objOpts.hole.width / 2) * drawDataset.options.amplification / (drawDataset.x_max_global - drawDataset.x_min_global);
-              pDataMin.amplification_x   = (objOpts.hole.width / 2) * drawDataset.options.amplification / (drawDataset.x_max_global - drawDataset.x_min_global);
-
-              const holeMaxPos = getPlotPosiotion( pDataMax, LCCore, objOpts);
-              const holeMinPos = getPlotPosiotion( pDataMin, LCCore, objOpts);
-
-
-              //X scale
-              const isDrawAxis = true;
-              if(isDrawAxis){
-                sketch.push()
-                sketch.strokeWeight(1);
-                sketch.stroke(drawDataset.options.colour);    
-                sketch.line(                  
-                  holeMinPos.pos_canvas_x,
-                  100    + scroller.scrollTop,
-                  holeMaxPos.pos_canvas_x,
-                  100    + scroller.scrollTop,
-                )
-
-                sketch.textSize(12);
-                sketch.noStroke();
-                sketch.fill(drawDataset.options.colour)
-
-                sketch.text(
-                  autoRound(drawDataset.data[holeName].x_min_hole).toString(),
-                  holeMinPos.pos_canvas_x - sketch.textWidth(autoRound(drawDataset.data[holeName].x_min_hole).toString()),
-                  90    + scroller.scrollTop,
-                )
-
-                sketch.text(
-                  autoRound(drawDataset.data[holeName].x_max_hole).toString(),
-                  holeMaxPos.pos_canvas_x,
-                  90    + scroller.scrollTop,
-                )
-                const title = drawDataset.name + " [" +drawDataset.unit+"]";
-
-                sketch.text(
-                  title,
-                  holeMinPos.pos_canvas_x + (holeMaxPos.pos_canvas_x - holeMinPos.pos_canvas_x)/2 - sketch.textSize(title)/2,
-                  70    + scroller.scrollTop,
-                )
-                sketch.pop()
-              }
+            //calc zoom level
+            const dispPix = scroller.clientHeight * objOpts.canvas.dpir;     
+            const drawResolution = (scrollerBotRealScale - scrollerTopRealScale)/dispPix;//cm/pic
+            let zoomLevel = 0;
+            if (drawResolution >= 10) {        // 10 cm/pix 〜 7.5 cm/pix
+                // level 4
+                zoomLevel = 13;
+            } else if (drawResolution >= 7.5000) {  
+                // level 3
+                zoomLevel = 12;
+            } else if (drawResolution >= 5.0000) { 
+                // level 2
+                zoomLevel = 11;
+            } else if (drawResolution >= 2.5000) {
+                // level 1
+                zoomLevel = 10;
+            } else if (drawResolution >= 1.0000) {  
+                // level 3
+                zoomLevel = 9;
+            } else if (drawResolution >= 0.7500) { 
+                // level 2
+                zoomLevel = 8;
+            } else if (drawResolution >= 0.5000) { 
+                // level 1
+                zoomLevel = 7;
+            } else if (drawResolution >= 0.2500) { 
+                // level 3
+                zoomLevel = 6;
+            } else if (drawResolution >= 0.1000) { 
+                // level 2
+                zoomLevel = 5;
+            } else if (drawResolution >= 0.0750) { 
+                // level 1
+                zoomLevel = 4;
+            } else if (drawResolution >= 0.050) {  
+                // level 3
+                zoomLevel = 3;
+            } else if (drawResolution >= 0.025) { 
+                // level 2
+                zoomLevel = 2;
+            } else if (drawResolution >= 0.010) { 
+                // level 1
+                zoomLevel = 1;
+            } else {
+                // level 0
+                zoomLevel = 0;
             }
+
+            //getdata
+            const pOptions = objOpts.plot.selected_options[t];            
+            const drawDataset = LCPlotData.draw_collections[t][zoomLevel];
+
+            //check inside
+            const bufferVal = objOpts.canvas.buffer_depth * yMag;
+
+            const searchTop = scrollerTopRealScale - bufferVal;
+            const searchBot = scrollerBotRealScale + bufferVal;
+            let startIndex  = binarySearchIndex(drawDataset.data, searchTop, (d) => d[objOpts.canvas.depth_scale]);
+            let endIndex    = binarySearchIndex(drawDataset.data, searchBot, (d) => d[objOpts.canvas.depth_scale]);
+            const numPoints = endIndex - startIndex ? endIndex - startIndex + 1 : 0;
+            if(["root"].includes(objOpts.developer.mode)){
+              console.log("Dipslay: Zoom: ",zoomLevel,", hight pix: ",sketch.height * dpir,", hight cm: ", (searchBot-searchTop).toFixed(2)," cm, points: N=", numPoints)
+            }
+            
+            //extract
+            const extractedDrawDataset = structuredClone(drawDataset);
+            extractedDrawDataset.data  = drawDataset.data.slice(startIndex, endIndex+1);
+            extractedDrawDataset.data.sort((a, b) =>
+                  a.hname.localeCompare(b.hname)
+            );
+
+            //calc position
+            if(extractedDrawDataset.data.length==0) continue;
+            const drawData = calcDrawPosition(extractedDrawDataset, LCCore, objOpts, pOptions);
+
+            //draw
+            let zeroDataDict = {};
+            // Calculate zero position if not yet calculated
+            LCCore.projects.forEach(project=>{
+              project.holes.forEach((hole, h)=>{
+                if(extractedDrawDataset.data.length>0){
+                  
+                }
+                const zeroDrawDataset = structuredClone(extractedDrawDataset);
+                zeroDrawDataset.data = [structuredClone(zeroDrawDataset.data[0]), structuredClone(zeroDrawDataset.data[0]), structuredClone(zeroDrawDataset.data[0])];
+                if(zeroDrawDataset.data[0]){
+                  //set zero
+                  zeroDrawDataset.data[0].val = 0;
+                  zeroDrawDataset.data[0].hname = hole.name;
+                  zeroDrawDataset.data[0].hidx = h;
+                  //set max
+                  zeroDrawDataset.data[1].val = zeroDrawDataset.max;
+                  zeroDrawDataset.data[1].hname = hole.name;
+                  zeroDrawDataset.data[1].hidx = h;
+                  //set min
+                  zeroDrawDataset.data[2].val = zeroDrawDataset.min;
+                  zeroDrawDataset.data[2].hname = hole.name;
+                  zeroDrawDataset.data[2].hidx = h;
+                  
+                  const zeroDataset = calcDrawPosition(zeroDrawDataset, LCCore, objOpts, pOptions);
+                  zeroDataDict[hole.name] = zeroDataset.data[0];
+                  /*
+                  console.log(zeroData)
+
+                  //draw baseline
+                  sketch.strokeWeight(1); 
+                  sketch.stroke("blue"); 
+                  sketch.noFill();
+                  sketch.line(
+                    zeroData.pos_x,
+                    drawData.min, // Screen Top
+                    zeroData.pos_x,
+                    drawData.max  // Screen Bottom
+                  );
+                  */
+
+                  //X axis
+                  const isDrawAxis = true;
+
+                  if (isDrawAxis) {
+                      const yAxis = 200 + scroller.scrollTop;
+                      const yLabel = yAxis + 15;
+                      const yTitle = yAxis - 25;
+                      
+                      const xMax = zeroDataset.data[1].pos_x;
+                      const xMin = zeroDataset.data[2].pos_x;
+                      const xCenter = xMin + (xMax - xMin) / 2;
+                      
+                      const minValueStr = autoRound(zeroDataset.min).toString();
+                      const maxValueStr = autoRound(zeroDataset.max).toString();
+                      const title = zeroDataset.data[0].header + " [" + zeroDataset.data[0].unit + "]";
+                      
+                      sketch.push();
+
+                      sketch.strokeWeight(2);
+                      sketch.stroke(pOptions.colour);
+                      sketch.fill(pOptions.colour);
+                      
+                      sketch.line(xMax, yAxis, xMin, yAxis);
+
+                      const tickLength = 5;
+                      sketch.strokeWeight(1);
+                      sketch.line(xMin, yAxis, xMin, yAxis + tickLength);
+                      sketch.line(xMax, yAxis, xMax, yAxis + tickLength);
+                      
+                      sketch.noStroke();
+                      sketch.textSize(12);
+
+                      sketch.textAlign(sketch.RIGHT);
+                      sketch.text(minValueStr, xMin, yLabel);
+
+                      sketch.textAlign(sketch.LEFT);
+                      sketch.text(maxValueStr, xMax, yLabel);
+                      
+                      sketch.textAlign(sketch.CENTER); 
+                      sketch.textSize(14);
+                      sketch.text(title, xCenter, yTitle);
+                      
+                      sketch.pop();
+                  }
+                  
+
+                }
+              })
+            })   
+
+            if (pOptions.plotType == "line") {
+              sketch.strokeWeight(1); 
+              sketch.stroke(pOptions.colour); 
+              sketch.noFill();
+              sketch.beginShape();
+            }else if(pOptions.plotType == "bar"){
+              sketch.noStroke(); 
+              sketch.fill(pOptions.colour);
+              sketch.beginShape(sketch.QUADS);                         
+            }
+
+            //main
+            for(let d=0; d<drawData.data.length; d++){
+              const pData = drawData.data[d];              
+              if (!Number.isFinite(pData.pos_x) || !Number.isFinite(pData.pos_y)) continue;
+
+              if(pOptions.plotType == "line"){
+                // ---------------------------------------------------------
+                // Line Plot: Use vertex() instead of line()
+                // ---------------------------------------------------------                
+                // Add a vertex to the current shape batch (doesn't draw yet)
+                sketch.vertex(pData.pos_x, pData.pos_y);
+
+                // Handle data discontinuity (e.g., different hole or section)
+                // We must break the line if the next point belongs to a different group
+                const nextpData = drawData.data[d+1];
+                if (nextpData == undefined || pData.hname !== nextpData.hname || pData.sname !== nextpData.sname) {
+                    sketch.endShape();   // Draw the current segment
+                    sketch.beginShape(); // Start a new segment
+                }            
+              }else if(pOptions.plotType == "scatter"){
+                // ---------------------------------------------------------
+                // Scatter Plot
+                // ---------------------------------------------------------    
+                sketch.stroke(pOptions.colour);
+                sketch.strokeWeight(3); 
+
+                sketch.point(
+                  pData.pos_x,
+                  pData.pos_y
+                );
+              }else if(pOptions.plotType == "bar"){
+                // ---------------------------------------------------------
+                // Bar Plot Logic (Dynamic Width)
+                // ---------------------------------------------------------                
+                // 1. Calculate dynamic height based on the distance to the next data point
+                let depthDiff = 0;
+
+                if (d < drawData.data.length - 1) {
+                    // Calculate distance to the NEXT point
+                    depthDiff = Math.abs(drawData.data[d+1][objOpts.canvas.depth_scale] - drawData.data[d][objOpts.canvas.depth_scale]);
+                } else if (d > 0) {
+                    // For the LAST point, use the distance from the PREVIOUS point
+                    depthDiff = Math.abs(drawData.data[d][objOpts.canvas.depth_scale] - drawData.data[d-1][objOpts.canvas.depth_scale]);
+                } else {
+                    // Fallback if there is only 1 data point
+                    depthDiff = 1.0; 
+                }
+
+                // 2. Convert depth difference to pixels (using yMag)
+                // Multiply by 0.9 or similar to leave a small gap (optional)
+                //let binWidth = (depthDiff * yMag) * 0.9; 
+                let binWidth = 5;
+                // Safety: ensure minimum visibility (e.g., at least 1px)
+                if(binWidth < 1) binWidth = 1;
+
+                // Define rectangle coordinates
+                const rectX0 = zeroDataDict[pData.hname].pos_x;
+                const rectX1 = pData.pos_x;
+                // Center the bar on the data point
+                const rectY0 = pData.pos_y - binWidth/2;
+                const rectY1 = pData.pos_y + binWidth/2;
+
+                // Register the 4 corners (QUADS)
+                sketch.vertex(rectX0, rectY0);
+                sketch.vertex(rectX1, rectY0);
+                sketch.vertex(rectX1, rectY1);
+                sketch.vertex(rectX0, rectY1);
+              }                                  
+            }
+
+            // Finish and render the final batch of lines
+            if (pOptions.plotType == "line" || pOptions.plotType == "bar") {
+              sketch.endShape();
+            }
+            
           }
-          sketch.pop();          
         }
       }
 
@@ -6497,21 +6468,62 @@ document.addEventListener("DOMContentLoaded", () => {
 
     }
   }
-  async function loadPlotData() {
-    //LC plot age_collection id is as same as LCAge id
-    const results = await unzip( await window.LCapi.LoadPlotFromLCPlot());
+  async function loadPlotData(type) {
+    //LC plot age_collection id is as same as LCAge id 
+    const results = await window.LCapi.LoadPlotData(type);
+
     if (results!==null) {
       //load
-      LCPlot = results;
-      const num_age_collections = LCPlot.age_collections.length;
-      const num_data_collections= LCPlot.data_collections.length;
-      console.log("[Renderer]: Plot Data have been loaded into the renderer.");
-      console.log(
-        "Plot data summary:",
-        "\nAge dataset: " + num_age_collections,
-        "\nData dataset:" + num_data_collections,
-        "\nData: ", LCPlot
-      );
+      const dataType = results.type;
+      const data     = await unzip(results.data);
+
+      if(dataType=="age"){
+        LCPlotAge = data;
+        console.log("Age data: ", LCPlotAge);
+
+        /*
+        //set row data
+        LCPlotAge.data = data;
+
+        //conversion 
+        const ageCollection = drawPointDataset();
+        ageCollection.id      = LCPlotAge.data.id;
+        ageCollection.name    = LCPlotAge.data.name;
+        ageCollection.version = LCPlotAge.data.version;
+        for(let i=0; i<LCPlotAge.data.ages.length; i++){
+          const dt = LCPlotAge.data.ages[i];
+          const agePData = drawPointData();
+          agePData.id     = dt.id;
+          agePData.type   = dt.data_type;
+          agePData.name   = dt.name;
+          agePData.header = "age";
+          agePData.val    = dt.age_mid;
+          agePData.unit   = dt.unit;
+
+          agePData.pname = dt
+          agePData.hname = dt.trinityData.hole_name;
+          agePData.sname = dt.trinityData.section_name;
+          agePData.dist  = dt.trinityData.distance;
+
+          agePData.pidx = dt.;
+          agePData.hidx = dt.;
+          agePData.sidx = dt.;
+
+          agePData.composite_depth  = dt.composite_depth;
+          agePData.event_free_depth = dt.evemnt_free_depth;
+          agePData.drilling_depth   = null;
+          agePData.age    = dt.age_mid;
+          agePData.ageu   = dt.age_upper_1std ? dt.age_upper_1std : dt.age_upper_2std;
+          agePData.agel   = dt.age_lower_1std ? dt.age_lower_1std : dt.age_lower_2std;
+          agePData.source = {code: dt.source_code, type: dt.source_type};
+
+        }
+        */
+      }else if(dataType=="data"){
+        //The plot contains multiple datasets, so the conversion is performed when the plot options are loaded.
+        LCPlotData = data;
+        console.log("Plot data: ", LCPlotData);
+      }   
     }
   }
   //-------------------------------------------------------------------------------------------
@@ -6544,10 +6556,10 @@ document.addEventListener("DOMContentLoaded", () => {
     //canvas initialise(remove all children)
 
     //data initialise
-    await window.LCapi.InitialiseAgePlot();
     await window.LCapi.InitialiseDataPlot();
 
-    LCPlot = null;
+    LCPlotAge = null;
+    LCPlotData= null;
   }
   function initialiseImages(){
     let modelImages = {
@@ -6592,19 +6604,15 @@ document.addEventListener("DOMContentLoaded", () => {
     await window.LCapi.InitialisePaths();
   }
   function updateView() {
-    if(isProcessing){return}
-    if (LCCore) {
-      //update
-      if (vectorObjects == null) {
-        vectorObjects = new p5(p5Sketch);
-      }
-      document.getElementById("p5Canvas").style.display = "block";
-      document.getElementById("rasterCanvas").style.display = "none";
-
-      makeP5CanvasBase();
-      vectorObjects.clear();
-      vectorObjects.redraw();
+    if(isProcessing || !LCCore){return}
+    //update
+    if (vectorObjects == null) {
+      vectorObjects = new p5(p5Sketch);
     }
+
+    makeP5CanvasBase();
+    vectorObjects.clear();
+    vectorObjects.redraw();
 
     //update pen canvas
     if (penObject.penCanvas) {
@@ -7307,10 +7315,10 @@ async function undo(type, name="unnamed"){
     let result;
     if(type == "undo"){
       result = await window.LCapi.sendUndo("main");
-      console.log("[Renderer]: Recieved undo data: ",result);
+      console.log("[Renderer]: received undo data: ",result);
     }else if(type == "redo"){
       result = await window.LCapi.sendRedo("main");
-      console.log("[Renderer]: Recieved redo data: ",result);
+      console.log("[Renderer]: received redo data: ",result);
     }else if(type == "save"){
       result = await window.LCapi.sendSaveState("main", name);
     }else if(type == "getChangedSectionIds"){
@@ -7758,18 +7766,22 @@ function getClickedItemIdx(mouseX, mouseY, LCCore, objOpts){
 }
 
 function getPlotPosiotion(data, LCCore, objOpts){
+  //legacy style for age points
   /*
   data = {
     type:"age",
     x:,
     min_x,
+    
     project_name:,
     hole_name:,
     section_name:,
     distance:,
+    
     comspoite_depth:,
     evemnt_free_depth:,
     age:,
+
     amplification_x:,
     amplification_y:,    
   }
@@ -7867,6 +7879,591 @@ function getPlotPosiotion(data, LCCore, objOpts){
   }
 
   return result
+}
+
+function drawPointDataset(){
+  const output = {
+    id: null,
+    name: null,
+    version: null,
+
+    zoom_level: 0,
+    max: null,
+    min: null,
+    data: []
+  };
+  return output
+}
+function drawPointData(data=null, LCCore=null){
+  const output = {
+    id: null,
+    type: null,
+    name: null,
+    header: null,
+    val: null,
+    unit:null,
+
+    pname: null,
+    hname: null,
+    sname: null,
+    dist: null,
+
+    pidx: null,
+    hidx: null,
+    sidx: null,
+
+    composite_depth: null,
+    event_free_depth: null,
+    drilling_depth: null,
+    age: null,
+    ageu: null,
+    agel: null,
+    source: null,
+
+    pos_x: null,
+    pos_y: null
+  };
+  
+  if(data){
+    output.id     = data[0];
+    output.type   = null;
+    output.name   = data[1];
+    output.header = null;
+    output.val    = null;
+
+    output.pname  = data[2];
+    output.hname  = data[3];
+    output.sname  = data[4];
+    output.dist   = data[5];
+    output.composite_depth  = data[6];
+    output.event_free_depth = data[7];
+    output.drilling_depth   = data[8];
+    output.age    = data[9];
+    output.ageu   = data[10];
+    output.agel   = data[11];
+    output.source = data[12] == "trinity" ? "trinity" : "global";
+
+    output.pos_x  = null;
+    output.pos_y  = null;
+  }
+
+  if(LCCore){
+    LCCore.projects.forEach((project, p)=>{
+      if(project.name === output.pname){
+        project.holes.forEach((hole, h)=>{
+          if(hole.name === output.hname){
+            hole.sections.forEach((section, s)=>{
+              if(section.name === output.sname){
+                output.pidx = p;
+                output.hidx = h;
+                output.sidx = s;
+              }
+            })
+          }
+        })
+      }
+    })    
+  }
+
+  return output;
+}
+function resamplePointData(numeratorDataset0, th, objOpts){
+  //sketch.height * dpir
+  const numeratorDataset1 = drawPointDataset();
+
+  let idxs = [];
+  let val_max = -Infinity;
+  let val_min = Infinity;
+  for(let d=0; d<numeratorDataset0.data.length; d++){
+    idxs.push(d);
+
+    if(idxs.length==1){
+      //start              
+      continue
+    }else{
+      const startProjName = numeratorDataset0.data[idxs[0]].pname;
+      const startHoleName = numeratorDataset0.data[idxs[0]].hname;
+      const startSecName  = numeratorDataset0.data[idxs[0]].sname;
+      const currtProjName = numeratorDataset0.data[d].pname;
+      const currtHoleName = numeratorDataset0.data[d].hname;
+      const currtSecName  = numeratorDataset0.data[d].sname;
+      const startPos      = numeratorDataset0.data[idxs[0]][objOpts.canvas.depth_scale];
+      const currtPos      = numeratorDataset0.data[d][objOpts.canvas.depth_scale];
+
+      if(startProjName === currtProjName && startHoleName === currtHoleName && startSecName === currtSecName){
+        //if same section                 
+        if(currtPos - startPos <= th){
+          //if in threshold
+          continue
+        }else{
+          //if out of threshold
+          const nextIdx = idxs.pop();
+          // composite_depth
+          let vals = idxs.map(i => { const val = numeratorDataset0.data[i].composite_depth; return val === null ? NaN : Number(val); }).filter(Number.isFinite);
+          const mCD = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
+
+          // event_free_depth
+          vals = idxs.map(i => { const val = numeratorDataset0.data[i].event_free_depth; return val === null ? NaN : Number(val); }).filter(Number.isFinite);
+          const mEFD = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
+
+          // drilling_depth
+          vals = idxs.map(i => { const val = numeratorDataset0.data[i].drilling_depth; return val === null ? NaN : Number(val); }).filter(Number.isFinite);
+          const mDD = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
+
+          // age
+          vals = idxs.map(i => { const val = numeratorDataset0.data[i].age; return val === null ? NaN : Number(val); }).filter(Number.isFinite);
+          const mAge = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
+
+          // ageu
+          vals = idxs.map(i => { const val = numeratorDataset0.data[i].ageu; return val === null ? NaN : Number(val); }).filter(Number.isFinite);
+          const mAgeu = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
+
+          // agel
+          vals = idxs.map(i => { const val = numeratorDataset0.data[i].agel; return val === null ? NaN : Number(val); }).filter(Number.isFinite);
+          const mAgel = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
+
+          // dist
+          vals = idxs.map(i => { const val = numeratorDataset0.data[i].dist; return val === null ? NaN : Number(val); }).filter(Number.isFinite);
+          const mDist = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
+
+          // val
+          vals = idxs.map(i => { const val = numeratorDataset0.data[i].val; return val === null ? NaN : Number(val); }).filter(Number.isFinite);
+          const mVal = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
+
+          const names = `${numeratorDataset0.data[idxs[0]].name}-${numeratorDataset0.data[idxs[idxs.length-1]].name} (${idxs.length})`;
+
+
+          //calc max/min
+          if (Number.isFinite(mVal)){
+            if(mVal < val_min){
+              val_min = mVal;
+            }
+
+            if(mVal > val_max){
+              val_max = mVal;
+            }
+          }
+
+          //apply
+          const newPointData = drawPointData()
+
+          newPointData.id = numeratorDataset0.data[idxs[0]].id;
+          newPointData.type = numeratorDataset0.data[idxs[0]].type
+          newPointData.name = names;
+          newPointData.header = numeratorDataset0.data[idxs[0]].header;
+          newPointData.unit   = numeratorDataset0.data[idxs[0]].unit;
+          newPointData.val = mVal;
+
+          newPointData.pname = startProjName;
+          newPointData.hname = startHoleName;
+          newPointData.sname = startSecName;
+
+          newPointData.pidx  = numeratorDataset0.data[idxs[0]].pidx;
+          newPointData.hidx  = numeratorDataset0.data[idxs[0]].hidx;
+          newPointData.sidx  = numeratorDataset0.data[idxs[0]].sidx;
+
+          newPointData.dist  = mDist;
+          newPointData.composite_depth  = mCD;
+          newPointData.event_free_depth = mEFD;
+          newPointData.drilling_depth   = mDD;
+          newPointData.age    = mAge;
+          newPointData.ageu   = mAgeu;
+          newPointData.agel   = mAgel;
+          newPointData.source = numeratorDataset0.data[idxs[0]].source;
+
+          newPointData.pos_x = numeratorDataset0.data[idxs[0]].pos_x;
+          newPointData.pos_y = numeratorDataset0.data[idxs[0]].pos_y;
+
+          numeratorDataset1.data.push(newPointData);
+
+          //initiarise
+          idxs = [nextIdx];
+        }
+      }else{
+        //if different section, restart
+        //if out of threshold
+          const nextIdx = idxs.pop();
+          // composite_depth
+          let vals = idxs.map(i => { const val = numeratorDataset0.data[i].composite_depth; return val === null ? NaN : Number(val); }).filter(Number.isFinite);
+          const mCD = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
+
+          // event_free_depth
+          vals = idxs.map(i => { const val = numeratorDataset0.data[i].event_free_depth; return val === null ? NaN : Number(val); }).filter(Number.isFinite);
+          const mEFD = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
+
+          // drilling_depth
+          vals = idxs.map(i => { const val = numeratorDataset0.data[i].drilling_depth; return val === null ? NaN : Number(val); }).filter(Number.isFinite);
+          const mDD = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
+
+          // age
+          vals = idxs.map(i => { const val = numeratorDataset0.data[i].age; return val === null ? NaN : Number(val); }).filter(Number.isFinite);
+          const mAge = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
+
+          // ageu
+          vals = idxs.map(i => { const val = numeratorDataset0.data[i].ageu; return val === null ? NaN : Number(val); }).filter(Number.isFinite);
+          const mAgeu = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
+
+          // agel
+          vals = idxs.map(i => { const val = numeratorDataset0.data[i].agel; return val === null ? NaN : Number(val); }).filter(Number.isFinite);
+          const mAgel = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
+
+          // dist
+          vals = idxs.map(i => { const val = numeratorDataset0.data[i].dist; return val === null ? NaN : Number(val); }).filter(Number.isFinite);
+          const mDist = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
+
+          // val
+          vals = idxs.map(i => { const val = numeratorDataset0.data[i].val; return val === null ? NaN : Number(val); }).filter(Number.isFinite);
+          const mVal = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
+
+          const names = `${numeratorDataset0.data[idxs[0]].name}-${numeratorDataset0.data[idxs[idxs.length-1]].name} (${idxs.length})`;
+
+          //calc max/min
+          if (Number.isFinite(mVal)){
+            if(mVal < val_min){
+              val_min = mVal;
+            }
+
+            if(mVal > val_max){
+              val_max = mVal;
+            }
+          }
+
+          //apply
+          const newPointData = drawPointData()
+
+          newPointData.id = numeratorDataset0.data[idxs[0]].id;
+          newPointData.type = numeratorDataset0.data[idxs[0]].type
+          newPointData.name = names;
+          newPointData.header = numeratorDataset0.data[idxs[0]].header;
+          newPointData.unit   = numeratorDataset0.data[idxs[0]].unit;
+          newPointData.val = mVal;
+
+          newPointData.pname = startProjName;
+          newPointData.hname = startHoleName;
+          newPointData.sname = startSecName;
+
+          newPointData.pidx  = numeratorDataset0.data[idxs[0]].pidx;
+          newPointData.hidx  = numeratorDataset0.data[idxs[0]].hidx;
+          newPointData.sidx  = numeratorDataset0.data[idxs[0]].sidx;
+
+          newPointData.dist  = mDist;
+          newPointData.composite_depth  = mCD;
+          newPointData.event_free_depth = mEFD;
+          newPointData.drilling_depth   = mDD;
+          newPointData.age    = mAge;
+          newPointData.ageu   = mAgeu;
+          newPointData.agel   = mAgel;
+          newPointData.source = numeratorDataset0.data[idxs[0]].source;
+
+          newPointData.pos_x = numeratorDataset0.data[idxs[0]].pos_x;
+          newPointData.pos_y = numeratorDataset0.data[idxs[0]].pos_y;
+
+          numeratorDataset1.data.push(newPointData);
+
+          //initiarise
+          idxs = [nextIdx];
+      } 
+    }
+  }
+
+  //finish process
+  if(idxs.length>0){
+    // composite_depth
+    let vals = idxs.map(i => { const val = numeratorDataset0.data[i].composite_depth; return val === null ? NaN : Number(val); }).filter(Number.isFinite);
+    const mCD = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
+
+    // event_free_depth
+    vals = idxs.map(i => { const val = numeratorDataset0.data[i].event_free_depth; return val === null ? NaN : Number(val); }).filter(Number.isFinite);
+    const mEFD = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
+
+    // drilling_depth
+    vals = idxs.map(i => { const val = numeratorDataset0.data[i].drilling_depth; return val === null ? NaN : Number(val); }).filter(Number.isFinite);
+    const mDD = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
+
+    // age
+    vals = idxs.map(i => { const val = numeratorDataset0.data[i].age; return val === null ? NaN : Number(val); }).filter(Number.isFinite);
+    const mAge = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
+
+    // ageu
+    vals = idxs.map(i => { const val = numeratorDataset0.data[i].ageu; return val === null ? NaN : Number(val); }).filter(Number.isFinite);
+    const mAgeu = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
+
+    // agel
+    vals = idxs.map(i => { const val = numeratorDataset0.data[i].agel; return val === null ? NaN : Number(val); }).filter(Number.isFinite);
+    const mAgel = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
+
+    // dist
+    vals = idxs.map(i => { const val = numeratorDataset0.data[i].dist; return val === null ? NaN : Number(val); }).filter(Number.isFinite);
+    const mDist = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
+
+    // val
+    vals = idxs.map(i => { const val = numeratorDataset0.data[i].val; return val === null ? NaN : Number(val); }).filter(Number.isFinite);
+    const mVal = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
+
+    const names = `${numeratorDataset0.data[idxs[0]].name}-${numeratorDataset0.data[idxs[idxs.length-1]].name} (${idxs.length})`;
+
+    //calc max/min
+    if (Number.isFinite(mVal)){
+      if(mVal < val_min){
+        val_min = mVal;
+      }
+
+      if(mVal > val_max){
+        val_max = mVal;
+      }
+    }
+
+    //apply
+    const newPointData = drawPointData()
+
+    newPointData.id = numeratorDataset0.data[idxs[0]].id;
+    newPointData.type = numeratorDataset0.data[idxs[0]].type
+    newPointData.name = names;
+    newPointData.header = numeratorDataset0.data[idxs[0]].header;
+    newPointData.unit   = numeratorDataset0.data[idxs[0]].unit;
+    newPointData.val = mVal;
+
+    newPointData.pname = numeratorDataset0.data[idxs[0]].pname;
+    newPointData.hname = numeratorDataset0.data[idxs[0]].hname;
+    newPointData.sname = numeratorDataset0.data[idxs[0]].sname;
+
+    newPointData.pidx  = numeratorDataset0.data[idxs[0]].pidx;
+    newPointData.hidx  = numeratorDataset0.data[idxs[0]].hidx;
+    newPointData.sidx  = numeratorDataset0.data[idxs[0]].sidx;
+
+    newPointData.dist  = mDist;
+    newPointData.composite_depth  = mCD;
+    newPointData.event_free_depth = mEFD;
+    newPointData.drilling_depth   = mDD;
+    newPointData.age    = mAge;
+    newPointData.ageu   = mAgeu;
+    newPointData.agel   = mAgel;
+    newPointData.source = numeratorDataset0.data[idxs[0]].source;
+
+    newPointData.pos_x = numeratorDataset0.data[idxs[0]].pos_x;
+    newPointData.pos_y = numeratorDataset0.data[idxs[0]].pos_y;
+
+    numeratorDataset1.data.push(newPointData);    
+  }
+
+  //
+  numeratorDataset1.max = Number.isFinite(val_max) ? val_max : null;
+  numeratorDataset1.min = Number.isFinite(val_min) ? val_min : null;
+
+  return numeratorDataset1;
+}
+function dividePlotData(numeratorDataSeries, denominatorDataSeries){
+  const dividedDataSeries = [];
+  if(numeratorDataSeries.length>0){              
+    if(denominatorDataSeries.length>0){
+      //case n/d
+      for(let i = 0; i< numeratorDataSeries.length; i++){
+        const dividedDataset = drawPointDataset();
+        let val_max = -Infinity;
+        let val_min = Infinity;
+        for(let d = 0; d < numeratorDataSeries[i].data.length; d++){
+          const nPdata = numeratorDataSeries[i].data[d];
+          const dPdata = denominatorDataSeries[i].data[d];
+          const ndPdata= drawPointData(); //base is numerator
+          
+          
+          //set val
+          ndPdata.type  = nPdata.type;                 
+          ndPdata.pname = nPdata.pname;
+          ndPdata.hname = nPdata.hname;
+          ndPdata.sname = nPdata.sname;
+          ndPdata.pidx  = nPdata.pidx;
+          ndPdata.hidx  = nPdata.hidx;
+          ndPdata.sidx  = nPdata.sidx;
+          ndPdata.dist  = nPdata.dist;
+          ndPdata.composite_depth  = nPdata.composite_depth;
+          ndPdata.event_free_depth = nPdata.event_free_depth;
+          ndPdata.drilling_depth   = nPdata.drilling_depth;
+          ndPdata.age    = nPdata.age;
+          ndPdata.ageu   = nPdata.ageu;
+          ndPdata.agel   = nPdata.agel;
+          ndPdata.source = nPdata.source;         
+                        
+          //divide
+          ndPdata.name   = nPdata.name+"/"+dPdata.name;
+          ndPdata.header = nPdata.header+"/"+dPdata.header;
+          const numeratorValue  = (Number.isFinite(nPdata.val)&&nPdata.val!==null) ? nPdata.val : NaN;
+          const denominatorValue= (Number.isFinite(dPdata.val)&&dPdata.val!==null) ? dPdata.val : NaN;
+          ndPdata.val    = numeratorValue / denominatorValue;
+          const numeratorUnit   = nPdata.unit!=="" ? nPdata.unit : "1";
+          const denominatorUnit = dPdata.unit!=="" ? "/"+dPdata.unit : "";
+          ndPdata.unit   = numeratorUnit + denominatorUnit;
+
+          //calc max/min
+          if(ndPdata.val<val_min){
+            val_min = ndPdata.val;
+          }
+          if(ndPdata.val>val_max){
+            val_max = ndPdata.val;
+          }
+
+          //submit
+          dividedDataset.data.push(ndPdata);
+        }   
+
+        //submit
+        dividedDataset.max = Number.isFinite(val_max) ? val_max : null;
+        dividedDataset.min = Number.isFinite(val_min) ? val_min : null;
+        dividedDataset.zoom_level = numeratorDataSeries[i].zoom_level;
+        dividedDataSeries.push(dividedDataset);        
+      }
+    }else{
+      // case n/1
+      for(let i = 0; i< numeratorDataSeries.length; i++){
+        const dividedDataset = drawPointDataset();
+        let val_max = -Infinity;
+        let val_min = Infinity;
+        for(let d = 0; d < numeratorDataSeries[i].data.length; d++){
+          const nPdata = numeratorDataSeries[i].data[d];
+          //submit
+          dividedDataset.data.push(nPdata);
+        }   
+
+        //submit
+        dividedDataset.max = numeratorDataSeries[i].max;
+        dividedDataset.min = numeratorDataSeries[i].min;
+        dividedDataset.zoom_level = numeratorDataSeries[i].zoom_level;
+        dividedDataSeries.push(dividedDataset);        
+      }
+    }
+  }else{
+    if(denominatorDataSeries.length>0){
+      //case 1/d
+      for(let i = 0; i< denominatorDataSeries.length; i++){
+        const dividedDataset = drawPointDataset();
+        let val_max = -Infinity;
+        let val_min = Infinity;
+        for(let d = 0; d < denominatorDataSeries[i].data.length; d++){
+          const dPdata = denominatorDataSeries[i].data[d];
+          const ndPdata= drawPointData(); //base is numerator
+                    
+          //set val
+          ndPdata.type  = dPdata.type;                 
+          ndPdata.pname = dPdata.pname;
+          ndPdata.hname = dPdata.hname;
+          ndPdata.sname = dPdata.sname;
+          ndPdata.pidx  = dPdata.pidx ;
+          ndPdata.hidx  = dPdata.hidx ;
+          ndPdata.sidx  = dPdata.sidx ;
+          ndPdata.dist  = dPdata.dist;
+          ndPdata.composite_depth  = dPdata.composite_depth;
+          ndPdata.event_free_depth = dPdata.event_free_depth;
+          ndPdata.drilling_depth   = dPdata.drilling_depth;
+          ndPdata.age    = dPdata.age;
+          ndPdata.ageu   = dPdata.ageu;
+          ndPdata.agel   = dPdata.agel;
+          ndPdata.source = dPdata.source;
+                        
+          //divide
+          ndPdata.name   = "1/"+dPdata.name;
+          ndPdata.header = "1/"+dPdata.header;
+          const denominatorValue= (Number.isFinite(dPdata.val)&&dPdata.val!==null) ? dPdata.val : NaN;
+          ndPdata.val    = 1 / denominatorValue;
+          ndPdata.unit   = ("1/" + dPdata.unit)!=="1/" ? "1/" + dPdata.unit : "-";
+
+          //calc max/min
+          if(ndPdata.val<val_min){
+            val_min = ndPdata.val;
+          }
+          if(ndPdata.val>val_max){
+            val_max = ndPdata.val;
+          }
+
+          //submit
+          dividedDataset.data.push(ndPdata);
+        }   
+
+        //submit
+        dividedDataset.max = Number.isFinite(val_max) ? val_max : null;
+        dividedDataset.min = Number.isFinite(val_min) ? val_min : null;
+        dividedDataset.zoom_level = denominatorDataSeries[i].zoom_level;
+        dividedDataSeries.push(dividedDataset);        
+      }
+    }else{
+      //1/1
+    }            
+  }
+  return dividedDataSeries
+}
+function calcDrawPosition(drawPointDataset, LCCore, objOpts, pOptions){
+  if(drawPointDataset.data.length==0){
+    console.log("[Renderer]: There is no target point data.")
+    return drawPointDataset
+  }
+
+  //initialise
+  const xMag  = objOpts.canvas.zoom_level[0] * objOpts.canvas.dpir;
+  let yMag    = objOpts.canvas.zoom_level[1] * objOpts.canvas.dpir;
+  const pad_x = objOpts.canvas.pad_x;
+  let pad_y   = objOpts.canvas.pad_y;
+  if (objOpts.canvas.depth_scale == "age") {
+    yMag  = yMag * objOpts.canvas.age_zoom_correction[0];
+    pad_y = pad_y + objOpts.canvas.age_zoom_correction[1];
+  }
+  const shift_x = objOpts.canvas.shift_x;
+  const shift_y = objOpts.canvas.shift_y;
+
+  const val_min = drawPointDataset.min;
+  const val_max = drawPointDataset.max;
+  const amp     = [(objOpts.hole.width / 2) * pOptions.amplification / (val_max - val_min), 1];
+
+  //get enable hole num
+  let numEnable  = 0;
+  let numDisable = 0;
+  const holeEnableList = [];
+  for(let p=0; p< LCCore.projects.length; p++){    
+    const hCounts = [];
+    for(let h=0; h< LCCore.projects[p].holes.length; h++){
+      
+      if(LCCore.projects[p].holes[h].enable){
+        numEnable += 1 + objOpts.project.interval * p;
+      }else{
+        numDisable += 1;
+      }
+      hCounts.push({enable: numEnable, disable: numDisable});      
+    }  
+    holeEnableList.push(hCounts);
+  }
+
+  //calc
+  for(let i=0; i<drawPointDataset.data.length; i++){
+    const drawData = drawPointDataset.data[i];
+    const enableHoles = holeEnableList[drawData.pidx][drawData.hidx];
+    
+    if(drawData.source === "trinity"){
+      //calc 
+      if(drawData.type == "age"){
+        //age xpos is fixed. adjust icon size
+        drawData.pos_x = ((objOpts.hole.distance + objOpts.hole.width) * (enableHoles.enable -1 ) + shift_x) * xMag + pad_x + objOpts.hole.width * xMag - objOpts.age.incon_size * 1.2;
+        drawData.pos_y = (drawData[objOpts.canvas.depth_scale] + shift_y) * yMag + pad_y - objOpts.age.incon_size / 2;
+      } else{
+        //data xpos, without adjust
+        drawData.pos_x = ((objOpts.hole.distance + objOpts.hole.width) * (enableHoles.enable -1 ) + (drawData.val - val_min) * amp[0] + shift_x) * xMag + pad_x;
+        drawData.pos_y = (drawData[objOpts.canvas.depth_scale]  * amp[1] + shift_y) * yMag + pad_y;
+      }
+    }else if(drawData.source === "global"){
+      //case depth source is CD, EFD, AGE
+      if(drawData.type == "age"){
+        const age_shift_x   = -50;
+        drawData.pos_x = age_shift_x + shift_x * xMag + pad_x - objOpts.age.incon_size * 1.2;
+        drawData.pos_y = (drawData[objOpts.canvas.depth_scale] + shift_y) * yMag + pad_y - objOpts.age.incon_size / 2;
+      }else{
+        drawData.pos_x = ((drawData.val - val_min) * amp[0] + shift_x) * xMag + 20;
+        drawData.pos_y = (drawData[objOpts.canvas.depth_scale] * amp[1] + shift_y) * yMag + pad_y;
+      }
+
+    }else{
+      console.log("[Renderer]: There is unsuspected source type.")
+      return drawPointDataset
+    }    
+  }
+
+  return drawPointDataset
 }
 
 //============================================================================================
