@@ -62,8 +62,10 @@ document.addEventListener("DOMContentLoaded", () => {
       plot:{},
       edit:{},
       image:{},
+      information:{},
       developer: {},
     };
+    objOpts.information.version = 1;
     objOpts.canvas.depth_scale = "composite_depth";
     objOpts.canvas.zoom_level = [4, 3]; //[x, y](300pix/1m)
     objOpts.canvas.age_zoom_correction = [1/10, 100];//[zoom level, pad level]
@@ -1136,6 +1138,7 @@ document.addEventListener("DOMContentLoaded", () => {
               title:"Properties: ",
               editable:false,
             },
+            editable:{},
             data:null,
           };
           LCCore.projects.forEach(p=>{
@@ -1154,7 +1157,14 @@ document.addEventListener("DOMContentLoaded", () => {
             }
           })
           if(sectionProperties.data!==null){
-            console.log(sectionProperties)
+            
+            const editable = {};
+            for(let key in sectionProperties.data){
+              sectionProperties.editable[key] = false;
+            }             
+
+            console.log("[Renderer]: Send section properties: ", sectionProperties)
+
             await window.LCapi.sendSettings(sectionProperties, "settings");
           }
         }
@@ -3737,6 +3747,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const pen = objOpts.pen;
     const plot = objOpts.plot; 
     const image = objOpts.image;
+    const information = objOpts.info;
     const developer = objOpts.developer;
     const options={
       editable:true,
@@ -3744,8 +3755,24 @@ document.addEventListener("DOMContentLoaded", () => {
       title:"Preferences",
     }
 
+    const editable = {
+      canvas: true,
+      project: true,
+      hole: true,
+      section: true,
+      marker: true,
+      event: true,
+      connection: true,
+      age: true,
+      pen: true,
+      image: true,
+      information: false,
+      developer: true,
+    }
+
     const settings = {
       options,
+      editable,
       data:{
         canvas,
         project,
@@ -3757,31 +3784,35 @@ document.addEventListener("DOMContentLoaded", () => {
         age,
         pen,
         image,
+        information,
         developer,
       }
     };
+
+    
     return settings
   }
   
   window.LCapi.receive("SettingsData", async (data) => {
     
     if(data == null){
-      //set default
+      //call default settings
       objOpts = setupSettings();
 
       //back to settings menu
-      const canvas = objOpts.canvas;
-      const project = objOpts.project;
-      const hole = objOpts.hole;
-      const section = objOpts.section;
-      const marker = objOpts.marker;
-      const event = objOpts.event;
-      const connection = objOpts.connection;
-      const age = objOpts.age;
-      const pen = objOpts.pen;
-      const image = objOpts.image; 
-      const plot = objOpts.plot; 
-      const developer = objOpts.developer; 
+      const canvas      = objOpts.canvas;
+      const project     = objOpts.project;
+      const hole        = objOpts.hole;
+      const section     = objOpts.section;
+      const marker      = objOpts.marker;
+      const event       = objOpts.event;
+      const connection  = objOpts.connection;
+      const age         = objOpts.age;
+      const pen         = objOpts.pen;
+      const image       = objOpts.image; 
+      const plot        = objOpts.plot; 
+      const information = objOpts.information;
+      const developer   = objOpts.developer; 
 
       const settings = {
         canvas,
@@ -3794,35 +3825,102 @@ document.addEventListener("DOMContentLoaded", () => {
         age,
         pen,
         image,  
+        information,
         developer,
       };
+      const editable = {
+        canvas: true,
+        project: true,
+        hole: true,
+        section: true,
+        marker: true,
+        event: true,
+        connection: true,
+        age: true,
+        pen: true,
+        image: true,  
+        information: false,
+        developer: true,
+      }
+      const options={
+        editable:true,
+        called_from:"settings",
+        title:"Preferences",
+      }
         
-      await window.LCapi.sendSettings(settings, "settings");
+      await window.LCapi.sendSettings({data: settings, editable, options}, "settings");
     }else{
-      Object.assign(objOpts.canvas, data.canvas);
-      Object.assign(objOpts.project, data.project);
-      Object.assign(objOpts.hole, data.hole);
-      Object.assign(objOpts.section, data.section);
-      Object.assign(objOpts.marker, data.marker);
-      Object.assign(objOpts.event, data.event);
-      Object.assign(objOpts.connection, data.connection);
-      Object.assign(objOpts.age, data.age);
-      Object.assign(objOpts.pen, data.pen);
-      Object.assign(objOpts.image, data.image); 
-      Object.assign(objOpts.developer, data.developer); 
+      // check settings format version
+      if(!data.data || data.data.information.version){
+        //old version
+        console.log("[Renderer]: Old-format settings detected. Replacing with the current version.",objOpts)
+        
+        //make current setttings
+        const settings = {
+          canvas      : objOpts.canvas,
+          project     : objOpts.project,
+          hole        : objOpts.hole,
+          section     : objOpts.section,
+          marker      : objOpts.marker,
+          event       : objOpts.event,
+          connection  : objOpts.connection,
+          age         : objOpts.age,
+          pen         : objOpts.pen,
+          image       : objOpts.image, 
+          plot        : objOpts.plot, 
+          information : objOpts.information,
+          developer   : objOpts.developer,
+        };
+        const editable = {
+          canvas: true,
+          project: true,
+          hole: true,
+          section: true,
+          marker: true,
+          event: true,
+          connection: true,
+          age: true,
+          pen: true,
+          image: true,  
+          information: false,
+          developer: true,
+        }
+        const options={
+          editable:true,
+          called_from:"settings",
+          title:"Preferences",
+        }
 
-      //important settings set to default
-      objOpts.canvas.is_draw_model = true;
-      objOpts.canvas.buffer_depth = 0;
-      objOpts.canvas.is_event = true;
-      objOpts.canvas.is_connection = true;
-      objOpts.canvas.is_grid = true;
-      objOpts.canvas.draw_core_photo = false;
-      objOpts.marker.show_name_labels = true;
-      objOpts.marker.show_distance_labels = true;
-    }
+        await window.LCapi.sendSettings({data: settings, editable, options}, "save");
+      }else{
+        //current version
+        Object.assign(objOpts.canvas,     data.data.canvas);
+        Object.assign(objOpts.project,    data.data.project);
+        Object.assign(objOpts.hole,       data.data.hole);
+        Object.assign(objOpts.section,    data.data.section);
+        Object.assign(objOpts.marker,     data.data.marker);
+        Object.assign(objOpts.event,      data.data.event);
+        Object.assign(objOpts.connection, data.data.connection);
+        Object.assign(objOpts.age,        data.data.age);
+        Object.assign(objOpts.pen,        data.data.pen);
+        Object.assign(objOpts.image,      data.data.image); 
+        Object.assign(objOpts.information,data.data.information); 
+        Object.assign(objOpts.developer,  data.data.developer); 
+
+        //important settings set to default
+        objOpts.canvas.is_draw_model        = true;
+        objOpts.canvas.buffer_depth         = 0;
+        objOpts.canvas.is_event             = true;
+        objOpts.canvas.is_connection        = true;
+        objOpts.canvas.is_grid              = true;
+        objOpts.canvas.draw_core_photo      = false;
+        objOpts.marker.show_name_labels     = true;
+        objOpts.marker.show_distance_labels = true;
+
+        console.log("[Renderer]: Settings are loaded.",objOpts)
+      }
+    }    
     
-    console.log("[RENDERER]: Setting is updated.",data,objOpts)
     updateView();
   });
 

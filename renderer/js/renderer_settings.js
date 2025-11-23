@@ -1,8 +1,16 @@
 window.addEventListener("DOMContentLoaded", () => {
     let settings = {};
     let isEditable = false;
-    function createMenu(data, container) {
+
+    function createMenu(data, editables, container) {
       Object.entries(data).forEach(([key, value]) => {
+        let isEditableObj;
+        if (typeof editables === "object"){
+          isEditableObj = editables[key];
+        }else{
+          isEditableObj = editables;
+        }
+
         if (typeof value === "object" && value !== null) {
           const details = document.createElement("details");
           const summary = document.createElement("summary");
@@ -10,7 +18,8 @@ window.addEventListener("DOMContentLoaded", () => {
           summary.style.fontSize = "25px";
           details.style.fontSize = "20px";
           details.appendChild(summary);
-          createMenu(value, details);
+
+          createMenu(value, isEditableObj, details);
           container.appendChild(details);
         } else {
           const wrapper = document.createElement("div");
@@ -19,7 +28,7 @@ window.addEventListener("DOMContentLoaded", () => {
           label.textContent = key;
 
           
-          if (isEditable) {
+          if (isEditable && isEditableObj) {
             const input = createInput(value);
             input.addEventListener("change", () => {
               data[key] = parseInputValue(input, value);
@@ -32,8 +41,8 @@ window.addEventListener("DOMContentLoaded", () => {
                 }
                 currentElement = currentElement.parentElement;
               }
-              console.log("Updated:", parentNames, settings);
-              window.SettingsApi.sendSettings(settings, "renderer");
+              console.log("Updated: ", parentNames);
+              window.SettingsApi.sendSettings({data: settings, editable:null, options:null}, "renderer");
             });
             wrapper.appendChild(label);
             wrapper.appendChild(input);
@@ -134,6 +143,7 @@ window.addEventListener("DOMContentLoaded", () => {
     //----------------------------------------------------------------
     window.SettingsApi.receive("SettingsData", async (data) => {
       console.log("Received data: ", data)
+
       document.getElementById("title").textContent = data.options.title;
 
         if(data.options.title=="Preferences"){
@@ -146,7 +156,8 @@ window.addEventListener("DOMContentLoaded", () => {
         isEditable = data.options.editable;
         const container = document.getElementById("menu-container");
         if (container) {
-         createMenu(settings, container);
+          container.innerHTML = "";
+          createMenu(settings,data.editable, container);
         }
         
     });

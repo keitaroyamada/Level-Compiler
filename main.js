@@ -3327,8 +3327,11 @@ function createMainWIndow() {
 
     }else if(to=="renderer"){
       mainWindow.webContents.send("SettingsData", data);
-      setSettings("settingsRenderer", data);
-    }else if(to=="main"){
+      if(data){
+        setSettings("settingsRenderer", data.data);
+      }      
+    }else if(to=="save"){
+      setSettings("settingsRenderer", data.data)
     }    
   });
   ipcMain.handle("saveBookmarks", (_e, data) => {
@@ -4186,7 +4189,7 @@ function createMainWIndow() {
   //--------------------------------------------------------------------------------------------------
   mainWindow.webContents.once("did-finish-load", () => {    
     const rendererSettings = getSettings("settingsRenderer");
-
+      
     const tempMainSettings = getSettings("settingsMain");
 
     //check & apply main settings
@@ -5774,6 +5777,7 @@ function getSettings(type){
   }else{
     console.log("MAIN: There is no setting data.")
   }
+
   return LCSettingData;
 }
 function setSettings(type, data){
