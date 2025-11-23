@@ -60,7 +60,7 @@ class LevelCompilerPlot {
     const allowExtrapolation = true;
 
     if(this.data_collections.length == 0){
-      return false
+      return {ok: false, type: 1, reason: "There is no target data."}
     }
 
     //sort
@@ -157,7 +157,7 @@ class LevelCompilerPlot {
       }
     }
 
-    return true   
+    return {ok: true, type: 0, reason: ""}
   }
 
   

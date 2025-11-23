@@ -69,6 +69,7 @@ let globalPath = {
   dataPaths:[], //{type:[lcmodel, csvmodel, csvage, csvplot], path:""}
 };
 let mainSettings = {isAutoUpdateDownload: true};
+let globalTempData = null;
 
 //windows
 let mainWindow = null;
@@ -182,7 +183,9 @@ function createMainWIndow() {
   ipcMain.handle("initialisePlotDataCollection", async (_e) => {
     //import modeln
     LCPlot.data_collections = [];
+    LCPlot.draw_collections = [];
     LCPlot.data_selected_id = null;
+
     const zipped = await zipData(LCPlot);
 
     if(zipped){
@@ -192,7 +195,7 @@ function createMainWIndow() {
         plotWindow.webContents.send("importedData", zipped);
       }      
       
-      console.log("MAIN: Project plot data collection is initialised.");
+      console.log("MAIN: Plot data collection is initialised.");
       return;
     }
   
@@ -736,6 +739,7 @@ function createMainWIndow() {
       bt_connection:  path.join(resourcePath, "resources","tool","connection.png"),
       bt_chart:       path.join(resourcePath, "resources","tool","chart.png"),
       bt_show_labels: path.join(resourcePath, "resources","tool","label.png"),
+      bt_core_model:  path.join(resourcePath, "resources","tool","core_model.png"),
     };
     
     let finder_paths ={
@@ -1892,6 +1896,7 @@ function createMainWIndow() {
   });
   ipcMain.handle("ConverterClose", (_e, data) => {
     if(converterWindow){
+      console.log("Converter Close called.")
       converterWindow.removeAllListeners("close");
       converterWindow.close();
       converterWindow = null;
@@ -1974,17 +1979,22 @@ function createMainWIndow() {
       try{       
         const res = LCPlot.calcDataCollectionPosition(LCCore, LCAge);
 
-        if(res){
+        if(res.ok){
           const zipped = await zipData(LCPlot);
           console.log("MAIN: Send data points to renderer.")
           return {type: "data", data: zipped};
         }else{
-          console.log("MAIN: Faild to recalc plot position")
-          return {type: "data", data: null};
+          if(res.type == 1){
+            //if target data is notexist.
+            return {type: "data", data: null};
+          }else{
+            console.log("MAIN: Faild to recalc plot position")
+            return {type: "data", data: null};
+          }          
         }
         
       }catch(err){
-        console.error("MAIN: Failed to zip: ", err);
+        console.error("MAIN: Failed to calc LCPlot: ", err);
         return null;
       }
     }
@@ -2310,14 +2320,22 @@ function createMainWIndow() {
   ipcMain.handle("OpenDivider", async (_e) => {
     if (dividerWindow) {
       dividerWindow.focus();
-      dividerWindow.webContents.send("DividerToolClicked", "");
+
+      if (dividerWindow.webContents.getURL()) {
+        dividerWindow.webContents.send("DividerToolClicked", "");
+      } else {
+        dividerWindow.webContents.once("did-finish-load", () => {
+          dividerWindow.webContents.send("DividerToolClicked", "");
+        });
+      }
+
       return;
     }
 
-    //create finder window
+    //initial construction
     dividerWindow = new BrowserWindow({
       title: "Divider",
-      parent:mainWindow,
+      parent: mainWindow,
       width: 1300,
       height: 800,
       webPreferences: {
@@ -2329,17 +2347,17 @@ function createMainWIndow() {
       dividerWindow = null;
       mainWindow.webContents.send("DividerClosed", "");
     });
+
     dividerWindow.setMenu(null);
 
     dividerWindow.loadFile(path.join(__dirname, "./renderer/divider.html"));
 
-    dividerWindow.once("ready-to-show", () => {
+    dividerWindow.webContents.once("did-finish-load", () => {
       dividerWindow.show();
-      //dividerWindow.webContents.openDevTools();
-      //dividerWindow.setAlwaysOnTop(true, "floating");
       dividerWindow.webContents.send("DividerToolClicked", "");
     });
   });
+
   ipcMain.handle("CloseDivider", async (_e) => {
     if (dividerWindow) {
       dividerWindow.close();
@@ -2758,43 +2776,411 @@ function createMainWIndow() {
     data.push([LCCore.projects[idx].id, LCCore.projects[idx].name]);
     return data;
   });
-  ipcMain.handle("cvtLoadCsv", async (_e, title, ext, path) => {
-    let result = null;
-    if(path==null){
-      result = await getfile(mainWindow, title, ext);
-    }else{
-      result = path;
-    }
+  ipcMain.handle("cvtLoadCsv", async (_e, title, ext, pathData) => {
+    try{
+      //progress bar
+      progressBar   = progressDialog(converterWindow, "Depth Converter", "Now checking...", true);
 
-    if (result !== null) {
-      try {
-        const csvData = parse(fs.readFileSync(result, "utf8"), {
-          columns: false,
-          delimiter: ",",
-        });
-        return [await zipData(csvData), result];
-      } catch (error) {
-        console.log(error);
-        console.error(
-          "Fail to read csv file. There is no such a file named: " + result
-        );
+      await new Promise((resolve) => {
+        progressBar.on("ready", resolve);
+      });
+
+      //main
+      //for converter
+      let result = null;
+      if(pathData==null){
+        result = await getfile(mainWindow, title, ext);
+      }else{
+        result = pathData;
+      }
+
+      if (result !== null) {
+        try {
+          //convert string to cell
+          const csvData = parse(fs.readFileSync(result, "utf8"), {
+            columns: false,
+            delimiter: ",",
+          });
+
+          //preserve into global temp data
+          const id   = lcfnc.getUniqueId();
+          const name = path.basename(result, path.extname(result));
+          globalTempData = {from: "converter", data: csvData, name:name, id: id};
+
+          //return 10 rows from top
+          const outData = {
+            data: csvData.slice(0,10),
+            path: result,
+            counts: csvData.length,
+            id:id
+          };
+
+          if(progressBar!==null){
+            progressBar.close();
+            progressBar = null;
+          }
+          return await zipData(outData);
+        } catch (error) {
+          console.log(error);
+          console.error(
+            "Fail to read csv file. There is no such a file named: " + result
+          );
+
+          if(progressBar!==null){
+            progressBar.close();
+            progressBar = null;
+          }
+          return [null, null];
+        }
+      } else {
+        if(progressBar!==null){
+          progressBar.close();
+          progressBar = null;
+        }
         return [null, null];
       }
-    } else {
-      return [null, null];
+
+    }catch(error){
+      console.error(error)
     }
   });
-  ipcMain.handle("cvtExport", async (_e, data) => {
-    //from converter
-    //console.log(data);
-    try{
+  ipcMain.handle("cvtConverter", async (_e, options) => {
+    options = await unzipData(options);
 
-      data = await unzipData(data);
-      
-      putcsvfile(converterWindow, null, data);
-      return true
-    }catch(err){
-      return false
+    if(globalTempData.from == "converter" && globalTempData.id == options.id){
+      //mage submit indata for depthconverter
+      let indataList = [];
+      let dataStartFromIdx = 0;
+      if (options.sourceType == "trinity") {
+        const nameIdx     = options.nameIdx;
+        const holeIdx     = options.holeIdx;
+        const sectionIdx  = options.sectionIdx;
+        const distanceIdx = options.distanceIdx;
+        dataStartFromIdx  = options.dataStartFrom;
+
+        //skip header
+        for (let i = options.headerLines; i < globalTempData.data.length; i++) {
+          const datumName   =  globalTempData.data[i][nameIdx];//data name
+          const projectName = null;
+          let holeName      = globalTempData.data[i][holeIdx];
+          if (/^\d+$/.test(holeName.toString()) == true) {
+            //case number
+            holeName = holeName.toString().padStart(2, "0");
+          }
+          let sectionName = globalTempData.data[i][sectionIdx];
+          if (/^\d+$/.test(sectionName.toString()) == true) {
+            //case number
+            sectionName = sectionName.toString().padStart(2, "0");
+          }
+          const distance = parseFloat(globalTempData.data[i][distanceIdx]);
+
+          indataList.push([
+            datumName,
+            [projectName, holeName, sectionName, distance],//position trinity name
+            [null,null,null,null],//search range
+          ]);
+        }
+      } else if (options.sourceType == "composite_depth") {
+        const nameIdx = options.nameIdx;
+        const cdIdx   = options.cdIdx;
+        dataStartFromIdx  = options.dataStartFrom;
+        for (let i = options.headerLines; i < globalTempData.data.length; i++) {
+          const datumName = (nameIdx === cdIdx) ? "" : globalTempData.data[i][nameIdx];//data name
+          const val       = parseFloat(globalTempData.data[i][cdIdx]);
+          indataList.push([
+            datumName,
+            val,
+            [null,null,null,null], 
+          ]);
+        }
+      } else if (options.sourceType == "event_free_depth") {
+        const nameIdx     = options.nameIdx;
+        const efdIdx      = options.efdIdx;
+        dataStartFromIdx  = options.dataStartFrom;
+        for (let i = options.headerLines; i < globalTempData.data.length; i++) {
+          const datumName = (nameIdx === efdIdx) ? "" : globalTempData.data[i][nameIdx];//data name
+          const val       = parseFloat(globalTempData.data[i][efdIdx]);
+          indataList.push([
+            datumName, 
+            val,
+            [null,null,null,null],
+          ]);
+        }
+      } else if (options.sourceType == "drilling_depth") {
+        const nameIdx     = options.nameIdx;
+        const ddIdx       = options.ddIdx;
+        dataStartFromIdx  = options.dataStartFrom;
+        for (let i = options.headerLines; i < globalTempData.data.length; i++) {
+          const datumName = (nameIdx === ddIdx) ? "" : globalTempData.data[i][nameIdx];//data name
+          const val       = parseFloat(globalTempData.data[i][ddIdx]);
+          indataList.push([
+            datumName, 
+            val,
+            [null,null,null,null],
+          ]);
+        }
+      } else if (options.sourceType == "age") {
+        const nameIdx     = options.nameIdx;
+        const ageIdx      = options.ageIdx;
+        dataStartFromIdx  = options.dataStartFrom;
+        for (let i = options.headerLines; i < globalTempData.data.length; i++) {
+          const datumName = (nameIdx === ageIdx) ? "" : globalTempData.data[i][nameIdx];//data name
+          const val       = parseFloat(globalTempData.data[i][ageIdx]);
+          indataList.push([
+            datumName,
+            val,
+            [null,null,null,null],
+          ]);
+        }
+      }
+
+      console.log("MAIN: Make imported data list.")
+
+      //submit data into depthConverter
+      const calcedDataList = await depthConverter(indataList, options);
+      if(calcedDataList===null){
+        return {ok:false, reason: "Usear cancelled."}
+      }
+
+      //
+      if(options.outType == "export"){
+        progressBar = progressDialog(converterWindow, "Depth Converter", "Now exporting...", true);
+        await new Promise((resolve) => {
+          progressBar.on("ready", resolve);
+        });
+        //EXPORT as CSV
+        //make export format
+        //header
+        let convertedData = [];
+        let header = [
+          "Name",
+          "Project",
+          "Hole",
+          "Section",
+          "Distance (cm)",
+          "Composite depth (cm)",
+          "Eventfree depth (cm)",
+          "Drilling depth (cm)",
+          "Age mid (calBP)",
+          "Age upper (calBP)",
+          "Age lower (calBP)",
+
+          "Connection",
+          "Connection Rank",
+          "Source Type",
+          "Calc Type",
+          "Correlation Model Version",
+          "Event Model Version",
+          "Age Model Version",
+          "Description"
+        ];
+        if(globalTempData.data[0].length>dataStartFromIdx +1){
+          for(let d=dataStartFromIdx +1; d<globalTempData.data[0].length; d++){
+            header.push(globalTempData.data[0][d]);
+          }
+        }
+        convertedData.push(header);
+
+        //main
+        if (globalTempData.data === null || calcedDataList === null) {
+          globalTempData = null;
+          return {ok:false, reason: "There is no valid data for convertion."}
+        }
+
+        //main data
+        for(let i=0; i<calcedDataList.length; i++){
+          //calc depth
+          const calcedData = calcedDataList[i];
+          
+          if(!calcedData){
+            console.log("[MAIN]: Conversion was skipped at line: "+i+".");
+            continue
+          }
+
+          //update header
+          if(i==0){
+            if(calcedData.is_main_model===false){
+              header[5] += " [DUO]";
+              header[6] += " [DUO]";
+              header[13]+= " [DUO]";
+              header[14]+= " [DUO]";
+            }else{
+              header[5] += " [MAIN]";
+              header[6] += " [MAIN]";
+              header[13]+= " [MAIN]";
+              header[14]+= " [MAIN]";
+            }
+            if(options.sourceType !== "trinity"){
+              header[1] += " [PASEUDO]";
+              header[2] += " [PASEUDO]";
+              header[3] += " [PASEUDO]";
+              header[4] += " [PASEUDO]";
+            }
+          }
+
+          //make output array
+          let rowData = [
+            calcedData.name, //data name
+            calcedData.project, //project name
+            calcedData.hole, //hole name
+            calcedData.section, //section name
+            parseFloat(calcedData.distance).toFixed(options.precision), //distance
+            parseFloat(calcedData.cd).toFixed(options.precision), //composite depth
+            parseFloat(calcedData.efd).toFixed(options.precision), //event free depth
+            parseFloat(calcedData.dd).toFixed(options.precision), //drilling depth
+            parseFloat(calcedData.age_mid).toFixed(options.precision), //age mid
+            parseFloat(calcedData.age_upper).toFixed(options.precision), //age upper
+            parseFloat(calcedData.age_lower).toFixed(options.precision), //age lower
+
+            calcedData.is_main_model ? "MAIN " + calcedData.section_type : "DUO " + calcedData.section_type, // MAIN master section/parallel section
+            calcedData.correlation_rank,  //connection rank
+
+            calcedData.source_type,
+            calcedData.calc_type,
+            calcedData.is_main_model ? "[MAIN]" + calcedData.correlation_model_version : "[DUO]" + calcedData.correlation_model_version,
+            calcedData.is_main_model ? "[MAIN]" + calcedData.event_model_version : "[DUO]" + calcedData.event_model_version,
+            calcedData.age_model_version ? "[MAIN]" + calcedData.age_model_version : "",
+            calcedData.description, 
+          ];
+
+          //add data
+          if(globalTempData.data[0].length>dataStartFromIdx+1){
+            for(let d=dataStartFromIdx+1; d<globalTempData.data[0].length; d++){
+              rowData.push(globalTempData.data[i+1][d]);//remove header
+            }
+          }
+                    
+          convertedData.push(rowData);
+        }
+        
+        //export
+        const res = await putcsvfile(converterWindow, null, convertedData);
+        if(res.ok){
+          console.log("[MAIN]: Converted data is exported successfully.");
+        }else{          
+          console.log("[MAIN]: Failed to export.",res.reason);
+        }
+
+        if(progressBar!==null){
+          progressBar.close();
+          progressBar = null;
+        }
+        globalTempData = null;
+        return res
+      }else if(options.outType == "import"){
+        progressBar = progressDialog(converterWindow, "Depth Converter", "Now importing...", true);
+        await new Promise((resolve) => {
+          progressBar.on("ready", resolve);
+        });
+        //main convertion
+        if (globalTempData.data === null || calcedDataList === null) {
+          globalTempData = null;
+          return {ok:false, reason: "There is no valid data for convertion."}
+        }
+
+        //main calc
+        let output = [];
+        for(let i=0; i<calcedDataList.length; i++){
+          //calc depth
+          const calcedData = calcedDataList[i];
+          
+          if(!calcedData){
+            console.log("[MAIN]: Conversion was skipped at line: "+i+".");
+            continue
+          }
+
+          let header = [];
+          let units  = [];
+          for(let d=dataStartFromIdx+1; d<globalTempData.data[0].length; d++){
+            const m = globalTempData.data[0][d].match(/^(.+?)(?:\[(.+)\])?$/) || [];
+            const name = m[1] || "";
+            const unit = m[2] || "";
+
+            header.push(name); //remove header
+            units.push(unit);
+          }
+          let values = [];
+          for(let d=dataStartFromIdx+1; d<globalTempData.data[0].length; d++){
+            values.push(parseFloat(globalTempData.data[i+1][d])); //remove header
+          }
+          
+          calcedData.data_header = header;
+          calcedData.data_values = values;
+          calcedData.data_units  = units;
+
+          if(calcedData.source_type !== "trinity"){
+            calcedData.project  = null;
+            calcedData.hole     = null;
+            calcedData.section  = null;
+            calcedData.distance = null;
+          }
+
+          output.push(calcedData);
+        }
+
+        //convert to flat       
+        const cvtData = cvt2flat(output);
+        cvtData.id   = globalTempData.id;
+        cvtData.name = globalTempData.name;
+
+        //set LCPlot
+        LCPlot.addDataset(cvtData);
+        
+        //send data
+        if(options.callFrom == "plotter"){
+          //make zip data
+          let zipped;
+          if(options.returnType == "full"){
+            zipped = await zipData(LCPlot);
+          }else if(options.returnType == "min"){
+            const tempLCPlot = structuredClone(LCPlot);
+            tempLCPlot.data_collections.forEach(dataset=>{
+              dataset.rows = [structuredClone(dataset.rows[0])];
+            })
+
+            zipped = await zipData(tempLCPlot);
+          }
+
+          //send => plotter
+          try {
+            plotWindow.webContents.send("importedData", zipped);
+            mainWindow.webContents.send("importedData", true); // -> call loadplotdata(PlotterGetData)
+            console.log("MAIN: Plot Data is imported into Plotter & renderer.");
+          } catch (err) {
+            console.error("MAIN: Failed to zip:", err);
+            dialog.showMessageBox(mainWindow, {
+              type: "info",
+              title: "Failed to load",
+              message: "Failed to load data",
+              detail: String(err),
+            });
+
+            globalTempData = null;
+            return {ok: false, reason: err}
+          }
+
+        }else if(options.callFrom == "converter"){    
+          globalTempData = null; 
+          return {ok: false, reason: "There is no actions."}     
+        }
+        
+        //finish
+        if(progressBar!==null){
+          //progressBar.close();
+          //progressBar = null;
+        }
+        globalTempData = null;
+        return {ok: true}        
+      } else {
+        console.log("[MAIN]: Unkown convertion type detected.")
+
+        if(progressBar!==null){
+          progressBar.close();
+          progressBar = null;
+        }
+        globalTempData = null;
+        return {ok: false, reason:"Unkown convertion type detected"} 
+      } 
     }
   });
   //--------------------------------------------------------------------------------------------------
@@ -2863,433 +3249,37 @@ function createMainWIndow() {
   ipcMain.handle("rendererLog", async (_e, data) => {
     mainWindow.webContents.send("rendererLog", data);
   });
-  ipcMain.handle("sendImportedData", async (_e, data) => {
-    //call from ""
-    if(plotWindow){
-      progressBar   = progressDialog(plotWindow, "", "Now sending...", true);
-    }else{
-      progressBar   = progressDialog(mainWindow, "", "Now sending...", true);
-    }
-    await new Promise(resolve => setTimeout(resolve, 100));
-           
-    try{
-      //unzip data
-      const recievedData = await unzipData(data);
-      recievedData.name = path.basename(recievedData.path);
-      recievedData.data.name = path.basename(recievedData.path);
-
-      //set data into lcplot
-      LCPlot.addDataset(recievedData.data);
-      //LCCore.emit('update_depth')
-      const zipped = await zipData(LCPlot);
-      
-      //send data
-      if(recievedData.send_to == "main"){
-        try {          
-          mainWindow.webContents.send("importedData", true);
-          console.log("MAIN: Plot Data is imported into renderer.");
-        } catch (err) {
-          console.error("MAIN: Failed to zip:", err);
-        }
-      }else if(recievedData.send_to == "plotter"){              
-        try {
-          plotWindow.webContents.send("importedData", zipped);
-          mainWindow.webContents.send("importedData", true); //loadplotdata
-          console.log("MAIN: Plot Data is imported into Plotter & renderer.");
-        } catch (err) {
-          console.error("MAIN: Failed to zip:", err);
-          dialog.showMessageBox(mainWindow, {
-            type: "info",
-            title: "Failed to load",
-            message: "Failed to load data",
-            detail: String(err),
-          });
-        }
-      }
-    }catch(er){
-      console.log(er)
-    }
-
-    if(progressBar){
-      progressBar.close()
-      progressBar = null; 
-    } 
-    
-  });
   ipcMain.handle("sendPlotOptions", (_e,data, to) => {
     if(to=="renderer"){
       mainWindow.webContents.send("PlotDataOptions", data);
     }    
   });
   ipcMain.handle("depthConverter", async (_e, dataList, options) => {
-    //main
-    //data: ["name","depth_data","target_id"] e.g. ["name",[projectName(no use),holeName, sectionName, distance],[null, null, null, null]]
-    //type: "trinity", "composite_depth", "event_free_depth","age"
-    //method(age): "linear"
     
-    const type = options.sourceType
-    const method = options.polationType;
-    const allowExtrapolation = options.allowOutside;
+    //convert
+    const resultList = await depthConverter(dataList, options);
 
-    dataList = await unzipData(dataList);//check&unzip
-
-    let callWindow;
-    let showProgress = false;
-    let distance_duplicate = 0;
-
-    if (options.callFrom === "converter") {
-      callWindow = converterWindow;
-      showProgress = true;
-      const cm = LCCore.checkModel();
-      cm.forEach(r=>{
-        distance_duplicate += r.distance_confliction_counts;
-      })
-      if(distance_duplicate>0){
-        const options = {
-          type: "question",
-          buttons: ["No", "Yes"],
-          defaultId: 0,
-          title: "Export",
-          message: "Duplicate marker positions were found (N="+distance_duplicate+"). This may result in incorrect data or processing errors.Do you want to continue exporting anyway?",
-        };
-
-        const { response } = await dialog.showMessageBox(callWindow, options);
-
-        if(response===0){
-          return null;
-        }
-      }
-    } else {
-      callWindow = mainWindow;
-    }
-    
-    let resultList = [];
-    if(showProgress){
-      if(progressBar!==null){
-        //new
-        progressBar.close();
-        progressBar=null;
-      }
-
-      progressBar   = progressDialog(callWindow, "Depth Converter", "Now converting...", false);        
-      await new Promise(resolve => progressBar.on('ready', resolve));
-    }    
-
-    for(let i=0; i<dataList.length; i++){
-      if(showProgress){
-        progressBar   = await updateProgress(progressBar, i, dataList.length);
-      }
-      
-      //initiarise
-      let results = {
-        name: null,
-        project: null,
-        hole: null,
-        section: null,
-        distance: null,
-        cd: null,
-        efd: null,
-        dd:null,
-        age_mid: null,
-        age_upper: null,
-        age_lower: null,
-        project_id: null,
-        hole_id: null,
-        section_id: null,
-        marker_id: null,
-        section_type: null,
-        correlation_rank: null,
-        correlation_model_version: null,
-        event_model_version: null,
-        age_model_version: null,
-        description: null,
-        source_type:null,
-        is_main_model: false,
-        distance_confrictionduplicate: false
-      };
-
-      if(LCCore.base_project_id){
-        const baseIdx = LCCore.search_idx_list[LCCore.base_project_id.toString()];
-        if(LCCore.projects[baseIdx[0]].model_type == "correlation"){
-          results.is_main_model = true;
-        }        
-      }
-
-      //main
-      const data = dataList[i];
-
-      if (type == "trinity") {
-        //calc each depth 
-        let send_data = [];
-        let td = new Trinity();
-        td.name         = data[0];
-        td.project_name = data[1][0];
-        td.hole_name    = data[1][1];
-        td.section_name = data[1][2];
-        td.distance     = parseFloat(data[1][3]);
-        if(td.hole_name==null||td.section_name==null||td.distance==null){
-          continue
-        }
-        send_data.push(td);
-        let targetId  = data[2];
-
-        //convert depth (listed for function)
-        const cd_list = LCCore.getDepthFromTrinity(targetId, send_data, "composite_depth", allowExtrapolation); //output:[sec id, cd, rank]
-
-        const cd = [];
-        cd.push(cd_list[0][1]);
-        let calcedId = cd_list[0][0];
-        
-        //
-        const efd_list = LCCore.getDepthFromTrinity(targetId, send_data, "event_free_depth", allowExtrapolation); //output:[sec id, efd, rank]
-        const efd = efd_list[0][1];
-        const new_rank = efd_list[0][2];
-
-        const dd_list = LCCore.getDepthFromTrinity(targetId, send_data, "drilling_depth", allowExtrapolation); //output:[sec id, efd, rank]
-        const dd = dd_list[0][1];
-
-        //calc age
-        const age = LCAge.getAgeFromEFD(efd, method);
-
-        //get age model idx
-        let ageIdx = null;
-        LCAge.AgeModels.forEach((a, s) => {
-          if (a.id == LCAge.selected_id) {
-            ageIdx = s;
-          }
-        });
-
-        //get idex
-        let calcedIdx;
-        if(calcedId == null){
-          calcedIdx = null;
-          console.log(cd)
-          console.log("MAIN: "+ send_data[0].hole_name +"-"+send_data[0].section_name+"-"+send_data[0].distance+"cm is out of section.");
-        } else {
-          calcedIdx = LCCore.search_idx_list[calcedId.toString()];
-        }       
-
-        //stack
-        results.name     = send_data[0] !== undefined ? send_data[0].name : NaN;
-        results.project  = calcedIdx !== null && calcedIdx !== undefined ? LCCore.projects[calcedIdx[0]].name : NaN;
-        results.hole     = send_data[0] !== undefined ? send_data[0].hole_name : NaN;
-        results.section  = send_data[0] !== undefined ? send_data[0].section_name : NaN;
-        results.distance = send_data[0] !== undefined ? send_data[0].distance : NaN;
-        results.cd  = cd[0] !== null ? cd[0] : NaN;
-        results.efd = efd !== null ? efd : NaN;
-        results.dd  = dd !== null ? dd : NaN;
-        results.age_mid   = age.age.mid   !== null ? age.age.mid   : NaN;
-        results.age_upper = age.age.upper !== null ? age.age.upper : NaN;
-        results.age_lower = age.age.lower !== null ? age.age.lower : NaN;
-        results.section_id =  calcedIdx !== null ?  [cd_list[0][0][0], cd_list[0][0][1], cd_list[0][0][2], null] : [null, null, null, null];
-        results.section_type = cd_list[0][4] !== null ? cd_list[0][4] : "";
-        results.correlation_rank = new_rank !== null ? new_rank : NaN;
-        results.correlation_model_version = calcedIdx !== null ? LCCore.projects[calcedIdx[0]].correlation_version : NaN;
-        results.event_model_version       = calcedIdx !== null ? LCCore.projects[calcedIdx[0]].correlation_version : NaN;
-        results.age_model_version         = LCAge.AgeModels[ageIdx] !== undefined ? LCAge.AgeModels[ageIdx].version : NaN;
-        results.description               = "";
-        results.source_type = type;
-        results.calc_type = cd_list[0][3];
-      } else if (type == "composite_depth") {
-        //get cd
-        const name     = data[0];
-        const cd       = parseFloat(data[1]);
-        const targetId = data[2];
-
-        //get nearest trinity return: [index: , project: , hole: , section: , distance: ]
-        const paseudoTrinity = LCCore.getNearestTrinity(targetId, cd, "composite_depth");
-
-        //calc efd
-        const efd = LCCore.getEFDfromCD(cd);
-
-        //calc age
-        const ageData = LCAge.getAgeFromEFD(efd, method);
-        const age = ageData.age;
-        const ageIdx = ageData.age_idx;
-
-        //stack
-        results.name = name;
-        results.project = paseudoTrinity.project !== null ? paseudoTrinity.project : NaN;
-        results.hole = paseudoTrinity.hole !== null ? paseudoTrinity.hole : NaN;
-        results.section = paseudoTrinity.section !== null ? paseudoTrinity.section : NaN;
-        results.distance = paseudoTrinity.distance !== null ? paseudoTrinity.distance : NaN;
-        results.cd = cd !== null ? cd : NaN;
-        results.efd = efd !== null ? efd : NaN;
-        results.dd  = NaN;
-        results.age_mid = age.mid !== null ? age.mid : NaN;
-        results.age_upper = age.upper !== null ? age.upper : NaN;
-        results.age_lower = age.lower !== null ? age.lower : NaN;
-        results.section_type = paseudoTrinity.section_type !== null ? paseudoTrinity.section_type : "";
-        results.correlation_rank = 3;
-        results.correlation_model_version = paseudoTrinity.index[0] !== null ? LCCore.projects[paseudoTrinity.index[0]].correlation_version : NaN;
-        results.event_model_version       = paseudoTrinity.index[0] !== null ? LCCore.projects[paseudoTrinity.index[0]].correlation_version : NaN;
-        results.age_model_version         = LCAge.AgeModels[ageIdx] !== undefined ? LCAge.AgeModels[ageIdx].version : NaN;
-        results.description               = "The trinity is paseudo data.";
-        results.source_type = type;
-        results.calc_type = "paseudo-depth";
-      } else if (type == "event_free_depth") {
-        //get efd
-        const name = data[0];
-        const efd = parseFloat(data[1]);
-        const targetId = data[2];
-
-        //get nearest trinity
-        const paseudoTrinity = LCCore.getNearestTrinity(targetId, efd, "event_free_depth");
-
-        //get paseudo cd
-        const cd = LCCore.getCDfromEFD(efd);
-
-        //calc age
-        const ageData = LCAge.getAgeFromEFD(efd, method);
-        const age = ageData.age;
-        const ageIdx = ageData.age_idx;
-
-        //stack
-        results.name = name;
-        results.project = paseudoTrinity.project !== null ? paseudoTrinity.project : NaN;
-        results.hole = paseudoTrinity.hole !== null ? paseudoTrinity.hole : NaN;
-        results.section = paseudoTrinity.section !== null ? paseudoTrinity.section : NaN;
-        results.distance = paseudoTrinity.distance !== null ? paseudoTrinity.distance : NaN;
-        results.cd = cd !== null ? cd : NaN;
-        results.efd = efd !== null ? efd : NaN;
-        results.dd  = NaN;
-        results.age_mid = age.mid !== null ? age.mid : NaN;
-        results.age_upper = age.upper !== null ? age.upper : NaN;
-        results.age_lower = age.lower !== null ? age.lower : NaN;
-        results.section_type = paseudoTrinity.section_type !== null ? paseudoTrinity.section_type : "";
-        results.correlation_rank = 3;
-        results.correlation_model_version = paseudoTrinity.index[0] !== null ? LCCore.projects[paseudoTrinity.index[0]].correlation_version : NaN;
-        results.event_model_version       = paseudoTrinity.index[0] !== null ? LCCore.projects[paseudoTrinity.index[0]].correlation_version : NaN;
-        results.age_model_version         = LCAge.AgeModels[ageIdx] !== undefined ? LCAge.AgeModels[ageIdx].version : NaN;
-        results.description               = "Converted from Event Free Depth. The trinity and CD are paseudo data.";
-        results.source_type = type;
-        results.calc_type = "paseudo-depth";
-      } else if (type == "drilling_depth") {
-        //NOT RECOMMENDED!!
-        //get cd
-        const name = data[0];
-        const dd = parseFloat(data[1]);
-        const targetId = data[2];
-
-        //convertion from drilling depth must be targetId.
-        if (targetId[0] == null || targetId[1] == null || targetId[2] == null){
-          continue;
-        }
-
-        //get nearest trinity
-        const paseudoTrinity = LCCore.getNearestTrinity(targetId, dd, "drilling_depth");
-        let send_data = [];
-        let td = new Trinity();
-        td.name         = name;
-        td.project_name = paseudoTrinity.project;
-        td.hole_name    = paseudoTrinity.hole;
-        td.section_name = paseudoTrinity.section;
-        td.distance     = paseudoTrinity.distance;
-        send_data.push(td);
-
-        //calc cd
-        const cd_list = LCCore.getDepthFromTrinity(targetId, send_data, "composite_depth"); //output:[sec id, cd]
-        const cd = cd_list[0][1];
-
-        //calc efd
-        const efd_list = LCCore.getDepthFromTrinity(targetId, send_data, "event_free_depth"); //output:[sec id, efd]
-        const efd = efd_list[0][1];
-        const new_rank = efd_list[0][2];
-
-        //calc age
-        const ageData = LCAge.getAgeFromEFD(efd, method);
-        const age = ageData.age;
-        const ageIdx = ageData.age_idx;
-
-        //stack
-        results.name = name;
-        results.hole = paseudoTrinity[0] !== null ? paseudoTrinity[0] : NaN;
-        results.section = paseudoTrinity[1] !== null ? paseudoTrinity[1] : NaN;
-        results.distance = paseudoTrinity[2] !== null ? paseudoTrinity[2] : NaN;
-        results.cd = cd !== null ? cd : NaN;
-        results.efd = efd !== null ? efd : NaN;
-        results.dd  = dd !== null ? dd : NaN;
-        results.age_mid = age.mid !== null ? age.mid : NaN;
-        results.age_upper = age.upper !== null ? age.upper : NaN;
-        results.age_lower = age.lower !== null ? age.lower : NaN;
-        results.section_type = paseudoTrinity.section_type !== null ? paseudoTrinity.section_type : "";
-        results.correlation_rank = 3;
-        results.correlation_model_version = paseudoTrinity.index[0] !== null ? LCCore.projects[paseudoTrinity.index[0]].correlation_version : NaN;
-        results.event_model_version       = paseudoTrinity.index[0] !== null ? LCCore.projects[paseudoTrinity.index[0]].correlation_version : NaN;
-        results.age_model_version         = LCAge.AgeModels[ageIdx] !== undefined ? LCAge.AgeModels[ageIdx].version : NaN;
-        results.description               = "NOT RECOMMENDED! Converted from Drilling Depth. The trinity, CD, EFD amd Age are paseudo data.";
-        results.source_type = type;
-        results.calc_type = "paseudo-depth";
-      } else if (type == "age") {
-        //get efd
-        const name = data[0];
-        const age = parseFloat(data[1]);
-        const targetId = data[2];
-
-        //calc efd
-        const efdData = LCAge.getEFDFromAge(age, method);
-        const efd = efdData.efd.mid;
-
-        //get paseudo cd
-        const cd = LCCore.getCDfromEFD(efd);
-
-        //re-calc age
-        const rage = LCAge.getAgeFromEFD(efd, method);
-
-        //get nearest trinity
-        const paseudoTrinity = LCCore.getNearestTrinity(targetId, efd, "composite_depth");
-
-        //get age model idx
-        let ageIdx = null;
-        LCAge.AgeModels.forEach((a, s) => {
-          if (a.id == LCAge.selected_id) {
-            ageIdx = s;
-          }
-        });
-
-        //stack
-        results.name = name;
-        results.project = paseudoTrinity.project !== null ? paseudoTrinity.project : NaN;
-        results.hole = paseudoTrinity.hole !== null ? paseudoTrinity.hole : NaN;
-        results.section = paseudoTrinity.section !== null ? paseudoTrinity.section : NaN;
-        results.distance = paseudoTrinity.distance !== null ? paseudoTrinity.distance : NaN;
-        results.cd = cd !== null ? cd : NaN;
-        results.efd = efd !== null ? efd : NaN;
-        results.dd  = NaN;
-        results.age_mid = rage.age.mid !== null ? rage.age.mid : NaN;
-        results.age_upper = rage.age.upper !== null ? rage.age.upper : NaN;
-        results.age_lower = rage.age.lower !== null ? rage.age.lower : NaN;
-        results.section_type = paseudoTrinity.section_type !== null ? paseudoTrinity.section_type : "";
-        results.correlation_rank = 3;
-        results.correlation_model_version = paseudoTrinity.index[0] !== null ? LCCore.projects[paseudoTrinity.index[0]].correlation_version : NaN;
-        results.event_model_version       = paseudoTrinity.index[0] !== null ? LCCore.projects[paseudoTrinity.index[0]].correlation_version : NaN;
-        results.age_model_version         = LCAge.AgeModels[ageIdx] !== undefined ? LCAge.AgeModels[ageIdx].version : NaN;
-        results.description               = "Converted from Age. The trinity and CD are paseudo data.";
-        results.source_type = type;
-        results.calc_type = "paseudo-depth";
-      } else {
-        results = null;
-      }
-
-      resultList.push(results);
-    }
-
-    if(progressBar!==null){
-      //progressBar   = await updateProgress(progressBar, 1, 1);
-      progressBar.close();
-      progressBar = null;
-    }
-
+    //postprocess for return
     if(resultList.length>1){
-      if(options.isZip){
-        return  await zipData(resultList);
+      if(options.returnType == "full"){
+        if(options.isZip){
+          return  await zipData(resultList);
+        }else{
+          return  resultList;
+        }
       }else{
-        return  resultList;
-      }
+        //
+        const extractedList = resultList.slice(0,10); 
+        if(options.isZip){
+          return  await zipData(extractedList);
+        }else{
+          return  extractedList;
+        }
+      }      
     }else{
       return resultList[0];
     }
-  });
+  });  
   ipcMain.handle("changeEditMode", (_e,mode) => {
     
     isEditMode = mode;
@@ -3685,6 +3675,373 @@ function createMainWIndow() {
   
   //--------------------------------------------------------------------------------------------------  
   //--------------------------------------------------------------------------------------------------
+  async function depthConverter(dataList, options){
+    //main
+    //data: ["name","depth_data","target_id"] e.g. ["name",[projectName(no use),holeName, sectionName, distance],[null, null, null, null]]
+    //type: "trinity", "composite_depth", "event_free_depth","age"
+    //method(age): "linear"
+    try{
+
+    }catch(err){
+
+    }
+    
+    const type = options.sourceType
+    const method = options.polationType;
+    const allowExtrapolation = options.allowOutside;
+
+    dataList = await unzipData(dataList);//check&unzip
+
+    let callWindow;
+    let showProgress = false;
+    let distance_duplicate = 0;
+
+    if (options.callFrom === "converter" || options.callFrom === "plotter") {
+      callWindow = converterWindow;
+      showProgress = true;
+      const cm = LCCore.checkModel();
+      cm.forEach(r=>{
+        distance_duplicate += r.distance_confliction_counts;
+      })
+      if(distance_duplicate>0){
+        const options = {
+          type: "question",
+          buttons: ["No", "Yes"],
+          defaultId: 0,
+          title: "Export",
+          message: "Duplicate marker positions were found (N="+distance_duplicate+"). This may result in incorrect data or processing errors.Do you want to continue exporting anyway?",
+        };
+
+        const { response } = await dialog.showMessageBox(callWindow, options);
+
+        if(response===0){
+          return null;
+        }
+      }
+    } else {
+      callWindow = mainWindow;
+    }
+    
+    let resultList = [];
+    if(showProgress){
+      if(progressBar!==null){
+        //new
+        progressBar.close();
+        progressBar=null;
+      }
+
+      progressBar   = progressDialog(callWindow, "Depth Converter", "Now converting...", false);        
+      await new Promise(resolve => progressBar.on('ready', resolve));
+    }    
+
+    for(let i=0; i<dataList.length; i++){
+      if(showProgress){
+        progressBar   = await updateProgress(progressBar, i, dataList.length);
+      }
+      
+      //initiarise
+      let results = {
+        name: null,
+        project: null,
+        hole: null,
+        section: null,
+        distance: null,
+        cd: null,
+        efd: null,
+        dd:null,
+        age_mid: null,
+        age_upper: null,
+        age_lower: null,
+        project_id: null,
+        hole_id: null,
+        section_id: null,
+        marker_id: null,
+        section_type: null,
+        correlation_rank: null,
+        correlation_model_version: null,
+        event_model_version: null,
+        age_model_version: null,
+        description: null,
+        source_type:null,
+        is_main_model: false,
+        distance_confrictionduplicate: false
+      };
+
+      if(LCCore.base_project_id){
+        const baseIdx = LCCore.search_idx_list[LCCore.base_project_id.toString()];
+        if(LCCore.projects[baseIdx[0]].model_type == "correlation"){
+          results.is_main_model = true;
+        }        
+      }
+
+      //main
+      const data = dataList[i];
+
+      if (type == "trinity") {
+        //calc each depth 
+        let send_data = [];
+        let td = new Trinity();
+        td.name         = data[0];
+        td.project_name = data[1][0];
+        td.hole_name    = data[1][1];
+        td.section_name = data[1][2];
+        td.distance     = parseFloat(data[1][3]);
+        if(td.hole_name==null||td.section_name==null||td.distance==null){
+          continue
+        }
+        send_data.push(td);
+        let targetId  = data[2];
+
+        //convert depth (listed for function)
+        const cd_list = LCCore.getDepthFromTrinity(targetId, send_data, "composite_depth", allowExtrapolation); //output:[sec id, cd, rank]
+
+        const cd = [];
+        cd.push(cd_list[0][1]);
+        let calcedId = cd_list[0][0];
+        
+        //
+        const efd_list = LCCore.getDepthFromTrinity(targetId, send_data, "event_free_depth", allowExtrapolation); //output:[sec id, efd, rank]
+        const efd = efd_list[0][1];
+        const new_rank = efd_list[0][2];
+
+        const dd_list = LCCore.getDepthFromTrinity(targetId, send_data, "drilling_depth", allowExtrapolation); //output:[sec id, efd, rank]
+        const dd = dd_list[0][1];
+
+        //calc age
+        const age = LCAge.getAgeFromEFD(efd, method);
+
+        //get age model idx
+        let ageIdx = null;
+        LCAge.AgeModels.forEach((a, s) => {
+          if (a.id == LCAge.selected_id) {
+            ageIdx = s;
+          }
+        });
+
+        //get idex
+        let calcedIdx;
+        if(calcedId == null){
+          calcedIdx = null;
+          console.log(cd)
+          console.log("MAIN: "+ send_data[0].hole_name +"-"+send_data[0].section_name+"-"+send_data[0].distance+"cm is out of section.");
+        } else {
+          calcedIdx = LCCore.search_idx_list[calcedId.toString()];
+        }       
+
+        //stack
+        results.name     = send_data[0] !== undefined ? send_data[0].name : NaN;
+        results.project  = calcedIdx !== null && calcedIdx !== undefined ? LCCore.projects[calcedIdx[0]].name : NaN;
+        results.hole     = send_data[0] !== undefined ? send_data[0].hole_name : NaN;
+        results.section  = send_data[0] !== undefined ? send_data[0].section_name : NaN;
+        results.distance = send_data[0] !== undefined ? send_data[0].distance : NaN;
+        results.cd  = cd[0] !== null ? cd[0] : NaN;
+        results.efd = efd !== null ? efd : NaN;
+        results.dd  = dd !== null ? dd : NaN;
+        results.age_mid   = age.age.mid   !== null ? age.age.mid   : NaN;
+        results.age_upper = age.age.upper !== null ? age.age.upper : NaN;
+        results.age_lower = age.age.lower !== null ? age.age.lower : NaN;
+        results.section_id =  calcedIdx !== null ?  [cd_list[0][0][0], cd_list[0][0][1], cd_list[0][0][2], null] : [null, null, null, null];
+        results.section_type = cd_list[0][4] !== null ? cd_list[0][4] : "";
+        results.correlation_rank = new_rank !== null ? new_rank : NaN;
+        results.correlation_model_version = calcedIdx !== null ? LCCore.projects[calcedIdx[0]].correlation_version : NaN;
+        results.event_model_version       = calcedIdx !== null ? LCCore.projects[calcedIdx[0]].correlation_version : NaN;
+        results.age_model_version         = LCAge.AgeModels[ageIdx] !== undefined ? LCAge.AgeModels[ageIdx].version : NaN;
+        results.description               = "";
+        results.source_type = type;
+        results.calc_type = cd_list[0][3];
+      } else if (type == "composite_depth") {
+        //get cd
+        const name     = data[0];
+        const cd       = parseFloat(data[1]);
+        const targetId = data[2];
+
+        //get nearest trinity return: [index: , project: , hole: , section: , distance: ]
+        const paseudoTrinity = LCCore.getNearestTrinity(targetId, cd, "composite_depth");
+
+        //calc efd
+        const efd = LCCore.getEFDfromCD(cd);
+
+        //calc age
+        const ageData = LCAge.getAgeFromEFD(efd, method);
+        const age = ageData.age;
+        const ageIdx = ageData.age_idx;
+
+        //stack
+        results.name = name;
+        results.project = paseudoTrinity.project !== null ? paseudoTrinity.project : NaN;
+        results.hole = paseudoTrinity.hole !== null ? paseudoTrinity.hole : NaN;
+        results.section = paseudoTrinity.section !== null ? paseudoTrinity.section : NaN;
+        results.distance = paseudoTrinity.distance !== null ? paseudoTrinity.distance : NaN;
+        results.cd = cd !== null ? cd : NaN;
+        results.efd = efd !== null ? efd : NaN;
+        results.dd  = NaN;
+        results.age_mid = age.mid !== null ? age.mid : NaN;
+        results.age_upper = age.upper !== null ? age.upper : NaN;
+        results.age_lower = age.lower !== null ? age.lower : NaN;
+        results.section_type = paseudoTrinity.section_type !== null ? paseudoTrinity.section_type : "";
+        results.correlation_rank = 3;
+        results.correlation_model_version = paseudoTrinity.index[0] !== null ? LCCore.projects[paseudoTrinity.index[0]].correlation_version : NaN;
+        results.event_model_version       = paseudoTrinity.index[0] !== null ? LCCore.projects[paseudoTrinity.index[0]].correlation_version : NaN;
+        results.age_model_version         = LCAge.AgeModels[ageIdx] !== undefined ? LCAge.AgeModels[ageIdx].version : NaN;
+        results.description               = "The trinity is paseudo data.";
+        results.source_type = type;
+        results.calc_type = "paseudo-depth";
+      } else if (type == "event_free_depth") {
+        //get efd
+        const name = data[0];
+        const efd = parseFloat(data[1]);
+        const targetId = data[2];
+
+        //get nearest trinity
+        const paseudoTrinity = LCCore.getNearestTrinity(targetId, efd, "event_free_depth");
+
+        //get paseudo cd
+        const cd = LCCore.getCDfromEFD(efd);
+
+        //calc age
+        const ageData = LCAge.getAgeFromEFD(efd, method);
+        const age = ageData.age;
+        const ageIdx = ageData.age_idx;
+
+        //stack
+        results.name = name;
+        results.project = paseudoTrinity.project !== null ? paseudoTrinity.project : NaN;
+        results.hole = paseudoTrinity.hole !== null ? paseudoTrinity.hole : NaN;
+        results.section = paseudoTrinity.section !== null ? paseudoTrinity.section : NaN;
+        results.distance = paseudoTrinity.distance !== null ? paseudoTrinity.distance : NaN;
+        results.cd = cd !== null ? cd : NaN;
+        results.efd = efd !== null ? efd : NaN;
+        results.dd  = NaN;
+        results.age_mid = age.mid !== null ? age.mid : NaN;
+        results.age_upper = age.upper !== null ? age.upper : NaN;
+        results.age_lower = age.lower !== null ? age.lower : NaN;
+        results.section_type = paseudoTrinity.section_type !== null ? paseudoTrinity.section_type : "";
+        results.correlation_rank = 3;
+        results.correlation_model_version = paseudoTrinity.index[0] !== null ? LCCore.projects[paseudoTrinity.index[0]].correlation_version : NaN;
+        results.event_model_version       = paseudoTrinity.index[0] !== null ? LCCore.projects[paseudoTrinity.index[0]].correlation_version : NaN;
+        results.age_model_version         = LCAge.AgeModels[ageIdx] !== undefined ? LCAge.AgeModels[ageIdx].version : NaN;
+        results.description               = "Converted from Event Free Depth. The trinity and CD are paseudo data.";
+        results.source_type = type;
+        results.calc_type = "paseudo-depth";
+      } else if (type == "drilling_depth") {
+        //NOT RECOMMENDED!!
+        //get cd
+        const name = data[0];
+        const dd = parseFloat(data[1]);
+        const targetId = data[2];
+
+        //convertion from drilling depth must be targetId.
+        if (targetId[0] == null || targetId[1] == null || targetId[2] == null){
+          continue;
+        }
+
+        //get nearest trinity
+        const paseudoTrinity = LCCore.getNearestTrinity(targetId, dd, "drilling_depth");
+        let send_data = [];
+        let td = new Trinity();
+        td.name         = name;
+        td.project_name = paseudoTrinity.project;
+        td.hole_name    = paseudoTrinity.hole;
+        td.section_name = paseudoTrinity.section;
+        td.distance     = paseudoTrinity.distance;
+        send_data.push(td);
+
+        //calc cd
+        const cd_list = LCCore.getDepthFromTrinity(targetId, send_data, "composite_depth"); //output:[sec id, cd]
+        const cd = cd_list[0][1];
+
+        //calc efd
+        const efd_list = LCCore.getDepthFromTrinity(targetId, send_data, "event_free_depth"); //output:[sec id, efd]
+        const efd = efd_list[0][1];
+        const new_rank = efd_list[0][2];
+
+        //calc age
+        const ageData = LCAge.getAgeFromEFD(efd, method);
+        const age = ageData.age;
+        const ageIdx = ageData.age_idx;
+
+        //stack
+        results.name = name;
+        results.hole = paseudoTrinity[0] !== null ? paseudoTrinity[0] : NaN;
+        results.section = paseudoTrinity[1] !== null ? paseudoTrinity[1] : NaN;
+        results.distance = paseudoTrinity[2] !== null ? paseudoTrinity[2] : NaN;
+        results.cd = cd !== null ? cd : NaN;
+        results.efd = efd !== null ? efd : NaN;
+        results.dd  = dd !== null ? dd : NaN;
+        results.age_mid = age.mid !== null ? age.mid : NaN;
+        results.age_upper = age.upper !== null ? age.upper : NaN;
+        results.age_lower = age.lower !== null ? age.lower : NaN;
+        results.section_type = paseudoTrinity.section_type !== null ? paseudoTrinity.section_type : "";
+        results.correlation_rank = 3;
+        results.correlation_model_version = paseudoTrinity.index[0] !== null ? LCCore.projects[paseudoTrinity.index[0]].correlation_version : NaN;
+        results.event_model_version       = paseudoTrinity.index[0] !== null ? LCCore.projects[paseudoTrinity.index[0]].correlation_version : NaN;
+        results.age_model_version         = LCAge.AgeModels[ageIdx] !== undefined ? LCAge.AgeModels[ageIdx].version : NaN;
+        results.description               = "NOT RECOMMENDED! Converted from Drilling Depth. The trinity, CD, EFD amd Age are paseudo data.";
+        results.source_type = type;
+        results.calc_type = "paseudo-depth";
+      } else if (type == "age") {
+        //get efd
+        const name = data[0];
+        const age = parseFloat(data[1]);
+        const targetId = data[2];
+
+        //calc efd
+        const efdData = LCAge.getEFDFromAge(age, method);
+        const efd = efdData.efd.mid;
+
+        //get paseudo cd
+        const cd = LCCore.getCDfromEFD(efd);
+
+        //re-calc age
+        const rage = LCAge.getAgeFromEFD(efd, method);
+
+        //get nearest trinity
+        const paseudoTrinity = LCCore.getNearestTrinity(targetId, efd, "composite_depth");
+
+        //get age model idx
+        let ageIdx = null;
+        LCAge.AgeModels.forEach((a, s) => {
+          if (a.id == LCAge.selected_id) {
+            ageIdx = s;
+          }
+        });
+
+        //stack
+        results.name = name;
+        results.project = paseudoTrinity.project !== null ? paseudoTrinity.project : NaN;
+        results.hole = paseudoTrinity.hole !== null ? paseudoTrinity.hole : NaN;
+        results.section = paseudoTrinity.section !== null ? paseudoTrinity.section : NaN;
+        results.distance = paseudoTrinity.distance !== null ? paseudoTrinity.distance : NaN;
+        results.cd = cd !== null ? cd : NaN;
+        results.efd = efd !== null ? efd : NaN;
+        results.dd  = NaN;
+        results.age_mid = rage.age.mid !== null ? rage.age.mid : NaN;
+        results.age_upper = rage.age.upper !== null ? rage.age.upper : NaN;
+        results.age_lower = rage.age.lower !== null ? rage.age.lower : NaN;
+        results.section_type = paseudoTrinity.section_type !== null ? paseudoTrinity.section_type : "";
+        results.correlation_rank = 3;
+        results.correlation_model_version = paseudoTrinity.index[0] !== null ? LCCore.projects[paseudoTrinity.index[0]].correlation_version : NaN;
+        results.event_model_version       = paseudoTrinity.index[0] !== null ? LCCore.projects[paseudoTrinity.index[0]].correlation_version : NaN;
+        results.age_model_version         = LCAge.AgeModels[ageIdx] !== undefined ? LCAge.AgeModels[ageIdx].version : NaN;
+        results.description               = "Converted from Age. The trinity and CD are paseudo data.";
+        results.source_type = type;
+        results.calc_type = "paseudo-depth";
+      } else {
+        results = null;
+      }
+
+      resultList.push(results);
+    }
+
+    if(progressBar!==null){
+      //progressBar   = await updateProgress(progressBar, 1, 1);
+      progressBar.close();
+      progressBar = null;
+    }
+
+    return resultList;
+  }
+  
   function checkChanges(currentLCCore, beforeLCCore){
     let changedIds = [];
     beforeLCCore.projects.forEach((project,p)=>{
@@ -3708,8 +4065,6 @@ function createMainWIndow() {
     
     return changedIds;
   }
-  
-
   function initialiseLCCore(){
     let newLCCore = new LevelCompilerCore();
 
@@ -3978,7 +4333,21 @@ function createMainWIndow() {
                     //mainWindow.webContents.send("UpdateViewFromMain"); 
                   }
                 },
-              },            
+              },
+              { type: "separator" },      
+              {
+                label:"Reload",
+                accelerator: "CmdOrCtrl+R",
+                click: () =>{
+                  if (isDev == false){
+                    if(LCCore.base_project_id==null){
+                      return
+                    }
+                  }
+
+                  mainWindow.webContents.send("ReloadMenuClicked", null);
+                }
+              },      
             ],
           },
           {
@@ -4328,6 +4697,40 @@ function createMainWIndow() {
               }
             }
           },
+          { type: "separator" },   
+          {
+            label:"Zoom",
+            submenu:[
+              {
+                label: "Zoomin",
+                //accelerator: "CmdOrCtrl+S",
+                click: async () => {
+                  mainWindow.webContents.send("ZoominMenuClicked");
+                }
+              },
+              {
+                label: "Zoom default",
+                //accelerator: "CmdOrCtrl+S",
+                click: async () => {
+                  mainWindow.webContents.send("ZoomdefaultMenuClicked");
+                }
+              },
+              {
+                label: "Zoomout",
+                //accelerator: "CmdOrCtrl+S",
+                click: async () => {
+                  mainWindow.webContents.send("ZoomoutMenuClicked");
+                }
+              },
+              {
+                label: "Zoom actual scale",
+                //accelerator: "CmdOrCtrl+S",
+                click: async () => {
+                  mainWindow.webContents.send("ZoomactualMenuClicked");
+                }
+              },
+            ]
+          },            
           { type: "separator" },
           {
             label: "Unload all models",
@@ -4469,6 +4872,7 @@ function createMainWIndow() {
               plotWindow = new BrowserWindow({
                 title: "Plotter",
                 parent:mainWindow,
+                //resizable: false,
                 width: 340,//full: 900
                 height: 600,
                 webPreferences: {preload: path.join(__dirname, "preload", "preload_plotter.js"),},
@@ -4499,7 +4903,8 @@ function createMainWIndow() {
                     click: () => {
                       plotWindow.webContents.send("PlotterCleared", "");    
                     },
-                  },
+                  }
+                  /*,
                   { type: "separator" },
                   {
                     label:"Export",
@@ -4507,6 +4912,7 @@ function createMainWIndow() {
                       plotWindow.webContents.send("PlotterExport", "");
                     }
                   }
+                  */
                 ]);
 
               //plotWindow.setMenu(customMenu);
@@ -4531,7 +4937,26 @@ function createMainWIndow() {
               });
             },
           },
-          
+          { type: "separator" },   
+          {
+            label:"Sub-tools",
+            submenu:[
+              {
+                label: "Snapshot",
+                //accelerator: "CmdOrCtrl+S",
+                click: async () => {
+                  mainWindow.webContents.send("SnapshotMenuClicked");
+                }
+              },
+              {
+                label: "Measure",
+                //accelerator: "CmdOrCtrl+S",
+                click: async () => {
+                  mainWindow.webContents.send("MeasureMenuClicked");
+                }
+              }
+            ]
+          },          
           { type: "separator" },
           {
             label: "Developer tool",
@@ -4669,7 +5094,7 @@ async function getfile(window=null, title, ext) {
     }
     return null;
   } catch (err) {
-    console.log(err);
+    console.error(err);
     return null;
   }
 }
@@ -4825,7 +5250,58 @@ async function zipData(data) {
 }
 */
 
+function cvt2flat(depthConverterDataList){
+  const flatData = {
+    id: null,
+    name: null,
+    correlation_model_version:null,
+    age_model_version: null,
+    descriptions: null,
+    
+    header: [],
+    units: [],
+    rows: [],
+  };
 
+  //initialise
+  flatData.id   = null;
+  flatData.name = null;
+  flatData.correlation_model_version = depthConverterDataList[0].correlation_model_version;
+  flatData.age_model_version         = depthConverterDataList[0].age_model_version;
+  flatData.descriptions              = "";
+  
+  const dataHeader = depthConverterDataList[0].data_header;
+  flatData.header  = ["id","name","project","hole","section","distance","composite_depth","event_free_depth","drilling_depth","age","age_upper","age_lower", "source_depth_type",...dataHeader];
+  const dataUnits  = depthConverterDataList[0].data_units;
+  flatData.units   = ["","","","","","","","","","","","","",...dataUnits];
+
+  //data
+  for(let r=0; r<depthConverterDataList.length; r++){
+    const dt = depthConverterDataList[r];
+    const row = [
+      r,
+      dt.name,
+      dt.project,
+      dt.hole,
+      dt.section,
+      dt.distance,
+      dt.cd,
+      dt.efd,
+      dt.dd,
+      dt.age_mid,
+      dt.age_upper,
+      dt.age_lower,
+      dt.source_type,
+      ...dt.data_values//spread
+    ];
+
+    flatData.rows.push(row);
+  }
+
+  //unit
+
+  return flatData;
+}
 
 //--------------------------------------------------------------------------------------------------
 async function getDirectory(window=null, title) {
@@ -4901,37 +5377,40 @@ async function findFileInDir(in_path, fileName, type) {
   }
 }
 //--------------------------------------------------------------------------------------------------
-async function putcsvfile(window=null, filePath, data) {
-  dialog
-    .showSaveDialog(
+async function putcsvfile(window = null, filePath, data) {
+  try {
+    const { canceled, filePath: savePath } = await dialog.showSaveDialog(
       window,
       {
-      title: "Please select save path",
-      defaultPath: filePath !== null? filePath:app.getPath("desktop"),
-      buttonLabel: "Save",
-      filters: [{ name: "Csv Files", extensions: ["csv"] }],
-    })
-    .then((file) => {
-      if (!file.canceled && file.filePath) {
-        //convert array --> csv
-        const csv = stringify(data,{ record_delimiter: '\r\n' });
-        //const csvCRLF = csv.replace(/\r?\n/g, "\r\n");
-        fs.writeFileSync(file.filePath, csv);
+        title: "Please select save path",
+        defaultPath: filePath !== null ? filePath : app.getPath("desktop"),
+        buttonLabel: "Save",
+        filters: [{ name: "Csv Files", extensions: ["csv"] }],
       }
-    })
-    .catch((err) => {
-      const response = dialog.showMessageBoxSync(
-        window,
-        {
-          type: "error",
-          buttons: ["OK"],
-          title: "Info",
-          message: "Failed to save file.",
-          detail: err.message,
-        });
-        console.log(err);
+    );
+
+    if (canceled || !savePath) {
+      return { ok: false, reason: "canceled" };
+    }
+
+    const overwritten = fs.existsSync(savePath); // 上書きか新規かを判定
+    const csv = stringify(data, { record_delimiter: "\r\n" });
+    fs.writeFileSync(savePath, csv);
+
+    return { ok: true, filePath: savePath, overwritten };
+  } catch (err) {
+    dialog.showMessageBoxSync(window, {
+      type: "error",
+      buttons: ["OK"],
+      title: "Info",
+      message: "Failed to save file.",
+      detail: err.message,
     });
+    console.error(err);
+    return { ok: false, reason: "error", error: err };
+  }
 }
+
 //--------------------------------------------------------------------------------------------------
 async function putmodelfile(window, data, path) {
   try{

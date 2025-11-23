@@ -74,7 +74,7 @@ document.addEventListener("DOMContentLoaded", () => {
     objOpts.canvas.shift_x = 0; //[cm]
     objOpts.canvas.shift_y = 100; //[cm]
     objOpts.canvas.bottom_pad = 100; //[cm]
-    objOpts.canvas.buffer_depth = 0; //[cm]
+    objOpts.canvas.buffer_depth = 0; //[%]
     objOpts.canvas.background_colour = "#ffffff";//"#f4f5f7";//"#f7f7f7"//"#f8fbff";//"#fffdfa";//""white
     objOpts.canvas.target_horizon = false;
     objOpts.canvas.is_grid = false;
@@ -89,6 +89,7 @@ document.addEventListener("DOMContentLoaded", () => {
     objOpts.canvas.finder_y = 0;
     objOpts.canvas.age_precision = 0;
     objOpts.canvas.display_height = 20.2;
+    objOpts.canvas.is_draw_model = true;
   
     objOpts.project.interval = 1;
     objOpts.project.font = "Arial";
@@ -433,6 +434,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
             //load images
             modelImages = await loadCoreImages(modelImages, LCCore, objOpts, ["drilling_depth","composite_depth","event_free_depth","age"]);
+            document.getElementById("bt_core_photo").click();
             console.log(modelImages)
           }
 
@@ -451,7 +453,7 @@ document.addEventListener("DOMContentLoaded", () => {
       await window.LCapi.clearProgressbar()
       updateView();
     }catch(err){
-      console.log(err)
+      console.error(err)
       await window.LCapi.clearProgressbar()
       updateView();
     }
@@ -494,20 +496,37 @@ document.addEventListener("DOMContentLoaded", () => {
       updateView();
     });
     //============================================================================================
+  //show model
+  document.getElementById("bt_core_model").addEventListener("click", async (event) => {
+    if(LCCore){
+      if (objOpts.canvas.is_draw_model) {
+        objOpts.canvas.is_draw_model = false;
+        document.getElementById("bt_core_model").style.backgroundColor = "#f0f0f0";
+      } else {
+        objOpts.canvas.is_draw_model = true;
+        document.getElementById("bt_core_model").style.backgroundColor = "#ccc";
+      }
+      updateView();
+    }      
+    });
+    //============================================================================================
   //connection
   document.getElementById("bt_connection").addEventListener("click", async (event) => {
-    if (objOpts.canvas.is_connection) {
-      objOpts.canvas.is_connection = false;
-      document.getElementById("bt_connection").style.backgroundColor = "#f0f0f0";
-    } else {
-      objOpts.canvas.is_connection = true;
-      document.getElementById("bt_connection").style.backgroundColor = "#ccc";
-    }
-    updateView();
+    if(LCCore){
+      if (objOpts.canvas.is_connection) {
+        objOpts.canvas.is_connection = false;
+        document.getElementById("bt_connection").style.backgroundColor = "#f0f0f0";
+      } else {
+        objOpts.canvas.is_connection = true;
+        document.getElementById("bt_connection").style.backgroundColor = "#ccc";
+      }
+      updateView();
+    }    
   });
   //============================================================================================
   //show event layers
   document.getElementById("bt_event_layer").addEventListener("click", async (event) => {
+    if(LCCore){
       if (objOpts.canvas.is_event) {
         objOpts.canvas.is_event = false;
         document.getElementById("bt_event_layer").style.backgroundColor = "#f0f0f0";
@@ -516,6 +535,7 @@ document.addEventListener("DOMContentLoaded", () => {
         document.getElementById("bt_event_layer").style.backgroundColor = "#ccc";
       }
       updateView();
+    }      
     });
   //============================================================================================
   //show core images
@@ -536,6 +556,7 @@ document.addEventListener("DOMContentLoaded", () => {
   //============================================================================================
   //rank
   document.getElementById("bt_rank").addEventListener("click", async (event) => {
+    if(LCCore){
       if (objOpts.marker.is_rank) {
         objOpts.marker.is_rank = false;
         document.getElementById("bt_rank").style.backgroundColor = "#f0f0f0";
@@ -544,7 +565,8 @@ document.addEventListener("DOMContentLoaded", () => {
         document.getElementById("bt_rank").style.backgroundColor = "#ccc";
       }
       updateView();
-    });
+    }      
+  });
   //============================================================================================
   //grid
   document.getElementById("bt_grid").addEventListener("click", async (event) => {
@@ -870,7 +892,7 @@ document.addEventListener("DOMContentLoaded", () => {
           //-------numerator--------   
           const numeratorDataSeries   = [];          
           if(nIdx!==null){            
-            const numeratorDataset0     = drawPointDataset();     
+            const numeratorDataset0 = drawPointDataset();     
             numeratorDataset0.zoom_level = 0;     
             let val_min = Infinity;
             let val_max = - Infinity;
@@ -988,7 +1010,7 @@ document.addEventListener("DOMContentLoaded", () => {
       console.log("[Renderer]: Plot data is loaded.",LCPlotData)
       updateView();
     }catch(er){
-      console.log(er)
+      console.error(er)
     }    
   });
   //============================================================================================
@@ -3742,6 +3764,7 @@ document.addEventListener("DOMContentLoaded", () => {
   }
   
   window.LCapi.receive("SettingsData", async (data) => {
+    
     if(data == null){
       //set default
       objOpts = setupSettings();
@@ -3787,14 +3810,46 @@ document.addEventListener("DOMContentLoaded", () => {
       Object.assign(objOpts.pen, data.pen);
       Object.assign(objOpts.image, data.image); 
       Object.assign(objOpts.developer, data.developer); 
+
+      //important settings set to default
+      objOpts.canvas.is_draw_model = true;
+      objOpts.canvas.buffer_depth = 0;
+      objOpts.canvas.is_event = true;
+      objOpts.canvas.is_connection = true;
+      objOpts.canvas.is_grid = true;
+      objOpts.canvas.draw_core_photo = false;
+      objOpts.marker.show_name_labels = true;
+      objOpts.marker.show_distance_labels = true;
     }
     
-    console.log("[RENDERER]: Setting is updated.",data)
+    console.log("[RENDERER]: Setting is updated.",data,objOpts)
     updateView();
   });
 
+  //-------------------------------------------------------------------------------------------
   window.LCapi.receive("DividerMenuClicked", async () => {
     document.getElementById("bt_divider").click();
+  });
+  window.LCapi.receive("ReloadMenuClicked", async () => {
+    document.getElementById("bt_reload").click();
+  });
+  window.LCapi.receive("ZoominMenuClicked", async () => {
+    document.getElementById("bt_zoomin").click();
+  });
+  window.LCapi.receive("ZoomoutMenuClicked", async () => {
+    document.getElementById("bt_zoomout").click();
+  });
+  window.LCapi.receive("ZoomdefaultMenuClicked", async () => {
+    document.getElementById("bt_zoom0").click();
+  });
+  window.LCapi.receive("ZoomactualMenuClicked", async () => {
+    document.getElementById("bt_zoomactual").click();
+  });
+  window.LCapi.receive("SnapshotMenuClicked", async () => {
+    document.getElementById("bt_snapshot").click();
+  });
+  window.LCapi.receive("MeasureMenuClicked", async () => {
+    document.getElementById("bt_measure").click();
   });
   //============================================================================================
   window.LCapi.receive("footerLeft", async (data) => {
@@ -4193,6 +4248,10 @@ document.addEventListener("DOMContentLoaded", () => {
       document.getElementById("bt_finder").click();
     }
     
+    // Ctrl + g => grid
+    if (event.ctrlKey && event.key === "g") {
+      document.getElementById("bt_grid").click();
+    }
         
   });
   //============================================================================================
@@ -4362,6 +4421,9 @@ document.addEventListener("DOMContentLoaded", () => {
       const shift_x = objOpts.canvas.shift_x;
       const shift_y = objOpts.canvas.shift_y;
 
+      const scrollerTopRealScale   = (scroller.scrollTop - pad_y) / yMag - shift_y;//cm
+      const scrollerBotRealScale   = (scroller.scrollTop + window.innerHeight - pad_y) / yMag - shift_y;//cm
+      const bufferVal = (scrollerBotRealScale-scrollerTopRealScale) * objOpts.canvas.buffer_depth * yMag;
       
       //-----------------------------------------------------------------------------------------
       //draw grid
@@ -4405,6 +4467,7 @@ document.addEventListener("DOMContentLoaded", () => {
             age_mod = objOpts.canvas.age_zoom_correction[0];
           }
         } catch (err){
+          console.error(err)
           alert("An unexpected error has occurred. There may be a problem with the LC cache or temporary files.");
           return
         }
@@ -4430,7 +4493,6 @@ document.addEventListener("DOMContentLoaded", () => {
             return text;
           }
         };
-
         
         //ygrid downward from zero
         for (let y = gridStartY; y < gridMaxY; y += gridStepY) {
@@ -4440,7 +4502,7 @@ document.addEventListener("DOMContentLoaded", () => {
             width: gridMaxX - 120,
             height: 1,
           };
-          if (!isInside(view_rect, grid_rect, objOpts.canvas.buffer_depth * yMag)) {
+          if (!isInside(view_rect, grid_rect, bufferVal)) {
             continue;
           }
           //grid
@@ -4466,7 +4528,7 @@ document.addEventListener("DOMContentLoaded", () => {
             width: gridMaxX - 120,
             height: 1,
           };
-          if (!isInside(view_rect, grid_rect, objOpts.canvas.buffer_depth * yMag)) {
+          if (!isInside(view_rect, grid_rect, bufferVal)) {
             continue;
           }
 
@@ -4488,7 +4550,6 @@ document.addEventListener("DOMContentLoaded", () => {
         
       }
       //-----------------------------------------------------------------------------------------
-
       //initialise
       //draw finder target line
       if(finderEnable){        
@@ -4539,102 +4600,104 @@ document.addEventListener("DOMContentLoaded", () => {
             );
       }
 
+      //========================================================================================== 
+      //========================================================================================== 
       //main
-      let isBbaseProjectMaster = false;
+      let isBaseProjectMaster = false;
       const baseProjectIdx = getIdxById(LCCore, LCCore.base_project_id);
       //console.log(LCCore.base_project_id, baseProjectIdx) 
       if(LCCore.projects[baseProjectIdx[0]].model_type == "correlation"){
-        isBbaseProjectMaster = true;
+        isBaseProjectMaster = true;
       }      
 
       let num_disable = {total: 0, hole: 0};
       for (let p = 0; p < LCCore.projects.length; p++) {
         //make project objects===================================================================================
         const project = LCCore.projects[p];
-        
-        //get position
-        let prj_num_enable_right = 0;
-              
-        project.holes.forEach(hc=>{
-          if(hc.enable){
-            prj_num_enable_right++;
-          }
-        })
-        
-        let prj_num_enable_left = 0;
-        LCCore.projects.filter(p=>p.order<project.order).forEach(p=>p.holes.forEach(h=>{if(h.enable){prj_num_enable_left++;}}))
-        prj_num_enable_left += objOpts.project.interval * project.order;
 
-        const prj_padx = objOpts.project.pad_x;//objOpts.hole.distance * xMag;
-        const prj_pady = objOpts.project.pad_y;
-        const project_x0 = -prj_padx + ((objOpts.section.width + objOpts.hole.distance) * prj_num_enable_left + shift_x) * xMag + pad_x;
-        const project_y0 = -prj_pady + (shift_y) * yMag + pad_y;
-        let project_w  = prj_padx/2 + (objOpts.section.width + objOpts.hole.distance) * (prj_num_enable_right-1) * xMag + pad_x;
-        if(project_w<=0){
-          project_w = 100;
-        }
-        let project_h = 1000;
-        if(project.composite_depth_bottom !== null &&  project.composite_depth_top !== null){
-          project_h = 2*prj_pady + (project.composite_depth_bottom - project.composite_depth_top) * yMag;
-        }        
+
+        if(objOpts.canvas.is_draw_model){
+          //get position
+          let prj_num_enable_right = 0;
                 
-        if(project.enable == true){
-          //show project name
-          let projectDispName = project.name; 
-          if(["root"].includes(objOpts.developer.mode)){
-            projectDispName = project.id[0].slice(0,5);
-          }
+          project.holes.forEach(hc=>{
+            if(hc.enable){
+              prj_num_enable_right++;
+            }
+          })
           
-          sketch.drawingContext.setLineDash([]);
-          sketch.fill(objOpts.project.font_colour);
-          sketch.stroke(objOpts.project.font_colour);
-          sketch.strokeWeight(2);
-          sketch.textFont(objOpts.project.font);
-          sketch.textSize(objOpts.project.font_size);
-          sketch.text(
-            projectDispName,
-            project_x0 + 40,
-            project_y0 + 40,
-          ); 
+          let prj_num_enable_left = 0;
+          LCCore.projects.filter(p=>p.order<project.order).forEach(p=>p.holes.forEach(h=>{if(h.enable){prj_num_enable_left++;}}))
+          prj_num_enable_left += objOpts.project.interval * project.order;
 
-          //show project area
-          if(objOpts.project.is_show_area){
-            sketch.push();//save
-            //check connection to base correlation model
-            if(isBbaseProjectMaster && includesString(project, LCCore.base_project_id[0])){
-              //connected master model
-              sketch.fill(objOpts.project.area_colour+"50");//HEX+alpha rate                            
-            }else{
-              //disconnected master model
-              sketch.fill(objOpts.project.area_colour_disconnected+"50");//HEX+alpha rate
-            }            
-            sketch.noStroke();
+          const prj_padx = objOpts.project.pad_x;//objOpts.hole.distance * xMag;
+          const prj_pady = objOpts.project.pad_y;
+          const project_x0 = -prj_padx + ((objOpts.section.width + objOpts.hole.distance) * prj_num_enable_left + shift_x) * xMag + pad_x;
+          const project_y0 = -prj_pady + (shift_y) * yMag + pad_y;
+          let project_w  = prj_padx/2 + (objOpts.section.width + objOpts.hole.distance) * (prj_num_enable_right-1) * xMag + pad_x;
+          if(project_w<=0){
+            project_w = 100;
+          }
+          let project_h = 1000;
+          if(project.composite_depth_bottom !== null &&  project.composite_depth_top !== null){
+            project_h = 2*prj_pady + (project.composite_depth_bottom - project.composite_depth_top) * yMag;
+          }        
+                  
+          if(project.enable == true){
+            //show project name
+            let projectDispName = project.name; 
+            if(["root"].includes(objOpts.developer.mode)){
+              projectDispName = project.id[0].slice(0,5);
+            }
             
-            sketch.rect(project_x0, project_y0, project_w, project_h, 5, 5, 5, 5); //rounded
-            sketch.pop();
-          }          
+            sketch.drawingContext.setLineDash([]);
+            sketch.fill(objOpts.project.font_colour);
+            sketch.stroke(objOpts.project.font_colour);
+            sketch.strokeWeight(2);
+            sketch.textFont(objOpts.project.font);
+            sketch.textSize(objOpts.project.font_size);
+            sketch.text(
+              projectDispName,
+              project_x0 + 40,
+              project_y0 + 40,
+            ); 
 
+            //show project area
+            if(objOpts.project.is_show_area){
+              sketch.push();//save
+              //check connection to base correlation model
+              if(isBaseProjectMaster && includesString(project, LCCore.base_project_id[0])){
+                //connected master model
+                sketch.fill(objOpts.project.area_colour+"50");//HEX+alpha rate                            
+              }else{
+                //disconnected master model
+                sketch.fill(objOpts.project.area_colour_disconnected+"50");//HEX+alpha rate
+              }            
+              sketch.noStroke();
+              
+              sketch.rect(project_x0, project_y0, project_w, project_h, 5, 5, 5, 5); //rounded
+              sketch.pop();
+            }          
 
-
-
-          //live hittest
-          if(objOpts.edit.hittest){
-            //console.log(objOpts.edit.hittest.project, objOpts.edit.hittest.hole)
-            if(["add_hole","delete_project","change_project_name","move_hole_to_project"].includes(objOpts.edit.mode)){
-              if(objOpts.edit.hittest.project == project.id[0]){
-                
-                sketch.push();//save
-                sketch.fill(0,0,0,0);
-                sketch.strokeWeight(3);
-                sketch.stroke("#ff0000");
-                
-                sketch.rect(project_x0, project_y0, project_w, project_h, 3, 3, 3, 3); //rounded
-                sketch.pop();
+            //live hittest
+            if(objOpts.edit.hittest){
+              //console.log(objOpts.edit.hittest.project, objOpts.edit.hittest.hole)
+              if(["add_hole","delete_project","change_project_name","move_hole_to_project"].includes(objOpts.edit.mode)){
+                if(objOpts.edit.hittest.project == project.id[0]){
+                  
+                  sketch.push();//save
+                  sketch.fill(0,0,0,0);
+                  sketch.strokeWeight(3);
+                  sketch.stroke("#ff0000");
+                  
+                  sketch.rect(project_x0, project_y0, project_w, project_h, 3, 3, 3, 3); //rounded
+                  sketch.pop();
+                }
               }
             }
           }
         }
-                
+                        
         for (let h = 0; h < LCCore.projects[p].holes.length; h++) {
           //make hole objects===================================================================================
           //load hole data
@@ -4671,7 +4734,7 @@ document.addEventListener("DOMContentLoaded", () => {
             scroller.scrollTop + pad_y - 20,
             //(hole_top + shift_y) * yMag + pad_y - 20
           );
-
+          
           //check position --------------------------------------------------
           // draw empty hole line
           if (hole_top == null && hole_bottom == null) { 
@@ -4696,571 +4759,545 @@ document.addEventListener("DOMContentLoaded", () => {
             sketch.pop();
           }
 
-          //get plot order for hit test--------------------------------------
+          if(objOpts.canvas.is_draw_model){
+            //get plot order for hit test--------------------------------------
+            let section_plot_order = [];
+            for (let i = 0; i < hole.sections.length; i++) {
+              section_plot_order.push(i);
+            }
 
-          let section_plot_order = [];
-          for (let i = 0; i < hole.sections.length; i++) {
-            section_plot_order.push(i);
-          }
-
-          //show live hitttest
-          if(objOpts.edit.hittest){
-            if(objOpts.edit.hittest.project == hole.id[0] && objOpts.edit.hittest.hole == hole.id[1]){
-              if(["change_hole_name","delete_hole","add_section"].includes(objOpts.edit.mode)){
-                let hole_bottom_e = null;
-                if(hole_bottom == null){
-                  if(project.composite_depth_bottom !== null){
-                    hole_bottom_e = project.composite_depth_bottom;
+            //show live hitttest
+            if(objOpts.edit.hittest){
+              if(objOpts.edit.hittest.project == hole.id[0] && objOpts.edit.hittest.hole == hole.id[1]){
+                if(["change_hole_name","delete_hole","add_section"].includes(objOpts.edit.mode)){
+                  let hole_bottom_e = null;
+                  if(hole_bottom == null){
+                    if(project.composite_depth_bottom !== null){
+                      hole_bottom_e = project.composite_depth_bottom;
+                    }else{
+                      hole_bottom_e = 1000;
+                    }
+                    
                   }else{
-                    hole_bottom_e = 1000;
+                    hole_bottom_e = hole_bottom;
                   }
                   
-                }else{
-                  hole_bottom_e = hole_bottom;
-                }
-                
-                sketch.push();//save
-                sketch.fill(0,0,0,0);
-                sketch.strokeWeight(3);
-                sketch.stroke("#ff0000");
-                const hole_ht_x0 = (hole_x0 + shift_x) * xMag + pad_x - 3;
-                const hole_ht_y0 = (hole_top + shift_y) * yMag + pad_y - 3;
-                const hole_ht_w  = objOpts.section.width * xMag + 6;
-                const hole_ht_h  = (hole_bottom_e - hole_top) * yMag + 6;
-                //console.log(hole_ht_x0,hole_ht_y0,hole_ht_w,hole_ht_h)
-                sketch.rect(hole_ht_x0, hole_ht_y0, hole_ht_w, hole_ht_h, 3, 3, 3, 3); //rounded
-                sketch.pop();
-              }
-            }
-          }
-
-          for (let s_o = 0; s_o < hole.sections.length; s_o++) {
-            const s = section_plot_order[s_o];
-
-            //make section objects===================================================================================
-            //load section data
-            const section = hole.sections[s];
-            
-            //calc position----------------------------------------------------
-            let section_top = section.markers[0][objOpts.canvas.depth_scale];
-            let section_bottom =
-              section.markers.slice(-1)[0][objOpts.canvas.depth_scale];
-            let section_mid = (section_top + section_bottom) / 2;
-
-            //check position
-            if (section_top == null || section_bottom == null) {
-              //console.log(  h +" th hole, " +  s +   " th section has any problem in the position."      );
-              continue;
-            }
-
-            //calc position
-            const sec_x0 = (hole_x0 + shift_x) * xMag + pad_x;
-            const sec_y0 = (section_top + shift_y) * yMag + pad_y;
-            const sec_w = objOpts.section.width * xMag;
-            const sec_h = (section_bottom - section_top) * yMag;
-            const sec_rect = {
-              x: sec_x0,
-              y: sec_y0,
-              width: sec_w,
-              height: sec_h,
-            };
-
-            //draw section-----------------------------------------------------
-            if (!isInside(view_rect, sec_rect, objOpts.canvas.buffer_depth * yMag)) {
-              continue;
-            }
-            //sketch.drawingContext.setLineDash([]);
-            sketch.strokeWeight(objOpts.section.line_width);
-            sketch.stroke(objOpts.section.line_colour);
-            sketch.fill(objOpts.section.face_colour);
-
-            //hittest
-            if(objOpts.edit.hittest){
-              if(["change_section_name","delete_section","connect_section", "disconnect_section"].includes(objOpts.edit.mode)){
-                if(objOpts.edit.hittest.hole == hole.id[1] && objOpts.edit.hittest.section == section.id[2]){
+                  sketch.push();//save
+                  sketch.fill(0,0,0,0);
                   sketch.strokeWeight(3);
                   sketch.stroke("#ff0000");
-                }               
+                  const hole_ht_x0 = (hole_x0 + shift_x) * xMag + pad_x - 3;
+                  const hole_ht_y0 = (hole_top + shift_y) * yMag + pad_y - 3;
+                  const hole_ht_w  = objOpts.section.width * xMag + 6;
+                  const hole_ht_h  = (hole_bottom_e - hole_top) * yMag + 6;
+                  //console.log(hole_ht_x0,hole_ht_y0,hole_ht_w,hole_ht_h)
+                  sketch.rect(hole_ht_x0, hole_ht_y0, hole_ht_w, hole_ht_h, 3, 3, 3, 3); //rounded
+                  sketch.pop();
+                }
               }
             }
-            //if selected
-            if(objOpts.edit.section_from !== null){
-              if(objOpts.edit.section_from.project == section.id[0] && objOpts.edit.section_from.hole == section.id[1] && objOpts.edit.section_from.section == section.id[2]){
-                sketch.strokeWeight(3);
-                sketch.stroke("#008000");
-              }
-            }
-            
-            
-            sketch.rect(sec_x0, sec_y0, sec_w, sec_h, 3, 3, 3, 3); //rounded
 
-            //check zoom level for ignoring plot markers
-            if (objOpts.canvas.zoom_level[1] < objOpts.marker.ignore_zoom_level) {
-              continue;
-            }
+            for (let s_o = 0; s_o < hole.sections.length; s_o++) {
+              const s = section_plot_order[s_o];
 
-            //add section photo-------------------------------------------------
-             let isPhtoExist = false;
-            if (objOpts.canvas.draw_core_photo) {
-              try {
-                let ptoto_depth_scale;
-                  ptoto_depth_scale = objOpts.canvas.depth_scale;
-               
-                if (modelImages[ptoto_depth_scale][hole.name + "-" + section.name] !== undefined) {
-                  isPhtoExist = true;
-                }
-
-                if (isPhtoExist) {
-                  try {
-                    const img = modelImages[ptoto_depth_scale][hole.name + "-" + section.name];
-                    sketch.image(
-                      img,
-                      sec_x0,
-                      sec_y0,
-                      sec_w,
-                      sec_h
-                    );
-                    if(objOpts.canvas.draw_core_photo_plot && modelImages.plot_colour[hole.name + "-" + section.name]){
-                      const getWidth = 10;
-                      const scanWidth = (getWidth*2)+1;
-                      const imCx = img.width / 2;
-                      const px = img.get(imCx-getWidth, 0, scanWidth, img.height);
-                      px.loadPixels();
-
-                      sketch.noFill();
-                      sketch.stroke(objOpts.canvas.photo_plot_colour); sketch.beginShape(); 
-                      
-                      for (let y = 0; y < img.height; y++) {
-                        let rSum = 0, gSum = 0, bSum = 0;
-
-                        for (let x = 0; x < scanWidth; x++) {
-                          const i = (y * scanWidth+ x) * 4;
-                          rSum += px.pixels[i];
-                          gSum += px.pixels[i + 1];
-                          bSum += px.pixels[i + 2];
-                        }
-
-                        const rAvg = rSum / scanWidth;
-                        const gAvg = gSum / scanWidth
-                        const bAvg = bSum / scanWidth;
-
-                        const L = (0.2126 * rAvg + 0.7152 * gAvg + 0.0722 * bAvg) * (100 / 255);
-
-                        const impy = sec_y0 + (y /img.height) *  sec_h;
-                        const impx = sec_x0 + (L / 100) * sec_w
-
-                        sketch.stroke(objOpts.canvas.photo_plot_colour); sketch.vertex(impx, impy);
-                      }
-                      sketch.endShape();
-
-                    }
-                  } catch (error) {
-                    console.error(error);
-                    console.log(modelImages[ptoto_depth_scale][hole.name + "-" + section.name]);
-                  }
-                }
-              } catch (err) {}
-            }
-
-            //add section name-------------------------------------------------
-            let secDispName = hole.name + "-" + section.name; 
-            if(["root"].includes(objOpts.developer.mode)){
-              secDispName = section.id[2].slice(0,5);
-            }
-
-            sketch.fill(objOpts.section.font_colour);
-            sketch.noStroke();
-            sketch.textFont(objOpts.section.font);
-            sketch.textSize(objOpts.section.font_size); 
-            sketch.push();
-            sketch.translate(
-              (hole_x0 + shift_x) * xMag + pad_x + objOpts.section.font_pos_x, //-10
-              (section_mid + shift_y) * yMag + pad_y + sketch.textWidth(secDispName)/2
-            );
-            sketch.rotate((objOpts.section.font_angle / 180) * Math.PI);
-            sketch.text(secDispName, 0, 0);
-            sketch.pop();
-            
-            //make marker objects=================================================================================
-            let msaterDirection = "none";
-            for (let m = 0; m < section.markers.length; m++) {
-              //load marker data
-              const marker = section.markers[m];
-              let markerLineColour = objOpts.marker.line_colour;
-
-              //calc marker position
-              let marker_top = marker[objOpts.canvas.depth_scale];
+              //make section objects===================================================================================
+              //load section data
+              const section = hole.sections[s];
+              
+              //calc position----------------------------------------------------
+              let section_top = section.markers[0][objOpts.canvas.depth_scale];
+              let section_bottom =
+                section.markers.slice(-1)[0][objOpts.canvas.depth_scale];
+              let section_mid = (section_top + section_bottom) / 2;
 
               //check position
-              if (marker_top == null) {
-                //console.log(  h + " th hole, " + s + " th section, " +  m + " th marker position has any problem."  );
+              if (section_top == null || section_bottom == null) {
+                //console.log(  h +" th hole, " +  s +   " th section has any problem in the position."      );
+                continue;
               }
 
-              //first, draw event
-              let ew = 1;
-              if (!objOpts.canvas.is_event) {
-                ew = objOpts.event.folded_width;
+              //calc position
+              const sec_x0 = (hole_x0 + shift_x) * xMag + pad_x;
+              const sec_y0 = (section_top + shift_y) * yMag + pad_y;
+              const sec_w = objOpts.section.width * xMag;
+              const sec_h = (section_bottom - section_top) * yMag;
+              const sec_rect = {
+                x: sec_x0,
+                y: sec_y0,
+                width: sec_w,
+                height: sec_h,
+              };
+
+              //draw section-----------------------------------------------------
+              if (!isInside(view_rect, sec_rect, objOpts.canvas.buffer_depth * yMag)) {
+                continue;
               }
-              
-              for (let e = 0; e < marker.event.length; e++) {
-                //make marker objects=================================================================================
-                //get position
-                const event = marker.event[e];
+              //sketch.drawingContext.setLineDash([]);
+              sketch.strokeWeight(objOpts.section.line_width);
+              sketch.stroke(objOpts.section.line_colour);
+              sketch.fill(objOpts.section.face_colour);
 
-                const [lowerDepth, eventThickness] = getEventPosiotion(
-                  LCCore,
-                  event,
-                  marker_top,
-                  objOpts
-                );
-
-                //draw event layers
-
-                if (lowerDepth !== null) {
-                  sketch.fill(objOpts.event.face_colour[event[3]]);
-                  sketch.noStroke();
-                  sketch.stroke(objOpts.event.face_colour[event[3]]);
-                  sketch.rect(
-                    (hole_x0 + shift_x) * xMag + pad_x + (objOpts.section.line_width+2)/2,
-                    (lowerDepth + shift_y) * yMag + pad_y,
-                    objOpts.section.width * ew * xMag - objOpts.section.line_width-2,
-                    eventThickness * yMag * objOpts.event.face_height,
-                    1,1,1,1 //rounded option
-                  );
+              //hittest
+              if(objOpts.edit.hittest){
+                if(["change_section_name","delete_section","connect_section", "disconnect_section"].includes(objOpts.edit.mode)){
+                  if(objOpts.edit.hittest.hole == hole.id[1] && objOpts.edit.hittest.section == section.id[2]){
+                    sketch.strokeWeight(3);
+                    sketch.stroke("#ff0000");
+                  }               
+                }
+              }
+              //if selected
+              if(objOpts.edit.section_from !== null){
+                if(objOpts.edit.section_from.project == section.id[0] && objOpts.edit.section_from.hole == section.id[1] && objOpts.edit.section_from.section == section.id[2]){
+                  sketch.strokeWeight(3);
+                  sketch.stroke("#008000");
                 }
               }
               
-              //live hittest
-              if(objOpts.edit.hittest){
-                if(["add_event","delete_event"].includes(objOpts.edit.mode)){
-                  const uid = [objOpts.edit.hittest.project, objOpts.edit.hittest.hole, objOpts.edit.hittest.section, objOpts.edit.hittest.upper_marker];
-                  const lid = [objOpts.edit.hittest.project, objOpts.edit.hittest.hole, objOpts.edit.hittest.section, objOpts.edit.hittest.lower_marker];
-                  if(marker.id.toString() == lid.toString()){
-                    const upper_depth = section.markers.filter((m)=>m.id.toString()==uid.toString())[0][objOpts.canvas.depth_scale];
-                    const lower_depth = marker[objOpts.canvas.depth_scale];
-                    sketch.push()
-                    sketch.noFill();
-                    sketch.stroke("#ff0000");
-                    sketch.strokeWeight(3);
+              
+              sketch.rect(sec_x0, sec_y0, sec_w, sec_h, 3, 3, 3, 3); //rounded
+
+              //check zoom level for ignoring plot markers
+              if (objOpts.canvas.zoom_level[1] < objOpts.marker.ignore_zoom_level) {
+                continue;
+              }
+
+              //add section photo-------------------------------------------------
+              let isPhtoExist = false;
+              if (objOpts.canvas.draw_core_photo) {
+                try {
+                  let ptoto_depth_scale;
+                    ptoto_depth_scale = objOpts.canvas.depth_scale;
+                
+                  if (modelImages[ptoto_depth_scale][hole.name + "-" + section.name] !== undefined) {
+                    isPhtoExist = true;
+                  }
+
+                  if (isPhtoExist) {
+                    try {
+                      const img = modelImages[ptoto_depth_scale][hole.name + "-" + section.name];
+                      sketch.image(
+                        img,
+                        sec_x0,
+                        sec_y0,
+                        sec_w,
+                        sec_h
+                      );
+                      if(objOpts.canvas.draw_core_photo_plot && modelImages.plot_colour[hole.name + "-" + section.name]){
+                        const getWidth = 10;
+                        const scanWidth = (getWidth*2)+1;
+                        const imCx = img.width / 2;
+                        const px = img.get(imCx-getWidth, 0, scanWidth, img.height);
+                        px.loadPixels();
+
+                        sketch.noFill();
+                        sketch.stroke(objOpts.canvas.photo_plot_colour); sketch.beginShape(); 
+                        
+                        for (let y = 0; y < img.height; y++) {
+                          let rSum = 0, gSum = 0, bSum = 0;
+
+                          for (let x = 0; x < scanWidth; x++) {
+                            const i = (y * scanWidth+ x) * 4;
+                            rSum += px.pixels[i];
+                            gSum += px.pixels[i + 1];
+                            bSum += px.pixels[i + 2];
+                          }
+
+                          const rAvg = rSum / scanWidth;
+                          const gAvg = gSum / scanWidth
+                          const bAvg = bSum / scanWidth;
+
+                          const L = (0.2126 * rAvg + 0.7152 * gAvg + 0.0722 * bAvg) * (100 / 255);
+
+                          const impy = sec_y0 + (y /img.height) *  sec_h;
+                          const impx = sec_x0 + (L / 100) * sec_w
+
+                          sketch.stroke(objOpts.canvas.photo_plot_colour); sketch.vertex(impx, impy);
+                        }
+                        sketch.endShape();
+
+                      }
+                    } catch (error) {
+                      console.error(error);
+                      console.log(modelImages[ptoto_depth_scale][hole.name + "-" + section.name]);
+                    }
+                  }
+                } catch (err) {
+                  console.error(err)
+                }
+              }
+
+              //add section name-------------------------------------------------
+              let secDispName = hole.name + "-" + section.name; 
+              if(["root"].includes(objOpts.developer.mode)){
+                secDispName = section.id[2].slice(0,5);
+              }
+
+              sketch.fill(objOpts.section.font_colour);
+              sketch.noStroke();
+              sketch.textFont(objOpts.section.font);
+              sketch.textSize(objOpts.section.font_size); 
+              sketch.push();
+              sketch.translate(
+                (hole_x0 + shift_x) * xMag + pad_x + objOpts.section.font_pos_x, //-10
+                (section_mid + shift_y) * yMag + pad_y + sketch.textWidth(secDispName)/2
+              );
+              sketch.rotate((objOpts.section.font_angle / 180) * Math.PI);
+              sketch.text(secDispName, 0, 0);
+              sketch.pop();
+              
+              //make marker objects=================================================================================
+              let msaterDirection = "none";
+              for (let m = 0; m < section.markers.length; m++) {
+                //load marker data
+                const marker = section.markers[m];
+                let markerLineColour = objOpts.marker.line_colour;
+
+                //calc marker position
+                let marker_top = marker[objOpts.canvas.depth_scale];
+
+                //check position
+                if (marker_top == null) {
+                  //console.log(  h + " th hole, " + s + " th section, " +  m + " th marker position has any problem."  );
+                }
+
+                //first, draw event
+                let ew = 1;
+                if (!objOpts.canvas.is_event) {
+                  ew = objOpts.event.folded_width;
+                }
+                
+                for (let e = 0; e < marker.event.length; e++) {
+                  //make marker objects=================================================================================
+                  //get position
+                  const event = marker.event[e];
+
+                  const [lowerDepth, eventThickness] = getEventPosiotion(
+                    LCCore,
+                    event,
+                    marker_top,
+                    objOpts
+                  );
+
+                  //draw event layers
+
+                  if (lowerDepth !== null) {
+                    sketch.fill(objOpts.event.face_colour[event[3]]);
+                    sketch.noStroke();
+                    sketch.stroke(objOpts.event.face_colour[event[3]]);
                     sketch.rect(
-                      (hole_x0 + shift_x) * xMag + pad_x + 3,
-                      (upper_depth + shift_y) * yMag + pad_y,
-                      objOpts.section.width * ew * xMag - 6,
-                      ((lower_depth-upper_depth)) * yMag,
+                      (hole_x0 + shift_x) * xMag + pad_x + (objOpts.section.line_width+2)/2,
+                      (lowerDepth + shift_y) * yMag + pad_y,
+                      objOpts.section.width * ew * xMag - objOpts.section.line_width-2,
+                      eventThickness * yMag * objOpts.event.face_height,
                       1,1,1,1 //rounded option
                     );
-                    sketch.pop()
                   }
                 }
-              }
-
-              //make marker objects=================================================================================
-              // remove top and bottom markers
-              let topBot = 0;
-              if (m == 0 || m == section.markers.length - 1) {
-                topBot -= objOpts.marker.width * xMag; //or +20
-              }
-              //draw markers
-              sketch.drawingContext.setLineDash([]);
-              sketch.strokeWeight(objOpts.marker.line_width);
-              if(objOpts.canvas.draw_core_photo){
-                sketch.stroke("Magenta"); //(markerLineColour);
-              }else{
-                sketch.stroke(objOpts.marker.line_colour); //(markerLineColour);
-              }
-              
-              let mw = 1;
-               
-              if (!objOpts.canvas.is_event) {
-                mw = objOpts.event.folded_width;
-              }
-
-              //check reversed
-              if(objOpts.marker.emphasise_reversed){
-                if(m!==0){
-                  if(section.markers[m-1][objOpts.canvas.depth_scale] > marker[objOpts.canvas.depth_scale]){
-                    sketch.stroke("Cyan"); 
-                    sketch.strokeWeight(objOpts.marker.line_width * 5);
-                  }
-                }
-
-              }
-              
-              //----------------------------------------------------------------------------------------------------------------------------------
-              //show hittest
-              if(objOpts.edit.editable){
+                
                 //live hittest
-                if(objOpts.edit.hittest !== null){
-                  if(["connect_marker","disconnect_marker", "delete_marker","change_marker_name","change_marker_distance","set_zero_point","enable_master","disable_master"].includes(objOpts.edit.mode)){
-                    const hitId = [objOpts.edit.hittest.project, objOpts.edit.hittest.hole, objOpts.edit.hittest.section, objOpts.edit.hittest.nearest_marker];
-                    if(Math.abs(objOpts.edit.hittest.nearest_distance) < objOpts.edit.sensibility){
-                      if(hitId.toString() == marker.id.toString()){
-                        sketch.strokeWeight(3);
-                        sketch.stroke("#ff0000");
-                      }
-                    }
-                  } else if(objOpts.edit.mode == "add_marker"){
-                    if(objOpts.edit.hittest.project == project.id[0] && objOpts.edit.hittest.hole == hole.id[1] && objOpts.edit.hittest.section == section.id[2]){
-                      sketch.push();//save
-                      sketch.strokeWeight(1);
+                if(objOpts.edit.hittest){
+                  if(["add_event","delete_event"].includes(objOpts.edit.mode)){
+                    const uid = [objOpts.edit.hittest.project, objOpts.edit.hittest.hole, objOpts.edit.hittest.section, objOpts.edit.hittest.upper_marker];
+                    const lid = [objOpts.edit.hittest.project, objOpts.edit.hittest.hole, objOpts.edit.hittest.section, objOpts.edit.hittest.lower_marker];
+                    if(marker.id.toString() == lid.toString()){
+                      const upper_depth = section.markers.filter((m)=>m.id.toString()==uid.toString())[0][objOpts.canvas.depth_scale];
+                      const lower_depth = marker[objOpts.canvas.depth_scale];
+                      sketch.push()
+                      sketch.noFill();
                       sketch.stroke("#ff0000");
-                      sketch.line(
-                        (hole_x0 + shift_x) * xMag + pad_x,
-                        sketch.mouseY+scroller.scrollTop, //(marker_top + shift_y) * yMag + pad_y,
-                        (hole_x0 + shift_x) * xMag + pad_x + objOpts.marker.width * mw * xMag,// + topBot,
-                        sketch.mouseY+scroller.scrollTop, //(marker_top + shift_y) * yMag + pad_y
-                      )
-                      sketch.pop();//load
-                    }
-                  }
-                } 
-
-                if(objOpts.edit.marker_from !== null && ["connect_marker", "delete_marker", "disconnect_marker"].includes(objOpts.edit.mode)){
-                  const hitId = [objOpts.edit.marker_from.project, objOpts.edit.marker_from.hole, objOpts.edit.marker_from.section, objOpts.edit.marker_from.nearest_marker];
-                  if(hitId.toString() == marker.id.toString()){
-                    sketch.strokeWeight(3);
-                    sketch.stroke("#ff0000");
-
-                    if(objOpts.edit.marker_to == null){
-                      //console.log(objOpts.edit);
-
-                      let ex0 = (hole_x0 + shift_x) * xMag + pad_x;
-                      let ey0 = (marker_top + shift_y) * yMag + pad_y;
-                      let ex1 = sketch.mouseX + scroller.scrollLeft;
-                      let ey1 = sketch.mouseY+scroller.scrollTop;
-                      
-                      //mouse position is righ/left of "from hole"
-                      if((sketch.mouseX + scroller.scrollLeft) > ((hole_x0 + shift_x) * xMag + pad_x + (objOpts.marker.width * mw * xMag)/2)){
-                        ex0 = (hole_x0 + shift_x) * xMag + pad_x + objOpts.marker.width * mw * xMag;
-                      }
-
-                      //if hit second marker
-                      if(objOpts.edit.hittest.marker !== null){
-                        //under construction
-                      }
-                      
-                      sketch.line(ex0,ey0,ex1,ey1);
+                      sketch.strokeWeight(3);
+                      sketch.rect(
+                        (hole_x0 + shift_x) * xMag + pad_x + 3,
+                        (upper_depth + shift_y) * yMag + pad_y,
+                        objOpts.section.width * ew * xMag - 6,
+                        ((lower_depth-upper_depth)) * yMag,
+                        1,1,1,1 //rounded option
+                      );
+                      sketch.pop()
                     }
                   }
                 }
-                if(objOpts.edit.marker_to !== null){
-                  const hitId = [objOpts.edit.marker_to.project, objOpts.edit.marker_to.hole, objOpts.edit.marker_to.section, objOpts.edit.marker_to.nearest_marker];
-                  if(hitId.toString() == marker.id.toString()){
-                    sketch.strokeWeight(3);
-                    sketch.stroke("#ff0000");
+
+                //make marker objects=================================================================================
+                // remove top and bottom markers
+                let topBot = 0;
+                if (m == 0 || m == section.markers.length - 1) {
+                  topBot -= objOpts.marker.width * xMag; //or +20
+                }
+                //draw markers
+                sketch.drawingContext.setLineDash([]);
+                sketch.strokeWeight(objOpts.marker.line_width);
+                if(objOpts.canvas.draw_core_photo){
+                  sketch.stroke("Magenta"); //(markerLineColour);
+                }else{
+                  sketch.stroke(objOpts.marker.line_colour); //(markerLineColour);
+                }
+                
+                let mw = 1;
+                
+                if (!objOpts.canvas.is_event) {
+                  mw = objOpts.event.folded_width;
+                }
+
+                //check reversed
+                if(objOpts.marker.emphasise_reversed){
+                  if(m!==0){
+                    if(section.markers[m-1][objOpts.canvas.depth_scale] > marker[objOpts.canvas.depth_scale]){
+                      sketch.stroke("Cyan"); 
+                      sketch.strokeWeight(objOpts.marker.line_width * 5);
+                    }
+                  }
+
+                }
+                
+                //----------------------------------------------------------------------------------------------------------------------------------
+                //show hittest
+                if(objOpts.edit.editable){
+                  //live hittest
+                  if(objOpts.edit.hittest !== null){
+                    if(["connect_marker","disconnect_marker", "delete_marker","change_marker_name","change_marker_distance","set_zero_point","enable_master","disable_master"].includes(objOpts.edit.mode)){
+                      const hitId = [objOpts.edit.hittest.project, objOpts.edit.hittest.hole, objOpts.edit.hittest.section, objOpts.edit.hittest.nearest_marker];
+                      if(Math.abs(objOpts.edit.hittest.nearest_distance) < objOpts.edit.sensibility){
+                        if(hitId.toString() == marker.id.toString()){
+                          sketch.strokeWeight(3);
+                          sketch.stroke("#ff0000");
+                        }
+                      }
+                    } else if(objOpts.edit.mode == "add_marker"){
+                      if(objOpts.edit.hittest.project == project.id[0] && objOpts.edit.hittest.hole == hole.id[1] && objOpts.edit.hittest.section == section.id[2]){
+                        sketch.push();//save
+                        sketch.strokeWeight(1);
+                        sketch.stroke("#ff0000");
+                        sketch.line(
+                          (hole_x0 + shift_x) * xMag + pad_x,
+                          sketch.mouseY+scroller.scrollTop, //(marker_top + shift_y) * yMag + pad_y,
+                          (hole_x0 + shift_x) * xMag + pad_x + objOpts.marker.width * mw * xMag,// + topBot,
+                          sketch.mouseY+scroller.scrollTop, //(marker_top + shift_y) * yMag + pad_y
+                        )
+                        sketch.pop();//load
+                      }
+                    }
+                  } 
+
+                  if(objOpts.edit.marker_from !== null && ["connect_marker", "delete_marker", "disconnect_marker"].includes(objOpts.edit.mode)){
+                    const hitId = [objOpts.edit.marker_from.project, objOpts.edit.marker_from.hole, objOpts.edit.marker_from.section, objOpts.edit.marker_from.nearest_marker];
+                    if(hitId.toString() == marker.id.toString()){
+                      sketch.strokeWeight(3);
+                      sketch.stroke("#ff0000");
+
+                      if(objOpts.edit.marker_to == null){
+                        //console.log(objOpts.edit);
+
+                        let ex0 = (hole_x0 + shift_x) * xMag + pad_x;
+                        let ey0 = (marker_top + shift_y) * yMag + pad_y;
+                        let ex1 = sketch.mouseX + scroller.scrollLeft;
+                        let ey1 = sketch.mouseY+scroller.scrollTop;
+                        
+                        //mouse position is righ/left of "from hole"
+                        if((sketch.mouseX + scroller.scrollLeft) > ((hole_x0 + shift_x) * xMag + pad_x + (objOpts.marker.width * mw * xMag)/2)){
+                          ex0 = (hole_x0 + shift_x) * xMag + pad_x + objOpts.marker.width * mw * xMag;
+                        }
+
+                        //if hit second marker
+                        if(objOpts.edit.hittest.marker !== null){
+                          //under construction
+                        }
+                        
+                        sketch.line(ex0,ey0,ex1,ey1);
+                      }
+                    }
+                  }
+                  if(objOpts.edit.marker_to !== null){
+                    const hitId = [objOpts.edit.marker_to.project, objOpts.edit.marker_to.hole, objOpts.edit.marker_to.section, objOpts.edit.marker_to.nearest_marker];
+                    if(hitId.toString() == marker.id.toString()){
+                      sketch.strokeWeight(3);
+                      sketch.stroke("#ff0000");
+                    }
                   }
                 }
-              }
-              //----------------------------------------------------------------------------------------------------------------------------------
-              //drow marker line
-              const marker_x0 = (hole_x0 + shift_x) * xMag + pad_x;
-              const marker_y0 = (marker_top + shift_y) * yMag + pad_y;
-              const marker_w  = (objOpts.marker.width * mw * xMag);
-              let relative_marker_x0 = 0;
-              if (isPhtoExist) {
-                relative_marker_x0 = marker.definition_relative_x;
-              }
-              sketch.line(
-                marker_x0 + marker_w * relative_marker_x0,
-                marker_y0,
-                marker_x0 + marker_w,// + topBot,
-                marker_y0,                  
-              );
+                //----------------------------------------------------------------------------------------------------------------------------------
+                //drow marker line
+                const marker_x0 = (hole_x0 + shift_x) * xMag + pad_x;
+                const marker_y0 = (marker_top + shift_y) * yMag + pad_y;
+                const marker_w  = (objOpts.marker.width * mw * xMag);
+                let relative_marker_x0 = 0;
+                if (isPhtoExist) {
+                  relative_marker_x0 = marker.definition_relative_x;
+                }
+                sketch.line(
+                  marker_x0 + marker_w * relative_marker_x0,
+                  marker_y0,
+                  marker_x0 + marker_w,// + topBot,
+                  marker_y0,                  
+                );
 
-              //add master section-----------------------------------------
-              const curreM = countMaster(LCCore, marker, "project");   
-              const lowerM = countMaster(LCCore, section.markers[m + 1], "project");   
+                //add master section-----------------------------------------
+                const curreM = countMaster(LCCore, marker, "project");   
+                const lowerM = countMaster(LCCore, section.markers[m + 1], "project");   
 
-              if(curreM.own == 1){
-                if(curreM.horizontal==0){
-                  //horizontal marker is NOT master
-                  if(lowerM.own == 1){
-                    msaterDirection = "vertical";
+                if(curreM.own == 1){
+                  if(curreM.horizontal==0){
+                    //horizontal marker is NOT master
+                    if(lowerM.own == 1){
+                      msaterDirection = "vertical";
+                    }else{
+                      msaterDirection = "none";
+                    }
+                  }else if(curreM.horizontal==1){
+                    //horizontal marker is master
+                    if(lowerM.own == 0){
+                      //lower marker is NOT master
+                      msaterDirection = "horizontal";
+                    }else{
+                      //lower marker is also master
+
+
+                      if(msaterDirection=="none" || msaterDirection=="horizontal"){
+                        //master come from hconnection or startpoint or parallel section
+                        msaterDirection = "vertical";
+                      }else if(msaterDirection=="vertical"){
+                        //master come from vconnection
+                        msaterDirection = "horizontal";
+                      }
+                    }
                   }else{
+                    //unsuspected case (master marker>=3)
                     msaterDirection = "none";
                   }
-                }else if(curreM.horizontal==1){
-                  //horizontal marker is master
-                  if(lowerM.own == 0){
-                    //lower marker is NOT master
-                    msaterDirection = "horizontal";
-                  }else{
-                    //lower marker is also master
-
-
-                    if(msaterDirection=="none" || msaterDirection=="horizontal"){
-                      //master come from hconnection or startpoint or parallel section
-                      msaterDirection = "vertical";
-                    }else if(msaterDirection=="vertical"){
-                      //master come from vconnection
-                      msaterDirection = "horizontal";
-                    }
-                  }
                 }else{
-                  //unsuspected case (master marker>=3)
                   msaterDirection = "none";
                 }
-              }else{
-                msaterDirection = "none";
-              }
 
-              if(msaterDirection == "vertical"){
-                //plot
-                sketch.drawingContext.setLineDash([]);
-                sketch.strokeWeight(objOpts.connection.master_section_line_width);                    
-                sketch.stroke(objOpts.connection.base_master_section_colour); //(markerLineColour);
-                if(project.model_type == "duo"){
-                  sketch.stroke(objOpts.connection.duo_master_section_colour);
-                }
-
-                const next_marker_top = section.markers[m + 1][objOpts.canvas.depth_scale];
-                sketch.line(
-                  (hole_x0 + shift_x) * xMag + pad_x,
-                  (marker_top + shift_y) * yMag + pad_y,
-                  (hole_x0 + shift_x) * xMag + pad_x,
-                  (next_marker_top + shift_y) * yMag + pad_y
-                );
-
-                
-              }
-
-              if(["developer","root"].includes(objOpts.developer.mode)){
-                  //data depth source arrow
+                if(msaterDirection == "vertical"){
+                  //plot
                   sketch.drawingContext.setLineDash([]);
-                  sketch.strokeWeight(1);                    
-                  sketch.stroke("white");
-                  sketch.fill("white");
-                  if(marker.depth_source[1] || marker.depth_source[2]){
-                    if(section.markers[m - 1] && marker.depth_source[1]){
-                      const upper_source = getDataFromId(LCCore, marker.depth_source[1]);
-                      if(upper_source  && section.markers[m - 1].id[1] === marker.depth_source[1][1]){
-                        const before_marker_top = upper_source[objOpts.canvas.depth_scale];
-                        //sec_w - 10
-                        sketch.line(
-                          (hole_x0 + shift_x) * xMag + pad_x + sec_w *0.7,
-                          (marker_top + shift_y) * yMag + pad_y,
-                          (hole_x0 + shift_x) * xMag + pad_x + sec_w *0.7,
-                          (before_marker_top + shift_y) * yMag + pad_y
-                        );
-                        sketch.line(
-                          (hole_x0 + shift_x) * xMag + pad_x + sec_w *0.7,
-                          (marker_top + shift_y) * yMag + pad_y,
-                          (hole_x0 + shift_x) * xMag + pad_x + sec_w *0.7 + 5,
-                          (marker_top + shift_y) * yMag + pad_y - 10
-                        );
-                        sketch.line(
-                          (hole_x0 + shift_x) * xMag + pad_x + sec_w *0.7,
-                          (marker_top + shift_y) * yMag + pad_y,
-                          (hole_x0 + shift_x) * xMag + pad_x + sec_w *0.7 -5,
-                          (marker_top + shift_y) * yMag + pad_y - 10
-                        );
-                        sketch.ellipse(
-                          (hole_x0 + shift_x) * xMag + pad_x + sec_w *0.7,
-                          (before_marker_top + shift_y) * yMag + pad_y,
-                          3
-                        );
-                      }                    
-                    }
+                  sketch.strokeWeight(objOpts.connection.master_section_line_width);                    
+                  sketch.stroke(objOpts.connection.base_master_section_colour); //(markerLineColour);
+                  if(project.model_type == "duo"){
+                    sketch.stroke(objOpts.connection.duo_master_section_colour);
+                  }
 
-                    if(section.markers[m + 1] && marker.depth_source[2]){
-                      const lower_source = getDataFromId(LCCore, marker.depth_source[2]);
-                      if(lower_source && section.markers[m + 1].id[1] === marker.depth_source[2][1]){     
-                        const next_marker_top = lower_source[objOpts.canvas.depth_scale];                 
-                        sketch.line(
-                          (hole_x0 + shift_x) * xMag + pad_x + sec_w *0.7,
-                          (marker_top + shift_y) * yMag + pad_y,
-                          (hole_x0 + shift_x) * xMag + pad_x + sec_w *0.7,
-                          (next_marker_top + shift_y) * yMag + pad_y
-                        );
-                        sketch.line(
-                          (hole_x0 + shift_x) * xMag + pad_x + sec_w *0.7 + 5,
-                          (marker_top + shift_y) * yMag + pad_y + 10,
-                          (hole_x0 + shift_x) * xMag + pad_x + sec_w *0.7,
-                          (marker_top + shift_y) * yMag + pad_y
-                        );
-                        sketch.line(
-                          (hole_x0 + shift_x) * xMag + pad_x + sec_w *0.7 -5,
-                          (marker_top + shift_y) * yMag + pad_y + 10,
-                          (hole_x0 + shift_x) * xMag + pad_x + sec_w *0.7,
-                          (marker_top + shift_y) * yMag + pad_y
-                        );
-                        sketch.ellipse(
-                          (hole_x0 + shift_x) * xMag + pad_x + sec_w *0.7,
-                          (next_marker_top + shift_y) * yMag + pad_y,
-                          3
-                        );
-                      }                     
-                    }
-                  }                  
-                }
-
-              //add rank marker-------------------------------------------
-              if (objOpts.marker.is_rank) {
-                sketch.fill("#000000");
-                sketch.noStroke();
-                sketch.textFont("Arial");
-                sketch.textSize(15);
-                let rank_name = "null";
-                if (marker.connection_rank != null){
-                  //1111111111111111
-                 // rank_name = marker.depth_source[0];//marker.connection_rank.toString();
-                 rank_name = marker.connection_rank.toString();
-                }
-                sketch.text(
-                  rank_name,
-                  (hole_x0 + shift_x) * xMag + pad_x + 10,//- 23,
-                  (marker_top + shift_y) * yMag + pad_y + 5
-                );
-
-
-                //connection rank
-                if (marker.connection_rank == null) {
-                  sketch.fill("#000000");
-                } else if (marker.connection_rank > 4) {
-                  sketch.fill("#A52A2A");
-                } else {
-                  sketch.fill(
-                    objOpts.marker.rank_colours[marker.connection_rank]
+                  const next_marker_top = section.markers[m + 1][objOpts.canvas.depth_scale];
+                  sketch.line(
+                    (hole_x0 + shift_x) * xMag + pad_x,
+                    (marker_top + shift_y) * yMag + pad_y,
+                    (hole_x0 + shift_x) * xMag + pad_x,
+                    (next_marker_top + shift_y) * yMag + pad_y
                   );
-                }
-                sketch.ellipse(
-                  (hole_x0 + shift_x) * xMag + pad_x,
-                  (marker_top + shift_y) * yMag + pad_y,
-                  9
-                );
 
-                //master flag
-                if (marker.isMaster){
-                  sketch.noFill();
-                  sketch.stroke("#0000FF");
                   
-                  sketch.strokeWeight(2); 
+                }
+
+                if(["developer","root"].includes(objOpts.developer.mode)){
+                    //data depth source arrow
+                    sketch.drawingContext.setLineDash([]);
+                    sketch.strokeWeight(1);                    
+                    sketch.stroke("white");
+                    sketch.fill("white");
+                    if(marker.depth_source[1] || marker.depth_source[2]){
+                      if(section.markers[m - 1] && marker.depth_source[1]){
+                        const upper_source = getDataFromId(LCCore, marker.depth_source[1]);
+                        if(upper_source  && section.markers[m - 1].id[1] === marker.depth_source[1][1]){
+                          const before_marker_top = upper_source[objOpts.canvas.depth_scale];
+                          //sec_w - 10
+                          sketch.line(
+                            (hole_x0 + shift_x) * xMag + pad_x + sec_w *0.7,
+                            (marker_top + shift_y) * yMag + pad_y,
+                            (hole_x0 + shift_x) * xMag + pad_x + sec_w *0.7,
+                            (before_marker_top + shift_y) * yMag + pad_y
+                          );
+                          sketch.line(
+                            (hole_x0 + shift_x) * xMag + pad_x + sec_w *0.7,
+                            (marker_top + shift_y) * yMag + pad_y,
+                            (hole_x0 + shift_x) * xMag + pad_x + sec_w *0.7 + 5,
+                            (marker_top + shift_y) * yMag + pad_y - 10
+                          );
+                          sketch.line(
+                            (hole_x0 + shift_x) * xMag + pad_x + sec_w *0.7,
+                            (marker_top + shift_y) * yMag + pad_y,
+                            (hole_x0 + shift_x) * xMag + pad_x + sec_w *0.7 -5,
+                            (marker_top + shift_y) * yMag + pad_y - 10
+                          );
+                          sketch.ellipse(
+                            (hole_x0 + shift_x) * xMag + pad_x + sec_w *0.7,
+                            (before_marker_top + shift_y) * yMag + pad_y,
+                            3
+                          );
+                        }                    
+                      }
+
+                      if(section.markers[m + 1] && marker.depth_source[2]){
+                        const lower_source = getDataFromId(LCCore, marker.depth_source[2]);
+                        if(lower_source && section.markers[m + 1].id[1] === marker.depth_source[2][1]){     
+                          const next_marker_top = lower_source[objOpts.canvas.depth_scale];                 
+                          sketch.line(
+                            (hole_x0 + shift_x) * xMag + pad_x + sec_w *0.7,
+                            (marker_top + shift_y) * yMag + pad_y,
+                            (hole_x0 + shift_x) * xMag + pad_x + sec_w *0.7,
+                            (next_marker_top + shift_y) * yMag + pad_y
+                          );
+                          sketch.line(
+                            (hole_x0 + shift_x) * xMag + pad_x + sec_w *0.7 + 5,
+                            (marker_top + shift_y) * yMag + pad_y + 10,
+                            (hole_x0 + shift_x) * xMag + pad_x + sec_w *0.7,
+                            (marker_top + shift_y) * yMag + pad_y
+                          );
+                          sketch.line(
+                            (hole_x0 + shift_x) * xMag + pad_x + sec_w *0.7 -5,
+                            (marker_top + shift_y) * yMag + pad_y + 10,
+                            (hole_x0 + shift_x) * xMag + pad_x + sec_w *0.7,
+                            (marker_top + shift_y) * yMag + pad_y
+                          );
+                          sketch.ellipse(
+                            (hole_x0 + shift_x) * xMag + pad_x + sec_w *0.7,
+                            (next_marker_top + shift_y) * yMag + pad_y,
+                            3
+                          );
+                        }                     
+                      }
+                    }                  
+                  }
+
+                //add rank marker-------------------------------------------
+                if (objOpts.marker.is_rank) {
+                  sketch.fill("#000000");
+                  sketch.noStroke();
+                  sketch.textFont("Arial");
+                  sketch.textSize(15);
+                  let rank_name = "null";
+                  if (marker.connection_rank != null){
+                    //1111111111111111
+                  // rank_name = marker.depth_source[0];//marker.connection_rank.toString();
+                  rank_name = marker.connection_rank.toString();
+                  }
+                  sketch.text(
+                    rank_name,
+                    (hole_x0 + shift_x) * xMag + pad_x + 10,//- 23,
+                    (marker_top + shift_y) * yMag + pad_y + 5
+                  );
+
+
+                  //connection rank
+                  if (marker.connection_rank == null) {
+                    sketch.fill("#000000");
+                  } else if (marker.connection_rank > 4) {
+                    sketch.fill("#A52A2A");
+                  } else {
+                    sketch.fill(
+                      objOpts.marker.rank_colours[marker.connection_rank]
+                    );
+                  }
                   sketch.ellipse(
                     (hole_x0 + shift_x) * xMag + pad_x,
                     (marker_top + shift_y) * yMag + pad_y,
-                    17
+                    9
                   );
-                  if (marker.isZeroPoint!==false){
+
+                  //master flag
+                  if (marker.isMaster){
                     sketch.noFill();
-                    sketch.stroke("Cyan");
-                    sketch.strokeWeight(3); 
-                    sketch.ellipse(
-                      (hole_x0 + shift_x) * xMag + pad_x,
-                      (marker_top + shift_y) * yMag + pad_y,
-                      25
-                    );
-                  }
-                }  
-                
-                if(["root"].includes(objOpts.developer.mode)){
-                  //data source is dirrerent project
-                  if(
-                    marker.depth_source[1] && 
-                    marker.depth_source[1][0] !== marker.id[0] &&
-                    marker.depth_source[1][0] !== LCCore.base_project_id[0]
-                  ){                  
-                    sketch.noFill();
-                    sketch.stroke("#ff0000");
+                    sketch.stroke("#0000FF");
                     
                     sketch.strokeWeight(2); 
                     sketch.ellipse(
@@ -5268,286 +5305,315 @@ document.addEventListener("DOMContentLoaded", () => {
                       (marker_top + shift_y) * yMag + pad_y,
                       17
                     );
-                  }
-                }                
-
-              }
-              
-              //add marker name without top/bottom name
-              if(objOpts.marker.show_name_labels){
-                //add marker name--------------------------------------------
-                if (m !== 0 && m !== section.markers.length - 1) {
-                  let markerDispName = marker.name;
+                    if (marker.isZeroPoint!==false){
+                      sketch.noFill();
+                      sketch.stroke("Cyan");
+                      sketch.strokeWeight(3); 
+                      sketch.ellipse(
+                        (hole_x0 + shift_x) * xMag + pad_x,
+                        (marker_top + shift_y) * yMag + pad_y,
+                        25
+                      );
+                    }
+                  }  
+                  
                   if(["root"].includes(objOpts.developer.mode)){
-                    markerDispName = marker.id[3].slice(0,5);
-                  }
-                  sketch.fill(objOpts.marker.font_colour);
-                  sketch.noStroke();
-                  sketch.textFont(objOpts.marker.font);
-                  sketch.textSize(objOpts.marker.font_size);
-                  sketch.text(
-                    markerDispName,
-                    (hole_x0 + shift_x) * xMag + pad_x - sketch.textWidth(marker.name) - 5,//+ 10,
-                    (marker_top + shift_y) * yMag + pad_y - 2
-                  );
-                }
-              }
-              if(objOpts.marker.show_distance_labels){
-                //add marker distance----------------------------------------
-                sketch.fill(objOpts.marker.font_colour);
-                sketch.noStroke();
-                sketch.textFont(objOpts.marker.font);
-                sketch.textSize(objOpts.marker.font_size);
-                if(["root"].includes(objOpts.developer.mode)){
-                  sketch.text(
-                    //objOpts.canvas.depth_scale
-                    (Math.round(marker["composite_depth"] * 10) / 10).toFixed(1).toString()+'('+(Math.round(marker.distance * 10) / 10).toFixed(1).toString()+')['+marker.unreliability?.toFixed(2).toString()+']',
-                    (hole_x0 + shift_x) * xMag + pad_x + objOpts.marker.width * xMag + 5,
-                    (marker_top + shift_y) * yMag + pad_y - 2
-                  );
-                }else{
-                  sketch.text(
-                    (Math.round(marker.distance * 10) / 10).toFixed(1).toString(),
-                    (hole_x0 + shift_x) * xMag + pad_x + objOpts.marker.width * xMag + 5,
-                    (marker_top + shift_y) * yMag + pad_y - 2
-                  );
-                }                
-              }              
-
-              //-----------------------------------------------------------
-              //make connection objects=================================================================================
-              //add connection
-              if( objOpts.canvas.is_connection){
-                let connection_colour = objOpts.connection.line_colour;
-                let connection_line_width = objOpts.connection.line_width;
-
-                //v_connection--------------------------------------------
-                if(m == 0){
-                  sketch.strokeWeight(connection_line_width);
-                  sketch.stroke(connection_colour);
-                  //case top
-                  marker.v_connection.forEach(c=>{
-                    if(c[2]!==marker.id[2]){
-                      //if connect other section
-                      const arrowSize=[8,8,20];
-                      sketch.line(
-                        marker_x0+marker_w/2,
-                        marker_y0 -arrowSize[2],
-                        marker_x0+marker_w/2,
-                        marker_y0 +arrowSize[2]
-                      )
-                      sketch.line(
-                        marker_x0+marker_w/2,
-                        marker_y0 +arrowSize[2],
-                        marker_x0+marker_w/2-arrowSize[0],
-                        marker_y0 +arrowSize[2] - arrowSize[1]
-                      )
-                      sketch.line(
-                        marker_x0+marker_w/2,
-                        marker_y0 +arrowSize[2],
-                        marker_x0+marker_w/2+arrowSize[0],
-                        marker_y0 +arrowSize[2] - arrowSize[1]
-                      )
+                    //data source is dirrerent project
+                    if(
+                      marker.depth_source[1] && 
+                      marker.depth_source[1][0] !== marker.id[0] &&
+                      marker.depth_source[1][0] !== LCCore.base_project_id[0]
+                    ){                  
+                      sketch.noFill();
+                      sketch.stroke("#ff0000");
+                      
+                      sketch.strokeWeight(2); 
+                      sketch.ellipse(
+                        (hole_x0 + shift_x) * xMag + pad_x,
+                        (marker_top + shift_y) * yMag + pad_y,
+                        17
+                      );
                     }
-                    return;
-                  })
+                  }                
+
                 }
-                if(m == section.markers.length - 1){
-                  sketch.strokeWeight(connection_line_width);
-                  sketch.stroke(connection_colour);
-                  //case top
-                  marker.v_connection.forEach(c=>{
-                    if(c[2]!==marker.id[2]){
-                      //if connect other section
-                      const arrowSize=[8,8,20];
-                      sketch.line(
-                        marker_x0+marker_w/2,
-                        marker_y0 -arrowSize[2],
-                        marker_x0+marker_w/2,
-                        marker_y0 +arrowSize[2]
-                      )
-                      sketch.line(
-                        marker_x0+marker_w/2,
-                        marker_y0 -arrowSize[2],
-                        marker_x0+marker_w/2-arrowSize[0],
-                        marker_y0 -arrowSize[2] + arrowSize[1]
-                      )
-                      sketch.line(
-                        marker_x0+marker_w/2,
-                        marker_y0 -arrowSize[2],
-                        marker_x0+marker_w/2+arrowSize[0],
-                        marker_y0 -arrowSize[2] + arrowSize[1]
-                      )
-                      return;
+                
+                //add marker name without top/bottom name
+                if(objOpts.marker.show_name_labels){
+                  //add marker name--------------------------------------------
+                  if (m !== 0 && m !== section.markers.length - 1) {
+                    let markerDispName = marker.name;
+                    if(["root"].includes(objOpts.developer.mode)){
+                      markerDispName = marker.id[3].slice(0,5);
                     }
-                  })
-                }
-
-                //h_connection--------------------------------------------
-                const connectionData = this.getNearestConnectedMarkerIdx( LCCore, marker.id, objOpts);
-
-                //check connection
-                if (connectionData == null) {
-                  //there is no connection
-                  continue;
-                }
-
-                const idxTo = connectionData.connected_idx;
-
-                //get connectied hole position
-                const connectedHole_x0 = (objOpts.hole.distance + objOpts.hole.width) * ((LCCore.projects[idxTo[0]].order * objOpts.project.interval)+ (connectionData.num_total - connectionData.num_total_disable)); //LCCore.projects[idxTo[0]].holes[idxTo[1]].order
-                const connectedMarker  = LCCore.projects[idxTo[0]].holes[idxTo[1]].sections[idxTo[2]].markers[idxTo[3]];
-                const connectedMarker_top = connectedMarker[objOpts.canvas.depth_scale];
-
-                if (connectedMarker_top == null) {
-                  //console.log("Connected marker position is null.");
-                  continue;
-                }
-
-                //get connector position
-                const cn_x0 = (hole_x0 + shift_x + objOpts.marker.width) * xMag + pad_x;
-                const cn_y0 = (marker_top + shift_y) * yMag + pad_y;
-                const cn_x1 = cn_x0 + objOpts.connection.indexWidth;
-                const cn_y1 = cn_y0;
-                const cn_x3 = (connectedHole_x0 + shift_x) * xMag + pad_x;
-                const cn_y3 = (connectedMarker_top + shift_y) * yMag + pad_y;
-                const cn_x2 = cn_x3 - objOpts.connection.indexWidth;
-                const cn_y2 = cn_y3;
-
-                //get style
-                if (cn_y0 !== cn_y3) {
-                  //not horizontal
-                  if (objOpts.connection.emphasise_non_horizontal && objOpts.canvas.depth_scale !== "drilling_depth"){
                     sketch.fill(objOpts.marker.font_colour);
                     sketch.noStroke();
                     sketch.textFont(objOpts.marker.font);
                     sketch.textSize(objOpts.marker.font_size);
                     sketch.text(
-                      "("+Math.abs(marker[objOpts.canvas.depth_scale] - connectedMarker[objOpts.canvas.depth_scale]).toFixed(1).toString()+")",
-                      (cn_x1 + cn_x2)/2,
-                      (cn_y1 + cn_y2)/2 - 10
-                    )
-                    
-                    connection_colour = "Cyan";
-                    connection_line_width = objOpts.connection.line_width * 4;
-                    
+                      markerDispName,
+                      (hole_x0 + shift_x) * xMag + pad_x - sketch.textWidth(marker.name) - 5,//+ 10,
+                      (marker_top + shift_y) * yMag + pad_y - 2
+                    );
                   }
                 }
-
-                //find master connections
-                let orderMaster = [];
-                let numMaster = 0;
-                if(marker.isMaster){
-                  numMaster+=1;
-                  orderMaster.push(hole.order);
-                }
-                if(marker.h_connection.length>0){
-                  marker.h_connection.forEach(hc=>{
-                    if(hc[0]==project.id[0]){
-                      const idxH = getIdxById(LCCore, hc);
-                      const hHole = LCCore.projects[idxH[0]].holes[idxH[1]];
-                      const hMarker = hHole.sections[idxH[2]].markers[idxH[3]];
-                      if(hMarker.isMaster){
-                        numMaster+=1;
-                        orderMaster.push(hHole.order);
-                      }
-                    }
-                  })
-                }
-                
-                 if(numMaster==2) {
-                  orderMaster.sort();
-                  if(hole.order>=orderMaster[0] && hole.order<orderMaster[1]){
-                    //if connection of master section
-                    if(project.model_type == "duo"){
-                      connection_colour = objOpts.connection.duo_master_section_colour;
-                    }else{
-                      connection_colour = objOpts.connection.base_master_section_colour;
-                    }
-                    
-                    connection_line_width = objOpts.connection.line_width;
-
-                    if(objOpts.connection.emphasise_master_connections){
-                      connection_line_width = connection_line_width * 2;
-                    }               
-                    
-                  }
-                }
-
-                if (connectionData.isNext == false) {
-                  //connected core is not located at the next
-                  if (objOpts.connection.show_remote_connections){
-                    if(objOpts.connection.emphasise_remote_connections){
-                      sketch.drawingContext.setLineDash([5, 5]);
-                    }
+                if(objOpts.marker.show_distance_labels){
+                  //add marker distance----------------------------------------
+                  sketch.fill(objOpts.marker.font_colour);
+                  sketch.noStroke();
+                  sketch.textFont(objOpts.marker.font);
+                  sketch.textSize(objOpts.marker.font_size);
+                  if(["root"].includes(objOpts.developer.mode)){
+                    sketch.text(
+                      //objOpts.canvas.depth_scale
+                      (Math.round(marker["composite_depth"] * 10) / 10).toFixed(1).toString()+'('+(Math.round(marker.distance * 10) / 10).toFixed(1).toString()+')['+marker.unreliability?.toFixed(2).toString()+']',
+                      (hole_x0 + shift_x) * xMag + pad_x + objOpts.marker.width * xMag + 5,
+                      (marker_top + shift_y) * yMag + pad_y - 2
+                    );
                   }else{
-                    continue
+                    sketch.text(
+                      (Math.round(marker.distance * 10) / 10).toFixed(1).toString(),
+                      (hole_x0 + shift_x) * xMag + pad_x + objOpts.marker.width * xMag + 5,
+                      (marker_top + shift_y) * yMag + pad_y - 2
+                    );
+                  }                
+                }              
+
+                //-----------------------------------------------------------
+                //make connection objects=================================================================================
+                //add connection
+                if( objOpts.canvas.is_connection){
+                  let connection_colour = objOpts.connection.line_colour;
+                  let connection_line_width = objOpts.connection.line_width;
+
+                  //v_connection--------------------------------------------
+                  if(m == 0){
+                    sketch.strokeWeight(connection_line_width);
+                    sketch.stroke(connection_colour);
+                    //case top
+                    marker.v_connection.forEach(c=>{
+                      if(c[2]!==marker.id[2]){
+                        //if connect other section
+                        const arrowSize=[8,8,20];
+                        sketch.line(
+                          marker_x0+marker_w/2,
+                          marker_y0 -arrowSize[2],
+                          marker_x0+marker_w/2,
+                          marker_y0 +arrowSize[2]
+                        )
+                        sketch.line(
+                          marker_x0+marker_w/2,
+                          marker_y0 +arrowSize[2],
+                          marker_x0+marker_w/2-arrowSize[0],
+                          marker_y0 +arrowSize[2] - arrowSize[1]
+                        )
+                        sketch.line(
+                          marker_x0+marker_w/2,
+                          marker_y0 +arrowSize[2],
+                          marker_x0+marker_w/2+arrowSize[0],
+                          marker_y0 +arrowSize[2] - arrowSize[1]
+                        )
+                      }
+                      return;
+                    })
                   }
-                }
+                  if(m == section.markers.length - 1){
+                    sketch.strokeWeight(connection_line_width);
+                    sketch.stroke(connection_colour);
+                    //case top
+                    marker.v_connection.forEach(c=>{
+                      if(c[2]!==marker.id[2]){
+                        //if connect other section
+                        const arrowSize=[8,8,20];
+                        sketch.line(
+                          marker_x0+marker_w/2,
+                          marker_y0 -arrowSize[2],
+                          marker_x0+marker_w/2,
+                          marker_y0 +arrowSize[2]
+                        )
+                        sketch.line(
+                          marker_x0+marker_w/2,
+                          marker_y0 -arrowSize[2],
+                          marker_x0+marker_w/2-arrowSize[0],
+                          marker_y0 -arrowSize[2] + arrowSize[1]
+                        )
+                        sketch.line(
+                          marker_x0+marker_w/2,
+                          marker_y0 -arrowSize[2],
+                          marker_x0+marker_w/2+arrowSize[0],
+                          marker_y0 -arrowSize[2] + arrowSize[1]
+                        )
+                        return;
+                      }
+                    })
+                  }
 
-                //draw connection---------------------------------------------
-                sketch.strokeWeight(connection_line_width);
-                sketch.stroke(connection_colour);
+                  //h_connection--------------------------------------------
+                  const connectionData = this.getNearestConnectedMarkerIdx( LCCore, marker.id, objOpts);
 
-                sketch.line(cn_x0, cn_y0, cn_x1, cn_y1); //start point
-                sketch.line(cn_x1, cn_y1, cn_x2, cn_y2); //index left
-                sketch.line(cn_x2, cn_y2, cn_x3, cn_y3); //index right
+                  //check connection
+                  if (connectionData == null) {
+                    //there is no connection
+                    continue;
+                  }
 
-                if(["developer","root"].includes(objOpts.developer.mode)){
-                  //source arrow
-                  let dir = null;
-                  if(marker.depth_source[1]){
-                    if(marker.depth_source[1][1] !== marker.id[1]){
-                      //not same hole
-                      if(marker.depth_source[1][3] == connectedMarker.id[3]){
-                        //connected between markers
-                        dir = "left";
+                  const idxTo = connectionData.connected_idx;
+
+                  //get connectied hole position
+                  const connectedHole_x0 = (objOpts.hole.distance + objOpts.hole.width) * ((LCCore.projects[idxTo[0]].order * objOpts.project.interval)+ (connectionData.num_total - connectionData.num_total_disable)); //LCCore.projects[idxTo[0]].holes[idxTo[1]].order
+                  const connectedMarker  = LCCore.projects[idxTo[0]].holes[idxTo[1]].sections[idxTo[2]].markers[idxTo[3]];
+                  const connectedMarker_top = connectedMarker[objOpts.canvas.depth_scale];
+
+                  if (connectedMarker_top == null) {
+                    //console.log("Connected marker position is null.");
+                    continue;
+                  }
+
+                  //get connector position
+                  const cn_x0 = (hole_x0 + shift_x + objOpts.marker.width) * xMag + pad_x;
+                  const cn_y0 = (marker_top + shift_y) * yMag + pad_y;
+                  const cn_x1 = cn_x0 + objOpts.connection.indexWidth;
+                  const cn_y1 = cn_y0;
+                  const cn_x3 = (connectedHole_x0 + shift_x) * xMag + pad_x;
+                  const cn_y3 = (connectedMarker_top + shift_y) * yMag + pad_y;
+                  const cn_x2 = cn_x3 - objOpts.connection.indexWidth;
+                  const cn_y2 = cn_y3;
+
+                  //get style
+                  if (cn_y0 !== cn_y3) {
+                    //not horizontal
+                    if (objOpts.connection.emphasise_non_horizontal && objOpts.canvas.depth_scale !== "drilling_depth"){
+                      sketch.fill(objOpts.marker.font_colour);
+                      sketch.noStroke();
+                      sketch.textFont(objOpts.marker.font);
+                      sketch.textSize(objOpts.marker.font_size);
+                      sketch.text(
+                        "("+Math.abs(marker[objOpts.canvas.depth_scale] - connectedMarker[objOpts.canvas.depth_scale]).toFixed(1).toString()+")",
+                        (cn_x1 + cn_x2)/2,
+                        (cn_y1 + cn_y2)/2 - 10
+                      )
+                      
+                      connection_colour = "Cyan";
+                      connection_line_width = objOpts.connection.line_width * 4;
+                      
+                    }
+                  }
+
+                  //find master connections
+                  let orderMaster = [];
+                  let numMaster = 0;
+                  if(marker.isMaster){
+                    numMaster+=1;
+                    orderMaster.push(hole.order);
+                  }
+                  if(marker.h_connection.length>0){
+                    marker.h_connection.forEach(hc=>{
+                      if(hc[0]==project.id[0]){
+                        const idxH = getIdxById(LCCore, hc);
+                        const hHole = LCCore.projects[idxH[0]].holes[idxH[1]];
+                        const hMarker = hHole.sections[idxH[2]].markers[idxH[3]];
+                        if(hMarker.isMaster){
+                          numMaster+=1;
+                          orderMaster.push(hHole.order);
+                        }
+                      }
+                    })
+                  }
+                  
+                  if(numMaster==2) {
+                    orderMaster.sort();
+                    if(hole.order>=orderMaster[0] && hole.order<orderMaster[1]){
+                      //if connection of master section
+                      if(project.model_type == "duo"){
+                        connection_colour = objOpts.connection.duo_master_section_colour;
                       }else{
-                        //not connected directly
-                        const sourceHole = getDataFromId(LCCore, [marker.depth_source[1][0],marker.depth_source[1][1],null,null]);
-                        if(sourceHole.order > hole.order && marker.depth_source[1][0] === marker.id[0]){
+                        connection_colour = objOpts.connection.base_master_section_colour;
+                      }
+                      
+                      connection_line_width = objOpts.connection.line_width;
+
+                      if(objOpts.connection.emphasise_master_connections){
+                        connection_line_width = connection_line_width * 2;
+                      }               
+                      
+                    }
+                  }
+
+                  if (connectionData.isNext == false) {
+                    //connected core is not located at the next
+                    if (objOpts.connection.show_remote_connections){
+                      if(objOpts.connection.emphasise_remote_connections){
+                        sketch.drawingContext.setLineDash([5, 5]);
+                      }
+                    }else{
+                      continue
+                    }
+                  }
+
+                  //draw connection---------------------------------------------
+                  sketch.strokeWeight(connection_line_width);
+                  sketch.stroke(connection_colour);
+
+                  sketch.line(cn_x0, cn_y0, cn_x1, cn_y1); //start point
+                  sketch.line(cn_x1, cn_y1, cn_x2, cn_y2); //index left
+                  sketch.line(cn_x2, cn_y2, cn_x3, cn_y3); //index right
+
+                  if(["developer","root"].includes(objOpts.developer.mode)){
+                    //source arrow
+                    let dir = null;
+                    if(marker.depth_source[1]){
+                      if(marker.depth_source[1][1] !== marker.id[1]){
+                        //not same hole
+                        if(marker.depth_source[1][3] == connectedMarker.id[3]){
+                          //connected between markers
                           dir = "left";
+                        }else{
+                          //not connected directly
+                          const sourceHole = getDataFromId(LCCore, [marker.depth_source[1][0],marker.depth_source[1][1],null,null]);
+                          if(sourceHole.order > hole.order && marker.depth_source[1][0] === marker.id[0]){
+                            dir = "left";
+                          }
                         }
-                      }
-                    }                                     
-                  }
+                      }                                     
+                    }
 
-                  if(connectedMarker.depth_source[1]){
-                    if(connectedMarker.depth_source[1][1] !== connectedMarker.id[1]){
-                      //not same hole
-                      if(connectedMarker.depth_source[1][3] == marker.id[3]){
-                        //connected between markers
-                        dir = "right";
-                      }else{
-                        //not connected directly
-                        const sourceHole = getDataFromId(LCCore, [connectedMarker.depth_source[1][0],connectedMarker.depth_source[1][1],null,null]);
-                        if(sourceHole.order < hole.order && connectedMarker.depth_source[1][0] === connectedMarker.id[0]){
+                    if(connectedMarker.depth_source[1]){
+                      if(connectedMarker.depth_source[1][1] !== connectedMarker.id[1]){
+                        //not same hole
+                        if(connectedMarker.depth_source[1][3] == marker.id[3]){
+                          //connected between markers
                           dir = "right";
+                        }else{
+                          //not connected directly
+                          const sourceHole = getDataFromId(LCCore, [connectedMarker.depth_source[1][0],connectedMarker.depth_source[1][1],null,null]);
+                          if(sourceHole.order < hole.order && connectedMarker.depth_source[1][0] === connectedMarker.id[0]){
+                            dir = "right";
+                          }
                         }
-                      }
-                    }   
+                      }   
+                    }
+                  
+
+                    //connectedMarker
+                    //sourceMarker
+                        
+                    sketch.drawingContext.setLineDash([]);
+                    if(dir=="right"){
+                      sketch.line(cn_x2, cn_y2-5, cn_x3, cn_y3); 
+                      sketch.line(cn_x2, cn_y2+5, cn_x3, cn_y3); 
+                    }else if(dir=="left"){
+                      sketch.line(cn_x0, cn_y0, cn_x1, cn_y1-5);
+                      sketch.line(cn_x0, cn_y0, cn_x1, cn_y1+5);
+                    }
+
                   }
-                 
 
-                  //connectedMarker
-                  //sourceMarker
-                       
-                  sketch.drawingContext.setLineDash([]);
-                  if(dir=="right"){
-                    sketch.line(cn_x2, cn_y2-5, cn_x3, cn_y3); 
-                    sketch.line(cn_x2, cn_y2+5, cn_x3, cn_y3); 
-                  }else if(dir=="left"){
-                    sketch.line(cn_x0, cn_y0, cn_x1, cn_y1-5);
-                    sketch.line(cn_x0, cn_y0, cn_x1, cn_y1+5);
-                  }
-
-                }
-
-                //------------------------------------------------------------                
-              } 
-              
-              //=====================================================================================================
-            }
+                  //------------------------------------------------------------                
+                } 
+                
+                //=====================================================================================================
+              }
+            }  
           }
         }
         num_disable.total += project.holes.length + objOpts.project.interval;
@@ -5568,7 +5634,7 @@ document.addEventListener("DOMContentLoaded", () => {
           //result.pos_canvas_y  = (data[objOpts.canvas.depth_scale] * data.amplification_y + shift_y) * yMag + pad_y;
           const scrollerTopRealScale   = (scroller.scrollTop - pad_y) / yMag - shift_y;//cm
           const scrollerBotRealScale   = (scroller.scrollTop + window.innerHeight - pad_y) / yMag - shift_y;//cm
-          const bufferVal = objOpts.canvas.buffer_depth * yMag;
+          const bufferVal = (scrollerBotRealScale-scrollerTopRealScale) * objOpts.canvas.buffer_depth * yMag;
           const searchTop = scrollerTopRealScale - bufferVal;
           const searchBot = scrollerBotRealScale + bufferVal;
           let startIndex = binarySearchIndex(ageList, searchTop, (d) => d[objOpts.canvas.depth_scale]);
@@ -5647,264 +5713,258 @@ document.addEventListener("DOMContentLoaded", () => {
       if(objOpts.plot.isVisible == true){
         if(objOpts.plot.selected_options !== null){          
           sketch.drawingContext.setLineDash([]);
-          for(let t=0; t<LCPlotData.draw_collections.length; t++){
-            //get inside data
-            const scrollerTopRealScale   = (scroller.scrollTop - pad_y) / yMag - shift_y;//cm
-            const scrollerBotRealScale   = (scroller.scrollTop + window.innerHeight - pad_y) / yMag - shift_y;//cm            
+          if(LCPlotData){
+            for(let t=0; t<LCPlotData.draw_collections.length; t++){
+              //get inside data
+              //const scrollerTopRealScale   = (scroller.scrollTop - pad_y) / yMag - shift_y;//cm
+              //const scrollerBotRealScale   = (scroller.scrollTop + window.innerHeight - pad_y) / yMag - shift_y;//cm            
 
-            //calc zoom level
-            const dispPix = scroller.clientHeight * objOpts.canvas.dpir;     
-            const drawResolution = (scrollerBotRealScale - scrollerTopRealScale)/dispPix;//cm/pic
-            let zoomLevel = 0;
-            if (drawResolution >= 10) {        // 10 cm/pix 〜 7.5 cm/pix
-                // level 4
-                zoomLevel = 13;
-            } else if (drawResolution >= 7.5000) {  
-                // level 3
-                zoomLevel = 12;
-            } else if (drawResolution >= 5.0000) { 
-                // level 2
-                zoomLevel = 11;
-            } else if (drawResolution >= 2.5000) {
-                // level 1
-                zoomLevel = 10;
-            } else if (drawResolution >= 1.0000) {  
-                // level 3
-                zoomLevel = 9;
-            } else if (drawResolution >= 0.7500) { 
-                // level 2
-                zoomLevel = 8;
-            } else if (drawResolution >= 0.5000) { 
-                // level 1
-                zoomLevel = 7;
-            } else if (drawResolution >= 0.2500) { 
-                // level 3
-                zoomLevel = 6;
-            } else if (drawResolution >= 0.1000) { 
-                // level 2
-                zoomLevel = 5;
-            } else if (drawResolution >= 0.0750) { 
-                // level 1
-                zoomLevel = 4;
-            } else if (drawResolution >= 0.050) {  
-                // level 3
-                zoomLevel = 3;
-            } else if (drawResolution >= 0.025) { 
-                // level 2
-                zoomLevel = 2;
-            } else if (drawResolution >= 0.010) { 
-                // level 1
-                zoomLevel = 1;
-            } else {
-                // level 0
-                zoomLevel = 0;
-            }
+              //calc zoom level
+              const dispPix = scroller.clientHeight * objOpts.canvas.dpir;     
+              const drawResolution = (scrollerBotRealScale - scrollerTopRealScale)/dispPix;//cm/pic
+              let zoomLevel = 0;
 
-            //getdata
-            const pOptions = objOpts.plot.selected_options[t];            
-            const drawDataset = LCPlotData.draw_collections[t][zoomLevel];
+              if (drawResolution >= 10) {        // 10 cm/pix 〜 7.5 cm/pix
+                  zoomLevel = 13;
+              } else if (drawResolution >= 7.5000) {  
+                  zoomLevel = 12;
+              } else if (drawResolution >= 5.0000) { 
+                  zoomLevel = 11;
+              } else if (drawResolution >= 2.5000) {
+                  zoomLevel = 10;
+              } else if (drawResolution >= 1.0000) {  
+                  zoomLevel = 9;
+              } else if (drawResolution >= 0.7500) { 
+                  zoomLevel = 8;
+              } else if (drawResolution >= 0.5000) { 
+                  zoomLevel = 7;
+              } else if (drawResolution >= 0.2500) { 
+                  zoomLevel = 6;
+              } else if (drawResolution >= 0.1000) { 
+                  zoomLevel = 5;
+              } else if (drawResolution >= 0.0750) { 
+                  zoomLevel = 4;
+              } else if (drawResolution >= 0.050) {  
+                  zoomLevel = 3;
+              } else if (drawResolution >= 0.025) { 
+                  zoomLevel = 2;
+              } else if (drawResolution >= 0.010) { 
+                  zoomLevel = 1;
+              } else {
+                  zoomLevel = 0;
+              }
 
-            //check inside
-            const bufferVal = objOpts.canvas.buffer_depth * yMag;
+              //getdata
+              const pOptions = objOpts.plot.selected_options[t];            
+              const drawDataset = LCPlotData.draw_collections[t][zoomLevel];
 
-            const searchTop = scrollerTopRealScale - bufferVal;
-            const searchBot = scrollerBotRealScale + bufferVal;
-            let startIndex  = binarySearchIndex(drawDataset.data, searchTop, (d) => d[objOpts.canvas.depth_scale]);
-            let endIndex    = binarySearchIndex(drawDataset.data, searchBot, (d) => d[objOpts.canvas.depth_scale]);
-            const numPoints = endIndex - startIndex ? endIndex - startIndex + 1 : 0;
-            if(["root"].includes(objOpts.developer.mode)){
-              console.log("Dipslay: Zoom: ",zoomLevel,", hight pix: ",sketch.height * dpir,", hight cm: ", (searchBot-searchTop).toFixed(2)," cm, points: N=", numPoints)
-            }
-            
-            //extract
-            const extractedDrawDataset = structuredClone(drawDataset);
-            extractedDrawDataset.data  = drawDataset.data.slice(startIndex, endIndex+1);
-            extractedDrawDataset.data.sort((a, b) =>
-                  a.hname.localeCompare(b.hname)
-            );
+              //check inside
+              //const bufferVal = (scrollerBotRealScale-scrollerTopRealScale) * objOpts.canvas.buffer_depth * yMag;
 
-            //calc position
-            if(extractedDrawDataset.data.length==0) continue;
-            const drawData = calcDrawPosition(extractedDrawDataset, LCCore, objOpts, pOptions);
+              const searchTop = scrollerTopRealScale - bufferVal;
+              const searchBot = scrollerBotRealScale + bufferVal;
+              let startIndex  = binarySearchIndex(drawDataset.data, searchTop, (d) => d[objOpts.canvas.depth_scale]);
+              let endIndex    = binarySearchIndex(drawDataset.data, searchBot, (d) => d[objOpts.canvas.depth_scale]);
+              const numPoints = endIndex - startIndex ? endIndex - startIndex + 1 : 0;
+              if(["root"].includes(objOpts.developer.mode)){
+                console.log("Dipslay: Zoom: ",zoomLevel,", hight pix: ",sketch.height * dpir,", hight cm: ", (searchBot-searchTop).toFixed(2)," cm, points: N=", numPoints)
+              }
+              
+              //extract
+              const extractedDrawDataset = structuredClone(drawDataset);
+              extractedDrawDataset.data  = drawDataset.data.slice(startIndex, endIndex+1);
+              if(extractedDrawDataset.data.length==0) continue;
 
-            //draw
-            let zeroDataDict = {};
-            // Calculate zero position if not yet calculated
-            LCCore.projects.forEach(project=>{
-              project.holes.forEach((hole, h)=>{
-                if(extractedDrawDataset.data.length>0){
-                  
-                }
-                const zeroDrawDataset = structuredClone(extractedDrawDataset);
-                zeroDrawDataset.data = [structuredClone(zeroDrawDataset.data[0]), structuredClone(zeroDrawDataset.data[0]), structuredClone(zeroDrawDataset.data[0])];
-                if(zeroDrawDataset.data[0]){
-                  //set zero
-                  zeroDrawDataset.data[0].val = 0;
-                  zeroDrawDataset.data[0].hname = hole.name;
-                  zeroDrawDataset.data[0].hidx = h;
-                  //set max
-                  zeroDrawDataset.data[1].val = zeroDrawDataset.max;
-                  zeroDrawDataset.data[1].hname = hole.name;
-                  zeroDrawDataset.data[1].hidx = h;
-                  //set min
-                  zeroDrawDataset.data[2].val = zeroDrawDataset.min;
-                  zeroDrawDataset.data[2].hname = hole.name;
-                  zeroDrawDataset.data[2].hidx = h;
-                  
-                  const zeroDataset = calcDrawPosition(zeroDrawDataset, LCCore, objOpts, pOptions);
-                  zeroDataDict[hole.name] = zeroDataset.data[0];
-                  /*
-                  console.log(zeroData)
-
-                  //draw baseline
-                  sketch.strokeWeight(1); 
-                  sketch.stroke("blue"); 
-                  sketch.noFill();
-                  sketch.line(
-                    zeroData.pos_x,
-                    drawData.min, // Screen Top
-                    zeroData.pos_x,
-                    drawData.max  // Screen Bottom
-                  );
-                  */
-
-                  //X axis
-                  const isDrawAxis = true;
-
-                  if (isDrawAxis) {
-                      const yAxis = 200 + scroller.scrollTop;
-                      const yLabel = yAxis + 15;
-                      const yTitle = yAxis - 25;
-                      
-                      const xMax = zeroDataset.data[1].pos_x;
-                      const xMin = zeroDataset.data[2].pos_x;
-                      const xCenter = xMin + (xMax - xMin) / 2;
-                      
-                      const minValueStr = autoRound(zeroDataset.min).toString();
-                      const maxValueStr = autoRound(zeroDataset.max).toString();
-                      const title = zeroDataset.data[0].header + " [" + zeroDataset.data[0].unit + "]";
-                      
-                      sketch.push();
-
-                      sketch.strokeWeight(2);
-                      sketch.stroke(pOptions.colour);
-                      sketch.fill(pOptions.colour);
-                      
-                      sketch.line(xMax, yAxis, xMin, yAxis);
-
-                      const tickLength = 5;
-                      sketch.strokeWeight(1);
-                      sketch.line(xMin, yAxis, xMin, yAxis + tickLength);
-                      sketch.line(xMax, yAxis, xMax, yAxis + tickLength);
-                      
-                      sketch.noStroke();
-                      sketch.textSize(12);
-
-                      sketch.textAlign(sketch.RIGHT);
-                      sketch.text(minValueStr, xMin, yLabel);
-
-                      sketch.textAlign(sketch.LEFT);
-                      sketch.text(maxValueStr, xMax, yLabel);
-                      
-                      sketch.textAlign(sketch.CENTER); 
-                      sketch.textSize(14);
-                      sketch.text(title, xCenter, yTitle);
-                      
-                      sketch.pop();
-                  }
-                  
-
-                }
-              })
-            })   
-
-            if (pOptions.plotType == "line") {
-              sketch.strokeWeight(1); 
-              sketch.stroke(pOptions.colour); 
-              sketch.noFill();
-              sketch.beginShape();
-            }else if(pOptions.plotType == "bar"){
-              sketch.noStroke(); 
-              sketch.fill(pOptions.colour);
-              sketch.beginShape(sketch.QUADS);                         
-            }
-
-            //main
-            for(let d=0; d<drawData.data.length; d++){
-              const pData = drawData.data[d];              
-              if (!Number.isFinite(pData.pos_x) || !Number.isFinite(pData.pos_y)) continue;
-
-              if(pOptions.plotType == "line"){
-                // ---------------------------------------------------------
-                // Line Plot: Use vertex() instead of line()
-                // ---------------------------------------------------------                
-                // Add a vertex to the current shape batch (doesn't draw yet)
-                sketch.vertex(pData.pos_x, pData.pos_y);
-
-                // Handle data discontinuity (e.g., different hole or section)
-                // We must break the line if the next point belongs to a different group
-                const nextpData = drawData.data[d+1];
-                if (nextpData == undefined || pData.hname !== nextpData.hname || pData.sname !== nextpData.sname) {
-                    sketch.endShape();   // Draw the current segment
-                    sketch.beginShape(); // Start a new segment
-                }            
-              }else if(pOptions.plotType == "scatter"){
-                // ---------------------------------------------------------
-                // Scatter Plot
-                // ---------------------------------------------------------    
-                sketch.stroke(pOptions.colour);
-                sketch.strokeWeight(3); 
-
-                sketch.point(
-                  pData.pos_x,
-                  pData.pos_y
+              //sort 
+              if(extractedDrawDataset.data[0].source == "trinity"){
+                extractedDrawDataset.data.sort((a, b) =>
+                      a.hname.localeCompare(b.hname)
                 );
+              }
+              
+              //calc position
+             
+              const drawData = calcDrawPosition(extractedDrawDataset, LCCore, objOpts, pOptions);
+
+              //draw
+              let zeroDataDict = {};
+              // Calculate zero position if not yet calculated
+              LCCore.projects.forEach(project=>{
+                project.holes.forEach((hole, h)=>{
+                  if(extractedDrawDataset.data.length>0){
+                    
+                  }
+                  const zeroDrawDataset = structuredClone(extractedDrawDataset);
+                  zeroDrawDataset.data = [structuredClone(zeroDrawDataset.data[0]), structuredClone(zeroDrawDataset.data[0]), structuredClone(zeroDrawDataset.data[0])];
+                  if(zeroDrawDataset.data[0]){
+                    //set zero
+                    zeroDrawDataset.data[0].val = 0;
+                    zeroDrawDataset.data[0].hname = hole.name;
+                    zeroDrawDataset.data[0].hidx = h;
+                    //set max
+                    zeroDrawDataset.data[1].val = zeroDrawDataset.max;
+                    zeroDrawDataset.data[1].hname = hole.name;
+                    zeroDrawDataset.data[1].hidx = h;
+                    //set min
+                    zeroDrawDataset.data[2].val = zeroDrawDataset.min;
+                    zeroDrawDataset.data[2].hname = hole.name;
+                    zeroDrawDataset.data[2].hidx = h;
+                    
+                    const zeroDataset = calcDrawPosition(zeroDrawDataset, LCCore, objOpts, pOptions);
+                    zeroDataDict[hole.name] = zeroDataset.data[0];
+                    /*
+                    console.log(zeroData)
+
+                    //draw baseline
+                    sketch.strokeWeight(1); 
+                    sketch.stroke("blue"); 
+                    sketch.noFill();
+                    sketch.line(
+                      zeroData.pos_x,
+                      drawData.min, // Screen Top
+                      zeroData.pos_x,
+                      drawData.max  // Screen Bottom
+                    );
+                    */
+
+                    //X axis
+                    const isDrawAxis = true;
+
+                    if (isDrawAxis) {
+                        const yAxis = 200 + scroller.scrollTop;
+                        const yLabel = yAxis + 15;
+                        const yTitle = yAxis - 25;
+                        
+                        const xMax = zeroDataset.data[1].pos_x;
+                        const xMin = zeroDataset.data[2].pos_x;
+                        const xCenter = xMin + (xMax - xMin) / 2;
+                        
+                        const minValueStr = autoRound(zeroDataset.min).toString();
+                        const maxValueStr = autoRound(zeroDataset.max).toString();
+                        const title = zeroDataset.data[0].header + " [" + zeroDataset.data[0].unit + "]";
+                        
+                        sketch.push();
+
+                        sketch.strokeWeight(2);
+                        sketch.stroke(pOptions.colour);
+                        sketch.fill(pOptions.colour);
+                        
+                        sketch.line(xMax, yAxis, xMin, yAxis);
+
+                        const tickLength = 5;
+                        sketch.strokeWeight(1);
+                        sketch.line(xMin, yAxis, xMin, yAxis + tickLength);
+                        sketch.line(xMax, yAxis, xMax, yAxis + tickLength);
+                        
+                        sketch.noStroke();
+                        sketch.textSize(12);
+
+                        sketch.textAlign(sketch.RIGHT);
+                        sketch.text(minValueStr, xMin, yLabel);
+
+                        sketch.textAlign(sketch.LEFT);
+                        sketch.text(maxValueStr, xMax, yLabel);
+                        
+                        sketch.textAlign(sketch.CENTER); 
+                        sketch.textSize(14);
+                        sketch.text(title, xCenter, yTitle);
+                        
+                        sketch.pop();
+                    }
+                    
+
+                  }
+                })
+              })   
+
+              if (pOptions.plotType == "line") {
+                sketch.strokeWeight(1); 
+                sketch.stroke(pOptions.colour); 
+                sketch.noFill();
+                sketch.beginShape();
               }else if(pOptions.plotType == "bar"){
-                // ---------------------------------------------------------
-                // Bar Plot Logic (Dynamic Width)
-                // ---------------------------------------------------------                
-                // 1. Calculate dynamic height based on the distance to the next data point
-                let depthDiff = 0;
+                sketch.noStroke(); 
+                sketch.fill(pOptions.colour);
+                sketch.beginShape(sketch.QUADS);                         
+              }
 
-                if (d < drawData.data.length - 1) {
-                    // Calculate distance to the NEXT point
-                    depthDiff = Math.abs(drawData.data[d+1][objOpts.canvas.depth_scale] - drawData.data[d][objOpts.canvas.depth_scale]);
-                } else if (d > 0) {
-                    // For the LAST point, use the distance from the PREVIOUS point
-                    depthDiff = Math.abs(drawData.data[d][objOpts.canvas.depth_scale] - drawData.data[d-1][objOpts.canvas.depth_scale]);
-                } else {
-                    // Fallback if there is only 1 data point
-                    depthDiff = 1.0; 
-                }
+              //main
+              for(let d=0; d<drawData.data.length; d++){
+                const pData = drawData.data[d];              
+                if (!Number.isFinite(pData.pos_x) || !Number.isFinite(pData.pos_y)) continue;
 
-                // 2. Convert depth difference to pixels (using yMag)
-                // Multiply by 0.9 or similar to leave a small gap (optional)
-                //let binWidth = (depthDiff * yMag) * 0.9; 
-                let binWidth = 5;
-                // Safety: ensure minimum visibility (e.g., at least 1px)
-                if(binWidth < 1) binWidth = 1;
+                if(pOptions.plotType == "line"){
+                  // ---------------------------------------------------------
+                  // Line Plot: Use vertex() instead of line()
+                  // ---------------------------------------------------------                
+                  // Add a vertex to the current shape batch (doesn't draw yet)
+                  sketch.vertex(pData.pos_x, pData.pos_y);
 
-                // Define rectangle coordinates
-                const rectX0 = zeroDataDict[pData.hname].pos_x;
-                const rectX1 = pData.pos_x;
-                // Center the bar on the data point
-                const rectY0 = pData.pos_y - binWidth/2;
-                const rectY1 = pData.pos_y + binWidth/2;
+                  // Handle data discontinuity (e.g., different hole or section)
+                  // We must break the line if the next point belongs to a different group
+                  const nextpData = drawData.data[d+1];
+                  if (nextpData == undefined || pData.hname !== nextpData.hname || pData.sname !== nextpData.sname) {
+                      sketch.endShape();   // Draw the current segment
+                      sketch.beginShape(); // Start a new segment
+                  }            
+                }else if(pOptions.plotType == "scatter"){
+                  // ---------------------------------------------------------
+                  // Scatter Plot
+                  // ---------------------------------------------------------    
+                  sketch.stroke(pOptions.colour);
+                  sketch.strokeWeight(3); 
 
-                // Register the 4 corners (QUADS)
-                sketch.vertex(rectX0, rectY0);
-                sketch.vertex(rectX1, rectY0);
-                sketch.vertex(rectX1, rectY1);
-                sketch.vertex(rectX0, rectY1);
-              }                                  
-            }
+                  sketch.point(
+                    pData.pos_x,
+                    pData.pos_y
+                  );
+                }else if(pOptions.plotType == "bar"){
+                  // ---------------------------------------------------------
+                  // Bar Plot Logic (Dynamic Width)
+                  // ---------------------------------------------------------                
+                  // 1. Calculate dynamic height based on the distance to the next data point
+                  let depthDiff = 0;
 
-            // Finish and render the final batch of lines
-            if (pOptions.plotType == "line" || pOptions.plotType == "bar") {
-              sketch.endShape();
-            }
-            
-          }
+                  if (d < drawData.data.length - 1) {
+                      // Calculate distance to the NEXT point
+                      depthDiff = Math.abs(drawData.data[d+1][objOpts.canvas.depth_scale] - drawData.data[d][objOpts.canvas.depth_scale]);
+                  } else if (d > 0) {
+                      // For the LAST point, use the distance from the PREVIOUS point
+                      depthDiff = Math.abs(drawData.data[d][objOpts.canvas.depth_scale] - drawData.data[d-1][objOpts.canvas.depth_scale]);
+                  } else {
+                      // Fallback if there is only 1 data point
+                      depthDiff = 1.0; 
+                  }
+
+                  // 2. Convert depth difference to pixels (using yMag)
+                  // Multiply by 0.9 or similar to leave a small gap (optional)
+                  //let binWidth = (depthDiff * yMag) * 0.9; 
+                  let binWidth = 5;
+                  // Safety: ensure minimum visibility (e.g., at least 1px)
+                  if(binWidth < 1) binWidth = 1;
+
+                  // Define rectangle coordinates
+                  const rectX0 = zeroDataDict[pData.hname].pos_x;
+                  const rectX1 = pData.pos_x;
+                  // Center the bar on the data point
+                  const rectY0 = pData.pos_y - binWidth/2;
+                  const rectY1 = pData.pos_y + binWidth/2;
+
+                  // Register the 4 corners (QUADS)
+                  sketch.vertex(rectX0, rectY0);
+                  sketch.vertex(rectX1, rectY0);
+                  sketch.vertex(rectX1, rectY1);
+                  sketch.vertex(rectX0, rectY1);
+                }                                  
+              }
+
+              // Finish and render the final batch of lines
+              if (pOptions.plotType == "line" || pOptions.plotType == "bar") {
+                sketch.endShape();
+              }
+              
+            } 
+          }          
         }
       }
 
@@ -5998,28 +6058,34 @@ document.addEventListener("DOMContentLoaded", () => {
     //let x = (scroller.scrollLeft + mouseX - pad_x) / xMag - shift_x;
     //let y = (scroller.scrollTop + mouseY - pad_y) / yMag / age_mod - shift_y;
     
+    console.log('clicked', clickCount);
     sketch.mouseClicked = () => {
       if (clickCount == 2) {
+        //get clicked point
         startPoint = null;
+        startPoint = getClickedItemIdx(sketch.mouseX, sketch.mouseY, LCCore, objOpts);
         clickCount -= 1;
+
+        //draw
         sketch.loop();
-        //convert depth scale
-        startPoint = getClickedItemIdx(sketch.mouseX, sketch.mouseY, LCCore, objOpts)        
+        console.log("[Measure]: Strat from " + startPoint.y);
+        
         //startPoint[0] = (sketch.mouseX + scroller.scrollLeft - objOpts.canvas.pad_x) / objOpts.canvas.zoom_level[0] * objOpts.canvas.dpir - objOpts.canvas.shift_x;
         //startPoint[1] = (sketch.mouseY + scroller.scrollTop - objOpts.canvas.pad_y - age_correction[1]) / (objOpts.canvas.zoom_level[1]  * objOpts.canvas.dpir * age_correction[0]) - objOpts.canvas.shift_y;
-        //finish
-        console.log("[Measure]: Strat from " + startPoint.y);
       } else if (clickCount == 1) {
+        //get clicked point
         endPoint = null;
-        clickCount -= 1;
-        sketch.noLoop();
-        //convert depth scale
         endPoint = getClickedItemIdx(sketch.mouseX, sketch.mouseY, LCCore, objOpts) 
+        clickCount -= 1;
+
+        //draw
+        sketch.noLoop();
+        console.log("[Measure]: End to " + endPoint.y);
+        
         //endPoint[0] = (sketch.mouseX + scroller.scrollLeft - objOpts.canvas.pad_x) / objOpts.canvas.zoom_level[0] * objOpts.canvas.dpir - objOpts.canvas.shift_x;
         //endPoint[1] = (sketch.mouseY + scroller.scrollTop - objOpts.canvas.pad_y - age_correction[1]) / (objOpts.canvas.zoom_level[1] * objOpts.canvas.dpir * age_correction[0]) - objOpts.canvas.shift_y;
-        //finish
-        console.log("[Measure]: End to " + endPoint.y);
 
+        //calc distance
         measureResults(startPoint, endPoint);
         document.body.style.cursor = "default"; 
         
@@ -7023,6 +7089,7 @@ function getIdxById(LCCore, id) {
 
     return relative_idxs;
   }catch(err){
+    console.error(err)
     return null;
   }
 }
@@ -7473,6 +7540,7 @@ async function loadCoreImages(modelImages, LCCore, objOpts, operations) {
           results.load_target_ids = [];
           p5resolve();
         }catch(err){
+          console.error(err)
           p5reject();
         }
         
@@ -7548,7 +7616,7 @@ async function assignCoreImages(coreImages, imageBuffers) {
                   results.plot_colour[imName] = false; 
                   resolveImage();
                 } catch (err) {
-                  console.log(err);
+                  console.error(err);
                   
                   imageBuffers[depthScale][imName] = null; delete imageBuffers[depthScale][imName];
                   resolveImage();
@@ -7566,6 +7634,7 @@ async function assignCoreImages(coreImages, imageBuffers) {
           
           resolve(results);
         } catch (err) {
+          console.error(err)
           reject(err);
         }
       });
@@ -7589,7 +7658,7 @@ async function loadResourcePath(objOpts){
     console.log(path);
     return path;
   } catch {
-    console.log("Failed to load resource path", error);
+    console.error("Failed to load resource path", error);
 
   }
 }
@@ -7598,7 +7667,9 @@ function loadToolIcons(objOpts) {
     try {
       data =  objOpts.interface.icon_list[key];
       document.getElementById(key).querySelector("img").src = data;
-    }catch{}
+    }catch(err){
+      console.error(err)
+    }
   }
 }
 //--------------------------------------------------------------------------------------------------
@@ -7941,7 +8012,7 @@ function drawPointData(data=null, LCCore=null){
     output.age    = data[9];
     output.ageu   = data[10];
     output.agel   = data[11];
-    output.source = data[12] == "trinity" ? "trinity" : "global";
+    output.source = data[12];// == "trinity" ? "trinity" : "global";
 
     output.pos_x  = null;
     output.pos_y  = null;
@@ -8432,10 +8503,10 @@ function calcDrawPosition(drawPointDataset, LCCore, objOpts, pOptions){
 
   //calc
   for(let i=0; i<drawPointDataset.data.length; i++){
-    const drawData = drawPointDataset.data[i];
-    const enableHoles = holeEnableList[drawData.pidx][drawData.hidx];
+    const drawData = drawPointDataset.data[i];    
     
     if(drawData.source === "trinity"){
+      const enableHoles = holeEnableList[drawData.pidx][drawData.hidx];
       //calc 
       if(drawData.type == "age"){
         //age xpos is fixed. adjust icon size
@@ -8446,7 +8517,7 @@ function calcDrawPosition(drawPointDataset, LCCore, objOpts, pOptions){
         drawData.pos_x = ((objOpts.hole.distance + objOpts.hole.width) * (enableHoles.enable -1 ) + (drawData.val - val_min) * amp[0] + shift_x) * xMag + pad_x;
         drawData.pos_y = (drawData[objOpts.canvas.depth_scale]  * amp[1] + shift_y) * yMag + pad_y;
       }
-    }else if(drawData.source === "global"){
+    }else{
       //case depth source is CD, EFD, AGE
       if(drawData.type == "age"){
         const age_shift_x   = -50;
@@ -8457,10 +8528,7 @@ function calcDrawPosition(drawPointDataset, LCCore, objOpts, pOptions){
         drawData.pos_y = (drawData[objOpts.canvas.depth_scale] * amp[1] + shift_y) * yMag + pad_y;
       }
 
-    }else{
-      console.log("[Renderer]: There is unsuspected source type.")
-      return drawPointDataset
-    }    
+    }
   }
 
   return drawPointDataset

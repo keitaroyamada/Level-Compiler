@@ -5,7 +5,8 @@ document.addEventListener("DOMContentLoaded", () => {
   let n_c = null;
   let output_type = "export";
   let called_from = "";
-  let headrLines = 1;
+  let headerLines = 1;
+  let dataId = null;
   //-------------------------------------------------------------------------------------------
   window.ConverterApi.receive("ConverterMenuClicked", async (data) => {
     output_type = data.output_type;
@@ -21,7 +22,7 @@ document.addEventListener("DOMContentLoaded", () => {
       document.getElementById("cvt_bt_convert").textContent = "Import";
       document.querySelectorAll('.precision_output').forEach(el => el.style.display = 'none');
       document.querySelectorAll('.check_outside').forEach(el => el.style.display = 'flex');
-      document.querySelectorAll('.check_outside').forEach(el => el.checked = true);
+      document.querySelectorAll('.check_outside input[type="checkbox"]').forEach(el => el.checked = true);
     }
 
     //make model chooser
@@ -53,6 +54,7 @@ document.addEventListener("DOMContentLoaded", () => {
   //-------------------------------------------------------------------------------------------
   //load data
   document.getElementById("cvt_bt_import").addEventListener("click", async (event) => {
+    //select csv button
       console.log("Load from file chose.");
       source_data = null;
       let path = null;
@@ -255,7 +257,7 @@ document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("cvt_bt_convert").addEventListener("click", async (event) => {
     try{
       document.getElementById("cvt_bt_convert").disabled = true;
-      await window.ConverterApi.progressbar("Depth converter", "Now checking...", true, "converterWindow");
+      //await window.ConverterApi.progressbar("Depth converter", "Now checking...", true, "converterWindow");
 
       console.log("[Converter]: Converting...");
       document.body.style.cursor = "wait"; 
@@ -268,306 +270,78 @@ document.addEventListener("DOMContentLoaded", () => {
       let modelIds = {correlation: corId,  age: ageId};
 
       //get source type
-      const sourceType = document.getElementById("cvt_source_type").value;
-      let depthMaxIdx = 0;
+      const sourceType   = document.getElementById("cvt_source_type").value;
+      let depthMaxIdx    = 0;
       const allowOutside = document.getElementById("allow_outside_data").checked;
       
-      //make indata
-      let indataList = [];
+      //make send data
+      const sendData = {
+        //for preparation
+        id: dataId,
+        sourceType: sourceType,
+        nameIdx: null,
+        holeIdx: null, 
+        sectionIdx: null, 
+        distanceIdx: null,
+        cdIdx: null,
+        efdIdx: null,
+        ddIdx: null,
+        ageIdx: null,
+        dataStartFrom: null,
+        headerLines: headerLines,
+
+        //for converter
+        polationType: "linear",  
+        returnType: "min",
+        outType: output_type,//"export" or "import"
+        allowOutside: allowOutside,
+        callFrom: (output_type == "export") ? "converter" : "plotter",
+        isZip: true,
+        precision:precision        
+      };
+
       if (sourceType == "trinity") {
-        const nameIdx     = document.getElementById("depth_chooser0").value;
-        const holeIdx     = document.getElementById("depth_chooser1").value;
-        const sectionIdx  = document.getElementById("depth_chooser2").value;
-        const distanceIdx = document.getElementById("depth_chooser3").value;
-        depthMaxIdx = Math.max(...[nameIdx, holeIdx, sectionIdx, distanceIdx]);
-        //skip header
-        for (let i = headrLines; i < source_data.length; i++) {
-          const datumName =  source_data[i][nameIdx];//data name
-          const projectName = null;
-          let holeName = source_data[i][holeIdx];
-          if (/^\d+$/.test(holeName.toString()) == true) {
-            //case number
-            holeName = holeName.toString().padStart(2, "0");
-          }
-          let sectionName = source_data[i][sectionIdx];
-          if (/^\d+$/.test(sectionName.toString()) == true) {
-            //case number
-            sectionName = sectionName.toString().padStart(2, "0");
-          }
-          const distance = parseFloat(source_data[i][distanceIdx]);
-
-          indataList.push([
-            datumName,
-            [projectName, holeName, sectionName, distance],//position trinity name
-            [null,null,null,null],//search range
-          ]);
-        }
+        sendData.nameIdx       = parseInt(document.getElementById("depth_chooser0").value);
+        sendData.holeIdx       = parseInt(document.getElementById("depth_chooser1").value);
+        sendData.sectionIdx    = parseInt(document.getElementById("depth_chooser2").value);
+        sendData.distanceIdx   = parseInt(document.getElementById("depth_chooser3").value);
+        sendData.dataStartFrom = Math.max(...[sendData.nameIdx, sendData.holeIdx, sendData.sectionIdx, sendData.distanceIdx]);
       } else if (sourceType == "composite_depth") {
-        const nameIdx = document.getElementById("depth_chooser0").value;
-        const cdIdx = document.getElementById("depth_chooser1").value;
-        depthMaxIdx = Math.max(...[nameIdx, cdIdx]);
-        for (let i = headrLines; i < source_data.length; i++) {
-          indataList.push([
-            source_data[i][nameIdx],
-            source_data[i][cdIdx],
-            [null,null,null,null], 
-          ]);
-        }
+        sendData.nameIdx       = parseInt(document.getElementById("depth_chooser0").value);
+        sendData.cdIdx         = parseInt(document.getElementById("depth_chooser1").value);
+        sendData.dataStartFrom = Math.max(...[sendData.nameIdx, sendData.cdIdx]);        
       } else if (sourceType == "event_free_depth") {
-        const nameIdx = document.getElementById("depth_chooser0").value;
-        const efdIdx = document.getElementById("depth_chooser1").value;
-        depthMaxIdx = Math.max(...[nameIdx, efdIdx]);
-        for (let i = headrLines; i < source_data.length; i++) {
-          indataList.push([
-            source_data[i][nameIdx], 
-            source_data[i][efdIdx],
-            [null,null,null,null],
-          ]);
-        }
+        sendData.nameIdx       = parseInt(document.getElementById("depth_chooser0").value);
+        sendData.efdIdx        = parseInt(document.getElementById("depth_chooser1").value);
+        sendData.dataStartFrom = Math.max(...[sendData.nameIdx, sendData.efdIdx]);
       } else if (sourceType == "drilling_depth") {
-        const nameIdx = document.getElementById("depth_chooser0").value;
-        const ddIdx = document.getElementById("depth_chooser1").value;
-        depthMaxIdx = Math.max(...[nameIdx, ddIdx]);
-        for (let i = headrLines; i < source_data.length; i++) {
-          indataList.push([
-            source_data[i][nameIdx], 
-            source_data[i][ddIdx],
-            [null,null,null,null],
-          ]);
-        }
+        sendData.nameIdx       = parseInt(document.getElementById("depth_chooser0").value);
+        sendData.ddIdx         = parseInt(document.getElementById("depth_chooser1").value);
+        sendData.dataStartFrom = Math.max(...[sendData.nameIdx, sendData.ddIdx]);
       } else if (sourceType == "age") {
-        const nameIdx = document.getElementById("depth_chooser0").value;
-        const ageIdx = document.getElementById("depth_chooser1").value;
-
-        depthMaxIdx = Math.max(...[nameIdx, ageIdx]);
-        for (let i = headrLines; i < source_data.length; i++) {
-          indataList.push([
-            source_data[i][nameIdx], 
-            source_data[i][ageIdx],
-            [null,null,null,null],
-          ]);
-        }
-      }
-      console.log("[Converter]: Finish making input data list.")
-
-      //output     
-      if(output_type == "export"){
-        //calc
-        let convertedData = [];
-        let header = [
-            "Name",
-            "Project",
-            "Hole",
-            "Section",
-            "Distance (cm)",
-            "Composite depth (cm)",
-            "Eventfree depth (cm)",
-            "Drilling depth (cm)",
-            "Age mid (calBP)",
-            "Age upper (calBP)",
-            "Age lower (calBP)",
-
-            "Connection",
-            "Connection Rank",
-            "Source Type",
-            "Calc Type",
-            "Correlation Model Version",
-            "Event Model Version",
-            "Age Model Version",
-            "Description"
-        ];
-        if(n_c>depthMaxIdx+1){
-          for(let d=depthMaxIdx+1; d<n_c; d++){
-            header.push(source_data[0][d]);
-          }
-        }
-        convertedData.push(header);
-
-        //main
-        if (source_data === null) {return}
-        //cal depth in main
-        const options = {
-          sourceType: sourceType,
-          polationType: "linear",  
-          allowOutside: allowOutside,
-          callFrom: "converter",
-          isZip: true,
-        };
-
-        const zipInData = await zip(indataList);
-
-        const calcedDataList = await unzip(await window.ConverterApi.depthConverter(zipInData, options));
-
-        if(calcedDataList===null) {
-          document.body.style.cursor = "default"; 
-          window.ConverterApi.clearProgressbar();
-          return
-        }
-
-        for(let i=0; i<calcedDataList.length; i++){
-          //calc depth
-          const calcedData = calcedDataList[i];
-          
-          if(!calcedData){
-            console.log("Conversion was skipped at line: "+i+".");
-            continue
-          }
-
-          //update header
-          if(i==0){
-            if(calcedData.is_main_model===false){
-              header[5]+=" [DUO]";
-              header[6]+=" [DUO]";
-              header[13]+=" [DUO]";
-              header[14]+=" [DUO]";
-            }else{
-              header[5]+=" [MAIN]";
-              header[6]+=" [MAIN]";
-              header[13]+=" [MAIN]";
-              header[14]+=" [MAIN]";
-            }
-            if(sourceType !== "trinity"){
-              header[1]+="[PASEUDO]";
-              header[2]+="[PASEUDO]";
-              header[3]+="[PASEUDO]";
-              header[4]+="[PASEUDO]";
-            }
-          }
-
-          //make output array
-          let rowData = [
-            calcedData.name, //data name
-            calcedData.project, //project name
-            calcedData.hole, //hole name
-            calcedData.section, //section name
-            parseFloat(calcedData.distance).toFixed(precision), //distance
-            parseFloat(calcedData.cd).toFixed(precision), //composite depth
-            parseFloat(calcedData.efd).toFixed(precision), //event free depth
-            parseFloat(calcedData.dd).toFixed(precision), //drilling depth
-            parseFloat(calcedData.age_mid).toFixed(precision), //age mid
-            parseFloat(calcedData.age_upper).toFixed(precision), //age upper
-            parseFloat(calcedData.age_lower).toFixed(precision), //age lower
-
-            calcedData.is_main_model ? "MAIN " + calcedData.section_type : "DUO " + calcedData.section_type, // MAIN master section/parallel section
-            calcedData.correlation_rank,  //connection rank
-
-            calcedData.source_type,
-            calcedData.calc_type,
-            calcedData.is_main_model ? "[MAIN]" + calcedData.correlation_model_version : "[DUO]" + calcedData.correlation_model_version,
-            calcedData.is_main_model ? "[MAIN]" + calcedData.event_model_version : "[DUO]" + calcedData.event_model_version,
-            calcedData.age_model_version ? "[MAIN]" + calcedData.age_model_version : "",
-            calcedData.description, 
-          ];
-
-          //add data
-          if(n_c>depthMaxIdx+1){
-            for(let d=depthMaxIdx+1; d<n_c; d++){
-              rowData.push(source_data[i+1][d]);//remove header
-            }
-          }
-                    
-          convertedData.push(rowData);
-        }
-        
-        //export
-        await window.ConverterApi.progressbar("Depth converter", "Now saving...", true, "converterWindow");
-
-        const exRes = await window.ConverterApi.cvtExport(await zip(convertedData));
-
-        if(exRes){
-          console.log("[Converter]: Converted data is exported.");
-          window.ConverterApi.clearProgressbar();
-          alert("Conversion completed successfully.");
-        }else{
-          window.ConverterApi.clearProgressbar();
-          console.log("[Converter]: Failed to export.");
-          alert("Failed to convert data.");
-        }
-        
-      } else if (output_type == "import"){
-        //main convertion
-        if (source_data === null) {return}
-        const options = {
-          sourceType: sourceType,
-          polationType: "linear",  
-          allowOutside: true,
-          callFrom: "converter",
-          isZip: true,
-        };
-
-        //main calc
-        const calcedDataList = await unzip(await window.ConverterApi.depthConverter(await zip(indataList), options));
-        console.log("[Converter]: Receive convereted depth datalist.")
-
-        if(calcedDataList===null) {
-          document.body.style.cursor = "default"; 
-          window.ConverterApi.clearProgressbar();
-          return
-        }
-
-        let output = [];
-
-        for(let i=0; i<calcedDataList.length; i++){
-          //calc depth
-          const calcedData = calcedDataList[i];
-          
-          if(!calcedData){
-            console.log("Conversion was skipped at line: "+i+".");
-            continue
-          }
-
-          let header = [];
-          let units  = [];
-          for(let d=depthMaxIdx+1; d<n_c; d++){
-            const m = source_data[0][d].match(/^(.+?)(?:\[(.+)\])?$/) || [];
-            const name = m[1] || "";
-            const unit = m[2] || "";
-
-            header.push(name); //remove header
-            units.push(unit);
-          }
-          let values = [];
-          for(let d=depthMaxIdx+1; d<n_c; d++){
-            values.push(parseFloat(source_data[i+1][d])); //remove header
-          }
-          
-          calcedData.data_header = header;
-          calcedData.data_values = values;
-          calcedData.data_units  = units;
-
-          output.push(calcedData);
-        }
-
-        const cvtData = cvt2flat(output);
-        cvtData.name = source_path.name;
-
-        const sendData = {
-          name:"",
-          path: source_path,
-          data: cvtData,
-          send_to:called_from,
-          send_from:"Converter",
-        };
-
-        
-        await window.ConverterApi.sendImportedData(await zip(sendData));
-        console.log("[Converter]: Converted data is imported.");
-
-        //colse window
-        //window.close();
-
-      } else {
-        console.log("Unkown convert type.")
+        sendData.nameIdx       = parseInt(document.getElementById("depth_chooser0").value);
+        sendData.ageIdx        = parseInt(document.getElementById("depth_chooser1").value);
+        sendData.dataStartFrom = Math.max(...[sendData.nameIdx, sendData.ageIdx]);
       }
 
-      document.body.style.cursor = "default"; 
-      document.getElementById("cvt_bt_convert").disabled = false;
-
-      window.ConverterApi.clearProgressbar();
-      //console.log(convertedData);
+      //convert
+      const result = await window.ConverterApi.cvtConverter(await zip(sendData));
       
+      if(result.ok){
+        console.log("[Converter]: Converted data is exported successfully.");
+      }else{          
+        console.log("[Converter]: Failed to export.",result.reason);
+      }
+
+      //finish
+      document.body.style.cursor = "default";
+      //window.ConverterApi.clearProgressbar();
+      document.getElementById("cvt_bt_convert").disabled = false;
+      //console.log(convertedData);
+
+      return
     }catch(err){
-      console.log(err);
+      console.log("[Converter]: Failed to convert.",err);
     }      
   });
 
@@ -607,6 +381,7 @@ document.addEventListener("DOMContentLoaded", () => {
       for(let d=0;d<dataList.length;d++){
         //initialise
         source_data = null;
+        dataId      = null;
 
         await loadCsv(dataList[d].fullpath);
       }
@@ -615,23 +390,26 @@ document.addEventListener("DOMContentLoaded", () => {
 
     });
   async function loadCsv(path){
-    const result = await window.ConverterApi.progressbar("Depth converter", "Now loading...", true, "converterWindow");
+    //const result = await window.ConverterApi.progressbar("Depth converter", "Now loading...", true, "converterWindow");
 
-    if(result){
-      let data;
-      [data, loadedpath] = await window.ConverterApi.cvtLoadCsv(
-        "Please select the conversion target data",
-        [
-          {
-            name: "CSV file",
-            extensions: ["csv"],
-          },
-        ],
-        path
-      );
-      source_data = await unzip(data);
-    }
-     await window.ConverterApi.clearProgressbar();
+    let numRows = 0;
+    const zippedResults = await window.ConverterApi.cvtLoadCsv(
+      "Please select the conversion target data",
+      [
+        {
+          name: "CSV file",
+          extensions: ["csv"],
+        },
+      ],
+      path
+    );
+      const unzippedResults = await unzip(zippedResults);
+
+      source_data = unzippedResults.data;
+      loadedpath  = unzippedResults.path;
+      numRows     = unzippedResults.counts;
+      dataId      = unzippedResults.id;
+     //await window.ConverterApi.clearProgressbar();
 
 
     if (source_data !== null) {
@@ -694,7 +472,7 @@ document.addEventListener("DOMContentLoaded", () => {
       document.getElementById("cvt_source_type").dispatchEvent(new Event("change"));
 
       document.getElementById("data_path").textContent = loadedpath.match(/[^\\\/]*$/)[0];
-      document.getElementById("num_rows").textContent  = "Rows = "+source_data.length;
+      document.getElementById("num_rows").textContent  = "Rows = " + numRows;
     }
    
   }
@@ -751,59 +529,6 @@ document.addEventListener("DOMContentLoaded", () => {
       return null;
     }
   }
-  function cvt2flat(depthConverterDataList){
-    const flatData = {
-      id: null,
-      name: null,
-      correlation_model_version:null,
-      age_model_version: null,
-      descriptions: null,
-      
-      header: [],
-      units: [],
-      rows: [],
-    };
-
-    //initiarise
-    flatData.id   = null;
-    flatData.name = null;
-    flatData.correlation_model_version = depthConverterDataList[0].correlation_model_version;
-    flatData.age_model_version         = depthConverterDataList[0].age_model_version;
-    flatData.descriptions              = "";
-    
-    const dataHeader = depthConverterDataList[0].data_header;
-    flatData.header  = ["id","name","project","hole","section","distance","composite_depth","event_free_depth","drilling_depth","age","age_upper","age_lower", "source_depth_type",...dataHeader];
-    const dataUnits  = depthConverterDataList[0].data_units;
-    flatData.units   = ["","","","","","","","","","","","","",...dataUnits];
-
-    //data
-    for(let r=0; r<depthConverterDataList.length; r++){
-      const dt = depthConverterDataList[r];
-      const row = [
-        r,
-        dt.name,
-        dt.project,
-        dt.hole,
-        dt.section,
-        dt.distance,
-        dt.cd,
-        dt.efd,
-        dt.dd,
-        dt.age_mid,
-        dt.age_upper,
-        dt.age_lower,
-        dt.source_type,
-        ...dt.data_values//spread
-      ];
-
-      flatData.rows.push(row);
-    }
-
-    //unit
-
-    return flatData;
-  }
-
   function getPathInfo(path) {
     const filename = path.replace(/\\/g, '/').split('/').pop();
 

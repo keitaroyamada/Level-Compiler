@@ -177,7 +177,7 @@ document.addEventListener("DOMContentLoaded", () => {
             amplification.type  = "number";
             amplification.id    = numSeries;
             amplification.placeholder = 1;
-            amplification.value = 1;
+            amplification.value = 2;
             amplification.style.width = "40px";
             amplification.title = "Amplitude gain";
             amplification.style.marginLeft = "5px";
@@ -328,7 +328,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
         //load LCPlot
         LCPlot = originalData;
-        console.log("Plot data: ", LCPlot)
+        console.log("Plot data(min): ", LCPlot)
 
         //initialise
         const parentElement = document.getElementById("c_collection");
@@ -447,6 +447,8 @@ document.addEventListener("DOMContentLoaded", () => {
         await window.PlotterApi.initialisePlotDataCollection();
     }
     function makeP5CanvasBase() {        //case base is too small
+        //legacy function
+        return 
         let ymin = 0;
         let ymax = 1000;
         
