@@ -424,8 +424,11 @@ document.addEventListener("DOMContentLoaded", () => {
         }else{        
           //case core image
           const response = await window.LCapi.askdialog(
-            "Load core images",
-            "Do you want to load the core images?"
+            {
+              title: "Load core images",
+              message: "Do you want to load the core images?",
+              parent: "main"
+            }
           );
 
           if (response.response) {
@@ -620,20 +623,22 @@ document.addEventListener("DOMContentLoaded", () => {
   //============================================================================================
   //pen
   document.getElementById("bt_pen").addEventListener("click", async (event) => {
-    if (!penObject.isPen) {
-      penObject.isPen = true;
-      document.getElementById("bt_pen").style.backgroundColor = "#ccc";
-      //make new pen canvas
-      document.getElementById("p5penCanvas").style.display = "block";
-      if (penObject.penCanvas == null) {
-        penObject.penCanvas = new p5(penSketch);
+    if(LCCore){
+      if (!penObject.isPen) {
+        penObject.isPen = true;
+        document.getElementById("bt_pen").style.backgroundColor = "#ccc";
+        //make new pen canvas
+        document.getElementById("p5penCanvas").style.display = "block";
+        if (penObject.penCanvas == null) {
+          penObject.penCanvas = new p5(penSketch);
+        }
+      } else {
+        penObject.isPen = false;
+        document.getElementById("bt_pen").style.backgroundColor = "#f0f0f0";
+        //undisplay canvas plot
+        document.getElementById("p5penCanvas").style.display = "none";
       }
-    } else {
-      penObject.isPen = false;
-      document.getElementById("bt_pen").style.backgroundColor = "#f0f0f0";
-      //undisplay canvas plot
-      document.getElementById("p5penCanvas").style.display = "none";
-    }
+    }    
   });
   //============================================================================================
 
@@ -709,8 +714,11 @@ document.addEventListener("DOMContentLoaded", () => {
   //Unload all models
   window.LCapi.receive("UnLoadModelsMenuClicked", async () => {
     const response = await window.LCapi.Confirm(
-      "Confirmation",
-      "Are you sure you want to clear the loaded models?"
+      {
+        title:"Confirm",
+        message:"Are you sure you want to clear the loaded models?",
+        parent: "main"
+      }
     );
     if (response) {
       //ok
@@ -1580,8 +1588,11 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     }else if(clickResult == "mergeProjects"){
       const response = await window.LCapi.askdialog(
-        "Merge all projects",
-        "Are you sure you want to merge all the projects?"
+        {
+          title:"Merge all projects",
+          message:"Are you sure you want to merge all the projects?",
+          parent: "main"
+        }        
       );
       if (response.response) {
         const result = await window.LCapi.mergeProjects();
@@ -1851,8 +1862,11 @@ document.addEventListener("DOMContentLoaded", () => {
       
       if(objOpts.edit.mode == "connect_marker"){
         const response = await window.LCapi.askdialog(
-          "Connect markers",
-          "Do you want to CONNECT between selected markers?"
+          {
+            title:"Connect markers",
+            message:"Do you want to CONNECT between selected markers?",
+            parent: "main"
+          }
         );
         if (response.response) {
           
@@ -1892,8 +1906,11 @@ document.addEventListener("DOMContentLoaded", () => {
         }
       } else if(objOpts.edit.mode == "connect_section"){
         const response = await window.LCapi.askdialog(
-          "Connect markers",
-          "Do you want to CONNECT between selected sections?"
+          {
+            title:"Connect markers",
+            message:"Do you want to CONNECT between selected sections?",
+            parent: "main"
+          }
         );
         if (response.response) {
           const fromId = [objOpts.edit.marker_from.project, objOpts.edit.marker_from.hole, objOpts.edit.marker_from.section, objOpts.edit.marker_from.nearest_marker];
@@ -1925,8 +1942,11 @@ document.addEventListener("DOMContentLoaded", () => {
         }
       } else if(objOpts.edit.mode == "disconnect_section"){
         const response = await window.LCapi.askdialog(
-          "Connect markers",
-          "Do you want to DISCONNECT between selected sections?"
+          {
+            title:"Connect markers",
+            message:"Do you want to DISCONNECT between selected sections?",
+            parent: "main"
+          }
         );
         if (response.response) {
           const fromId = [objOpts.edit.marker_from.project, objOpts.edit.marker_from.hole, objOpts.edit.marker_from.section, objOpts.edit.marker_from.nearest_marker];
@@ -2052,8 +2072,11 @@ document.addEventListener("DOMContentLoaded", () => {
         if(objOpts.edit.mode == "change_marker_name"){
           if(objOpts.edit.marker_from.markerName.includes("-top") || objOpts.edit.marker_from.markerName.includes("-bottom")){
             response = await window.LCapi.askdialog(
-              "Reserved Name Change Warning",
-              "You are attempting to change a name that is reserved by system rules. Do you want to proceed with this change?"
+              {
+                title:"Reserved Name Change Warning",
+                message:"You are attempting to change a name that is reserved by system rules. Do you want to proceed with this change?",
+                parent: "main"
+              }
             );
 
             if(!response.response){
@@ -2206,8 +2229,11 @@ document.addEventListener("DOMContentLoaded", () => {
         let response = true;
         if(isExistZeroPoint == true){
           response = await window.LCapi.askdialog(
-            "Set Zero Point",
-            "The Zero point has alrady been defined. Do you want to replace this?"
+            {
+              title:"Set Zero Point",
+              message: "The Zero point has alrady been defined. Do you want to replace this?",
+              parent: "main"
+            }
           );
         }
 
@@ -2242,8 +2268,11 @@ document.addEventListener("DOMContentLoaded", () => {
         
       }else if (objOpts.edit.mode == "disconnect_marker"){
           const response = await window.LCapi.askdialog(
-            "Disconnect markers",
-            "Do you want to DISCONNECT connections in this marker?"
+            {
+              title:"Disconnect markers",
+              message:"Do you want to DISCONNECT connections in this marker?",
+              parent: "main"
+            }
           );
           if (response.response) {
             const fromId = [objOpts.edit.marker_from.project, objOpts.edit.marker_from.hole, objOpts.edit.marker_from.section, objOpts.edit.marker_from.nearest_marker];
@@ -2352,8 +2381,11 @@ document.addEventListener("DOMContentLoaded", () => {
       isProcessing = true;
       if(objOpts.edit.mode == "delete_marker"){
         const response = await window.LCapi.askdialog(
-          "Delete markers",
-          "Do you want to DELETE the selected marker?"
+          {
+            title:"Delete markers",
+            message:"Do you want to DELETE the selected marker?",
+            parent: "main"
+          }
         );
         if (response.response) {
           const fromId = [objOpts.edit.marker_from.project, objOpts.edit.marker_from.hole, objOpts.edit.marker_from.section, objOpts.edit.marker_from.nearest_marker];
@@ -2413,8 +2445,11 @@ document.addEventListener("DOMContentLoaded", () => {
     if(objOpts.edit.mode == "add_marker"){
       isProcessing = true;
       const response = await window.LCapi.askdialog(
-        "Add new markers",
-        "Do you want to ADD a new marker?"
+        {
+          title:"Add new markers",
+          message:"Do you want to ADD a new marker?",
+          parent: "main"
+        }
       );
       if (response.response) {
         
@@ -2576,8 +2611,11 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     }else if(objOpts.edit.mode == "delete_event"){
       const response = await window.LCapi.askdialog(
-        "Delete event",
-        "Are you sure you want to REMOVE all events?",
+        {
+          title:"Delete event", 
+          message:"Are you sure you want to REMOVE all events?",
+          parent: "main"
+        }
       );
       if(response.response){
         const upperId   = [ht.project, ht.hole, ht.section, ht.upper_marker];
@@ -2704,8 +2742,11 @@ document.addEventListener("DOMContentLoaded", () => {
     if(objOpts.edit.mode == "delete_section"){
       isProcessing = true;
       const response = await window.LCapi.askdialog(
-        "Delete section",
-        "Do you want to delete the section?",
+        {
+          title:"Delete section",
+          message:"Do you want to delete the section?",
+          parent: "main"
+        }
       );
       if (response.response) {
         const targetId = [ht.project, ht.hole, ht.section, null];
@@ -2902,8 +2943,11 @@ document.addEventListener("DOMContentLoaded", () => {
       //if get both sections
       if(objOpts.edit.mode == "connect_section"){
         const response = await window.LCapi.askdialog(
-          "Connect sections",
-          "Do you want to CONNECT between selected sections?"
+          {
+            title:"Connect sections",
+            message:"Do you want to CONNECT between selected sections?",
+            parent: "main"
+          }
         );
         if (response.response) {
           console.log("[Editor]: Connected sections between " + fromId +" and " + toId);
@@ -2930,8 +2974,11 @@ document.addEventListener("DOMContentLoaded", () => {
         }
       } else if(objOpts.edit.mode == "disconnect_section"){
         const response = await window.LCapi.askdialog(
-          "Connect sections",
-          "Do you want to DISCONNECT between selected sections?"
+          {
+            title:"Connect sections",
+            message:"Do you want to DISCONNECT between selected sections?",
+            parent: "main"
+          }
         );
         if (response.response) {
           console.log("[Editor]: Disconnected markers between " + fromId +" and " + toId);
@@ -3053,8 +3100,11 @@ document.addEventListener("DOMContentLoaded", () => {
 
     if(objOpts.edit.mode == "delete_hole"){
       const response = await window.LCapi.askdialog(
-        "Delete hole",
-        "Do you want to delete the hole?",
+        {
+          title:"Delete hole",
+          message:"Do you want to delete the hole?",
+          parent: "main"
+        }
       );
       if (response.response) {
         const targetId = [ht.project, ht.hole, null, null];
@@ -3229,8 +3279,11 @@ document.addEventListener("DOMContentLoaded", () => {
 
     if(objOpts.edit.mode == "delete_project"){
       const response = await window.LCapi.askdialog(
-        "Delete project",
-        "Are you sure to delete this project?",
+        {
+          title:"Delete project",
+          message:"Are you sure to delete this project?",
+          parent: "main"
+        }
       );
       if (response.response) {
         const targetId = [ht.project, null, null, null];
@@ -3271,8 +3324,11 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     }else if(objOpts.edit.mode == "move_hole_to_project"){
       const response = await window.LCapi.askdialog(
-        "Move hole to project",
-        "Are you sure to move the hole to this selected project?",
+        {
+          title:"Move hole to project",
+          message:"Are you sure to move the hole to this selected project?",
+          parent: "main"
+        }
       );
 
       if(response.response){
@@ -3319,9 +3375,12 @@ document.addEventListener("DOMContentLoaded", () => {
     const projectData = getDataFromId(LCCore, LCCore.base_project_id);
     if(projectData.model_type == "duo"){
       const response = await window.LCapi.askdialog(
-        "Export model",
-        "Connections to the main model will not be exported because the main model is not loaded.\n"+      
-        "Are you sure you want to export?"
+        {
+          title:"Export model",
+          message:"Connections to the main model will not be exported because the main model is not loaded.\n"+      
+                  "Are you sure you want to export?",
+          parent: "main"
+        }        
       );
 
       if(response.response){
@@ -3333,13 +3392,19 @@ document.addEventListener("DOMContentLoaded", () => {
   });
   window.LCapi.receive("ExportCorrelationAsLFMenuClicked", async () => {
     const response = await window.LCapi.askdialog(
-      "Export model",
-      "Please note that the following expression cannot be used in LF format.\n"+      
-      "+ If erosion event included, it cannot be converted.\n"+
-      "+ If CD is not defined, the marker will be ignored.: \n"+
-      "+ If markup event included, it will be ignored.\n"+
-      "+ With 5 or more holes in a project, output is produced but cannot be loaded in Level Finder.\n"+
-      "Are you sure you want to export?"
+      {
+        title:"Export model",
+        message:
+          "Please note that the following expression cannot be used in LF format.\n"+      
+          "+ If erosion event included, it cannot be converted.\n"+
+          "+ If CD is not defined, the marker will be ignored.: \n"+
+          "+ If markup event included, it will be ignored.\n"+
+          "+ With 5 or more holes in a project, output is produced but cannot be loaded in Level Finder.\n"+
+          "Are you sure you want to export?",
+        parent: "main"
+      }
+      
+      
     );
 
     if(response.response){
@@ -6339,9 +6404,18 @@ document.addEventListener("DOMContentLoaded", () => {
         sketch.loop(); //
       } 
     };
-    sketch.keyPressed = () => {
+    sketch.keyPressed = async () => {
       if (sketch.key === 'n' && sketch.keyIsDown(sketch.CONTROL)) { 
-        if (confirm("Are you sure you want to delete the written data?")) {
+        const response = await window.LCapi.Confirm(
+          {
+            title:"Confirm",
+            message:"Are you sure you want to delete the written data?",
+            parent: "main"
+          }
+        );
+
+        if (response) {
+        //if (confirm("Are you sure you want to delete the written data?")) {
           penData = [];
           sketch.pmouseX = sketch.mouseX;
           sketch.pmouseY = sketch.mouseY;

@@ -543,7 +543,15 @@ document.addEventListener("DOMContentLoaded", () => {
     var rows = table.rows;
 
     if (rows.length > 1) {
-      var userResponse = confirm("Do you want to update the definition table?");
+      const userResponse = await window.DividerApi.Confirm(
+        {
+          title:"Confirm",
+          message:"Do you want to update the definition table?",
+          parent: "divider"
+        }
+      );
+      
+      //var userResponse = confirm("Do you want to update the definition table?");
       if (userResponse == false) {
         return;
       }

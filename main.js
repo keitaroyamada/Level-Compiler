@@ -940,16 +940,27 @@ function createMainWIndow() {
       return true
     }         
   });
-  ipcMain.handle("askdialog", (_e, tit, txt) => {
+  ipcMain.handle("askdialog", (_e, opts, txt) => {
     const options = {
       type: "question",
       buttons: ["No", "Yes"],
       defaultId: 0,
-      title: tit,
-      message: txt,
+      title: opts.title,
+      message: opts.message,
     };
 
-    const response = dialog.showMessageBox(null, options);
+    let targetWindow = null;
+    if(opts.parent == "main"){
+      targetWindow = mainWindow;
+    }else if(opts.parent == "settings"){
+      targetWindow = settingsWindow;
+    }else if(opts.parent == "labeler"){
+      targetWindow = labelerWindow;
+    }else if(opts.parent == "finder"){
+      targetWindow = finderWindow;
+    }
+
+    const response = dialog.showMessageBox(targetWindow, options);
     return response;
   });
   ipcMain.handle("inputdialog", async (_e, data,) => {
@@ -2425,14 +2436,22 @@ function createMainWIndow() {
       return;
     }
   });
-  ipcMain.handle("Confirm", async (event, title, message) => {
+  ipcMain.handle("Confirm", async (event, opts, message) => {
     const options = {
       type: "question",
       buttons: ["Yes", "No"],
-      title: title,
-      message: message,
+      title: opts.title,
+      message: opts.message,
     };
-    const result = await dialog.showMessageBox(options);
+
+    let targetWindow = null;
+    if(opts.parent == "main"){
+      targetWindow = mainWindow;
+    }else if(opts.parent == "divider"){
+      targetWindow = dividerWindow;
+    }
+
+    const result = await dialog.showMessageBox(targetWindow, options);
     return result.response === 0;
   });
   ipcMain.handle("SendDepthToFinder", async (_e, data) => {

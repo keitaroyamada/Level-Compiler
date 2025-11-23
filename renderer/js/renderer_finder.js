@@ -636,33 +636,36 @@ document.addEventListener("DOMContentLoaded", () => {
       return
     }
     const response = await window.FinderApi.askdialog(
-        "Delete bookmark",
-        "Are you sure you want to delete this bookmark?"
-      );
+      {
+        title:"Delete bookmark",
+        message:"Are you sure you want to delete this bookmark?",
+        parent:"finder"
+      }
+    );
 
+    if(response.response){
+      //delete
+      delete bookmarks[select];
+      console.log("Finder: "+select+" is deleted.")
+      //update list
+      //clear
+      var parentElement = document.getElementById("bookmarksOptions");
+      while (parentElement.firstChild) {
+        parentElement.removeChild(parentElement.firstChild);
+      }
 
-    //delete
-    delete bookmarks[select];
-    console.log("Finder: "+select+" is deleted.")
+      //update
+      for (const key in bookmarks) {
+        const option = document.createElement("option");
+        option.textContent = key; //name
+        //option.value       = holeList[i][0]; //idx
+        //option.id          = holeList[i][1]; //id
+        document.getElementById("bookmarksOptions").appendChild(option);
+      }
 
-    //update list
-    //clear
-    var parentElement = document.getElementById("bookmarksOptions");
-    while (parentElement.firstChild) {
-      parentElement.removeChild(parentElement.firstChild);
+      //save
+      await window.FinderApi.saveBookmarks(bookmarks);
     }
-
-    //update
-    for (const key in bookmarks) {
-      const option = document.createElement("option");
-      option.textContent = key; //name
-      //option.value       = holeList[i][0]; //idx
-      //option.id          = holeList[i][1]; //id
-      document.getElementById("bookmarksOptions").appendChild(option);
-    }
-
-    //save
-    await window.FinderApi.saveBookmarks(bookmarks);
   });
   document.getElementById("bookmarksOptions").addEventListener("change", async (event) => {
     console.log("Finder: "+event.target.value+" is selected.")

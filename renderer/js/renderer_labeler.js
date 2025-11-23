@@ -65,8 +65,11 @@ document.addEventListener("DOMContentLoaded", () => {
     document.getElementById("bt_delete_marker").style.backgroundColor = "#f0f0f0";
 
     const response = await window.LabelerApi.askdialog(
-      "Initialise Canvas",
-      "Do you want to Remove all data?"
+      {
+        title:"Initialise Canvas",
+        message:"Do you want to Remove all data?",
+        parent:"labeler"
+      }
     );
     if (response.response) {
       loadToolIcons();
@@ -708,8 +711,11 @@ document.addEventListener("DOMContentLoaded", () => {
           const targetId = [ht.project, ht.hole, ht.section, ht.nearest_marker];
           if(objOpts.mode == "change_marker_dd" && (ht.nearest_marker_name.includes("-top") || ht.nearest_marker_name.includes("-bottom"))){
             const askData2 = await window.LabelerApi.askdialog(
-              "Batch change marker drilling depth",
-              "Do you want to update the all marker's drilling depth?"
+              {
+                title:"Batch change marker drilling depth",
+                message:"Do you want to update the all marker's drilling depth?",
+                parent:"labeler"
+              }
             );
             if (askData2.response) {
               //first, update top/bottom
@@ -805,8 +811,11 @@ document.addEventListener("DOMContentLoaded", () => {
       //if get both markers
       if(objOpts.mode == "delete_marker"){
         const response = await window.LabelerApi.askdialog(
-          "Delete markers",
-          "Do you want to DELETE the selected marker?"
+          {
+            title:"Delete markers",
+            message:"Do you want to DELETE the selected marker?",
+            parent:"labeler"
+          }
         );
         if (response.response) {
           const fromId = [objOpts.marker_from.project, objOpts.marker_from.hole, objOpts.marker_from.section, objOpts.marker_from.nearest_marker];
