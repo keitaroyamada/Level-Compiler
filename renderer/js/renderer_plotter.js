@@ -105,7 +105,7 @@ document.addEventListener("DOMContentLoaded", () => {
             Nolabel.htmlFor = numSeries;
             Nolabel.textContent = numSeries.toString().padStart(2, "0");
             Nolabel.style.marginRight = "5px";
-            Nolabel.title = "Source: " + LCPlot.data_collections[selectedIdx].name;
+            Nolabel.title = "Source: " + LCPlot.data_collections[selectedIdx].name;            
 
             //data name
             const serieslabel = document.createElement("label");
@@ -343,7 +343,17 @@ document.addEventListener("DOMContentLoaded", () => {
             option.textContent = dataset.name;
 
             document.getElementById("c_collection").appendChild(option);
+            document.getElementById("c_collection").value = dataset.id;
+            
         });
+
+        //add plot data
+        /*
+        setTimeout(() => {
+            document.getElementById("bt_add").click();
+        }, 10);
+        */
+
         document.body.style.cursor = "default"; 
         window.PlotterApi.clearProgressbar();
         window.PlotterApi.ConverterClose();
