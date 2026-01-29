@@ -29,7 +29,7 @@ const { PassThrough } = require('stream');
 const https = require('https');
 const { autoUpdater} = require('electron-updater');
 
-const { app, BrowserWindow, Menu, ipcMain, dialog, shell, screen, session } = require("electron");
+const { app, BrowserWindow, Menu, ipcMain, dialog, shell, screen, session, protocol } = require("electron");
 const { LevelCompilerCore } = require("./LC_modules/LevelCompilerCore.js");
 const { Project } = require("./LC_modules/Project.js");
 const lcfnc  = require("./LC_modules/lcfnc.js");
@@ -70,6 +70,7 @@ let globalPath = {
 };
 let mainSettings = {isAutoUpdateDownload: true};
 let globalTempData = null;
+let sendBuffer = null;
 
 //windows
 let mainWindow = null;
@@ -451,12 +452,15 @@ function createMainWIndow() {
     } 
   });
   ipcMain.handle("LoadCoreImage", async (_e, loadOptions, type) => {
-    //type: "core_images", "labeler"
+    //type: "core_images", "labeler"    
     const coreImages = await loadCoreImages(loadOptions, type);
     return coreImages;
   });
   async function loadCoreImages(loadOptions, type){
     const isShowMemory = false;
+    progressBar   = progressDialog(mainWindow, "Load modeled section images", "Now converting...", false);    
+    await new Promise(r => progressBar.on('ready', r));
+
     //console.log("   Load core image called")
     let releasedWorkers = 0;
     let numTotalTasks = 0;
@@ -482,6 +486,8 @@ function createMainWIndow() {
 
       if(targetList.length < 1){
         console.log("MAIN: There is no registered image folders.")
+        progressBar   = await updateProgress(progressBar, 1, 1);
+        progressBar = null;
         return null
       }
       console.log("MAIN: Load images: N = "+loadOptions.targetIds.length+"; Operations: ["+loadOptions.operations+"]");
@@ -549,12 +555,14 @@ function createMainWIndow() {
 
       if(tasks.length==0){
         console.log("MAIN: Failed to get tasks", targetList, loadOptions);
+        progressBar   = await updateProgress(progressBar, 1, 1);
+        progressBar = null;
         return null
       }
       //submit
       //make worker
       numTotalTasks = tasks.length;
-      progressBar   = progressDialog(mainWindow, "Load modeled section images", "Now converting...", false);
+      
       progressBar   = await updateProgress(progressBar, 0, numTotalTasks);
       const workers = await initialiseWorkerPool(NUM_WORKERS, tasks, idleWorkers, coreImages);
 
@@ -1881,7 +1889,7 @@ function createMainWIndow() {
 
     //create finder window
     converterWindow = new BrowserWindow({
-      parent: plotWindow, 
+      parent: plotWindow ? plotWindow : mainWindow, 
       title: "Converter",
       width: 700,
       height: 800,
@@ -1980,7 +1988,7 @@ function createMainWIndow() {
         try{
           const zipped = await zipData(ageModel);
           console.log("MAIN: Send age point data to renderer.")
-          return {type: "age", data: zipped};
+          return {type: "age", protocol: "direct",data: zipped};
         }catch(err){
           console.error("MAIN: Failed to zip: ", err);
           return null;
@@ -1990,17 +1998,21 @@ function createMainWIndow() {
       try{       
         const res = LCPlot.calcDataCollectionPosition(LCCore, LCAge);
 
-        if(res.ok){
-          const zipped = await zipData(LCPlot);
+        if(res.ok){          
           console.log("MAIN: Send data points to renderer.")
-          return {type: "data", data: zipped};
+          //sendBuffer = await zipData(LCPlot);
+          //sendBuffer = encode(LCPlot);
+          //return {type: "data", protocol: "buffer", data: true};
+
+          const data = await zipData(LCPlot);
+          return {type: "data", protocol: "direct", data: data};
         }else{
           if(res.type == 1){
             //if target data is notexist.
-            return {type: "data", data: null};
+            return {type: "data", protocol: "direct", data: null};
           }else{
             console.log("MAIN: Faild to recalc plot position")
-            return {type: "data", data: null};
+            return {type: "data", protocol: "direct",data: null};
           }          
         }
         
@@ -2355,8 +2367,12 @@ function createMainWIndow() {
     });
 
     dividerWindow.on("closed", () => {
-      dividerWindow = null;
-      mainWindow.webContents.send("DividerClosed", "");
+      
+      if(mainWindow && !mainWindow.isDestroyed){
+        mainWindow.webContents.send("DividerClosed", "");
+        dividerWindow = null;
+      }
+      
     });
 
     dividerWindow.setMenu(null);
@@ -2389,7 +2405,7 @@ function createMainWIndow() {
     console.log("MAIN: Exported Divided data.");
   });
   ipcMain.handle("OpenFinder", async (_e) => {
-    if (finderWindow) {
+    if (finderWindow && !finderWindow.isDestroyed()) {
       finderWindow.focus();
       finderWindow.webContents.send("FinderToolClicked", "");
       return;
@@ -2407,8 +2423,11 @@ function createMainWIndow() {
     });
 
     finderWindow.on("closed", () => {
-      finderWindow = null;
-      mainWindow.webContents.send("FinderClosed", "");
+      if(mainWindow && !mainWindow.isDestroyed()){ 
+        finderWindow = null;
+        mainWindow.webContents.send("FinderClosed", "");
+      }
+      
     });
     finderWindow.setMenu(null);
 
@@ -2430,7 +2449,7 @@ function createMainWIndow() {
     });
   });
   ipcMain.handle("CloseFinder", async (_e) => {
-    if (finderWindow) {
+    if (finderWindow && !finderWindow.isDestroyed()) {
       finderWindow.close();
       finderWindow = null;
       return;
@@ -3037,6 +3056,14 @@ function createMainWIndow() {
             }
           }
 
+          let correlationType = "";        
+          
+          if(calcedData.section_type === "Master Section"){
+            correlationType = "MAIN " + calcedData.section_type;            
+          }else if(calcedData.section_type === "Parallel Section"){
+            correlationType = "DUO " + calcedData.section_type;
+          }          
+
           //make output array
           let rowData = [
             calcedData.name, //data name
@@ -3051,7 +3078,7 @@ function createMainWIndow() {
             parseFloat(calcedData.age_upper).toFixed(options.precision), //age upper
             parseFloat(calcedData.age_lower).toFixed(options.precision), //age lower
 
-            calcedData.is_main_model ? "MAIN " + calcedData.section_type : "DUO " + calcedData.section_type, // MAIN master section/parallel section
+            correlationType,//calcedData.is_main_model ? "MAIN " + calcedData.section_type : "DUO " + calcedData.section_type, // MAIN master section/parallel section
             calcedData.correlation_rank,  //connection rank
 
             calcedData.source_type,
@@ -3756,9 +3783,12 @@ function createMainWIndow() {
       await new Promise(resolve => progressBar.on('ready', resolve));
     }    
 
+    let last = performance.now();
     for(let i=0; i<dataList.length; i++){
-      if(showProgress){
+      const now = performance.now();
+      if (showProgress && now - last > 50) {  // 50ms each
         progressBar   = await updateProgress(progressBar, i, dataList.length);
+        last = now;        
       }
       
       //initiarise
@@ -4719,6 +4749,18 @@ function createMainWIndow() {
               }
             }
           },
+          {
+            label: "Model evaluation",
+            visible: false,
+            click: () => {
+              if(LCCore !== null && LCCore.projects.length>0){
+                const results = LCCore.leaveOneOut();
+                
+                mainWindow.webContents.send("rendererLog", results);
+                putcsvfile(mainWindow, "results.csv", results);                
+              }
+            }
+          },
           { type: "separator" },   
           {
             label:"Zoom",
@@ -4800,9 +4842,10 @@ function createMainWIndow() {
           
               converterWindow.loadFile(path.join(__dirname, "./renderer/converter.html"));
           
-              converterWindow.once("ready-to-show", () => {
+              converterWindow.once("ready-to-show", () => {                
+                //converterWindow.setAlwaysOnTop(true, "floating");
                 converterWindow.show();
-                converterWindow.setAlwaysOnTop(true, "floating");
+                converterWindow.focus();
                 //converterWindow.webContents.openDevTools();
                 //converterWindow.setAlwaysOnTop(true, "normal");
                 const data = {
@@ -4906,6 +4949,7 @@ function createMainWIndow() {
                 }
                 
                 e.preventDefault(); 
+                
                 plotWindow.hide();
                 //plotWindow = null;
                 if(mainWindow && !mainWindow.isDestroyed()){
@@ -4915,7 +4959,9 @@ function createMainWIndow() {
               plotWindow.on("closed", () => {
                 plotWindow = null; 
                 if (mainWindow && !mainWindow.isDestroyed()){
-                  mainWindow.webContents.send("LabelerClosed", "");
+                  if(mainWindow.webContents){
+                    mainWindow.webContents.send("LabelerClosed", "");
+                  }                  
                 }
               });
 
@@ -5135,7 +5181,9 @@ async function zipData(data) {
     let inputData;
     try {
       // MessagePack encode
+      console.time("encode");
       inputData = encode(data); // Uint8Array
+      console.timeEnd("encode");
     } catch (serializeError) {
       console.error("[zipData] msgpack encoding failed:", serializeError);
       mainWindow.webContents.send("AlertRenderer", serializeError);
@@ -5143,9 +5191,22 @@ async function zipData(data) {
       return;
     }
 
-    const buf = Buffer.from(inputData); // Uint8Array → Buffer
+    //const buf = Buffer.from(inputData); // Uint8Array → Buffer
+    const buf = Buffer.from(
+      inputData.buffer,
+      inputData.byteOffset,
+      inputData.byteLength
+    );
 
-    zlib.gzip(buf, (err, buffer) => {
+    const gzipOptions = { 
+      level: zlib.constants.Z_BEST_SPEED,//Z_BEST_COMPRESSION, 
+      strategy: zlib.constants.Z_RLE,
+      memLevel: 9 
+    };
+
+    console.time("gzip");
+    zlib.gzip(buf, gzipOptions, (err, buffer) => {
+    //zlib.gzip(buf, (err, buffer) => {
       if (err) {
         console.error("[zipData] Gzip compression failed:", err);
         mainWindow.webContents.send("AlertRenderer", err);
@@ -5155,6 +5216,7 @@ async function zipData(data) {
         resolve(buffer);
       }
     });
+    console.timeEnd("gzip");
   });
 }
 
@@ -5832,8 +5894,32 @@ function getDisplayInfo(screen){
   }
 }
 //--------------------------------------------------------------------------------------------------
+protocol.registerSchemesAsPrivileged([
+  {
+    scheme: "app",
+    privileges: {
+      standard: true,        // treat as a normal URL scheme like http/https
+      secure: true,          // treat as a secure scheme (same as https)
+      supportFetchAPI: true, // allow usage with fetch() and XHR
+      corsEnabled: true,     // enable CORS behavior
+    },
+  },
+]);
+
 app.whenReady().then(async() => {
   await session.defaultSession.clearCache();  //clear cache
+  
+  // protocol handler
+  protocol.handle("app", async (_request) => {
+    const u8 = sendBuffer;
+    sendBuffer = null; // clear after sending
+
+    return new Response(
+      new Blob([u8], { type: "application/octet-stream" })
+    );
+  });
+  //if call from renderer
+  //const res = await fetch("app://data");
 
   //create main window
   createMainWIndow();

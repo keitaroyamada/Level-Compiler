@@ -2305,8 +2305,14 @@ class LevelCompilerCore extends EventEmitter{
         }
       }
     } else {
-      this.setErrorAlert("","E027: Numbers of section 'top' and 'bottom' do not match.");
-      console.log("ERROR: E027: Numbers of section 'top' and 'bottom' do not match.");
+      if(topIndices.length > bottomIndices.length){
+        this.setErrorAlert("","E027: There are fewr 'bottom' flags than 'top' flag.");
+        console.log("ERROR: E027: There are fewr 'bottom' flags than 'top' flag.");
+      }else{
+        this.setErrorAlert("","E027: There are fewr 'top' flags than 'bottom' flag.");
+        console.log("ERROR: E027: There are fewr 'top' flags than 'bottom' flag.");
+      }
+      
       return;
     }
     this.setStatus("completed","");
@@ -6388,6 +6394,74 @@ class LevelCompilerCore extends EventEmitter{
         this.projects[i].correlation_version = version;
       }      
     }    
+  }
+  leaveOneOut(){
+    const data = [];
+
+    data.push([
+      "Project Name",
+      "Hole Name",
+      "Section Name",
+      "Position",
+      "Source",
+      "Original Composite Depth",
+      "Leave Out Composite Depth"
+    ]);
+
+    const backupProjects = structuredClone(this.projects);
+    console.log("Start Leave-One-Out evaluation")
+
+    for (let p=0; p<this.projects.length; p++){
+      for(let h=0; h<this.projects[p].holes.length; h++){
+        for(let s=0; s<this.projects[p].holes[h].sections.length; s++){
+          for(let m=0; m<this.projects[p].holes[h].sections[s].markers.length; m++){
+            console.log(((p+1)/this.projects.length-1).toFixed(2), ((h+1)/this.projects[p].holes.length).toFixed(2), ((s+1)/this.projects[p].holes[h].sections.length).toFixed(2))
+            
+            //get current data
+            const currentMarkerData = structuredClone(this.projects[p].holes[h].sections[s].markers[m]);
+            const connections = structuredClone(this.projects[p].holes[h].sections[s].markers[m].h_connection);
+            
+            //disconnect horizontal connections
+            for(let hc=0; hc<this.projects[p].holes[h].sections[s].markers[m].h_connection.length; hc++){
+              const connectedId = this.projects[p].holes[h].sections[s].markers[m].h_connection[hc]
+              if(connectedId[0] ===  this.projects[p].id[0]){
+                //if same project
+                const connectedMarkerData = this.getDataByIdx(this.search_idx_list[connectedId.toString()]);
+                if(!currentMarkerData.isMaster || !connectedMarkerData.isMaster){
+                  //if not master connection, leave connection
+                  this.disconnectMarkers(currentMarkerData.id, connectedMarkerData.id, "horizontal");
+                }
+              }
+            }  
+
+            //calc new composite depth
+            this.calcCompositeDepth();
+            const newCurrentMarkerData = this.projects[p].holes[h].sections[s].markers[m];
+            data.push([
+              this.projects[p].name,
+              this.projects[p].holes[h].name,
+              this.projects[p].holes[h].sections[s].name,
+              this.projects[p].holes[h].sections[s].markers[m].distance,
+              this.projects[p].holes[h].sections[s].markers[m].depth_source[0],
+              currentMarkerData.composite_depth,
+              newCurrentMarkerData.composite_depth
+            ]);
+
+            //restore connections
+            this.projects = [];
+            Object.assign(this.projects, backupProjects);
+            this.updateSearchIdx();
+
+          }
+        }
+      }
+    }
+
+    //restore
+
+
+    console.log("Done")
+    return data;
   }
   
 }

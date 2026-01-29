@@ -155,14 +155,14 @@ document.addEventListener("DOMContentLoaded", () => {
     objOpts.event.folded_width  = 0.1;//rate
     objOpts.event.face_height = 0.98;//rate
   
-    objOpts.connection.emphasise_master_connections = false;
+    objOpts.connection.emphasise_master_connections = true;
     objOpts.connection.master_section_line_width = 4;
     objOpts.connection.base_master_section_colour = "#0000FF"
     objOpts.connection.duo_master_section_colour = "#73A7D1";
     objOpts.connection.line_colour = "#000000";
     objOpts.connection.line_width = 1.5;
     objOpts.connection.indexWidth = objOpts.hole.distance * 0.7; //20;
-    objOpts.connection.emphasise_non_horizontal = true;
+    objOpts.connection.emphasise_non_horizontal = false;
     objOpts.connection.show_remote_connections = true;
     objOpts.connection.emphasise_remote_connections = true;
   
@@ -186,7 +186,7 @@ document.addEventListener("DOMContentLoaded", () => {
     objOpts.edit.handleMove = null;
     objOpts.edit.passwards = "admin";
 
-    objOpts.developer.mode = "user"; 
+    objOpts.developer.mode = "user";//"user";"developer";"root"; 
 
     objOpts.pen.colour = "#ff0000";
     objOpts.image.dpcm = 24;
@@ -838,7 +838,9 @@ document.addEventListener("DOMContentLoaded", () => {
     try{
       console.log("[Renderer]: Plot options are received.")
 
-      LCPlotData.draw_collections = [];
+      if(LCPlotData.draw_collections){
+        LCPlotData.draw_collections = [];
+      }      
 
       if(data.emitType=="new"){
         //await loadPlotData();//latest ver is load plot data at the same time of loading plotter
@@ -899,6 +901,7 @@ document.addEventListener("DOMContentLoaded", () => {
           const dispPix = scroller.clientHeight * objOpts.canvas.dpir;     
           let th = [0.010, 0.025, 0.050, 0.075, 0.10, 0.25, 0.50, 0.75, 1.0, 2.5, 5.0, 7.5, 10]; //cm
           
+          console.time("[Renderer]: Making multi-level data: ")
           //-------numerator--------   
           const numeratorDataSeries   = [];          
           if(nIdx!==null){            
@@ -1012,6 +1015,7 @@ document.addEventListener("DOMContentLoaded", () => {
           //submit
           LCPlotData.draw_collections.push(dividedDataSeries);
 
+          console.timeEnd("[Renderer]: Making multi-level data: ")
         }
       }else{
         console.log("[Renderer]: There is no plot data or information: ", objOpts.plot.selected_options, LCPlotData.data_collections)
@@ -3763,6 +3767,7 @@ document.addEventListener("DOMContentLoaded", () => {
   //============================================================================================
   //close finder
   window.LCapi.receive("FinderClosed", async () => {
+    console.log("[Finder]: Finder closed.")
     //call from main process
     finderEnable = false;
     updateView();
@@ -3812,7 +3817,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const pen = objOpts.pen;
     const plot = objOpts.plot; 
     const image = objOpts.image;
-    const information = objOpts.info;
+    const information = objOpts.information;
     const developer = objOpts.developer;
     const options={
       editable:true,
@@ -3859,7 +3864,6 @@ document.addEventListener("DOMContentLoaded", () => {
   }
   
   window.LCapi.receive("SettingsData", async (data) => {
-    
     if(data == null){
       //call default settings
       objOpts = setupSettings();
@@ -3915,27 +3919,16 @@ document.addEventListener("DOMContentLoaded", () => {
         
       await window.LCapi.sendSettings({data: settings, editable, options}, "settings");
     }else{
+      console.log(data)
       // check settings format version
-      if(!data.data || data.data.information.version){
+      if(!data?.data?.information?.version){
         //old version
         console.log("[Renderer]: Old-format settings detected. Replacing with the current version.",objOpts)
         
         //make current setttings
-        const settings = {
-          canvas      : objOpts.canvas,
-          project     : objOpts.project,
-          hole        : objOpts.hole,
-          section     : objOpts.section,
-          marker      : objOpts.marker,
-          event       : objOpts.event,
-          connection  : objOpts.connection,
-          age         : objOpts.age,
-          pen         : objOpts.pen,
-          image       : objOpts.image, 
-          plot        : objOpts.plot, 
-          information : objOpts.information,
-          developer   : objOpts.developer,
-        };
+        const settings = data.data;
+        settings.information = objOpts.information;
+
         const editable = {
           canvas: true,
           project: true,
@@ -3957,6 +3950,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }
 
         await window.LCapi.sendSettings({data: settings, editable, options}, "save");
+        await window.LCapi.sendSettings({data: settings, editable, options}, "settings");
       }else{
         //current version
         Object.assign(objOpts.canvas,     data.data.canvas);
@@ -5803,9 +5797,9 @@ document.addEventListener("DOMContentLoaded", () => {
           let startIndex = binarySearchIndex(ageList, searchTop, (d) => d[objOpts.canvas.depth_scale]);
           let endIndex   = binarySearchIndex(ageList, searchBot, (d) => d[objOpts.canvas.depth_scale]);
 
-          for (let a = startIndex; a < endIndex + 1; a++) {    
+          for (let a = startIndex; a < endIndex; a++) {    
             let pData = {
-              type: ageList[a].data_type, //used
+              type: ageList[a].data_type ? ageList[a].data_type : "", //used
               amplification_x: 1,//used
               amplification_y: 1, //used
               original_depth_type: ageList[a].original_depth_type,//used
@@ -5952,14 +5946,11 @@ document.addEventListener("DOMContentLoaded", () => {
               //draw
               let zeroDataDict = {};
               // Calculate zero position if not yet calculated
-              LCCore.projects.forEach(project=>{
+              LCCore.projects.forEach((project, p)=>{
                 project.holes.forEach((hole, h)=>{
-                  if(extractedDrawDataset.data.length>0){
-                    
-                  }
                   const zeroDrawDataset = structuredClone(extractedDrawDataset);
                   zeroDrawDataset.data = [structuredClone(zeroDrawDataset.data[0]), structuredClone(zeroDrawDataset.data[0]), structuredClone(zeroDrawDataset.data[0])];
-                  if(zeroDrawDataset.data[0]){
+                  if(extractedDrawDataset.data[0].pidx === p && zeroDrawDataset.data[0]){
                     //set zero
                     zeroDrawDataset.data[0].val = 0;
                     zeroDrawDataset.data[0].hname = hole.name;
@@ -5974,7 +5965,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     zeroDrawDataset.data[2].hidx = h;
                     
                     const zeroDataset = calcDrawPosition(zeroDrawDataset, LCCore, objOpts, pOptions);
-                    zeroDataDict[hole.name] = zeroDataset.data[0];
+                    zeroDataDict[hole.name] = zeroDataset.data;
                     /*
                     console.log(zeroData)
 
@@ -6107,8 +6098,10 @@ document.addEventListener("DOMContentLoaded", () => {
                   if(binWidth < 1) binWidth = 1;
 
                   // Define rectangle coordinates
-                  const rectX0 = zeroDataDict[pData.hname].pos_x;
+                  //const xMin = zeroDataset.data[2].pos_x;
+                  const rectX0 = zeroDataDict[pData.hname][2].pos_x;
                   const rectX1 = pData.pos_x;
+
                   // Center the bar on the data point
                   const rectY0 = pData.pos_y - binWidth/2;
                   const rectY1 = pData.pos_y + binWidth/2;
@@ -6709,14 +6702,13 @@ document.addEventListener("DOMContentLoaded", () => {
   async function loadPlotData(type) {
     //LC plot age_collection id is as same as LCAge id 
     const results = await window.LCapi.LoadPlotData(type);
-
     if (results!==null) {
       //load
       const dataType = results.type;
-      const data     = await unzip(results.data);
+      const protocol = results.protocol;
 
       if(dataType=="age"){
-        LCPlotAge = data;
+        LCPlotAge = await unzip(results.data);;
         console.log("Age data: ", LCPlotAge);
 
         /*
@@ -6758,9 +6750,17 @@ document.addEventListener("DOMContentLoaded", () => {
         }
         */
       }else if(dataType=="data"){
-        //The plot contains multiple datasets, so the conversion is performed when the plot options are loaded.
-        LCPlotData = data;
-        console.log("Plot data: ", LCPlotData);
+        if(protocol == "direct"){
+          //The plot contains multiple datasets, so the conversion is performed when the plot options are loaded.
+          LCPlotData = await unzip(results.data);;
+          console.log("Plot data: ", LCPlotData);
+        }else if(protocol == "buffer"){
+          //if buffer URL
+          const res = await fetch("app://data");
+          const u8  = new Uint8Array(await res.arrayBuffer());   
+          LCPlotData =  msgpack.decode(u8);//;await unzip(u8);
+        }
+        
       }   
     }
   }
@@ -7473,26 +7473,54 @@ async function unzip(result){
 }
   */
 async function unzip(result) {
+  console.time("unzip: ")
   if (result == null) {
+    console.timeEnd("unzip: ")
     return null;
   }
 
-  try {
-    // 1. Gunzip
-    const ds = new DecompressionStream('gzip');
-    const blob = new Blob([result]);
-    const stream = blob.stream().pipeThrough(ds);
-    const response = new Response(stream);
-    
-    const arrayBuffer = await response.arrayBuffer();
+  // normalize to Uint8Array
+  let u8;
+  if (result instanceof Uint8Array) {
+    u8 = result;
+  } else if (result instanceof ArrayBuffer) {
+    u8 = new Uint8Array(result);
+  } else {
+    // Blob や Response を渡されても一応対応
+    const buf = await result.arrayBuffer();
+    u8 = new Uint8Array(buf);
+  }
 
-    // 2. MessagePack decode
-    const decodedData = msgpack.decode(new Uint8Array(arrayBuffer));
+  const isGzip =
+    u8.length >= 3 &&
+    u8[0] === 0x1f &&
+    u8[1] === 0x8b &&
+    u8[2] === 0x08;
+
+  try {
+    let decodedData;
+
+    if (isGzip) {
+      // 1. Gunzip
+      const ds = new DecompressionStream('gzip');
+      const blob = new Blob([u8]);
+      const stream = blob.stream().pipeThrough(ds);
+      const response = new Response(stream);
+      
+      const arrayBuffer = await response.arrayBuffer();
+
+      // 2. MessagePack decode
+      decodedData = msgpack.decode(new Uint8Array(arrayBuffer));
+    }else{
+      decodedData = msgpack.decode(u8);
+    }
     
+    console.timeEnd("unzip: ")
     return decodedData;
 
   } catch (e) {
     console.error("[renderer] Gzip is failed to unzip:", e);
+    console.timeEnd("unzip: ")
     return null; 
   }
 }
@@ -7691,7 +7719,7 @@ async function loadCoreImages(modelImages, LCCore, objOpts, operations) {
         dpcm:results.image_resolution,//dpcm:objOpts.image.dpcm,
       };
       console.log(loadOptions)
-
+      
       //main Progress   
       await new Promise(async(p5resolve,p5reject) => {
         try{
