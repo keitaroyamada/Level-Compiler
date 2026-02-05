@@ -208,7 +208,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
      let askData = {
             title:"Batch input",
-            label:"Please input strat distance(cm).",
+            label:"Please input START position(cm).",
             value:1.0,
             type:"number",
           };
@@ -219,7 +219,7 @@ document.addEventListener("DOMContentLoaded", () => {
       }
       askData = {
             title:"Batch input",
-            label:"Please input end distance(cm).",
+            label:"Please input END position(cm).",
             value:10.0,
             type:"number",
           };
@@ -1075,10 +1075,10 @@ document.getElementById("exportButton").addEventListener("click", () => {
       "Project",
       "Hole", 
       "Section",
-      "Actural distance upper (cm)",
-      "Actural distance lower (cm)",
-      "Definition distance upper (cm)", 
-      "Definition distance lower (cm)",
+      "Actural position upper (cm)",
+      "Actural position lower (cm)",
+      "Definition position upper (cm)", 
+      "Definition position lower (cm)",
       "Conversion direction",
       "Definition CD upper (cm)", 
       "Definition CD lower (cm)", 

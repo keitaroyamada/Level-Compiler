@@ -6395,7 +6395,8 @@ class LevelCompilerCore extends EventEmitter{
       }      
     }    
   }
-  leaveOneOut(){
+  leaveOneOut(target="in"){
+    const includeMasterConnection = true;
     const data = [];
 
     data.push([
@@ -6415,7 +6416,12 @@ class LevelCompilerCore extends EventEmitter{
       for(let h=0; h<this.projects[p].holes.length; h++){
         for(let s=0; s<this.projects[p].holes[h].sections.length; s++){
           for(let m=0; m<this.projects[p].holes[h].sections[s].markers.length; m++){
-            console.log(((p+1)/this.projects.length-1).toFixed(2), ((h+1)/this.projects[p].holes.length).toFixed(2), ((s+1)/this.projects[p].holes[h].sections.length).toFixed(2))
+            const rateProject = ((p)/(this.projects.length));
+            const rateHole    = ((h)/(this.projects[p].holes.length));
+            const rateSection = ((s)/(this.projects[p].holes[h].sections.length));
+            
+            //progress
+            console.log((rateProject*100).toFixed(1)+"%", (rateHole*100).toFixed(1)+"%", (rateSection*100).toFixed(1)+"%")
             
             //get current data
             const currentMarkerData = structuredClone(this.projects[p].holes[h].sections[s].markers[m]);
@@ -6424,14 +6430,35 @@ class LevelCompilerCore extends EventEmitter{
             //disconnect horizontal connections
             for(let hc=0; hc<this.projects[p].holes[h].sections[s].markers[m].h_connection.length; hc++){
               const connectedId = this.projects[p].holes[h].sections[s].markers[m].h_connection[hc]
-              if(connectedId[0] ===  this.projects[p].id[0]){
-                //if same project
-                const connectedMarkerData = this.getDataByIdx(this.search_idx_list[connectedId.toString()]);
-                if(!currentMarkerData.isMaster || !connectedMarkerData.isMaster){
-                  //if not master connection, leave connection
-                  this.disconnectMarkers(currentMarkerData.id, connectedMarkerData.id, "horizontal");
+              if(target==="in"){
+                //case in same project
+                if(connectedId[0] ===  this.projects[p].id[0]){
+                  //if same project
+                  const connectedMarkerData = this.getDataByIdx(this.search_idx_list[connectedId.toString()]);
+                  if(includeMasterConnection){
+                    if(!currentMarkerData.isMaster || !connectedMarkerData.isMaster){
+                      //if not master connection, leave connection
+                      this.disconnectMarkers(currentMarkerData.id, connectedMarkerData.id, "horizontal");
+                    }
+                  }else{
+                    this.disconnectMarkers(currentMarkerData.id, connectedMarkerData.id, "horizontal");
+                  }                  
                 }
-              }
+              }else{
+                //case between projects
+                if(connectedId[0] !==  this.projects[p].id[0]){
+                  //if between project
+                  const connectedMarkerData = this.getDataByIdx(this.search_idx_list[connectedId.toString()]);
+                  if(includeMasterConnection){
+                    if(!currentMarkerData.isMaster || !connectedMarkerData.isMaster){
+                      //if not master connection, leave connection
+                      this.disconnectMarkers(currentMarkerData.id, connectedMarkerData.id, "horizontal");
+                    }
+                  }else{
+                    this.disconnectMarkers(currentMarkerData.id, connectedMarkerData.id, "horizontal");
+                  }
+                }
+              }              
             }  
 
             //calc new composite depth

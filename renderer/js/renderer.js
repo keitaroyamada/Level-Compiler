@@ -48,7 +48,6 @@ document.addEventListener("DOMContentLoaded", () => {
   let objOpts = setupSettings();
   function setupSettings(){
     let objOpts = {
-      interface:{},
       canvas: {},
       project:{},
       hole: {},
@@ -57,15 +56,18 @@ document.addEventListener("DOMContentLoaded", () => {
       event: {},
       connection: {},
       age: {},
-      pen: {},
-      edit:{},
       plot:{},
-      edit:{},
-      image:{},
+      pen: {},
+      image:{},      
       information:{},
       developer: {},
+      
+      edit:{},
+      plotter: {},
+      interface:{},
     };
-    objOpts.information.version = 1;
+    objOpts.information.version = 2;
+    
     objOpts.canvas.depth_scale = "composite_depth";
     objOpts.canvas.zoom_level = [4, 3]; //[x, y](300pix/1m)
     objOpts.canvas.age_zoom_correction = [1/10, 100];//[zoom level, pad level]
@@ -99,7 +101,7 @@ document.addEventListener("DOMContentLoaded", () => {
     objOpts.project.font_colour = "#000000";
     objOpts.project.is_show_area = true;
     objOpts.project.area_colour = "#EBEBEB";
-    objOpts.project.area_colour_disconnected = "#FFE5E5";
+    objOpts.project.area_colour_disconnected = "#f96a6a";
     objOpts.project.pad_x = 80;
     objOpts.project.pad_y = 200;
   
@@ -166,12 +168,13 @@ document.addEventListener("DOMContentLoaded", () => {
     objOpts.connection.show_remote_connections = true;
     objOpts.connection.emphasise_remote_connections = true;
   
-    objOpts.plot.isVisible = false;
-    objOpts.plot.collecion_idx = 0;
-    objOpts.plot.series_idx = 0;
-    objOpts.plot.selected_options = null;
-    objOpts.plot.on_section = true;
-    objOpts.plot.useResampleByScale = true;
+    objOpts.plotter.selected_options = null;
+
+    objOpts.plot.is_visible = false;
+    objOpts.plot.use_resample_by_scale = true;
+    objOpts.plot.barplot_width = 1;
+    objOpts.plot.lineplot_stroke = 1;
+    objOpts.plot.is_draw_axis = true;
   
     objOpts.edit.editable = false;
     objOpts.edit.contextmenu_enable = false;
@@ -189,9 +192,11 @@ document.addEventListener("DOMContentLoaded", () => {
     objOpts.developer.mode = "user";//"user";"developer";"root"; 
 
     objOpts.pen.colour = "#ff0000";
+
     objOpts.image.dpcm = 24;
     objOpts.image.dpcm_high = 200;
-    objOpts.image.enableLoad = {composite_depth: true, event_free_depth: true, age: true};
+    objOpts.image.enable_load = {composite_depth: true, event_free_depth: true, age: true};
+
     objOpts.age.incon_size = 20;
     objOpts.age.alt_radius = 3;
      
@@ -847,14 +852,14 @@ document.addEventListener("DOMContentLoaded", () => {
       }
 
       //get plotter options
-      objOpts.plot.selected_options = data.data;
-      objOpts.plot.isVisible = true;
+      objOpts.plotter.selected_options = data.data;
+      objOpts.plot.is_visible = true;
       document.getElementById("bt_chart").style.backgroundColor = "#ccc";
 
       //calc plotvaluse
-      if(objOpts.plot.selected_options !== null && LCPlotData.data_collections.length>0){
+      if(objOpts.plotter.selected_options !== null && LCPlotData.data_collections.length>0){
         // clac each datasets
-        const selectedList = objOpts.plot.selected_options;
+        const selectedList = objOpts.plotter.selected_options;
         for(let t=0; t< selectedList.length; t++){
           //each Plot list in plotter
           const target = selectedList[t];           
@@ -904,7 +909,7 @@ document.addEventListener("DOMContentLoaded", () => {
           console.time("[Renderer]: Making multi-level data: ")
           //-------numerator--------   
           const numeratorDataSeries   = [];          
-          if(nIdx!==null){            
+          if(nIdx!==null){         
             const numeratorDataset0 = drawPointDataset();     
             numeratorDataset0.zoom_level = 0;     
             let val_min = Infinity;
@@ -912,6 +917,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
             LCPlotData.data_collections[colIdx].rows.forEach(row=>{     
               const drawPoint  = drawPointData(row, LCCore);
+              if(!Number.isFinite(drawPoint.composite_depth)){
+                return
+              } 
               drawPoint.type   = "data";
               drawPoint.header = LCPlotData.data_collections[colIdx].header[nIdx] ? LCPlotData.data_collections[colIdx].header[nIdx] : "";
               drawPoint.unit   = LCPlotData.data_collections[colIdx].units[nIdx]  ? LCPlotData.data_collections[colIdx].units[nIdx]  : "";
@@ -944,7 +952,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 th[t] = th[t] * objOpts.canvas.age_zoom_correction[0];
               }
 
-              if(objOpts.plot.useResampleByScale ){
+              if(objOpts.plot.use_resample_by_scale){
                 //calc
                 const numeratorDataset1 = resamplePointData(numeratorDataset0, th[t], objOpts)
                 numeratorDataset1.zoom_level = t + 1;
@@ -967,6 +975,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
             LCPlotData.data_collections[colIdx].rows.forEach(row=>{     
               const drawPoint  = drawPointData(row, LCCore);
+              if(!Number.isFinite(drawPoint.composite_depth)){
+                return
+              }
               drawPoint.type   = "data";
               drawPoint.header = LCPlotData.data_collections[colIdx].header[dIdx] ? LCPlotData.data_collections[colIdx].header[dIdx] : "";
               drawPoint.unit   = LCPlotData.data_collections[colIdx].units[dIdx]  ? LCPlotData.data_collections[colIdx].units[dIdx]  : "";
@@ -1000,9 +1011,11 @@ document.addEventListener("DOMContentLoaded", () => {
                 th[t] = th[t] * objOpts.canvas.age_zoom_correction[0];
               }
 
-              //calc
-              const denominatorDataset1 = resamplePointData(denominatorDataset0, th[t], objOpts)
-              denominatorDataset1.zoom_level = t + 1;
+              if(objOpts.plot.use_resample_by_scale){
+                //calc
+                const denominatorDataset1 = resamplePointData(denominatorDataset0, th[t], objOpts)
+                denominatorDataset1.zoom_level = t + 1;
+              }
 
               //submit
               denominatorDataSeries.push(denominatorDataset1);
@@ -1011,17 +1024,20 @@ document.addEventListener("DOMContentLoaded", () => {
 
           //calc divided values
           const dividedDataSeries = dividePlotData(numeratorDataSeries, denominatorDataSeries);
-
+          
           //submit
           LCPlotData.draw_collections.push(dividedDataSeries);
 
           console.timeEnd("[Renderer]: Making multi-level data: ")
         }
       }else{
-        console.log("[Renderer]: There is no plot data or information: ", objOpts.plot.selected_options, LCPlotData.data_collections)
+        console.log("[Renderer]: There is no plot data or information: ", objOpts.plotter.selected_options, LCPlotData.data_collections)
       }
       
-      console.log("[Renderer]: Plot data is loaded.",LCPlotData)
+      console.log("[Renderer]: Plot data is loaded.")
+      if(["root","developer"].includes(objOpts.developer.mode)){
+        console.log("[Renderer]: Plot data: ",LCPlotData)
+      }
       updateView();
     }catch(er){
       console.error(er)
@@ -1161,7 +1177,16 @@ document.addEventListener("DOMContentLoaded", () => {
                     if(s.id[2]==ht.section){
                       console.log(p.name)
                       sectionProperties.options.title += p.name+" "+h.name+"-"+s.name; 
-                      sectionProperties.data = s;
+
+                      //replace marker => position(becase definition)
+                      const secData = structuredClone(s);
+                      secData.markers.forEach((m,i)=>{
+                        m.position = s.markers[i].distance;
+                        delete m.distance;
+                      })
+                      
+                      //send to window
+                      sectionProperties.data = secData;
                     }
                   })
                 }              
@@ -2115,8 +2140,8 @@ document.addEventListener("DOMContentLoaded", () => {
         }else if(objOpts.edit.mode == "change_marker_distance"){
           target = "distance";
           const askData = {
-            title:"Change marker distance",
-            label:"Please input new distance(cm).",
+            title:"Change marker position",
+            label:"Please input new position(cm).",
             value:0.0,
             type:"number",
           };
@@ -2602,7 +2627,7 @@ document.addEventListener("DOMContentLoaded", () => {
             const changedData = await getUpdatedSectionIds("depth");          
             console.log("[Renderer]: Affected sections:",changedData);
             //const affectedSections = getConnectedSectionIds([upperId, lowerId]);
-            if(changedData.ids.length>0 && (objOpts.image.enableLoad.event_free_depth || objOpts.image.enableLoad.age)){
+            if(changedData.ids.length>0 && (objOpts.image.enable_load.event_free_depth || objOpts.image.enable_load.age)){
               modelImages.load_target_ids = changedData.ids;
               modelImages = await loadCoreImages(modelImages, LCCore, objOpts, changedData.details);
             }
@@ -2637,7 +2662,7 @@ document.addEventListener("DOMContentLoaded", () => {
           const changedData = await getUpdatedSectionIds("depth");
           console.log("[Renderer]: Affected sections:",changedData);
           //const affectedSections = getConnectedSectionIds([upperId, lowerId]);
-          if(changedData.ids.length>0 && (objOpts.image.enableLoad.event_free_depth || objOpts.image.enableLoad.age)){
+          if(changedData.ids.length>0 && (objOpts.image.enable_load.event_free_depth || objOpts.image.enable_load.age)){
             modelImages.load_target_ids = changedData.ids;
             modelImages = await loadCoreImages(modelImages, LCCore, objOpts, changedData.details);
           }
@@ -3419,12 +3444,12 @@ document.addEventListener("DOMContentLoaded", () => {
   //============================================================================================
   document.getElementById("bt_chart").addEventListener("click", async () => {
     if (LCCore) {
-      if (!objOpts.plot.isVisible ) {
-        objOpts.plot.isVisible = true;
+      if (!objOpts.plot.is_visible ) {
+        objOpts.plot.is_visible = true;
         document.getElementById("bt_chart").style.backgroundColor = "#ccc";
         updateView();
       } else {
-        objOpts.plot.isVisible = false;
+        objOpts.plot.is_visible = false;
         document.getElementById("bt_chart").style.backgroundColor = "#f0f0f0";
         updateView();
       }
@@ -3755,6 +3780,20 @@ document.addEventListener("DOMContentLoaded", () => {
         document.getElementById("bt_finder").style.backgroundColor = "#ccc";
         await LCapi.OpenFinder("OpenFinder", async () => {});
         objOpts.canvas.finder_y = 0;
+
+        //calc current centre position
+        const rect = document.getElementById("p5Canvas").getBoundingClientRect(); 
+        const centerX = (rect.width / 2);
+        const centerY = (rect.height / 2);//IF ADD 76PIX, CENTRED
+
+        const ht = getClickedItemIdx(centerX, centerY, LCCore, objOpts);   
+
+        //send position
+        setTimeout(async () => {            
+            await window.LCapi.SendDepthToFinder(ht);
+        }, 100);
+
+        
         updateView();
       } else {
         finderEnable = false;
@@ -3797,70 +3836,56 @@ document.addEventListener("DOMContentLoaded", () => {
     console.log(data);
   });
   window.LCapi.receive("SettingsMenuClicked", async () => {
-    const settings = makeSettingData();
+    const settings = makeSendSettingData();
     await window.LCapi.sendSettings(settings, "settings");
   });
   window.LCapi.receive("getSettingsFromRenderer", async () => {
-    const settings = makeSettingData();
+    const settings = makeSendSettingData();
     await window.LCapi.sendSettings(settings, "main");
   });
 
-  function makeSettingData(){
-    const canvas = objOpts.canvas;
-    const project = objOpts.project;
-    const hole = objOpts.hole;
-    const section = objOpts.section;
-    const marker = objOpts.marker;
-    const event = objOpts.event;
-    const connection = objOpts.connection;
-    const age = objOpts.age;
-    const pen = objOpts.pen;
-    const plot = objOpts.plot; 
-    const image = objOpts.image;
-    const information = objOpts.information;
-    const developer = objOpts.developer;
+  function makeSendSettingData(){
+    const editable_deny = new Set([
+      "information",
+      "interface",
+      "edit",
+      "plotter"
+    ]);
+    const list_deny = new Set([
+      "interface",
+      "edit",
+      "plotter"
+    ]);
+
+    const settings = {};
+    for (const k in objOpts) {
+      if (objOpts[k] && typeof objOpts[k] === "object") {
+        if (!list_deny.has(k)) {
+          settings[k] = structuredClone(objOpts[k]);
+        }
+      }
+    }
+
+    const editable = {};
+    for (const k in objOpts) {
+      if (objOpts[k] && typeof objOpts[k] === "object" && !editable_deny.has(k)) {
+        editable[k] = true;
+      }
+    }
+
     const options={
       editable:true,
       called_from:"renderer",
       title:"Preferences",
     }
 
-    const editable = {
-      canvas: true,
-      project: true,
-      hole: true,
-      section: true,
-      marker: true,
-      event: true,
-      connection: true,
-      age: true,
-      pen: true,
-      image: true,
-      information: false,
-      developer: true,
-    }
-
-    const settings = {
+    const sendData = {
       options,
       editable,
-      data:{
-        canvas,
-        project,
-        hole,
-        section,
-        marker,
-        event,
-        connection,
-        age,
-        pen,
-        image,
-        information,
-        developer,
-      }
+      data:settings
     };
-
     
-    return settings
+    return sendData
   }
   
   window.LCapi.receive("SettingsData", async (data) => {
@@ -3869,115 +3894,34 @@ document.addEventListener("DOMContentLoaded", () => {
       objOpts = setupSettings();
 
       //back to settings menu
-      const canvas      = objOpts.canvas;
-      const project     = objOpts.project;
-      const hole        = objOpts.hole;
-      const section     = objOpts.section;
-      const marker      = objOpts.marker;
-      const event       = objOpts.event;
-      const connection  = objOpts.connection;
-      const age         = objOpts.age;
-      const pen         = objOpts.pen;
-      const image       = objOpts.image; 
-      const plot        = objOpts.plot; 
-      const information = objOpts.information;
-      const developer   = objOpts.developer; 
-
-      const settings = {
-        canvas,
-        project,
-        hole,
-        section,
-        marker,
-        event,
-        connection,
-        age,
-        pen,
-        image,  
-        information,
-        developer,
-      };
-      const editable = {
-        canvas: true,
-        project: true,
-        hole: true,
-        section: true,
-        marker: true,
-        event: true,
-        connection: true,
-        age: true,
-        pen: true,
-        image: true,  
-        information: false,
-        developer: true,
-      }
-      const options={
-        editable:true,
-        called_from:"settings",
-        title:"Preferences",
-      }
+      const settings = makeSendSettingData();
         
-      await window.LCapi.sendSettings({data: settings, editable, options}, "settings");
+      await window.LCapi.sendSettings(settings, "settings");
     }else{
-      console.log(data)
-      // check settings format version
-      if(!data?.data?.information?.version){
-        //old version
-        console.log("[Renderer]: Old-format settings detected. Replacing with the current version.",objOpts)
+      //call saved settings
+
+      if(!Number.isFinite(data.information?.version) || (data.information?.version < objOpts.information.version)){
+        // case: old beta version format(<v1.1.1), older version format
+        //overwrite the saved settings with app settings
+
+        const settings = makeSendSettingData()
+
+        await window.LCapi.sendSettings({ data: settings, editable, options }, "save");
         
-        //make current setttings
-        const settings = data.data;
-        settings.information = objOpts.information;
-
-        const editable = {
-          canvas: true,
-          project: true,
-          hole: true,
-          section: true,
-          marker: true,
-          event: true,
-          connection: true,
-          age: true,
-          pen: true,
-          image: true,  
-          information: false,
-          developer: true,
-        }
-        const options={
-          editable:true,
-          called_from:"settings",
-          title:"Preferences",
-        }
-
-        await window.LCapi.sendSettings({data: settings, editable, options}, "save");
-        await window.LCapi.sendSettings({data: settings, editable, options}, "settings");
+        console.log("[Renderer]: Beta-format settings detected. Replacing with the current version.", settings)
       }else{
-        //current version
-        Object.assign(objOpts.canvas,     data.data.canvas);
-        Object.assign(objOpts.project,    data.data.project);
-        Object.assign(objOpts.hole,       data.data.hole);
-        Object.assign(objOpts.section,    data.data.section);
-        Object.assign(objOpts.marker,     data.data.marker);
-        Object.assign(objOpts.event,      data.data.event);
-        Object.assign(objOpts.connection, data.data.connection);
-        Object.assign(objOpts.age,        data.data.age);
-        Object.assign(objOpts.pen,        data.data.pen);
-        Object.assign(objOpts.image,      data.data.image); 
-        Object.assign(objOpts.information,data.data.information); 
-        Object.assign(objOpts.developer,  data.data.developer); 
+        //case: same version (or app is older than saved settings)
+        for (const k in data) {
+          if (!objOpts[k]) continue;
+          if (typeof data[k] === "object" && typeof objOpts[k] === "object") {
+            Object.assign(objOpts[k], data[k]);
+          } else {
+            objOpts[k] = data[k];
+          }
+        }
 
-        //important settings set to default
-        objOpts.canvas.is_draw_model        = true;
-        objOpts.canvas.buffer_depth         = 0;
-        objOpts.canvas.is_event             = true;
-        objOpts.canvas.is_connection        = true;
-        objOpts.canvas.is_grid              = true;
-        objOpts.canvas.draw_core_photo      = false;
-        objOpts.marker.show_name_labels     = true;
-        objOpts.marker.show_distance_labels = true;
-
-        console.log("[Renderer]: Settings are loaded.",objOpts)
-      }
+        console.log("[Renderer]: Settings are loaded.", objOpts)        
+      }  
     }    
     
     updateView();
@@ -4170,17 +4114,22 @@ document.addEventListener("DOMContentLoaded", () => {
 
       if (event.altKey) {
         event.preventDefault();
-        //add zoom level
+
+        const viewH = scroller.clientHeight;
+        
+        // Calculate the ratio of the "content" only, excluding the fixed offset
+        const relative_scroll_pos_y = (scroller.scrollTop + viewH / 2 - canvasBase.offsetTop) / objOpts.canvas.zoom_level[1];
+        const relative_scroll_pos_x = (scroller.scrollLeft - objOpts.canvas.pad_x) / scroller.scrollWidth;
+
+        // add zoom level
         objOpts.canvas.zoom_level[0] += 0.01 * deltaX;
         if (event.ctrlKey) {
-          //If ctrl key, x scroll
           objOpts.canvas.zoom_level[0] += 0.01 * deltaY;
         } else {
-          //if no ctrl key, yscroll
           objOpts.canvas.zoom_level[1] += 0.01 * deltaY;
         }
 
-        //limit of smaller
+        // limit of smaller
         if (objOpts.canvas.zoom_level[1] < 0.1) {
           objOpts.canvas.zoom_level[1] = 0.1;
         }
@@ -4188,25 +4137,24 @@ document.addEventListener("DOMContentLoaded", () => {
           objOpts.canvas.zoom_level[0] = 0.1;
         }
 
-        //mouse position
-        const relative_scroll_pos_x = (scroller.scrollLeft - objOpts.canvas.pad_x) / scroller.scrollWidth;
-        const relative_scroll_pos_y = scroller.scrollTop / scroller.scrollHeight;
-
-        //calc new canvas size
+        // calc new canvas size
         makeP5CanvasBase();
         const canvasBase_width  = parseInt(canvasBase.style.width.match(/\d+/)[0], 10);
-        const canvasBase_height = parseInt(canvasBase.style.height.match(/\d+/)[0], 10);
+        // canvasBase_height is maintained as an existing variable
 
-        //get new scroll pos
+        // get new scroll pos
         const new_scroll_pos_x = canvasBase_width * relative_scroll_pos_x + objOpts.canvas.pad_x;
-        const new_scroll_pos_y = canvasBase_height * relative_scroll_pos_y;
+        
+        // Calculate position with the new zoom level and add back the fixed offset
+        const new_scroll_pos_y = (relative_scroll_pos_y * objOpts.canvas.zoom_level[1]) - (viewH / 2) + canvasBase.offsetTop;
 
-        scroller.scrollTo(new_scroll_pos_x, new_scroll_pos_y); //move scroll position
+        // MOVE
+        scroller.scrollTo(new_scroll_pos_x, new_scroll_pos_y);
 
-        //update data
+        // update data
         canvasPos = [new_scroll_pos_x, new_scroll_pos_y];
 
-        //update plot
+        // update plot
         updateView();
       }
     },
@@ -5867,8 +5815,8 @@ document.addEventListener("DOMContentLoaded", () => {
       //==========================================================================================
       //==========================================================================================
       //draw data points     //0000000000000000000000000000
-      if(objOpts.plot.isVisible == true){
-        if(objOpts.plot.selected_options !== null){          
+      if(objOpts.plot.is_visible == true){
+        if(objOpts.plotter.selected_options !== null){          
           sketch.drawingContext.setLineDash([]);
           if(LCPlotData){
             for(let t=0; t<LCPlotData.draw_collections.length; t++){
@@ -5912,7 +5860,7 @@ document.addEventListener("DOMContentLoaded", () => {
               }
 
               //getdata
-              const pOptions = objOpts.plot.selected_options[t];            
+              const pOptions = objOpts.plotter.selected_options[t];            
               const drawDataset = LCPlotData.draw_collections[t][zoomLevel];
 
               //check inside
@@ -5920,27 +5868,44 @@ document.addEventListener("DOMContentLoaded", () => {
 
               const searchTop = scrollerTopRealScale - bufferVal;
               const searchBot = scrollerBotRealScale + bufferVal;
+              const depthArr = drawDataset.depth_map[objOpts.canvas.depth_scale]; 
+              const startIndex = binarySearchIndex(depthArr, searchTop, (e) => e.value);
+              const endIndex   = binarySearchIndex(depthArr, searchBot, (e) => e.value);
+
+              const targetIdxs = depthArr.slice(startIndex, endIndex).map(e => e.idx).sort((a, b) => a - b);
+              const numPoints = targetIdxs.length;
+
+              //extract
+              /*
+              const searchTop = scrollerTopRealScale - bufferVal;
+              const searchBot = scrollerBotRealScale + bufferVal;
               let startIndex  = binarySearchIndex(drawDataset.data, searchTop, (d) => d[objOpts.canvas.depth_scale]);
               let endIndex    = binarySearchIndex(drawDataset.data, searchBot, (d) => d[objOpts.canvas.depth_scale]);
               const numPoints = endIndex - startIndex ? endIndex - startIndex + 1 : 0;
+
+              const extractedDrawDataset = { ...drawDataset };
+              extractedDrawDataset.data = drawDataset.data.slice(startIndex, endIndex + 1).map(d => ({ ...d }));
+              */
+
               if(["root"].includes(objOpts.developer.mode)){
                 console.log("Dipslay: Zoom: ",zoomLevel,", hight pix: ",sketch.height * dpir,", hight cm: ", (searchBot-searchTop).toFixed(2)," cm, points: N=", numPoints)
               }
               
               //extract
-              const extractedDrawDataset = structuredClone(drawDataset);
-              extractedDrawDataset.data  = drawDataset.data.slice(startIndex, endIndex+1);
-              if(extractedDrawDataset.data.length==0) continue;
-
-              //sort 
-              if(extractedDrawDataset.data[0].source == "trinity"){
-                extractedDrawDataset.data.sort((a, b) =>
-                      a.hname.localeCompare(b.hname)
-                );
+              const extractedDrawDataset = {};
+              for (const k in drawDataset) {
+                if (k !== "data") extractedDrawDataset[k] = drawDataset[k];
               }
+
+              extractedDrawDataset.data = new Array(targetIdxs.length);
+              for (let i = 0; i < targetIdxs.length; i++) {
+                const d = drawDataset.data[targetIdxs[i]];
+                extractedDrawDataset.data[i] = { ...d };
+              }
+                
+              if(extractedDrawDataset.data.length==0) continue;
               
-              //calc position
-             
+              //calc position             
               const drawData = calcDrawPosition(extractedDrawDataset, LCCore, objOpts, pOptions);
 
               //draw
@@ -5948,9 +5913,18 @@ document.addEventListener("DOMContentLoaded", () => {
               // Calculate zero position if not yet calculated
               LCCore.projects.forEach((project, p)=>{
                 project.holes.forEach((hole, h)=>{
-                  const zeroDrawDataset = structuredClone(extractedDrawDataset);
-                  zeroDrawDataset.data = [structuredClone(zeroDrawDataset.data[0]), structuredClone(zeroDrawDataset.data[0]), structuredClone(zeroDrawDataset.data[0])];
-                  if(extractedDrawDataset.data[0].pidx === p && zeroDrawDataset.data[0]){
+                  const firstDataPoint = extractedDrawDataset.data[0];
+                  if(firstDataPoint && firstDataPoint.pidx === p){
+                    
+                    const d1 = { ...firstDataPoint };
+                    const d2 = { ...firstDataPoint };
+                    const d3 = { ...firstDataPoint };
+                    
+                    const zeroDrawDataset = { 
+                        ...extractedDrawDataset, 
+                        data: [d1, d2, d3]
+                    };
+
                     //set zero
                     zeroDrawDataset.data[0].val = 0;
                     zeroDrawDataset.data[0].hname = hole.name;
@@ -5966,26 +5940,14 @@ document.addEventListener("DOMContentLoaded", () => {
                     
                     const zeroDataset = calcDrawPosition(zeroDrawDataset, LCCore, objOpts, pOptions);
                     zeroDataDict[hole.name] = zeroDataset.data;
-                    /*
-                    console.log(zeroData)
-
-                    //draw baseline
-                    sketch.strokeWeight(1); 
-                    sketch.stroke("blue"); 
-                    sketch.noFill();
-                    sketch.line(
-                      zeroData.pos_x,
-                      drawData.min, // Screen Top
-                      zeroData.pos_x,
-                      drawData.max  // Screen Bottom
-                    );
-                    */
-
+                    
                     //X axis
-                    const isDrawAxis = true;
-
-                    if (isDrawAxis) {
-                        const yAxis = 200 + scroller.scrollTop;
+                    if (objOpts.plot.is_draw_axis) {
+                      let yAxis = 200 + scroller.scrollTop;
+                      if(h%2==0){
+                        yAxis -= 60; 
+                      }
+                        
                         const yLabel = yAxis + 15;
                         const yTitle = yAxis - 25;
                         
@@ -5996,7 +5958,6 @@ document.addEventListener("DOMContentLoaded", () => {
                         const minValueStr = autoRound(zeroDataset.min).toString();
                         const maxValueStr = autoRound(zeroDataset.max).toString();
                         const title = zeroDataset.data[0].header + " [" + zeroDataset.data[0].unit + "]";
-                        
                         sketch.push();
 
                         sketch.strokeWeight(2);
@@ -6025,84 +5986,153 @@ document.addEventListener("DOMContentLoaded", () => {
                         
                         sketch.pop();
                     }
-                    
-
                   }
+
+                  //const zeroDrawDataset = structuredClone(extractedDrawDataset);
+                  //zeroDrawDataset.data = [structuredClone(zeroDrawDataset.data[0]), structuredClone(zeroDrawDataset.data[0]), structuredClone(zeroDrawDataset.data[0])];
                 })
               })   
 
-              if (pOptions.plotType == "line") {
-                sketch.strokeWeight(1); 
-                sketch.stroke(pOptions.colour); 
-                sketch.noFill();
-                sketch.beginShape();
-              }else if(pOptions.plotType == "bar"){
-                sketch.noStroke(); 
-                sketch.fill(pOptions.colour);
-                sketch.beginShape(sketch.QUADS);                         
-              }
-
-              //main
+              //========== main plot ====================
+              let isPlotting = false;
+              let objCounts  = 0;
+              let linePlotStroke = objOpts.plot.lineplot_stroke;
+              const numCut = 200;
+              //main roop
               for(let d=0; d<drawData.data.length; d++){
-                const pData = drawData.data[d];              
-                if (!Number.isFinite(pData.pos_x) || !Number.isFinite(pData.pos_y)) continue;
+                objCounts += 1;
+                //get data
+                const pData = drawData.data[d];
 
+                //if valid data exist, plot
                 if(pOptions.plotType == "line"){
                   // ---------------------------------------------------------
-                  // Line Plot: Use vertex() instead of line()
-                  // ---------------------------------------------------------                
-                  // Add a vertex to the current shape batch (doesn't draw yet)
+                  // Line Plot: (using vertex)
+                  // ---------------------------------------------------------
+                  // Check Delimiter
+                  if (!Number.isFinite(pData.pos_y) || !Number.isFinite(pData.pos_x)) {
+                    if (isPlotting) {
+                        sketch.endShape();
+                        objCounts = 0;
+                        isPlotting = false;
+                    }
+                   console.log(pData)
+                    //to next loop
+                    continue;
+                  }
+
+                  // ---------------------------------------------------------
+                  // Check for Discontinuity (Section/Hole Change)
+                  if (isPlotting && d>0) {
+                    const prevData = drawData.data[d - 1];
+                    if (pData.hname !== prevData.hname || pData.sname !== prevData.sname) {
+                        sketch.endShape();
+                        objCounts = 0;
+                        isPlotting = false;    
+                    }
+                  }
+
+                  // ---------------------------------------------------------
+                  // Draw
+                  if (!isPlotting) {
+                    sketch.beginShape();
+                    sketch.strokeJoin(sketch.BEVEL);
+                    sketch.strokeWeight(linePlotStroke);
+                    sketch.stroke(pOptions.colour);
+                    sketch.noFill();
+                    isPlotting = true;
+                  }
+
+                  // ---------------------------------------------------------
+                  // plot vertex
                   sketch.vertex(pData.pos_x, pData.pos_y);
 
-                  // Handle data discontinuity (e.g., different hole or section)
-                  // We must break the line if the next point belongs to a different group
-                  const nextpData = drawData.data[d+1];
-                  if (nextpData == undefined || pData.hname !== nextpData.hname || pData.sname !== nextpData.sname) {
-                      sketch.endShape();   // Draw the current segment
-                      sketch.beginShape(); // Start a new segment
-                  }            
+                  if(objCounts>numCut){
+                    sketch.endShape();
+                    objCounts = 0;
+                    sketch.beginShape();
+                    sketch.strokeJoin(sketch.BEVEL);
+                    sketch.strokeWeight(linePlotStroke);
+                    sketch.stroke(pOptions.colour);
+                    sketch.noFill();
+                    isPlotting = true;
+                  }
+            
                 }else if(pOptions.plotType == "scatter"){
                   // ---------------------------------------------------------
                   // Scatter Plot
-                  // ---------------------------------------------------------    
-                  sketch.stroke(pOptions.colour);
-                  sketch.strokeWeight(3); 
+                  // ---------------------------------------------------------   
+                  if (!Number.isFinite(pData.pos_y) || !Number.isFinite(pData.pos_x)) {
+                    continue;
+                  }
 
-                  sketch.point(
-                    pData.pos_x,
-                    pData.pos_y
-                  );
+                  if (!isPlotting) {
+                    sketch.beginShape(sketch.POINTS);
+                    sketch.stroke(pOptions.colour);
+                    sketch.strokeWeight(3);
+                    isPlotting = true;
+                  }
+
+                  sketch.vertex(pData.pos_x, pData.pos_y);
+
+                  if(objCounts > numCut){
+                    sketch.endShape();
+                    isPlotting = false;
+                    objCounts = 0;
+                  }
+
                 }else if(pOptions.plotType == "bar"){
                   // ---------------------------------------------------------
-                  // Bar Plot Logic (Dynamic Width)
-                  // ---------------------------------------------------------                
-                  // 1. Calculate dynamic height based on the distance to the next data point
+                  // Bar Plot: (using QUADS)
+                  // ---------------------------------------------------------
+                  // Check Delimiter (same as line)
+                  if (!Number.isFinite(pData.pos_y) || !Number.isFinite(pData.pos_x)) {
+                    if (isPlotting) {
+                      sketch.endShape();
+                      isPlotting = false;
+                    }
+                    continue;
+                  }
+
+                  // ---------------------------------------------------------
+                  // Check for Discontinuity (Section/Hole Change) (same as line)
+                  if (isPlotting && d>0) {
+                    const prevData = drawData.data[d - 1];
+                    if (pData.hname !== prevData.hname || pData.sname !== prevData.sname) {
+                      sketch.endShape();
+                      isPlotting = false;
+                    }
+                  }
+
+                  // ---------------------------------------------------------
+                  // Draw (start a QUADS batch)
+                  if (!isPlotting) {
+                    sketch.beginShape(sketch.QUADS);
+                    sketch.noStroke();
+                    sketch.fill(pOptions.colour);
+                    isPlotting = true;
+                  }
+
+                  // ---------------------------------------------------------
+                  // Bar Plot Logic 
                   let depthDiff = 0;
 
                   if (d < drawData.data.length - 1) {
-                      // Calculate distance to the NEXT point
-                      depthDiff = Math.abs(drawData.data[d+1][objOpts.canvas.depth_scale] - drawData.data[d][objOpts.canvas.depth_scale]);
+                    depthDiff = Math.abs(drawData.data[d+1][objOpts.canvas.depth_scale] - drawData.data[d][objOpts.canvas.depth_scale]);
                   } else if (d > 0) {
-                      // For the LAST point, use the distance from the PREVIOUS point
-                      depthDiff = Math.abs(drawData.data[d][objOpts.canvas.depth_scale] - drawData.data[d-1][objOpts.canvas.depth_scale]);
+                    depthDiff = Math.abs(drawData.data[d][objOpts.canvas.depth_scale] - drawData.data[d-1][objOpts.canvas.depth_scale]);
                   } else {
-                      // Fallback if there is only 1 data point
-                      depthDiff = 1.0; 
+                    depthDiff = 1.0;
                   }
 
-                  // 2. Convert depth difference to pixels (using yMag)
-                  // Multiply by 0.9 or similar to leave a small gap (optional)
-                  //let binWidth = (depthDiff * yMag) * 0.9; 
-                  let binWidth = 5;
-                  // Safety: ensure minimum visibility (e.g., at least 1px)
-                  if(binWidth < 1) binWidth = 1;
+                  
+                  let binWidth = objOpts.plot.barplot_width;//if fix depth, => * yMag;
+                  if (binWidth < 1) binWidth = 1;
 
                   // Define rectangle coordinates
-                  //const xMin = zeroDataset.data[2].pos_x;
                   const rectX0 = zeroDataDict[pData.hname][2].pos_x;
                   const rectX1 = pData.pos_x;
 
-                  // Center the bar on the data point
                   const rectY0 = pData.pos_y - binWidth/2;
                   const rectY1 = pData.pos_y + binWidth/2;
 
@@ -6111,12 +6141,19 @@ document.addEventListener("DOMContentLoaded", () => {
                   sketch.vertex(rectX1, rectY0);
                   sketch.vertex(rectX1, rectY1);
                   sketch.vertex(rectX0, rectY1);
-                }                                  
+
+                  if(objCounts > numCut){ 
+                    sketch.endShape();
+                    isPlotting = false;
+                    objCounts = 0;
+                  }
+                }                 
               }
 
-              // Finish and render the final batch of lines
-              if (pOptions.plotType == "line" || pOptions.plotType == "bar") {
+              // Ensure the last shape is closed
+              if (isPlotting) {
                 sketch.endShape();
+                isPlotting = false;
               }
               
             } 
@@ -6573,11 +6610,14 @@ document.addEventListener("DOMContentLoaded", () => {
 
       //shwo model summary
       console.log("[Renderer]: Correlation Model has been loaded into the renderer.");
-      console.log(
-        "Name: " + LCCore.name,
-        "\nDescriptions: " + LCCore.descriptions,
-        "\nModel data: " , LCCore
-      );
+      if(["root","developer"].includes(objOpts.developer.mode)){
+        console.log(
+          "Name: " + LCCore.name,
+          "\nDescriptions: " + LCCore.descriptions,
+          "\nModel data: " , LCCore
+        );
+      }
+      
       /*
       LCCore.projects.forEach(p=>{
         console.log(
@@ -6652,7 +6692,10 @@ document.addEventListener("DOMContentLoaded", () => {
         }
       });
 
-      console.log("[Renderer]: Marker Ages updated.",LCCore);
+      console.log("[Renderer]: Marker Ages updated.");
+      if(["root","developer"].includes(objOpts.developer.mode)){
+        console.log("Model data: ",LCCore);
+      }
 
       console.log("[Renderer]: Age model has been loaded into the renderer.");
       console.log(
@@ -6752,8 +6795,11 @@ document.addEventListener("DOMContentLoaded", () => {
       }else if(dataType=="data"){
         if(protocol == "direct"){
           //The plot contains multiple datasets, so the conversion is performed when the plot options are loaded.
-          LCPlotData = await unzip(results.data);;
-          console.log("Plot data: ", LCPlotData);
+          LCPlotData = await unzip(results.data);
+          console.log("Plot data loaded.")
+          if(["root","developer"].includes(objOpts.developer.mode)){
+            console.log("Plot data: ", LCPlotData);
+          }
         }else if(protocol == "buffer"){
           //if buffer URL
           const res = await fetch("app://data");
@@ -7647,8 +7693,8 @@ async function loadCoreImages(modelImages, LCCore, objOpts, operations) {
 
   //check operations
   
-  for (const op in objOpts.image.enableLoad) {
-    if(!objOpts.image.enableLoad[op]){
+  for (const op in objOpts.image.enable_load) {
+    if(!objOpts.image.enable_load[op]){
       operations = operations.filter(item => item !== op);
     }
   }  
@@ -8301,7 +8347,7 @@ function resamplePointData(numeratorDataset0, th, objOpts){
           vals = idxs.map(i => { const val = numeratorDataset0.data[i].val; return val === null ? NaN : Number(val); }).filter(Number.isFinite);
           const mVal = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
 
-          const names = `${numeratorDataset0.data[idxs[0]].name}-${numeratorDataset0.data[idxs[idxs.length-1]].name} (${idxs.length})`;
+          const names = `${numeratorDataset0.data[idxs[0]].name}<->${numeratorDataset0.data[idxs[idxs.length-1]].name} [N=${idxs.length}]`;
 
 
           //calc max/min
@@ -8386,7 +8432,7 @@ function resamplePointData(numeratorDataset0, th, objOpts){
           vals = idxs.map(i => { const val = numeratorDataset0.data[i].val; return val === null ? NaN : Number(val); }).filter(Number.isFinite);
           const mVal = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
 
-          const names = `${numeratorDataset0.data[idxs[0]].name}-${numeratorDataset0.data[idxs[idxs.length-1]].name} (${idxs.length})`;
+          const names = `${numeratorDataset0.data[idxs[0]].name}<-|${numeratorDataset0.data[idxs[idxs.length-1]].name} [N=${idxs.length}]`;
 
           //calc max/min
           if (Number.isFinite(mVal)){
@@ -8438,6 +8484,9 @@ function resamplePointData(numeratorDataset0, th, objOpts){
   }
 
   //finish process
+  // The last group in `idxs` may not be flushed inside the loop,
+  // because no threshold break or section change occurs at the array end.
+  // This block finalizes and outputs the remaining accumulated points.
   if(idxs.length>0){
     // composite_depth
     let vals = idxs.map(i => { const val = numeratorDataset0.data[i].composite_depth; return val === null ? NaN : Number(val); }).filter(Number.isFinite);
@@ -8471,7 +8520,7 @@ function resamplePointData(numeratorDataset0, th, objOpts){
     vals = idxs.map(i => { const val = numeratorDataset0.data[i].val; return val === null ? NaN : Number(val); }).filter(Number.isFinite);
     const mVal = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
 
-    const names = `${numeratorDataset0.data[idxs[0]].name}-${numeratorDataset0.data[idxs[idxs.length-1]].name} (${idxs.length})`;
+    const names = `${numeratorDataset0.data[idxs[0]].name}<-||${numeratorDataset0.data[idxs[idxs.length-1]].name} [N=${idxs.length}]`;
 
     //calc max/min
     if (Number.isFinite(mVal)){
@@ -8527,6 +8576,7 @@ function dividePlotData(numeratorDataSeries, denominatorDataSeries){
   const dividedDataSeries = [];
   if(numeratorDataSeries.length>0){              
     if(denominatorDataSeries.length>0){
+      //===========================================================================
       //case n/d
       for(let i = 0; i< numeratorDataSeries.length; i++){
         const dividedDataset = drawPointDataset();
@@ -8581,9 +8631,42 @@ function dividePlotData(numeratorDataSeries, denominatorDataSeries){
         dividedDataset.max = Number.isFinite(val_max) ? val_max : null;
         dividedDataset.min = Number.isFinite(val_min) ? val_min : null;
         dividedDataset.zoom_level = numeratorDataSeries[i].zoom_level;
+
+        //sort
+        if(dividedDataset.data.length > 0){
+          if(dividedDataset.data[0].source == "trinity"){
+            dividedDataset.data.sort((a, b) =>
+              a.hname.localeCompare(b.hname)
+            );
+          }
+        }
+
+        //get cd map
+        const depthMap = {
+          composite_depth: [],
+          drilling_depth: [],
+          event_free_depth: [],
+          age: [],
+        };
+        dividedDataset.data.forEach((item, idx) => {
+          depthMap.composite_depth.push({ idx, value: item.composite_depth });
+          depthMap.drilling_depth.push({ idx, value: item.drilling_depth });
+          depthMap.event_free_depth.push({ idx, value: item.event_free_depth });
+          depthMap.age.push({ idx, value: item.age });
+        });
+
+        // map sort
+        depthMap.composite_depth.sort((a, b) => a.value - b.value);
+        depthMap.drilling_depth.sort((a, b) => a.value - b.value);
+        depthMap.event_free_depth.sort((a, b) => a.value - b.value);
+        depthMap.age.sort((a, b) => a.value - b.value);
+
+        dividedDataset.depth_map = depthMap;
+
         dividedDataSeries.push(dividedDataset);        
       }
     }else{
+      //======================================================================
       // case n/1
       for(let i = 0; i< numeratorDataSeries.length; i++){
         const dividedDataset = drawPointDataset();
@@ -8599,11 +8682,44 @@ function dividePlotData(numeratorDataSeries, denominatorDataSeries){
         dividedDataset.max = numeratorDataSeries[i].max;
         dividedDataset.min = numeratorDataSeries[i].min;
         dividedDataset.zoom_level = numeratorDataSeries[i].zoom_level;
+
+        //sort
+        if(dividedDataset.data.length > 0){
+          if(dividedDataset.data[0].source == "trinity"){
+            dividedDataset.data.sort((a, b) =>
+              a.hname.localeCompare(b.hname)
+            );
+          }
+        }
+
+        //get cd map
+        const depthMap = {
+          composite_depth: [],
+          drilling_depth: [],
+          event_free_depth: [],
+          age: [],
+        };
+        dividedDataset.data.forEach((item, idx) => {
+          depthMap.composite_depth.push({ idx, value: item.composite_depth });
+          depthMap.drilling_depth.push({ idx, value: item.drilling_depth });
+          depthMap.event_free_depth.push({ idx, value: item.event_free_depth });
+          depthMap.age.push({ idx, value: item.age });
+        });
+
+        // map sort
+        depthMap.composite_depth.sort((a, b) => a.value - b.value);
+        depthMap.drilling_depth.sort((a, b) => a.value - b.value);
+        depthMap.event_free_depth.sort((a, b) => a.value - b.value);
+        depthMap.age.sort((a, b) => a.value - b.value);
+
+        dividedDataset.depth_map = depthMap;
+
         dividedDataSeries.push(dividedDataset);        
       }
     }
   }else{
     if(denominatorDataSeries.length>0){
+      //===========================================================
       //case 1/d
       for(let i = 0; i< denominatorDataSeries.length; i++){
         const dividedDataset = drawPointDataset();
@@ -8653,6 +8769,38 @@ function dividePlotData(numeratorDataSeries, denominatorDataSeries){
         dividedDataset.max = Number.isFinite(val_max) ? val_max : null;
         dividedDataset.min = Number.isFinite(val_min) ? val_min : null;
         dividedDataset.zoom_level = denominatorDataSeries[i].zoom_level;
+
+        //sort
+        if(dividedDataset.data.length > 0){
+          if(dividedDataset.data[0].source == "trinity"){
+            dividedDataset.data.sort((a, b) =>
+              a.hname.localeCompare(b.hname)
+            );
+          }
+        }
+
+        //get cd map
+        const depthMap = {
+          composite_depth: [],
+          drilling_depth: [],
+          event_free_depth: [],
+          age: [],
+        };
+        dividedDataset.data.forEach((item, idx) => {
+          depthMap.composite_depth.push({ idx, value: item.composite_depth });
+          depthMap.drilling_depth.push({ idx, value: item.drilling_depth });
+          depthMap.event_free_depth.push({ idx, value: item.event_free_depth });
+          depthMap.age.push({ idx, value: item.age });
+        });
+
+        // map sort
+        depthMap.composite_depth.sort((a, b) => a.value - b.value);
+        depthMap.drilling_depth.sort((a, b) => a.value - b.value);
+        depthMap.event_free_depth.sort((a, b) => a.value - b.value);
+        depthMap.age.sort((a, b) => a.value - b.value);
+
+        dividedDataset.depth_map = depthMap;
+
         dividedDataSeries.push(dividedDataset);        
       }
     }else{
@@ -8703,19 +8851,27 @@ function calcDrawPosition(drawPointDataset, LCCore, objOpts, pOptions){
 
   //calc
   for(let i=0; i<drawPointDataset.data.length; i++){
-    const drawData = drawPointDataset.data[i];    
+    const drawData = drawPointDataset.data[i];   
     
     if(drawData.source === "trinity"){
-      const enableHoles = holeEnableList[drawData.pidx][drawData.hidx];
-      //calc 
-      if(drawData.type == "age"){
-        //age xpos is fixed. adjust icon size
-        drawData.pos_x = ((objOpts.hole.distance + objOpts.hole.width) * (enableHoles.enable -1 ) + shift_x) * xMag + pad_x + objOpts.hole.width * xMag - objOpts.age.incon_size * 1.2;
-        drawData.pos_y = (drawData[objOpts.canvas.depth_scale] + shift_y) * yMag + pad_y - objOpts.age.incon_size / 2;
-      } else{
-        //data xpos, without adjust
-        drawData.pos_x = ((objOpts.hole.distance + objOpts.hole.width) * (enableHoles.enable -1 ) + (drawData.val - val_min) * amp[0] + shift_x) * xMag + pad_x;
-        drawData.pos_y = (drawData[objOpts.canvas.depth_scale]  * amp[1] + shift_y) * yMag + pad_y;
+      if(drawData.pidx !== null && drawData.hidx !== null){
+        const enableHoles = holeEnableList[drawData.pidx][drawData.hidx];
+        //calc 
+        if(drawData[objOpts.canvas.depth_scale] == null){console.log(1111111111111)}
+        if(drawData.type == "age"){
+          //age xpos is fixed. adjust icon size
+          drawData.pos_x = ((objOpts.hole.distance + objOpts.hole.width) * (enableHoles.enable -1 ) + shift_x) * xMag + pad_x + objOpts.hole.width * xMag - objOpts.age.incon_size * 1.2;
+          drawData.pos_y = (drawData[objOpts.canvas.depth_scale] + shift_y) * yMag + pad_y - objOpts.age.incon_size / 2;
+        } else{
+          //data xpos, without adjust
+          if(Number.isFinite(drawData.val)){
+            drawData.pos_x = ((objOpts.hole.distance + objOpts.hole.width) * (enableHoles.enable -1 ) + (drawData.val - val_min) * amp[0] + shift_x) * xMag + pad_x;
+          }else{
+            drawData.pos_x = NaN;
+          }
+          
+          drawData.pos_y = (drawData[objOpts.canvas.depth_scale]  * amp[1] + shift_y) * yMag + pad_y;
+        }
       }
     }else{
       //case depth source is CD, EFD, AGE

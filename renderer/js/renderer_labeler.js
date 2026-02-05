@@ -373,9 +373,9 @@ document.addEventListener("DOMContentLoaded", () => {
       
       //show footer
       if(isDev==true){
-        document.getElementById("footerLeftText").innerText ="distance: "+dist.toFixed(2)+" cm; RowPos: <"+rowx.toFixed(0)+","+rowy.toFixed(0)+">; ZoomCorrectionPos: <" + x.toFixed(0)+","+y.toFixed(0)+">; RelativePos: <"+rx.toFixed(2)+","+ry.toFixed(2)+">";
+        document.getElementById("footerLeftText").innerText ="Position: "+dist.toFixed(2)+" cm; RowPos: <"+rowx.toFixed(0)+","+rowy.toFixed(0)+">; ZoomCorrectionPos: <" + x.toFixed(0)+","+y.toFixed(0)+">; RelativePos: <"+rx.toFixed(2)+","+ry.toFixed(2)+">";
       }else{
-        document.getElementById("footerLeftText").innerText ="Distance: "+dist.toFixed(1)+" cm";
+        document.getElementById("footerLeftText").innerText ="Position: "+dist.toFixed(1)+" cm";
       }
     }
        
@@ -686,8 +686,8 @@ document.addEventListener("DOMContentLoaded", () => {
         }else if(objOpts.mode == "change_marker_distance"){
           target = "distance";
           const askData = {
-            title:"Change marker distance",
-            label:"Please input new distance(cm).",
+            title:"Change marker position",
+            label:"Please input new position(cm).",
             value:0.0,
             type:"number",
           };

@@ -1256,7 +1256,7 @@ function createMainWIndow() {
                 } 
               },
               { 
-                label: 'Edit distance', 
+                label: 'Edit position', 
                 click: () => {
                   console.log('MAIN: Edit marker distance'); 
                   resolve("changeMarkerDistance");                      
@@ -2423,11 +2423,14 @@ function createMainWIndow() {
     });
 
     finderWindow.on("closed", () => {
-      if(mainWindow && !mainWindow.isDestroyed()){ 
-        finderWindow = null;
-        mainWindow.webContents.send("FinderClosed", "");
+      finderWindow = null;
+      const { webContents } = mainWindow;
+      if (webContents && !webContents.isDestroyed()) {
+        try {
+          webContents.send("FinderClosed", "");
+        } catch (e) {
+        }
       }
-      
     });
     finderWindow.setMenu(null);
 
@@ -2995,7 +2998,7 @@ function createMainWIndow() {
           "Project",
           "Hole",
           "Section",
-          "Distance (cm)",
+          "Position (cm)",
           "Composite depth (cm)",
           "Eventfree depth (cm)",
           "Drilling depth (cm)",
@@ -3332,7 +3335,7 @@ function createMainWIndow() {
     menuRebuild();
     
   });
-  ipcMain.handle("sendSettings", (_e,data, to) => {
+  ipcMain.handle("sendSettings", (_e,sendData, to) => {
     if(to=="settings"){
       if(settingsWindow==null){
         //case of call properties
@@ -3365,19 +3368,19 @@ function createMainWIndow() {
          // converterWindow.setAlwaysOnTop(true, "normal");
          //settingsWindow.webContents.openDevTools();
           settingsWindow.setAlwaysOnTop(true, "floating");
-          settingsWindow.webContents.send("SettingsData", data);
+          settingsWindow.webContents.send("SettingsData", sendData);
         });
       }else{
-        settingsWindow.webContents.send("SettingsData", data);
+        settingsWindow.webContents.send("SettingsData", sendData);
       }
 
     }else if(to=="renderer"){
-      mainWindow.webContents.send("SettingsData", data);
-      if(data){
-        setSettings("settingsRenderer", data.data);
+      mainWindow.webContents.send("SettingsData", sendData.data);
+      if(sendData){
+        setSettings("settingsRenderer", sendData.data);
       }      
     }else if(to=="save"){
-      setSettings("settingsRenderer", data.data)
+      setSettings("settingsRenderer", sendData.data)
     }    
   });
   ipcMain.handle("saveBookmarks", (_e, data) => {
@@ -4751,10 +4754,10 @@ function createMainWIndow() {
           },
           {
             label: "Model evaluation",
-            visible: false,
+            visible: true,
             click: () => {
               if(LCCore !== null && LCCore.projects.length>0){
-                const results = LCCore.leaveOneOut();
+                const results = LCCore.leaveOneOut("in");
                 
                 mainWindow.webContents.send("rendererLog", results);
                 putcsvfile(mainWindow, "results.csv", results);                
@@ -5355,7 +5358,7 @@ function cvt2flat(depthConverterDataList){
   flatData.descriptions              = "";
   
   const dataHeader = depthConverterDataList[0].data_header;
-  flatData.header  = ["id","name","project","hole","section","distance","composite_depth","event_free_depth","drilling_depth","age","age_upper","age_lower", "source_depth_type",...dataHeader];
+  flatData.header  = ["id","name","project","hole","section","position","composite_depth","event_free_depth","drilling_depth","age","age_upper","age_lower", "source_depth_type",...dataHeader];
   const dataUnits  = depthConverterDataList[0].data_units;
   flatData.units   = ["","","","","","","","","","","","","",...dataUnits];
 

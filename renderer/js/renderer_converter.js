@@ -80,12 +80,12 @@ document.addEventListener("DOMContentLoaded", () => {
       if (select == "trinity") {
         //-----------------------------------------------------
         if (source_data !== null) {
-          const disp = ["Name", "Hole", "Section", "Distance"];
+          const disp = ["Name", "Hole", "Section", "Position"];
           const key = {
             Name:["name"],
             Hole:["hole"],
             Section:["sec","core number"],
-            Distance:["dist","psp","position"],
+            Position:["dist","psp","position"],
           }
           for (let n = 0; n < 4; n++) {
             const div = document.createElement("div");

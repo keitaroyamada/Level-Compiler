@@ -98,7 +98,8 @@ document.addEventListener("DOMContentLoaded", () => {
             seriesDiv.style.paddingLeft = "0px";
             seriesCheck.type    = "checkbox";
             seriesCheck.id      = numSeries;
-            seriesCheck.checked = true;            
+            seriesCheck.checked = true;
+            seriesCheck.title = "Visible(Show/Hide)";            
 
             //data No
             const Nolabel = document.createElement("label");
@@ -172,16 +173,18 @@ document.addEventListener("DOMContentLoaded", () => {
             plotColour.style.marginLeft= "40px";
             plotColour.title = "Plot colour";
 
-            //amplification options
+            //amplification options(spinner)
             const amplification = document.createElement("input");
             amplification.type  = "number";
             amplification.id    = numSeries;
             amplification.placeholder = 1;
             amplification.value = 2;
             amplification.style.width = "40px";
-            amplification.title = "Amplitude gain";
+            amplification.title = "Set Amplitude gain (section width=2)";
             amplification.style.marginLeft = "5px";
+            amplification.className = "no-spin";
 
+            
             //plot type options
             const plotTypeDropdown = document.createElement("select");
             plotTypeDropdown.style.width = "70px";
@@ -201,7 +204,7 @@ document.addEventListener("DOMContentLoaded", () => {
             //delete button
             const deleteBtn = document.createElement("button");
             deleteBtn.textContent = "×";
-            deleteBtn.title = "delete";
+            deleteBtn.title = "Close plot";
             deleteBtn.style.marginLeft = "10px";
             deleteBtn.addEventListener("click", () => {
                 const parentElement = document.getElementById("plot_list");

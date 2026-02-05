@@ -65,6 +65,7 @@ class LevelCompilerPlot {
 
     //sort
     this.sortDataBy("composite_depth");
+    //this.sortDataBy("trinity");
 
     //calc depth
     for (let c = 0; c < this.data_collections.length; c++) {
@@ -180,7 +181,7 @@ class LevelCompilerPlot {
     */
 
     let targetIdx = 6;
-    if(target == "composite_depth"){
+    if(target == "composite_depth" || target == "trinity"){
       targetIdx = 6;
     }else if(target == "event_free_depth"){
       targetIdx = 7;
@@ -188,9 +189,26 @@ class LevelCompilerPlot {
       targetIdx = 9;
     }
 
-    this.data_collections.forEach(dataSet=>{
-      dataSet.rows.sort((a,b)=>a[targetIdx] - b[targetIdx]);
-    })
+    this.data_collections.forEach(dataSet => {
+      dataSet.rows.sort((a, b) => {
+        const x = Number(a[targetIdx]);
+        const y = Number(b[targetIdx]);
+        if (!Number.isFinite(x) && !Number.isFinite(y)) return 0;
+        if (!Number.isFinite(x)) return 1;  
+        if (!Number.isFinite(y)) return -1;
+        return x - y;      
+      });
+    });
+
+    if(target="trinity"){
+      this.data_collections.forEach(dataSet => {
+        dataSet.rows.sort((a, b) => {
+          return a[3].localeCompare(b[3]);
+        
+        })
+      });
+    }
+   
     console.log("LCPlot: Plot Data is sorted by "+target);
   }
 

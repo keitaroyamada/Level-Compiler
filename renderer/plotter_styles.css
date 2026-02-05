@@ -228,3 +228,14 @@ hr {
   border: 1px solid #ccc;
   border-radius: 6px;
 }
+
+/* Chrome, Safari, Edge, Opera */
+.no-spin::-webkit-outer-spin-button,
+.no-spin::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+/* Firefox */
+.no-spin {
+  -moz-appearance: textfield;
+}

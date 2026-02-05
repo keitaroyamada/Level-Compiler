@@ -77,7 +77,6 @@ window.addEventListener("DOMContentLoaded", () => {
       ];
 
       if (typeof value === "string" && isColor) {
-        // カラーを正規化してから設定（to hex）
         const dummy = document.createElement("div");
         dummy.style.color = value;
         document.body.appendChild(dummy);
@@ -123,7 +122,7 @@ window.addEventListener("DOMContentLoaded", () => {
         input.style.marginTop = "15px";
         input.style.marginBottom = "15px";
       } else {
-        throw new Error("Unsupported type data detected.", value);
+        throw new Error("Unsupported type data detected.", typeof value, value);
       }
       return input;
     }
@@ -141,26 +140,26 @@ window.addEventListener("DOMContentLoaded", () => {
   
     
     //----------------------------------------------------------------
-    window.SettingsApi.receive("SettingsData", async (data) => {
-      console.log("Received data: ", data)
+    window.SettingsApi.receive("SettingsData", async (receivedData) => {
+      console.log("Received data: ", receivedData)
 
-      document.getElementById("title").textContent = data.options.title;
+      document.getElementById("title").textContent = receivedData.options.title;
 
-        if(data.options.title=="Preferences"){
+        if(receivedData.options.title=="Preferences"){
           document.getElementById("default").style.display = "block";
         }else{
         document.getElementById("default").style.display = "none";  
         }
           
-        settings = data.data;
-        isEditable = data.options.editable;
+        settings = receivedData.data;
+        isEditable = receivedData.options.editable;
         const container = document.getElementById("menu-container");
         if (container) {
           container.innerHTML = "";
-          createMenu(settings,data.editable, container);
+          createMenu(settings,receivedData.editable, container);
         }
-        
     });
+
     document.getElementById("default").addEventListener("click", async (event) => {
       const response = await window.SettingsApi.askdialog(
         {
