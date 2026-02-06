@@ -183,22 +183,22 @@ function createMainWIndow() {
 
   ipcMain.handle("initialisePlotDataCollection", async (_e) => {
     //import modeln
-    LCPlot.data_collections = [];
-    LCPlot.draw_collections = [];
-    LCPlot.data_selected_id = null;
+    LCPlot = initialiseLCPlotData();
+    
+    //for mainwindow
+    mainWindow.webContents.send("initialiseLCPlotData");
+    console.log("MAIN: Renderer LCPlot is initialised.");
 
+    //for plotter
     const zipped = await zipData(LCPlot);
 
-    if(zipped){
-      mainWindow.webContents.send("importedData", zipped);
-
-      if(plotWindow){
-        plotWindow.webContents.send("importedData", zipped);
-      }      
+    if(zipped &&plotWindow){
+      plotWindow.webContents.send("importedData", zipped);      
       
-      console.log("MAIN: Plot data collection is initialised.");
-      return;
+      console.log("MAIN: Plotter LCPlot is initialised.");
     }
+
+    console.log("MAIN: ALL LCPlot is initialised.")
   
   });
   ipcMain.handle("InitialisePaths", async (_e) => {
@@ -287,9 +287,9 @@ function createMainWIndow() {
 
     //load ages into LCCore
     LCCore.calcMarkerAges(LCAge);
-    if(LCPlot.data_collections.length>0){
-      const res = LCPlot.calcDataCollectionPosition(LCCore, LCAge);
-    }
+    //if(LCPlot.data_collections.length>0){
+    //const res = LCPlot.calcDataCollectionPosition(LCCore, LCAge);
+    //}
 
     //LCAge.checkAges();
     if(LCAge.unreliable_ids.length>0){
@@ -312,8 +312,8 @@ function createMainWIndow() {
     try{
       const zipped = await zipData(LCCore.exportSerialisedModel());
       if(LCPlot.data_collections.length>0){
-        //initiarise view
-        plotWindow.webContents.send("initiariseSendData");
+        //initialise view
+        plotWindow.webContents.send("initialiseSendData");
       }
       console.log("MAIN: Load age model into LCCore. id: " +  LCAge.selected_id + " name:" +  model_name);
       return zipped;
@@ -3804,7 +3804,7 @@ function createMainWIndow() {
         last = now;        
       }
       
-      //initiarise
+      //initialise
       let results = {
         name: null,
         project: null,
@@ -4165,6 +4165,11 @@ function createMainWIndow() {
   }
   function initialiseDataPath(type){
     globalPath.dataPaths.filter(data => data.type !== type);
+  }
+  function initialiseLCPlotData(){
+    let newLCPlot = new LevelCompilerPlot();
+    newLCPlot.initialiseDataCollection();
+    return newLCPlot;
   }
   function registerModelFromCsv(fullpath, type="forLC"){
     try {
@@ -4951,7 +4956,7 @@ function createMainWIndow() {
                 title: "Plotter",
                 parent:mainWindow,
                 //resizable: false,
-                width: 340,//full: 900
+                width: 660,//full: 900
                 height: 600,
                 webPreferences: {preload: path.join(__dirname, "preload", "preload_plotter.js"),},
               });
@@ -4982,7 +4987,7 @@ function createMainWIndow() {
                   {
                     label: "Release loaded data",
                     click: () => {
-                      plotWindow.webContents.send("PlotterCleared", "");    
+                      plotWindow.webContents.send("PlotterCleared", "");  
                     },
                   }
                   /*,
@@ -5130,6 +5135,14 @@ function progressDialog(window, tit, txt, indeterminate){
 }
 async function updateProgress(progress, n, N){
   if (!progress) return null;
+
+  try{
+    const w = progress._window;
+    if (w && !w.isDestroyed()){
+      if (w.isMinimized && w.isMinimized()) w.restore();
+      if (w.isVisible  && !w.isVisible())  w.show();
+    }
+  }catch(e){}
 
   const winOk = progress._window && progress._window.webContents && !progress._window.isDestroyed();
 

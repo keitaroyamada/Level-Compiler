@@ -771,7 +771,7 @@ document.addEventListener("DOMContentLoaded", () => {
   });
    //============================================================================================
    //import plot data
-  window.LCapi.receive("importedData", async (data) => {
+  window.LCapi.receive("importedData", async (data) => {    
     if(data){
       console.log("[Renderer]: Imported data received.");
       //load renderer
@@ -844,10 +844,10 @@ document.addEventListener("DOMContentLoaded", () => {
   });
   //============================================================================================
   window.LCapi.receive("PlotDataOptions", async (data) => {
-     console.log("[Renderer]: Plot options are received.")
+     console.log("[Renderer]: Plot options are received.", data)
+
      try{
       
-
       if(LCPlotData.draw_collections){
         LCPlotData.draw_collections = [];
       }      
@@ -4724,88 +4724,86 @@ document.addEventListener("DOMContentLoaded", () => {
         //make project objects===================================================================================
         const project = LCCore.projects[p];
 
-
-        if(objOpts.canvas.is_draw_model){
-          //get position
-          let prj_num_enable_right = 0;
-                
-          project.holes.forEach(hc=>{
-            if(hc.enable){
-              prj_num_enable_right++;
-            }
-          })
-          
-          let prj_num_enable_left = 0;
-          LCCore.projects.filter(p=>p.order<project.order).forEach(p=>p.holes.forEach(h=>{if(h.enable){prj_num_enable_left++;}}))
-          prj_num_enable_left += objOpts.project.interval * project.order;
-
-          const prj_padx = objOpts.project.pad_x;//objOpts.hole.distance * xMag;
-          const prj_pady = objOpts.project.pad_y;
-          const project_x0 = -prj_padx + ((objOpts.section.width + objOpts.hole.distance) * prj_num_enable_left + shift_x) * xMag + pad_x;
-          const project_y0 = -prj_pady + (shift_y) * yMag + pad_y;
-          let project_w  = prj_padx/2 + (objOpts.section.width + objOpts.hole.distance) * (prj_num_enable_right-1) * xMag + pad_x;
-          if(project_w<=0){
-            project_w = 100;
-          }
-          let project_h = 1000;
-          if(project.composite_depth_bottom !== null &&  project.composite_depth_top !== null){
-            project_h = 2*prj_pady + (project.composite_depth_bottom - project.composite_depth_top) * yMag;
-          }        
-                  
-          if(project.enable == true){
-            //show project name
-            let projectDispName = project.name; 
-            if(["root"].includes(objOpts.developer.mode)){
-              projectDispName = project.id[0].slice(0,5);
-            }
-            
-            sketch.drawingContext.setLineDash([]);
-            sketch.fill(objOpts.project.font_colour);
-            sketch.stroke(objOpts.project.font_colour);
-            sketch.strokeWeight(2);
-            sketch.textFont(objOpts.project.font);
-            sketch.textSize(objOpts.project.font_size);
-            sketch.text(
-              projectDispName,
-              project_x0 + 40,
-              project_y0 + 40,
-            ); 
-
-            //show project area
-            if(objOpts.project.is_show_area){
-              sketch.push();//save
-              //check connection to base correlation model
-              if(isBaseProjectMaster && includesString(project, LCCore.base_project_id[0])){
-                //connected master model
-                sketch.fill(objOpts.project.area_colour+"50");//HEX+alpha rate                            
-              }else{
-                //disconnected master model
-                sketch.fill(objOpts.project.area_colour_disconnected+"50");//HEX+alpha rate
-              }            
-              sketch.noStroke();
+        //get position
+        let prj_num_enable_right = 0;
               
-              sketch.rect(project_x0, project_y0, project_w, project_h, 5, 5, 5, 5); //rounded
-              sketch.pop();
-            }          
+        project.holes.forEach(hc=>{
+          if(hc.enable){
+            prj_num_enable_right++;
+          }
+        })
+        
+        let prj_num_enable_left = 0;
+        LCCore.projects.filter(p=>p.order<project.order).forEach(p=>p.holes.forEach(h=>{if(h.enable){prj_num_enable_left++;}}))
+        prj_num_enable_left += objOpts.project.interval * project.order;
 
-            //live hittest
-            if(objOpts.edit.hittest){
-              //console.log(objOpts.edit.hittest.project, objOpts.edit.hittest.hole)
-              if(["add_hole","delete_project","change_project_name","move_hole_to_project"].includes(objOpts.edit.mode)){
-                if(objOpts.edit.hittest.project == project.id[0]){
-                  
-                  sketch.push();//save
-                  sketch.fill(0,0,0,0);
-                  sketch.strokeWeight(3);
-                  sketch.stroke("#ff0000");
-                  
-                  sketch.rect(project_x0, project_y0, project_w, project_h, 3, 3, 3, 3); //rounded
-                  sketch.pop();
-                }
+        const prj_padx = objOpts.project.pad_x;//objOpts.hole.distance * xMag;
+        const prj_pady = objOpts.project.pad_y;
+        const project_x0 = -prj_padx + ((objOpts.section.width + objOpts.hole.distance) * prj_num_enable_left + shift_x) * xMag + pad_x;
+        const project_y0 = -prj_pady + (shift_y) * yMag + pad_y;
+        let project_w  = prj_padx/2 + (objOpts.section.width + objOpts.hole.distance) * (prj_num_enable_right-1) * xMag + pad_x;
+        if(project_w<=0){
+          project_w = 100;
+        }
+        let project_h = 1000;
+        if(project.composite_depth_bottom !== null &&  project.composite_depth_top !== null){
+          project_h = 2*prj_pady + (project.composite_depth_bottom - project.composite_depth_top) * yMag;
+        }        
+                
+        if(project.enable == true){
+          //show project name
+          let projectDispName = project.name; 
+          if(["root"].includes(objOpts.developer.mode)){
+            projectDispName = project.id[0].slice(0,5);
+          }
+          
+          sketch.drawingContext.setLineDash([]);
+          sketch.fill(objOpts.project.font_colour);
+          sketch.stroke(objOpts.project.font_colour);
+          sketch.strokeWeight(2);
+          sketch.textFont(objOpts.project.font);
+          sketch.textSize(objOpts.project.font_size);
+          sketch.text(
+            projectDispName,
+            project_x0 + 40,
+            project_y0 + 40,
+          ); 
+
+          //show project area
+          if(objOpts.project.is_show_area){
+            sketch.push();//save
+            //check connection to base correlation model
+            if(isBaseProjectMaster && includesString(project, LCCore.base_project_id[0])){
+              //connected master model
+              sketch.fill(objOpts.project.area_colour+"50");//HEX+alpha rate                            
+            }else{
+              //disconnected master model
+              sketch.fill(objOpts.project.area_colour_disconnected+"50");//HEX+alpha rate
+            }            
+            sketch.noStroke();
+            
+            sketch.rect(project_x0, project_y0, project_w, project_h, 5, 5, 5, 5); //rounded
+            sketch.pop();
+          }          
+
+          //live hittest
+          if(objOpts.edit.hittest){
+            //console.log(objOpts.edit.hittest.project, objOpts.edit.hittest.hole)
+            if(["add_hole","delete_project","change_project_name","move_hole_to_project"].includes(objOpts.edit.mode)){
+              if(objOpts.edit.hittest.project == project.id[0]){
+                
+                sketch.push();//save
+                sketch.fill(0,0,0,0);
+                sketch.strokeWeight(3);
+                sketch.stroke("#ff0000");
+                
+                sketch.rect(project_x0, project_y0, project_w, project_h, 3, 3, 3, 3); //rounded
+                sketch.pop();
               }
             }
           }
         }
+        
                         
         for (let h = 0; h < LCCore.projects[p].holes.length; h++) {
           //make hole objects===================================================================================
@@ -5731,7 +5729,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
       //==========================================================================================      
       //draw age points      
-      if (LCPlotAge !== null &&  LCPlotAge.ages.length > 0) {
+      if (objOpts.canvas.is_draw_model && LCPlotAge !== null &&  LCPlotAge.ages.length > 0) {
         //if(LCPlotAge.id == document.getElementById("AgeModelSelect").value) //if check id
         
         //get age data(because age data, age series is single)
@@ -5919,92 +5917,171 @@ document.addEventListener("DOMContentLoaded", () => {
               const drawData = calcDrawPosition(extractedDrawDataset, LCCore, objOpts, pOptions);
 
               //draw
+              let zeroDataset;
               let zeroDataDict = {};
               // Calculate zero position if not yet calculated
-              LCCore.projects.forEach((project, p)=>{
-                project.holes.forEach((hole, h)=>{
-                  if(!hole.enable){
-                    return
-                  }
-                  const firstDataPoint = extractedDrawDataset.data[0];
-                  if(firstDataPoint && firstDataPoint.pidx === p){
-                    
-                    const d1 = { ...firstDataPoint };
-                    const d2 = { ...firstDataPoint };
-                    const d3 = { ...firstDataPoint };
-                    
-                    const zeroDrawDataset = { 
-                        ...extractedDrawDataset, 
-                        data: [d1, d2, d3]
-                    };
+              const firstDataPoint = extractedDrawDataset.data[0];
 
-                    //set zero
-                    zeroDrawDataset.data[0].val = 0;
-                    zeroDrawDataset.data[0].hname = hole.name;
-                    zeroDrawDataset.data[0].hidx = h;
-                    //set max
-                    zeroDrawDataset.data[1].val = zeroDrawDataset.max;
-                    zeroDrawDataset.data[1].hname = hole.name;
-                    zeroDrawDataset.data[1].hidx = h;
-                    //set min
-                    zeroDrawDataset.data[2].val = zeroDrawDataset.min;
-                    zeroDrawDataset.data[2].hname = hole.name;
-                    zeroDrawDataset.data[2].hidx = h;
-                    
-                    const zeroDataset = calcDrawPosition(zeroDrawDataset, LCCore, objOpts, pOptions);
-                    zeroDataDict[hole.name] = zeroDataset.data;
-                    
-                    //X axis
-                    if (objOpts.plot.is_draw_axis) {
-                      let yAxis = 200 + scroller.scrollTop;
-                      if(h%2==0){
-                        yAxis -= 60; 
+              if(firstDataPoint){                
+                if(firstDataPoint.source === "trinity"){
+                  //if input data source is trinity
+                  LCCore.projects.forEach((project, p)=>{
+                    project.holes.forEach((hole, h)=>{
+                      if(!hole.enable){
+                        return
                       }
-                        
-                        const yLabel = yAxis + 15;
-                        const yTitle = yAxis - 25;
-                        
-                        const xMax = zeroDataset.data[1].pos_x;
-                        const xMin = zeroDataset.data[2].pos_x;
-                        const xCenter = xMin + (xMax - xMin) / 2;
-                        
-                        const minValueStr = autoRound(zeroDataset.min).toString();
-                        const maxValueStr = autoRound(zeroDataset.max).toString();
-                        const title = zeroDataset.data[0].header + " [" + zeroDataset.data[0].unit + "]";
-                        sketch.push();
 
-                        sketch.strokeWeight(2);
-                        sketch.stroke(pOptions.colour);
-                        sketch.fill(pOptions.colour);
+                      if(firstDataPoint.pidx === p){
+                        //case trinity data
+                        const d1 = { ...firstDataPoint };
+                        const d2 = { ...firstDataPoint };
+                        const d3 = { ...firstDataPoint };
                         
-                        sketch.line(xMax, yAxis, xMin, yAxis);
+                        const zeroDrawDataset = { 
+                            ...extractedDrawDataset, 
+                            data: [d1, d2, d3]
+                        };
 
-                        const tickLength = 5;
-                        sketch.strokeWeight(1);
-                        sketch.line(xMin, yAxis, xMin, yAxis + tickLength);
-                        sketch.line(xMax, yAxis, xMax, yAxis + tickLength);
+                        //set zero
+                        zeroDrawDataset.data[0].val   = 0;
+                        zeroDrawDataset.data[0].hname = hole.name;
+                        zeroDrawDataset.data[0].hidx  = h;
+                        //set max
+                        zeroDrawDataset.data[1].val   = zeroDrawDataset.max;
+                        zeroDrawDataset.data[1].hname = hole.name;
+                        zeroDrawDataset.data[1].hidx  = h;
+                        //set min
+                        zeroDrawDataset.data[2].val   = zeroDrawDataset.min;
+                        zeroDrawDataset.data[2].hname = hole.name;
+                        zeroDrawDataset.data[2].hidx  = h;
                         
-                        sketch.noStroke();
-                        sketch.textSize(12);
+                        zeroDataset = calcDrawPosition(zeroDrawDataset, LCCore, objOpts, pOptions);
+                        zeroDataDict[hole.name] = zeroDataset.data;
 
-                        sketch.textAlign(sketch.RIGHT);
-                        sketch.text(minValueStr, xMin, yLabel);
+                        //========== X axis for trinity===============
+                        if (objOpts.plot.is_draw_axis) {
+                          let yAxis = 200 + scroller.scrollTop;
 
-                        sketch.textAlign(sketch.LEFT);
-                        sketch.text(maxValueStr, xMax, yLabel);
+                          if(h%2==0){
+                            yAxis -= 60; 
+                          }
+                            
+                          const yLabel = yAxis - 5;
+                          const yTitle = yAxis - 25;
+                          
+                          const xMax = zeroDataset.data[1].pos_x;
+                          const xMin = zeroDataset.data[2].pos_x;
+                          const xCenter = xMin + (xMax - xMin) / 2;
                         
-                        sketch.textAlign(sketch.CENTER); 
-                        sketch.textSize(14);
-                        sketch.text(title, xCenter, yTitle);
-                        
-                        sketch.pop();
-                    }
+                          const minValueStr = autoRound(zeroDataset.min).toString();
+                          const maxValueStr = autoRound(zeroDataset.max).toString();
+                          const title = zeroDataset.data[0].header + " [" + zeroDataset.data[0].unit + "]";
+                          sketch.push();
+
+                          sketch.strokeWeight(2);
+                          sketch.stroke(pOptions.colour);
+                          sketch.fill(pOptions.colour);
+                          
+                          sketch.line(xMax, yAxis, xMin, yAxis);
+
+                          /*
+                          const tickLength = 5;
+                          sketch.strokeWeight(1);
+                          sketch.line(xMin, yAxis, xMin, yAxis + tickLength);
+                          sketch.line(xMax, yAxis, xMax, yAxis + tickLength);
+                          */
+                          sketch.noStroke();
+                          sketch.textSize(12);
+
+                          sketch.textAlign(sketch.RIGHT);
+                          sketch.text(minValueStr, xMin, yLabel);
+
+                          sketch.textAlign(sketch.LEFT);
+                          sketch.text(maxValueStr, xMax, yLabel);
+                          
+                          sketch.textAlign(sketch.CENTER); 
+                          sketch.textSize(14);
+                          sketch.text(title, xCenter, yTitle);
+
+                          sketch.pop();
+                        }
+                      }
+                    })
+                  })   
+
+                  }else{
+                  //}else if(["composite_depth", "age", "event_free_depth"].includes(firstDataPoint.source)){
+                  //case trinity data
+                  const d1 = { ...firstDataPoint };
+                  const d2 = { ...firstDataPoint };
+                  const d3 = { ...firstDataPoint };
+                  
+                  const zeroDrawDataset = { 
+                      ...extractedDrawDataset, 
+                      data: [d1, d2, d3]
+                  };
+
+                  //set zero
+                  zeroDrawDataset.data[0].val   = 0;
+                  zeroDrawDataset.data[0].hname = null;
+                  zeroDrawDataset.data[0].hidx  = null;
+                  //set max
+                  zeroDrawDataset.data[1].val   = zeroDrawDataset.max;
+                  zeroDrawDataset.data[1].hname = null;
+                  zeroDrawDataset.data[1].hidx  = null;
+                  //set min
+                  zeroDrawDataset.data[2].val   = zeroDrawDataset.min;
+                  zeroDrawDataset.data[2].hname = null;
+                  zeroDrawDataset.data[2].hidx  = null;
+                  
+                  zeroDataset = calcDrawPosition(zeroDrawDataset, LCCore, objOpts, pOptions);
+                  zeroDataDict["global"] = zeroDataset.data;
+
+                  //========== X axis for global ===============
+                  if (objOpts.plot.is_draw_axis) {
+                    let yAxis = 200 + scroller.scrollTop;
+                      
+                    const yLabel = yAxis - 5;
+                    const yTitle = yAxis - 25;
+                    
+                    const xMax = zeroDataset.data[1].pos_x;
+                    const xMin = zeroDataset.data[2].pos_x;
+                    const xCenter = xMin + (xMax - xMin) / 2;
+                  
+                    const minValueStr = autoRound(zeroDataset.min).toString();
+                    const maxValueStr = autoRound(zeroDataset.max).toString();
+                    const title = zeroDataset.data[0].header + " [" + zeroDataset.data[0].unit + "]";
+                    sketch.push();
+
+                    sketch.strokeWeight(2);
+                    sketch.stroke(pOptions.colour);
+                    sketch.fill(pOptions.colour);
+                    
+                    sketch.line(xMax, yAxis, xMin, yAxis);
+
+                    /*
+                    const tickLength = 5;
+                    sketch.strokeWeight(1);
+                    sketch.line(xMin, yAxis, xMin, yAxis + tickLength);
+                    sketch.line(xMax, yAxis, xMax, yAxis + tickLength);
+                    */
+                    sketch.noStroke();
+                    sketch.textSize(12);
+
+                    sketch.textAlign(sketch.RIGHT);
+                    sketch.text(minValueStr, xMin, yLabel);
+
+                    sketch.textAlign(sketch.LEFT);
+                    sketch.text(maxValueStr, xMax, yLabel);
+                    
+                    sketch.textAlign(sketch.CENTER); 
+                    sketch.textSize(14);
+                    sketch.text(title, xCenter, yTitle);
+
+                    sketch.pop();
                   }
-
-                  //const zeroDrawDataset = structuredClone(extractedDrawDataset);
-                  //zeroDrawDataset.data = [structuredClone(zeroDrawDataset.data[0]), structuredClone(zeroDrawDataset.data[0]), structuredClone(zeroDrawDataset.data[0])];
-                })
-              })   
+                }
+              }
 
               //========== main plot ====================
               let isPlotting = false;
@@ -6142,7 +6219,12 @@ document.addEventListener("DOMContentLoaded", () => {
                   if (binWidth < 1) binWidth = 1;
 
                   // Define rectangle coordinates
-                  const rectX0 = zeroDataDict[pData.hname][2].pos_x;
+                  let rectX0;
+                  if(firstDataPoint.source === "trinity"){
+                    rectX0 = zeroDataDict[pData.hname][2].pos_x;
+                  }else{
+                    rectX0 = zeroDataDict["global"][2].pos_x;  
+                  }
                   const rectX1 = pData.pos_x;
 
                   const rectY0 = pData.pos_y - binWidth/2;
@@ -6858,7 +6940,17 @@ document.addEventListener("DOMContentLoaded", () => {
 
     LCPlotAge = null;
     LCPlotData= null;
+    objOpts.plotter.selected_options = [];
   }
+  window.LCapi.receive("initialiseLCPlotData", async () => {
+    //call from main process
+    LCPlotData= null;
+    objOpts.plotter.selected_options = [];
+
+    if(["root","developer"].includes(objOpts.developer.mode)){
+      console.log(LCPlotData)
+    }
+  });
   function initialiseImages(){
     let modelImages = {
       image_dir: "",
@@ -8408,7 +8500,7 @@ function resamplePointData(numeratorDataset0, th, objOpts){
 
           numeratorDataset1.data.push(newPointData);
 
-          //initiarise
+          //initialise
           idxs = [nextIdx];
         }
       }else{
@@ -8492,7 +8584,7 @@ function resamplePointData(numeratorDataset0, th, objOpts){
 
           numeratorDataset1.data.push(newPointData);
 
-          //initiarise
+          //initialise
           idxs = [nextIdx];
       } 
     }
@@ -8831,6 +8923,7 @@ function calcDrawPosition(drawPointDataset, LCCore, objOpts, pOptions){
   }
 
   //initialise
+  const isFlip = pOptions.isFlip ? pOptions.isFlip : false;
   const xMag  = objOpts.canvas.zoom_level[0] * objOpts.canvas.dpir;
   let yMag    = objOpts.canvas.zoom_level[1] * objOpts.canvas.dpir;
   const pad_x = objOpts.canvas.pad_x;
@@ -8882,8 +8975,7 @@ function calcDrawPosition(drawPointDataset, LCCore, objOpts, pOptions){
         }
         
         const enableHoles = holeEnableList[drawData.pidx][drawData.hidx];
-        //calc 
-        if(drawData[objOpts.canvas.depth_scale] == null){console.log(1111111111111)}
+        //calc        
         if(drawData.type == "age"){
           //age xpos is fixed. adjust icon size
           drawData.pos_x = ((objOpts.hole.distance + objOpts.hole.width) * (enableHoles.enable -1 ) + shift_x) * xMag + pad_x + objOpts.hole.width * xMag - objOpts.age.incon_size * 1.2;
@@ -8891,7 +8983,11 @@ function calcDrawPosition(drawPointDataset, LCCore, objOpts, pOptions){
         } else{
           //data xpos, without adjust
           if(Number.isFinite(drawData.val)){
-            drawData.pos_x = ((objOpts.hole.distance + objOpts.hole.width) * (enableHoles.enable -1 ) + (drawData.val - val_min) * amp[0] + shift_x) * xMag + pad_x;
+            let relative_x = (drawData.val - val_min) * amp[0];
+            if(isFlip){
+              relative_x = objOpts.hole.width - relative_x;
+            }
+            drawData.pos_x = ((objOpts.hole.distance + objOpts.hole.width) * (enableHoles.enable -1 ) + relative_x + shift_x) * xMag + pad_x;
           }else{
             drawData.pos_x = NaN;
           }
@@ -8909,7 +9005,6 @@ function calcDrawPosition(drawPointDataset, LCCore, objOpts, pOptions){
         drawData.pos_x = ((drawData.val - val_min) * amp[0] + shift_x) * xMag + 20;
         drawData.pos_y = (drawData[objOpts.canvas.depth_scale] * amp[1] + shift_y) * yMag + pad_y;
       }
-
     }
   }
 

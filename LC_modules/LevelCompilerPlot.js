@@ -20,6 +20,7 @@ class LevelCompilerPlot {
   //methods
   initialiseDataCollection(){
     this.data_collections = [];
+    this.draw_collections = [];
     this.data_selected_id = null;
   }
   addNewDataset(){
@@ -200,11 +201,10 @@ class LevelCompilerPlot {
       });
     });
 
-    if(target="trinity"){
+    if(target=="trinity"){
       this.data_collections.forEach(dataSet => {
         dataSet.rows.sort((a, b) => {
-          return a[3].localeCompare(b[3]);
-        
+          return String(a[3] ?? "").localeCompare(String(b[3] ?? ""));        
         })
       });
     }

@@ -184,7 +184,23 @@ document.addEventListener("DOMContentLoaded", () => {
             amplification.style.marginLeft = "5px";
             amplification.className = "no-spin";
 
-            
+            //plot direction
+            const plotDirection = document.createElement("select");
+            plotDirection.style.width = "60px";
+            plotDirection.style.marginLeft = "5px";
+            plotDirection.id = numSeries;
+            plotDirection.title = "Plot Direction";
+
+            const flipOptNormal = document.createElement("option");
+            flipOptNormal.value = "false";
+            flipOptNormal.textContent = "normal";
+            plotDirection.appendChild(flipOptNormal);
+
+            const flipOptFlip = document.createElement("option");
+            flipOptFlip.value = "true";
+            flipOptFlip.textContent = "flip";
+            plotDirection.appendChild(flipOptFlip)
+
             //plot type options
             const plotTypeDropdown = document.createElement("select");
             plotTypeDropdown.style.width = "70px";
@@ -224,11 +240,13 @@ document.addEventListener("DOMContentLoaded", () => {
             seriesDiv.appendChild(numeratorDropdown);
             seriesDiv.appendChild(separatorlabel);
             seriesDiv.appendChild(denominatorDropdown);
-            seriesDiv.appendChild(seriesCheck);
             seriesDiv.appendChild(plotColour);
             seriesDiv.appendChild(serieslabel);
             seriesDiv.appendChild(amplification);
             seriesDiv.appendChild(plotTypeDropdown);
+            seriesDiv.appendChild(plotDirection);
+            seriesDiv.appendChild(seriesCheck);
+            
 
             container.appendChild(seriesDiv);
 
@@ -384,6 +402,7 @@ document.addEventListener("DOMContentLoaded", () => {
             const plotTypeDropdown    = child.querySelector("select:nth-of-type(3)");
             const noLabel             = child.querySelector("label:nth-of-type(1)");
             const splitLabel          = child.querySelector("label:nth-of-type(2)");
+            const plotDirection       = child.querySelector("select:nth-of-type(4)");
             
             const checkboxValue      = checkbox ? checkbox.checked : null;
             const numeratorId        = numeratorDropdown ? numeratorDropdown.value : null;
@@ -392,6 +411,8 @@ document.addEventListener("DOMContentLoaded", () => {
             const colourValue        = plotColour ? plotColour.value : "gray";
             const amplificationValue = amplification ? amplification.value : null;
             const plotType           = plotTypeDropdown ? plotTypeDropdown.value : "line";
+            const plotDirectionValue = plotDirection ? (plotDirection.value==="true") : false;
+
 
             //set colour value
             numeratorDropdown.style.color   = colourValue;
@@ -401,6 +422,7 @@ document.addEventListener("DOMContentLoaded", () => {
             parentCollection.style.color    = colourValue;
             plotTypeDropdown.style.color    = colourValue;
             amplification.style.color       = colourValue;
+            plotDirection.style.color       = colourValue;
             //plotColour.style.color = colourValue;
 
             result.isDraw = checkboxValue;
@@ -411,6 +433,8 @@ document.addEventListener("DOMContentLoaded", () => {
             result.order         = i;
             result.amplification = parseFloat(amplificationValue);
             result.plotType      = plotType;
+            result.isFlip        = plotDirectionValue;
+
             results.push(result);
         });
         return results;
@@ -453,6 +477,7 @@ document.addEventListener("DOMContentLoaded", () => {
               });
 
             updateView();
+            //await window.PlotterApi.PlotterClose();
         } 
 
     })   
