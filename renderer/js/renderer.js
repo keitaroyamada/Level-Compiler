@@ -70,7 +70,7 @@ document.addEventListener("DOMContentLoaded", () => {
     };
 
     //=========== public properties =========== 
-    objOpts.information.version = 2;
+    objOpts.information.version = 2.1;
     objOpts.developer.mode = "user";//"user";"developer";"root"; 
     
     objOpts.canvas.depth_scale = "composite_depth";
@@ -171,7 +171,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     objOpts.plot.is_visible = false;
     objOpts.plot.is_draw_axis = true;
-    objOpts.plot.use_resample_by_scale = true;
+    objOpts.plot.use_resample_by_scale = false;
     objOpts.plot.barplot_width = 1;
     objOpts.plot.lineplot_stroke = 1;
       
@@ -949,7 +949,7 @@ document.addEventListener("DOMContentLoaded", () => {
             }
 
             //sunbmit
-            numeratorDataSeries.push(numeratorDataset0);
+            numeratorDataSeries.push(numeratorDataset0);//original data
             
             //zoom level1   
             for (let t=0; t<th.length; t++){
@@ -959,16 +959,12 @@ document.addEventListener("DOMContentLoaded", () => {
               }
 
               if(objOpts.plot.use_resample_by_scale){
-                //calc
+                //if resample option is true, add resample data
                 const numeratorDataset1 = resamplePointData(numeratorDataset0, th[t], objOpts)
                 numeratorDataset1.zoom_level = t + 1;
                 //submit
                 numeratorDataSeries.push(numeratorDataset1);
-              } else{
-                //submit
-                const numeratorDataset1 = structuredClone(numeratorDataset0);
-                numeratorDataSeries.push(numeratorDataset1);
-              }               
+              }
             }
           }
           //-------denominator--------
@@ -5869,8 +5865,13 @@ document.addEventListener("DOMContentLoaded", () => {
               }
 
               //getdata
-              const pOptions = objOpts.plotter.selected_options[t];            
-              const drawDataset = LCPlotData.draw_collections[t][zoomLevel];
+              const pOptions = objOpts.plotter.selected_options[t];    
+              let drawDataset ;
+              if(objOpts.plot.use_resample_by_scale){        
+                drawDataset = LCPlotData.draw_collections[t][zoomLevel];
+              }else{
+                drawDataset = LCPlotData.draw_collections[t][0];
+              }
 
               //check inside
               //const bufferVal = (scrollerBotRealScale-scrollerTopRealScale) * objOpts.canvas.buffer_depth * yMag;
