@@ -2150,7 +2150,7 @@ class LevelCompilerCore extends EventEmitter{
         }
       }
     }
-    this.setStatus("completed","");
+    this.setStatus("completed","");    
   }
   findSectionIdByName(projectId, hole_name, section_name) {
     this.setStatus("running","start findSectionIdByName");
@@ -6396,7 +6396,6 @@ class LevelCompilerCore extends EventEmitter{
     }    
   }
   leaveOneOut(target="in"){
-    const includeMasterConnection = true;
     const data = [];
 
     data.push([
@@ -6404,9 +6403,10 @@ class LevelCompilerCore extends EventEmitter{
       "Hole Name",
       "Section Name",
       "Position",
-      "Source",
+      "Original interpolate Source",
+      "Leave One Out interpolate Source",
       "Original Composite Depth",
-      "Leave Out Composite Depth"
+      "Leave One Out Composite Depth"
     ]);
 
     const backupProjects = structuredClone(this.projects);
@@ -6425,7 +6425,6 @@ class LevelCompilerCore extends EventEmitter{
             
             //get current data
             const currentMarkerData = structuredClone(this.projects[p].holes[h].sections[s].markers[m]);
-            const connections = structuredClone(this.projects[p].holes[h].sections[s].markers[m].h_connection);
             
             //disconnect horizontal connections
             for(let hc=0; hc<this.projects[p].holes[h].sections[s].markers[m].h_connection.length; hc++){
@@ -6435,28 +6434,14 @@ class LevelCompilerCore extends EventEmitter{
                 if(connectedId[0] ===  this.projects[p].id[0]){
                   //if same project
                   const connectedMarkerData = this.getDataByIdx(this.search_idx_list[connectedId.toString()]);
-                  if(includeMasterConnection){
-                    if(!currentMarkerData.isMaster || !connectedMarkerData.isMaster){
-                      //if not master connection, leave connection
-                      this.disconnectMarkers(currentMarkerData.id, connectedMarkerData.id, "horizontal");
-                    }
-                  }else{
-                    this.disconnectMarkers(currentMarkerData.id, connectedMarkerData.id, "horizontal");
-                  }                  
+                  this.disconnectMarkers(currentMarkerData.id, connectedId, "horizontal");
                 }
               }else{
                 //case between projects
                 if(connectedId[0] !==  this.projects[p].id[0]){
                   //if between project
-                  const connectedMarkerData = this.getDataByIdx(this.search_idx_list[connectedId.toString()]);
-                  if(includeMasterConnection){
-                    if(!currentMarkerData.isMaster || !connectedMarkerData.isMaster){
-                      //if not master connection, leave connection
-                      this.disconnectMarkers(currentMarkerData.id, connectedMarkerData.id, "horizontal");
-                    }
-                  }else{
-                    this.disconnectMarkers(currentMarkerData.id, connectedMarkerData.id, "horizontal");
-                  }
+                  
+                  this.disconnectMarkers(currentMarkerData.id, connectedId, "horizontal");
                 }
               }              
             }  
@@ -6469,14 +6454,14 @@ class LevelCompilerCore extends EventEmitter{
               this.projects[p].holes[h].name,
               this.projects[p].holes[h].sections[s].name,
               this.projects[p].holes[h].sections[s].markers[m].distance,
-              this.projects[p].holes[h].sections[s].markers[m].depth_source[0],
+              currentMarkerData.depth_source[0],
+              newCurrentMarkerData.depth_source[0],
               currentMarkerData.composite_depth,
               newCurrentMarkerData.composite_depth
             ]);
 
             //restore connections
-            this.projects = [];
-            Object.assign(this.projects, backupProjects);
+            this.projects = structuredClone(backupProjects);
             this.updateSearchIdx();
 
           }

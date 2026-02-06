@@ -440,7 +440,24 @@ document.addEventListener("DOMContentLoaded", () => {
             //await window.PlotterApi.PlotterClose();
         } 
 
-    })    
+    })   
+    window.PlotterApi.receive("initiariseSendData", async () => {
+        if(LCPlot !== null ){ 
+            //remove all sended data
+            const parentElement = document.getElementById("plot_list");
+            Array.from(parentElement.children).forEach((child) => {
+                const grandChild = child.querySelector("input[type='checkbox']");
+                grandChild.checked = false;                
+                parentElement.dispatchEvent(new Event('change'));
+                child.remove();
+              });
+
+            updateView();
+        } 
+
+    })   
+    
+    
     //============================================================================
     function updateView() {
     if (vectorObjects == null) {

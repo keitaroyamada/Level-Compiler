@@ -39,6 +39,9 @@ document.addEventListener("DOMContentLoaded", () => {
       ageLower:document.getElementById("ageLowerInput").value
     };
 
+    //get current position
+    await window.FinderApi.requestCurrentPosition();
+
   });
   window.FinderApi.receive("Bookmarks", async (bookmarkData) => {
     window.FinderApi.rendererLog("[Finder]: Finder received bookmarks.");

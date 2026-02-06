@@ -157,7 +157,7 @@ class LevelCompilerPlot {
         }
       }
     }
-
+    console.log("LCPlot: Data point CD/EFD/DD/Age are calculated.")
     return {ok: true, type: 0, reason: ""}
   }
 

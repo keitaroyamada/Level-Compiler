@@ -53,9 +53,11 @@ document.addEventListener("DOMContentLoaded", () => {
       hole: {},
       section: {},
       marker: {},
+
       event: {},
       connection: {},
       age: {},
+      
       plot:{},
       pen: {},
       image:{},      
@@ -66,44 +68,41 @@ document.addEventListener("DOMContentLoaded", () => {
       plotter: {},
       interface:{},
     };
+
+    //=========== public properties =========== 
     objOpts.information.version = 2;
+    objOpts.developer.mode = "user";//"user";"developer";"root"; 
     
     objOpts.canvas.depth_scale = "composite_depth";
+    objOpts.canvas.background_colour = "#ffffff";//"#f4f5f7";//"#f7f7f7"//"#f8fbff";//"#fffdfa";//""white    
+    objOpts.canvas.display_height = 20.2;
+    objOpts.canvas.is_draw_model = true;
+    objOpts.canvas.is_event = true;
+    objOpts.canvas.is_connection = true;
+    objOpts.canvas.is_target = false;//mouse target
+    objOpts.canvas.draw_core_photo = false;
+    objOpts.canvas.is_grid = false;
+    objOpts.canvas.grid_width = 0.5;
+    objOpts.canvas.grid_colour = "#565656";
     objOpts.canvas.zoom_level = [4, 3]; //[x, y](300pix/1m)
     objOpts.canvas.age_zoom_correction = [1/10, 100];//[zoom level, pad level]
     objOpts.canvas.dpir = 1; //window.devicePixelRatio || 1;
-    objOpts.canvas.mouse_over_colour = "#ff0000";
     objOpts.canvas.pad_x = 200; //[px]
     objOpts.canvas.pad_y = 100; //[px]
     objOpts.canvas.shift_x = 0; //[cm]
     objOpts.canvas.shift_y = 100; //[cm]
     objOpts.canvas.bottom_pad = 100; //[cm]
-    objOpts.canvas.buffer_depth = 0; //[%]
-    objOpts.canvas.background_colour = "#ffffff";//"#f4f5f7";//"#f7f7f7"//"#f8fbff";//"#fffdfa";//""white
-    objOpts.canvas.target_horizon = false;
-    objOpts.canvas.is_grid = false;
-    objOpts.canvas.grid_width = 0.5;
-    objOpts.canvas.grid_colour = "#565656";
-    objOpts.canvas.is_target = false;//mouse target
-    objOpts.canvas.is_event = true;
-    objOpts.canvas.is_connection = true;
-    objOpts.canvas.draw_core_photo = false;
-    objOpts.canvas.draw_core_photo_plot = true;
-    objOpts.canvas.photo_plot_colour = "#ff0000";
-    objOpts.canvas.finder_y = 0;
-    objOpts.canvas.age_precision = 0;
-    objOpts.canvas.display_height = 20.2;
-    objOpts.canvas.is_draw_model = true;
-  
+    objOpts.canvas.buffer_depth = 0.1; //[rate]
+    
     objOpts.project.interval = 1;
-    objOpts.project.font = "Arial";
-    objOpts.project.font_size = 25;
-    objOpts.project.font_colour = "#000000";
     objOpts.project.is_show_area = true;
     objOpts.project.area_colour = "#EBEBEB";
     objOpts.project.area_colour_disconnected = "#f96a6a";
     objOpts.project.pad_x = 80;
     objOpts.project.pad_y = 200;
+    objOpts.project.font = "Arial";
+    objOpts.project.font_size = 25;
+    objOpts.project.font_colour = "#000000";
   
     objOpts.hole.distance = 20;
     objOpts.hole.width = 20;
@@ -122,11 +121,14 @@ document.addEventListener("DOMContentLoaded", () => {
     objOpts.section.font_angle =  -90;
     objOpts.section.font_pos_x = -10;
     objOpts.section.font_colour = "#000000";
-  
+
+    objOpts.marker.show_name_labels = true;
+    objOpts.marker.show_position_labels = true;
+    objOpts.marker.emphasise_reversed = true;
+    objOpts.marker.is_rank = false;
     objOpts.marker.line_colour = "#808080";
     objOpts.marker.line_width = 1;
-    objOpts.marker.width = 20;
-    objOpts.marker.is_rank = false;
+    objOpts.marker.width = 20;    
     objOpts.marker.rank_colours = [
       "#008000", // green
       "#66CC66", // medium green
@@ -139,10 +141,7 @@ document.addEventListener("DOMContentLoaded", () => {
     objOpts.marker.font = "Arial";
     objOpts.marker.font_size = 12;
     objOpts.marker.font_colour = "#000000";
-    objOpts.marker.show_name_labels = true;
-    objOpts.marker.show_distance_labels = true;
-    objOpts.marker.emphasise_reversed = true;
-  
+    
     objOpts.event.line_colour = "#ff0000";
     objOpts.event.face_colour = {
       general: "#FFD700",    // gold
@@ -168,38 +167,25 @@ document.addEventListener("DOMContentLoaded", () => {
     objOpts.connection.show_remote_connections = true;
     objOpts.connection.emphasise_remote_connections = true;
   
-    objOpts.plotter.selected_options = null;
+    objOpts.plotter.selected_options = [];// store plot options from plotter
 
     objOpts.plot.is_visible = false;
+    objOpts.plot.is_draw_axis = true;
     objOpts.plot.use_resample_by_scale = true;
     objOpts.plot.barplot_width = 1;
     objOpts.plot.lineplot_stroke = 1;
-    objOpts.plot.is_draw_axis = true;
-  
-    objOpts.edit.editable = false;
-    objOpts.edit.contextmenu_enable = false;
-    objOpts.edit.hittest = null;
-    objOpts.edit.mode = null;
-    objOpts.edit.sensibility = 2;
-    objOpts.edit.marker_from = null;
-    objOpts.edit.marker_to = null;
-    objOpts.edit.section_from = null;
-    objOpts.edit.section_to = null;
-    objOpts.edit.handleClick = null;
-    objOpts.edit.handleMove = null;
-    objOpts.edit.passwards = "admin";
-
-    objOpts.developer.mode = "user";//"user";"developer";"root"; 
-
+      
     objOpts.pen.colour = "#ff0000";
 
+    objOpts.image.draw_core_photo_plot = false;
+    objOpts.image.photo_plot_colour = "#ff0000";
     objOpts.image.dpcm = 24;
     objOpts.image.dpcm_high = 200;
     objOpts.image.enable_load = {composite_depth: true, event_free_depth: true, age: true};
 
+    objOpts.age.age_precision = 0;
     objOpts.age.incon_size = 20;
-    objOpts.age.alt_radius = 3;
-     
+    objOpts.age.alt_radius = 3;     
     objOpts.age.incon_list = {
       terrestrial: ["", "#008000"],
       terrestrial_unreliable: ["", "#008000"],
@@ -223,11 +209,27 @@ document.addEventListener("DOMContentLoaded", () => {
       interpolation_unreliable: ["", "transparent"],
       interpolation_disable: ["", "transparent"],
     };
+
+    //=========== private properties =========== 
+    objOpts.edit.editable = false;
+    objOpts.edit.contextmenu_enable = false;
+    objOpts.edit.hittest = null;
+    objOpts.edit.mode = null;
+    objOpts.edit.sensibility = 2;
+    objOpts.edit.marker_from = null;
+    objOpts.edit.marker_to = null;
+    objOpts.edit.section_from = null;
+    objOpts.edit.section_to = null;
+    objOpts.edit.handleClick = null;
+    objOpts.edit.handleMove = null;
+    objOpts.edit.passwards = "admin";    
+    
     let resourceIcons = window.LCapi.GetResources();
     objOpts.interface.icon_list = resourceIcons.tool;
     for(const key in objOpts.age.incon_list){
       objOpts.age.incon_list[key][0] = resourceIcons.plot[key];
     }
+    objOpts.interface.finder_y = 0;
 
     return objOpts;
   }
@@ -401,6 +403,7 @@ document.addEventListener("DOMContentLoaded", () => {
               await loadModel(true, true);
             }
           } else if(droppedData.name.includes("[age]")){
+
             //case age file
             console.log("[Renderer]: Age model file load from drop.");
             //register age model
@@ -409,6 +412,7 @@ document.addEventListener("DOMContentLoaded", () => {
             if(age_model_list.length >0){
               document.getElementById("AgeModelSelect").value = age_model_list[age_model_list.length-1].id;
               await loadAge(age_model_list[age_model_list.length-1].id);
+
               await loadPlotData("age");//age plot
               await loadPlotData("data")
             }
@@ -595,28 +599,28 @@ document.addEventListener("DOMContentLoaded", () => {
   //show labels
   document.getElementById("bt_show_labels").addEventListener("click", async (event) => {
     if(LCCore){
-      if (objOpts.marker.show_name_labels || objOpts.marker.show_distance_labels) {      
+      if (objOpts.marker.show_name_labels || objOpts.marker.show_position_labels) {      
         if (event.shiftKey){
           objOpts.marker.show_name_labels = false;
-          objOpts.marker.show_distance_labels = true;
+          objOpts.marker.show_position_labels = true;
         } else if (event.ctrlKey){
           objOpts.marker.show_name_labels = true;
-          objOpts.marker.show_distance_labels = false;
+          objOpts.marker.show_position_labels = false;
         } else {
           objOpts.marker.show_name_labels = false;
-          objOpts.marker.show_distance_labels = false;
+          objOpts.marker.show_position_labels = false;
           document.getElementById("bt_show_labels").style.backgroundColor = "#f0f0f0";
         }
       } else {
         if (event.shiftKey){
           objOpts.marker.show_name_labels = false;
-          objOpts.marker.show_distance_labels = true;
+          objOpts.marker.show_position_labels = true;
         } else if (event.ctrlKey){
           objOpts.marker.show_name_labels = true;
-          objOpts.marker.show_distance_labels = false;
+          objOpts.marker.show_position_labels = false;
         } else {
           objOpts.marker.show_name_labels = true;
-          objOpts.marker.show_distance_labels = true;
+          objOpts.marker.show_position_labels = true;
         }
         document.getElementById("bt_show_labels").style.backgroundColor = "#ccc";
       }
@@ -840,8 +844,9 @@ document.addEventListener("DOMContentLoaded", () => {
   });
   //============================================================================================
   window.LCapi.receive("PlotDataOptions", async (data) => {
-    try{
-      console.log("[Renderer]: Plot options are received.")
+     console.log("[Renderer]: Plot options are received.")
+     try{
+      
 
       if(LCPlotData.draw_collections){
         LCPlotData.draw_collections = [];
@@ -860,6 +865,7 @@ document.addEventListener("DOMContentLoaded", () => {
       if(objOpts.plotter.selected_options !== null && LCPlotData.data_collections.length>0){
         // clac each datasets
         const selectedList = objOpts.plotter.selected_options;
+        
         for(let t=0; t< selectedList.length; t++){
           //each Plot list in plotter
           const target = selectedList[t];           
@@ -1039,9 +1045,11 @@ document.addEventListener("DOMContentLoaded", () => {
         console.log("[Renderer]: Plot data: ",LCPlotData)
       }
       updateView();
+      return {LCPlotData, objOpts}
     }catch(er){
       console.error(er)
-    }    
+      return false
+    }
   });
   //============================================================================================
   //Edit correlation model
@@ -1666,7 +1674,12 @@ document.addEventListener("DOMContentLoaded", () => {
                   h.sections.forEach(s=>{
                     if(s.id[2]==ht.section){
                       modelImages.plot_colour[h.name+"-"+s.name] = !modelImages.plot_colour[h.name+"-"+s.name];
-                      console.log(h.name+"-"+s.name, modelImages.plot_colour[h.name+"-"+s.name])
+                      if(objOpts.image.draw_core_photo_plot){
+                        objOpts.image.draw_core_photo_plot = false;
+                      }else{
+                        objOpts.image.draw_core_photo_plot = true;
+                      }
+                      //console.log(h.name+"-"+s.name, modelImages.plot_colour[h.name+"-"+s.name])
                     }
                   })
                 }              
@@ -3779,22 +3792,8 @@ document.addEventListener("DOMContentLoaded", () => {
         finderEnable = true;
         document.getElementById("bt_finder").style.backgroundColor = "#ccc";
         await LCapi.OpenFinder("OpenFinder", async () => {});
-        objOpts.canvas.finder_y = 0;
+        objOpts.interface.finder_y = 0;
 
-        //calc current centre position
-        const rect = document.getElementById("p5Canvas").getBoundingClientRect(); 
-        const centerX = (rect.width / 2);
-        const centerY = (rect.height / 2);//IF ADD 76PIX, CENTRED
-
-        const ht = getClickedItemIdx(centerX, centerY, LCCore, objOpts);   
-
-        //send position
-        setTimeout(async () => {            
-            await window.LCapi.SendDepthToFinder(ht);
-        }, 100);
-
-        
-        updateView();
       } else {
         finderEnable = false;
         document.getElementById("bt_finder").style.backgroundColor = "#f0f0f0";
@@ -3803,8 +3802,21 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     }
   });
+
+  
   //============================================================================================
   //close finder
+  window.LCapi.receive("FinderRequestCurrentPosition", async () => {
+    console.log("[Finder]: Finder request current position.")
+    //calc current centre position
+    const rect = document.getElementById("p5Canvas").getBoundingClientRect(); 
+    const centerX = (rect.width / 2);
+    const centerY = (rect.height / 2);//IF ADD 76PIX, CENTRED
+
+    const ht = getClickedItemIdx(centerX, centerY, LCCore, objOpts);   
+    await window.LCapi.SendDepthToFinder(ht);
+
+  });
   window.LCapi.receive("FinderClosed", async () => {
     console.log("[Finder]: Finder closed.")
     //call from main process
@@ -3927,6 +3939,7 @@ document.addEventListener("DOMContentLoaded", () => {
     updateView();
   });
 
+  
   //-------------------------------------------------------------------------------------------
   window.LCapi.receive("DividerMenuClicked", async () => {
     document.getElementById("bt_divider").click();
@@ -3968,7 +3981,7 @@ document.addEventListener("DOMContentLoaded", () => {
     //move position based on finder
       //get location
     let pos_y = data[objOpts.canvas.depth_scale];
-    objOpts.canvas.finder_y = pos_y;
+    objOpts.interface.finder_y = pos_y;
     console.log("[Renderer]: Received data from Finder: ", pos_y, objOpts.canvas.depth_scale);
     if(data.isMove){
       if (objOpts.canvas.depth_scale !== "drilling_depth") {
@@ -4020,12 +4033,7 @@ document.addEventListener("DOMContentLoaded", () => {
     objOpts.edit.hittest = ht;
     
     //get/show footer text
-    let options = {canvas:{depth_scale: objOpts.canvas.depth_scale, age_precision: objOpts.canvas.age_precision}};
-    if(["root"].includes(objOpts.developer.mode)){
-      options.canvas.depth_scale = "canvas_position";
-    }
-    
-    const txt = await getFooterInfo(LCCore, objOpts.edit.hittest, options);
+    const txt = await getFooterInfo(LCCore, objOpts.edit.hittest, objOpts);
     document.getElementById("footerRightText").textContent = txt;
 
     //target line
@@ -4677,7 +4685,7 @@ document.addEventListener("DOMContentLoaded", () => {
         } 
 
         //fix position
-        const target_y = (objOpts.canvas.finder_y + shift_y) * yMag + pad_y;
+        const target_y = (objOpts.interface.finder_y + shift_y) * yMag + pad_y;
         //const target_x0 = 140;
         //const target_x1 = (hole_x1 + shift_x + objOpts.hole.width / 2) * xMag + pad_x;
         const target_x0 = canvasPos[0] + 20;
@@ -4988,7 +4996,7 @@ document.addEventListener("DOMContentLoaded", () => {
                         sec_w,
                         sec_h
                       );
-                      if(objOpts.canvas.draw_core_photo_plot && modelImages.plot_colour[hole.name + "-" + section.name]){
+                      if(objOpts.image.draw_core_photo_plot && modelImages.plot_colour[hole.name + "-" + section.name]){
                         const getWidth = 10;
                         const scanWidth = (getWidth*2)+1;
                         const imCx = img.width / 2;
@@ -4996,7 +5004,8 @@ document.addEventListener("DOMContentLoaded", () => {
                         px.loadPixels();
 
                         sketch.noFill();
-                        sketch.stroke(objOpts.canvas.photo_plot_colour); sketch.beginShape(); 
+                        sketch.stroke(objOpts.image.photo_plot_colour); 
+                        sketch.beginShape(); 
                         
                         for (let y = 0; y < img.height; y++) {
                           let rSum = 0, gSum = 0, bSum = 0;
@@ -5017,7 +5026,7 @@ document.addEventListener("DOMContentLoaded", () => {
                           const impy = sec_y0 + (y /img.height) *  sec_h;
                           const impx = sec_x0 + (L / 100) * sec_w
 
-                          sketch.stroke(objOpts.canvas.photo_plot_colour); sketch.vertex(impx, impy);
+                          sketch.vertex(impx, impy);
                         }
                         sketch.endShape();
 
@@ -5462,7 +5471,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     );
                   }
                 }
-                if(objOpts.marker.show_distance_labels){
+                if(objOpts.marker.show_position_labels){
                   //add marker distance----------------------------------------
                   sketch.fill(objOpts.marker.font_colour);
                   sketch.noStroke();
@@ -5913,6 +5922,9 @@ document.addEventListener("DOMContentLoaded", () => {
               // Calculate zero position if not yet calculated
               LCCore.projects.forEach((project, p)=>{
                 project.holes.forEach((hole, h)=>{
+                  if(!hole.enable){
+                    return
+                  }
                   const firstDataPoint = extractedDrawDataset.data[0];
                   if(firstDataPoint && firstDataPoint.pidx === p){
                     
@@ -5997,7 +6009,7 @@ document.addEventListener("DOMContentLoaded", () => {
               let isPlotting = false;
               let objCounts  = 0;
               let linePlotStroke = objOpts.plot.lineplot_stroke;
-              const numCut = 200;
+              const numCut = 2000;
               //main roop
               for(let d=0; d<drawData.data.length; d++){
                 objCounts += 1;
@@ -6016,7 +6028,6 @@ document.addEventListener("DOMContentLoaded", () => {
                         objCounts = 0;
                         isPlotting = false;
                     }
-                   console.log(pData)
                     //to next loop
                     continue;
                   }
@@ -6796,6 +6807,8 @@ document.addEventListener("DOMContentLoaded", () => {
         if(protocol == "direct"){
           //The plot contains multiple datasets, so the conversion is performed when the plot options are loaded.
           LCPlotData = await unzip(results.data);
+
+          
           console.log("Plot data loaded.")
           if(["root","developer"].includes(objOpts.developer.mode)){
             console.log("Plot data: ", LCPlotData);
@@ -7387,8 +7400,9 @@ async function getFooterInfo(LCCore, hittest, objOpts) {
       polationType: "linear",  
       allowOutside: false
     };
+
     const calcedData = await window.LCapi.depthConverter([["", hittest.y, targetId]], options);
-    age = calcedData !== null ? calcedData.age_mid.toFixed(objOpts.canvas.age_precision) + " calBP)" : "---)";
+    age = calcedData !== null ? calcedData.age_mid.toFixed(objOpts.age.age_precision) + " calBP)" : "---)";
   }
 
   let trinityData = "[----]";
@@ -7397,7 +7411,7 @@ async function getFooterInfo(LCCore, hittest, objOpts) {
   }
    
   if (objOpts.canvas.depth_scale == "age") {
-  txt = "Age: " + hittest.y.toFixed(objOpts.canvas.age_precision) + " calBP";
+  txt = "Age: " + hittest.y.toFixed(objOpts.age.age_precision) + " calBP";
   }else if (objOpts.canvas.depth_scale == "composite_depth") {
     txt =
       "Composite Depth: " +
@@ -7417,7 +7431,7 @@ async function getFooterInfo(LCCore, hittest, objOpts) {
       (hittest.y/100).toFixed(2) + 
       " m (Age: " +
       age
-  } else if (objOpts.canvas.depth_scale == "canvas_position") {
+  } else if (["root"].includes(objOpts.developer.mode)) {
     txt = "Canvas Position: [x: " + hittest.raw_x.toFixed(2) + ",y: " + hittest.raw_y.toFixed(2) + "]";
   } else if (objOpts.canvas.depth_scale == "real_position") {
     txt = "Canvas Position: [x: " + hittest.x.toFixed(2) + ",y: " + hittest.y.toFixed(2) + "]";
@@ -7532,7 +7546,7 @@ async function unzip(result) {
   } else if (result instanceof ArrayBuffer) {
     u8 = new Uint8Array(result);
   } else {
-    // Blob や Response を渡されても一応対応
+    // Blob ,Response 
     const buf = await result.arrayBuffer();
     u8 = new Uint8Array(buf);
   }
@@ -8835,12 +8849,17 @@ function calcDrawPosition(drawPointDataset, LCCore, objOpts, pOptions){
   let numEnable  = 0;
   let numDisable = 0;
   const holeEnableList = [];
-  for(let p=0; p< LCCore.projects.length; p++){    
+  for(let p=0; p< LCCore.projects.length; p++){  
+    
+    if (p > 0) {
+      numEnable += objOpts.project.interval;
+    }
+
     const hCounts = [];
     for(let h=0; h< LCCore.projects[p].holes.length; h++){
       
       if(LCCore.projects[p].holes[h].enable){
-        numEnable += 1 + objOpts.project.interval * p;
+        numEnable += 1;
       }else{
         numDisable += 1;
       }
@@ -8855,6 +8874,12 @@ function calcDrawPosition(drawPointDataset, LCCore, objOpts, pOptions){
     
     if(drawData.source === "trinity"){
       if(drawData.pidx !== null && drawData.hidx !== null){
+        if (!LCCore.projects[drawData.pidx].holes[drawData.hidx].enable) {
+          drawData.pos_x = NaN;
+          drawData.pos_y = NaN;
+          continue;
+        }
+        
         const enableHoles = holeEnableList[drawData.pidx][drawData.hidx];
         //calc 
         if(drawData[objOpts.canvas.depth_scale] == null){console.log(1111111111111)}

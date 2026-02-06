@@ -71,10 +71,39 @@ window.addEventListener("DOMContentLoaded", () => {
       })();
 
       const fontOptions = [
-        "Arial", "Verdana", "Tahoma", "Trebuchet MS",
-        "Georgia", "Times New Roman", "Courier New",
-        "Lucida Console", "Comic Sans MS", "Monospace"
+        "Arial",
+        "BIZ UD Gothic",
+        "BIZ UD Mincho",
+        "Bradley Hand",
+        "Brush Script MT",
+        "Comic Sans MS",
+        "Consolas",
+        "Courier New",
+        "cursive",
+        "Georgia",
+        "Helvetica",
+        "HanziPen SC",
+        "HanziPen TC",
+        "Hiragino Sans",
+        "Lucida Handwriting",
+        "Meiryo",
+        "Menlo",
+        "Monaco",
+        "monospace",
+        "sans-serif",
+        "Segoe Print",
+        "Segoe UI",
+        "serif",
+        "Snell Roundhand",
+        "system-ui",
+        "Tahoma",
+        "Times New Roman",
+        "UD Gothic",
+        "UD Mincho",
+        "Verdana",
+        "Yu Gothic",
       ];
+
 
       if (typeof value === "string" && isColor) {
         const dummy = document.createElement("div");

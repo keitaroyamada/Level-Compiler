@@ -20,6 +20,9 @@ contextBridge.exposeInMainWorld("FinderApi", {
   askdialog: (args1, args2) => ipcRenderer.invoke("askdialog", args1, args2),
   saveBookmarks: (args1) => ipcRenderer.invoke("saveBookmarks", args1),
 
+  requestCurrentPosition: () => ipcRenderer.invoke("requestCurrentPosition"),
+  
+
   //main -> renderer
   receive: (channel, func) => {
     ipcRenderer.on(channel, (event, ...args) => func(...args));

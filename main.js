@@ -287,6 +287,9 @@ function createMainWIndow() {
 
     //load ages into LCCore
     LCCore.calcMarkerAges(LCAge);
+    if(LCPlot.data_collections.length>0){
+      const res = LCPlot.calcDataCollectionPosition(LCCore, LCAge);
+    }
 
     //LCAge.checkAges();
     if(LCAge.unreliable_ids.length>0){
@@ -305,9 +308,13 @@ function createMainWIndow() {
       mainWindow.webContents.send("AlertRenderer", err);
     }
 
+    //send data
     try{
       const zipped = await zipData(LCCore.exportSerialisedModel());
-
+      if(LCPlot.data_collections.length>0){
+        //initiarise view
+        plotWindow.webContents.send("initiariseSendData");
+      }
       console.log("MAIN: Load age model into LCCore. id: " +  LCAge.selected_id + " name:" +  model_name);
       return zipped;
     }catch(err){
@@ -2558,8 +2565,7 @@ function createMainWIndow() {
         changedSections.forEach(i=>{          
           changedIds.push(LCCore.projects[i.project].holes[i.hole].sections[i.section].id);
           
-          LCCore.projects[i.project].holes[i.hole].sections[i.section].markers.forEach(m=>{
-          })
+          //LCCore.projects[i.project].holes[i.hole].sections[i.section].markers.forEach(m=>{          })
         })       
 
         //Undo image
@@ -3391,6 +3397,10 @@ function createMainWIndow() {
     LCBookmarkSet[LCCore.name] = data;
     setSettings("bookmarks", LCBookmarkSet);
   });
+  ipcMain.handle("requestCurrentPosition", (_e) => {
+    mainWindow.webContents.send("FinderRequestCurrentPosition");    
+  });
+
   ipcMain.handle("openExtarnalLink", (_e,url) => {
     if(url){
       shell.openExternal(url);
@@ -4754,7 +4764,7 @@ function createMainWIndow() {
           },
           {
             label: "Model evaluation",
-            visible: true,
+            visible: false,
             click: () => {
               if(LCCore !== null && LCCore.projects.length>0){
                 const results = LCCore.leaveOneOut("in");
@@ -4763,7 +4773,7 @@ function createMainWIndow() {
                 putcsvfile(mainWindow, "results.csv", results);                
               }
             }
-          },
+          },          
           { type: "separator" },   
           {
             label:"Zoom",
