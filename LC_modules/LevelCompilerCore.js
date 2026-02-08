@@ -6395,6 +6395,16 @@ class LevelCompilerCore extends EventEmitter{
       }      
     }    
   }
+  equalName(a, b) {
+    const isNumLike = v =>
+      typeof v === "number" ||
+      (typeof v === "string" && /^[0-9]+$/.test(v));
+
+    if (isNumLike(a) && isNumLike(b)) {
+      return Number(a) === Number(b);
+    }
+    return String(a) === String(b);
+  }
   leaveOneOut(target="in"){
     const data = [];
 

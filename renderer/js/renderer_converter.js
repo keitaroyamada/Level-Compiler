@@ -330,6 +330,7 @@ document.addEventListener("DOMContentLoaded", () => {
       if(result.ok){
         console.log("[Converter]: Converted data is exported successfully.");
       }else{          
+        alert(result.reason)
         console.log("[Converter]: Failed to export.",result.reason);
       }
 

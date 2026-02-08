@@ -87,9 +87,9 @@ document.addEventListener("DOMContentLoaded", () => {
     objOpts.canvas.zoom_level = [4, 3]; //[x, y](300pix/1m)
     objOpts.canvas.age_zoom_correction = [1/10, 100];//[zoom level, pad level]
     objOpts.canvas.dpir = 1; //window.devicePixelRatio || 1;
-    objOpts.canvas.pad_x = 200; //[px]
-    objOpts.canvas.pad_y = 100; //[px]
-    objOpts.canvas.shift_x = 0; //[cm]
+    objOpts.canvas.pad_x = 210; //[px]
+    objOpts.canvas.pad_y = 110; //[px]
+    objOpts.canvas.shift_x = 10; //[cm]
     objOpts.canvas.shift_y = 100; //[cm]
     objOpts.canvas.bottom_pad = 100; //[cm]
     objOpts.canvas.buffer_depth = 0.1; //[rate]
@@ -171,10 +171,13 @@ document.addEventListener("DOMContentLoaded", () => {
 
     objOpts.plot.is_visible = false;
     objOpts.plot.is_draw_axis = true;
-    objOpts.plot.use_resample_by_scale = false;
+    //objOpts.plot.use_resample_by_scale = false;// To enable this option, adjustments arising from data sorting are required.
     objOpts.plot.barplot_width = 1;
     objOpts.plot.lineplot_stroke = 1;
-      
+    objOpts.plot.lineplot_split_sections = true;
+    objOpts.plot.lineplot_ignore_invalid = true;
+    objOpts.plot.invalid_value = ["-9999","na", "n/a", "null", "none", "nan","missing"];
+    
     objOpts.pen.colour = "#ff0000";
 
     objOpts.image.draw_core_photo_plot = false;
@@ -183,6 +186,7 @@ document.addEventListener("DOMContentLoaded", () => {
     objOpts.image.dpcm_high = 200;
     objOpts.image.enable_load = {composite_depth: true, event_free_depth: true, age: true};
 
+    objOpts.age.is_visible = true;
     objOpts.age.age_precision = 0;
     objOpts.age.incon_size = 20;
     objOpts.age.alt_radius = 3;     
@@ -852,29 +856,31 @@ document.addEventListener("DOMContentLoaded", () => {
         LCPlotData.draw_collections = [];
       }      
 
-      if(data.emitType=="new"){
-        //await loadPlotData();//latest ver is load plot data at the same time of loading plotter
-      }
-
       //get plotter options
       objOpts.plotter.selected_options = data.data;
       objOpts.plot.is_visible = true;
       document.getElementById("bt_chart").style.backgroundColor = "#ccc";
 
+      //emit type: new: start plot, add: add new data, updateDataset: update data values, updateSetting: update only setting
+      if(objOpts.plotter.selected_options.emitType=="updateSetting"){
+        //If only settings are changed, skip data recalculation as it is unnecessary        
+        if(["root","developer"].includes(objOpts.developer.mode)){
+          console.log("[Renderer]: Plotter update only settings")
+        }
+        return
+      }
+
+      //initiarise
+      const invalidSet = new Set(objOpts.plot.invalid_value);
+
       //calc plotvaluse
       if(objOpts.plotter.selected_options !== null && LCPlotData.data_collections.length>0){
         // clac each datasets
         const selectedList = objOpts.plotter.selected_options;
-        
         for(let t=0; t< selectedList.length; t++){
           //each Plot list in plotter
-          const target = selectedList[t];           
-              
-          //check draw
-          if(target.isDraw == false){
-            continue
-          }
-
+          const target = selectedList[t];       
+          
           //main
           //get idx
           let colIdx = null;
@@ -908,12 +914,11 @@ document.addEventListener("DOMContentLoaded", () => {
             continue
           }
 
-          //calc values
-          const dispPix = scroller.clientHeight * objOpts.canvas.dpir;     
-          let th = [0.010, 0.025, 0.050, 0.075, 0.10, 0.25, 0.50, 0.75, 1.0, 2.5, 5.0, 7.5, 10]; //cm
-          
-          console.time("[Renderer]: Making multi-level data: ")
-          //-------numerator--------   
+          //calc bin size
+          let th = [0.010, 0.025, 0.050, 0.075, 0.10, 0.25, 0.50, 0.75, 1.0, 2.5, 5.0, 7.5, 10]; //cm          
+          //console.time("[Renderer]: Making multi-level data: ")
+          //-------numerator----------------------------------------------------------------------------------------------------   
+          //the data row is sorted by the original depth source
           const numeratorDataSeries   = [];          
           if(nIdx!==null){         
             const numeratorDataset0 = drawPointDataset();     
@@ -921,15 +926,23 @@ document.addEventListener("DOMContentLoaded", () => {
             let val_min = Infinity;
             let val_max = - Infinity;
 
-            LCPlotData.data_collections[colIdx].rows.forEach(row=>{     
+            LCPlotData.data_collections[colIdx].rows.forEach((row,ridx)=>{     
               const drawPoint  = drawPointData(row, LCCore);
+              
               if(!Number.isFinite(drawPoint.composite_depth)){
                 return
               } 
+
+              drawPoint.idx = ridx;
+              drawPoint.id  = row[0] ? row[0] : "";
+
               drawPoint.type   = "data";
               drawPoint.header = LCPlotData.data_collections[colIdx].header[nIdx] ? LCPlotData.data_collections[colIdx].header[nIdx] : "";
               drawPoint.unit   = LCPlotData.data_collections[colIdx].units[nIdx]  ? LCPlotData.data_collections[colIdx].units[nIdx]  : "";
-              drawPoint.val    = Number.isFinite(row[nIdx]) ? row[nIdx] : NaN;
+
+              // Sanitize input: assign 'raw' only if it is a valid, finite number; otherwise fallback to NaN.              
+              const isValid = row[nIdx] !== null && !invalidSet.has(String(row[nIdx]).toLowerCase()) && Number.isFinite(Number(row[nIdx]));
+              drawPoint.val = isValid ? Number(row[nIdx]) : NaN;
 
               numeratorDataset0.data.push(drawPoint);     
               if(drawPoint.val < val_min){
@@ -950,24 +963,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
             //sunbmit
             numeratorDataSeries.push(numeratorDataset0);//original data
-            
-            //zoom level1   
-            for (let t=0; t<th.length; t++){
-              
-              if(objOpts.canvas.depth_scale == "age"){
-                th[t] = th[t] * objOpts.canvas.age_zoom_correction[0];
-              }
-
-              if(objOpts.plot.use_resample_by_scale){
-                //if resample option is true, add resample data
-                const numeratorDataset1 = resamplePointData(numeratorDataset0, th[t], objOpts)
-                numeratorDataset1.zoom_level = t + 1;
-                //submit
-                numeratorDataSeries.push(numeratorDataset1);
-              }
-            }
           }
-          //-------denominator--------
+          //-------denominator------------------------------------------------------------------------------------------
+          //the data row is sorted by the original depth source
           const denominatorDataSeries = [];
           if(dIdx!==null){            
             const denominatorDataset0     = drawPointDataset();     
@@ -975,16 +973,23 @@ document.addEventListener("DOMContentLoaded", () => {
             let val_min = Infinity;
             let val_max = - Infinity;
 
-            LCPlotData.data_collections[colIdx].rows.forEach(row=>{     
+            LCPlotData.data_collections[colIdx].rows.forEach((row,ridx)=>{     
               const drawPoint  = drawPointData(row, LCCore);
               if(!Number.isFinite(drawPoint.composite_depth)){
                 return
               }
+              
+              drawPoint.idx = ridx;
+              drawPoint.id  = row[0] ? row[0] : "";
+
               drawPoint.type   = "data";
               drawPoint.header = LCPlotData.data_collections[colIdx].header[dIdx] ? LCPlotData.data_collections[colIdx].header[dIdx] : "";
               drawPoint.unit   = LCPlotData.data_collections[colIdx].units[dIdx]  ? LCPlotData.data_collections[colIdx].units[dIdx]  : "";
-              drawPoint.val    = Number.isFinite(row[dIdx]) ? row[dIdx] : NaN;
-
+              
+              // Sanitize input: assign 'raw' only if it is a valid, finite number; otherwise fallback to NaN.              
+              const isValid = row[dIdx] !== null && !invalidSet.has(String(row[dIdx]).toLowerCase()) && Number.isFinite(Number(row[dIdx]));
+              drawPoint.val = isValid ? Number(row[dIdx]) : NaN;
+              
               denominatorDataset0.data.push(drawPoint);     
 
               if(drawPoint.val < val_min){
@@ -1005,46 +1010,76 @@ document.addEventListener("DOMContentLoaded", () => {
 
             //sunbmit
             denominatorDataSeries.push(denominatorDataset0);
-            
-            //zoom level1          
-            for (let t=0; t<th.length; t++){
-              
-              if(objOpts.canvas.depth_scale == "age"){
-                th[t] = th[t] * objOpts.canvas.age_zoom_correction[0];
-              }
-
-              if(objOpts.plot.use_resample_by_scale){
-                //calc
-                const denominatorDataset1 = resamplePointData(denominatorDataset0, th[t], objOpts)
-                denominatorDataset1.zoom_level = t + 1;
-              }
-
-              //submit
-              denominatorDataSeries.push(denominatorDataset1);
-            }
           }
 
+          //=================== calc divided values ============================================================================
           //calc divided values
           const dividedDataSeries = dividePlotData(numeratorDataSeries, denominatorDataSeries);
-          
+
+          //resample based on zoom level1
+          /*
+          if(objOpts.plot.use_resample_by_scale){
+            for (let t=0; t<th.length; t++){                          
+              //if resample option is true, add resample data
+              //if use this function, input dataseries must be sort by the depth scale
+              const resampledDataset = resamplePointData(dividedDataSeries, th[t], objOpts)
+              resampledDataset.zoom_level = t + 1;
+              //submit
+              dividedDataSeries.push(resampledDataset);
+            }
+          }
+          */
+
+          //2. sort dataset map by composite depth(if not exist, keep original order)
+          dividedDataSeries.forEach(dividedData => {
+            if (dividedData.data.length > 0) {
+              if (dividedData.data[0].source == "trinity") {
+                // 1. Create a combined array of objects pairing 'data' and 'depth_map'
+                // (Assumes both arrays have the same length)
+                const combined = dividedData.depth_map.composite_depth.map((list, index) => ({
+                  index,
+                  mapDrillingDepth:  dividedData.depth_map.drilling_depth[index],
+                  mapCompositeDepth: list,
+                  mapEventFreeDepth: dividedData.depth_map.event_free_depth[index],
+                  mapAge:            dividedData.depth_map.age[index],
+                }));
+
+                // 2. Sort the combined array based on 'hname'
+                combined.sort((a, b) => {
+                  const d = a.mapCompositeDepth.value - b.mapCompositeDepth.value;
+                  return d !== 0 ? d : a.index - b.index;  
+                })
+                
+                //sort((a, b) => a.dataItem.hname.localeCompare(b.dataItem.hname));
+
+                // 3. Map the sorted results back to the original properties
+                dividedData.depth_map.drilling_depth = combined.map(c => c.mapDrillingDepth);
+                dividedData.depth_map.composite_depth = combined.map(c => c.mapCompositeDepth);
+                dividedData.depth_map.event_free_depth = combined.map(c => c.mapEventFreeDepth);
+                dividedData.depth_map.age = combined.map(c => c.mapAge);
+                
+              }
+            }
+          });
+
           //submit
           LCPlotData.draw_collections.push(dividedDataSeries);
 
-          console.timeEnd("[Renderer]: Making multi-level data: ")
+          //console.timeEnd("[Renderer]: Making multi-level data: ")       
+        }
+
+        if(["root","developer"].includes(objOpts.developer.mode)){
+          console.log("[Renderer]: Plot data: ",LCPlotData)
+        }else{
+          console.log("[Renderer]: Plot data is loaded.")
         }
       }else{
         console.log("[Renderer]: There is no plot data or information: ", objOpts.plotter.selected_options, LCPlotData.data_collections)
       }
-      
-      console.log("[Renderer]: Plot data is loaded.")
-      if(["root","developer"].includes(objOpts.developer.mode)){
-        console.log("[Renderer]: Plot data: ",LCPlotData)
-      }
+           
       updateView();
-      return {LCPlotData, objOpts}
     }catch(er){
       console.error(er)
-      return false
     }
   });
   //============================================================================================
@@ -1670,12 +1705,7 @@ document.addEventListener("DOMContentLoaded", () => {
                   h.sections.forEach(s=>{
                     if(s.id[2]==ht.section){
                       modelImages.plot_colour[h.name+"-"+s.name] = !modelImages.plot_colour[h.name+"-"+s.name];
-                      if(objOpts.image.draw_core_photo_plot){
-                        objOpts.image.draw_core_photo_plot = false;
-                      }else{
-                        objOpts.image.draw_core_photo_plot = true;
-                      }
-                      //console.log(h.name+"-"+s.name, modelImages.plot_colour[h.name+"-"+s.name])
+                      console.log("Renderer: Draw image brightness: ", h.name+"-"+s.name, modelImages.plot_colour[h.name+"-"+s.name])
                     }
                   })
                 }              
@@ -5729,7 +5759,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
       //==========================================================================================      
       //draw age points      
-      if (objOpts.canvas.is_draw_model && LCPlotAge !== null &&  LCPlotAge.ages.length > 0) {
+      if (objOpts.canvas.is_draw_model && objOpts.age.is_visible && LCPlotAge !== null &&  LCPlotAge.ages.length > 0) {
         //if(LCPlotAge.id == document.getElementById("AgeModelSelect").value) //if check id
         
         //get age data(because age data, age series is single)
@@ -5863,7 +5893,12 @@ document.addEventListener("DOMContentLoaded", () => {
               }
 
               //getdata
-              const pOptions = objOpts.plotter.selected_options[t];    
+              const pOptions = objOpts.plotter.selected_options[t];   
+              
+              if(!pOptions.isDraw){
+                continue
+              }
+              
               let drawDataset ;
               if(objOpts.plot.use_resample_by_scale){        
                 drawDataset = LCPlotData.draw_collections[t][zoomLevel];
@@ -5874,9 +5909,10 @@ document.addEventListener("DOMContentLoaded", () => {
               //check inside
               //const bufferVal = (scrollerBotRealScale-scrollerTopRealScale) * objOpts.canvas.buffer_depth * yMag;
 
-              const searchTop = scrollerTopRealScale - bufferVal;
-              const searchBot = scrollerBotRealScale + bufferVal;
-              const depthArr = drawDataset.depth_map[objOpts.canvas.depth_scale]; 
+              const searchTop  = scrollerTopRealScale - bufferVal;
+              const searchBot  = scrollerBotRealScale + bufferVal;
+              //if changed resample option after plotted, depth_map error
+              const depthArr   = drawDataset.depth_map[objOpts.canvas.depth_scale]; 
               const startIndex = binarySearchIndex(depthArr, searchTop, (e) => e.value);
               const endIndex   = binarySearchIndex(depthArr, searchBot, (e) => e.value);
 
@@ -5954,56 +5990,58 @@ document.addEventListener("DOMContentLoaded", () => {
                         zeroDrawDataset.data[2].val   = zeroDrawDataset.min;
                         zeroDrawDataset.data[2].hname = hole.name;
                         zeroDrawDataset.data[2].hidx  = h;
-                        
+
                         zeroDataset = calcDrawPosition(zeroDrawDataset, LCCore, objOpts, pOptions);
                         zeroDataDict[hole.name] = zeroDataset.data;
 
-                        //========== X axis for trinity===============
+                        //========== X axis for trinity===============                        
                         if (objOpts.plot.is_draw_axis) {
-                          let yAxis = 200 + scroller.scrollTop;
+                          if(pOptions.isAxis){
+                            let yAxis = 100 + scroller.scrollTop + 60 * t;
 
-                          if(h%2==0){
-                            yAxis -= 60; 
-                          }
+                            if(h%2==0){
+                              yAxis -= 60; 
+                            }
+                              
+                            const yLabel = yAxis - 5;
+                            const yTitle = yAxis - 25;
                             
-                          const yLabel = yAxis - 5;
-                          const yTitle = yAxis - 25;
+                            const xMax = zeroDataset.data[1].pos_x;
+                            const xMin = zeroDataset.data[2].pos_x;
+                            const xCenter = xMin + (xMax - xMin) / 2;
                           
-                          const xMax = zeroDataset.data[1].pos_x;
-                          const xMin = zeroDataset.data[2].pos_x;
-                          const xCenter = xMin + (xMax - xMin) / 2;
-                        
-                          const minValueStr = autoRound(zeroDataset.min).toString();
-                          const maxValueStr = autoRound(zeroDataset.max).toString();
-                          const title = zeroDataset.data[0].header + " [" + zeroDataset.data[0].unit + "]";
-                          sketch.push();
+                            const minValueStr = autoRound(zeroDataset.min).toString();
+                            const maxValueStr = autoRound(zeroDataset.max).toString();
+                            const title = zeroDataset.data[0].header + " [" + zeroDataset.data[0].unit + "]";
+                            sketch.push();
 
-                          sketch.strokeWeight(2);
-                          sketch.stroke(pOptions.colour);
-                          sketch.fill(pOptions.colour);
-                          
-                          sketch.line(xMax, yAxis, xMin, yAxis);
+                            sketch.strokeWeight(2);
+                            sketch.stroke(pOptions.colour);
+                            sketch.fill(pOptions.colour);
+                            
+                            sketch.line(xMax, yAxis, xMin, yAxis);
 
-                          /*
-                          const tickLength = 5;
-                          sketch.strokeWeight(1);
-                          sketch.line(xMin, yAxis, xMin, yAxis + tickLength);
-                          sketch.line(xMax, yAxis, xMax, yAxis + tickLength);
-                          */
-                          sketch.noStroke();
-                          sketch.textSize(12);
+                            /*
+                            const tickLength = 5;
+                            sketch.strokeWeight(1);
+                            sketch.line(xMin, yAxis, xMin, yAxis + tickLength);
+                            sketch.line(xMax, yAxis, xMax, yAxis + tickLength);
+                            */
+                            sketch.noStroke();
+                            sketch.textSize(12);
 
-                          sketch.textAlign(sketch.RIGHT);
-                          sketch.text(minValueStr, xMin, yLabel);
+                            sketch.textAlign(sketch.RIGHT);
+                            sketch.text(minValueStr, xMin, yLabel);
 
-                          sketch.textAlign(sketch.LEFT);
-                          sketch.text(maxValueStr, xMax, yLabel);
-                          
-                          sketch.textAlign(sketch.CENTER); 
-                          sketch.textSize(14);
-                          sketch.text(title, xCenter, yTitle);
+                            sketch.textAlign(sketch.LEFT);
+                            sketch.text(maxValueStr, xMax, yLabel);
+                            
+                            sketch.textAlign(sketch.CENTER); 
+                            sketch.textSize(14);
+                            sketch.text(title, xCenter, yTitle);
 
-                          sketch.pop();
+                            sketch.pop(); 
+                          }                          
                         }
                       }
                     })
@@ -6039,46 +6077,48 @@ document.addEventListener("DOMContentLoaded", () => {
 
                   //========== X axis for global ===============
                   if (objOpts.plot.is_draw_axis) {
-                    let yAxis = 200 + scroller.scrollTop;
+                    if(pOptions.isAxis){
+                      let yAxis = 200 + scroller.scrollTop;
+                        
+                      const yLabel = yAxis - 5;
+                      const yTitle = yAxis - 25;
                       
-                    const yLabel = yAxis - 5;
-                    const yTitle = yAxis - 25;
+                      const xMax = zeroDataset.data[1].pos_x;
+                      const xMin = zeroDataset.data[2].pos_x;
+                      const xCenter = xMin + (xMax - xMin) / 2;
                     
-                    const xMax = zeroDataset.data[1].pos_x;
-                    const xMin = zeroDataset.data[2].pos_x;
-                    const xCenter = xMin + (xMax - xMin) / 2;
-                  
-                    const minValueStr = autoRound(zeroDataset.min).toString();
-                    const maxValueStr = autoRound(zeroDataset.max).toString();
-                    const title = zeroDataset.data[0].header + " [" + zeroDataset.data[0].unit + "]";
-                    sketch.push();
+                      const minValueStr = autoRound(zeroDataset.min).toString();
+                      const maxValueStr = autoRound(zeroDataset.max).toString();
+                      const title = zeroDataset.data[0].header + " [" + zeroDataset.data[0].unit + "]";
+                      sketch.push();
 
-                    sketch.strokeWeight(2);
-                    sketch.stroke(pOptions.colour);
-                    sketch.fill(pOptions.colour);
-                    
-                    sketch.line(xMax, yAxis, xMin, yAxis);
+                      sketch.strokeWeight(2);
+                      sketch.stroke(pOptions.colour);
+                      sketch.fill(pOptions.colour);
+                      
+                      sketch.line(xMax, yAxis, xMin, yAxis);
 
-                    /*
-                    const tickLength = 5;
-                    sketch.strokeWeight(1);
-                    sketch.line(xMin, yAxis, xMin, yAxis + tickLength);
-                    sketch.line(xMax, yAxis, xMax, yAxis + tickLength);
-                    */
-                    sketch.noStroke();
-                    sketch.textSize(12);
+                      /*
+                      const tickLength = 5;
+                      sketch.strokeWeight(1);
+                      sketch.line(xMin, yAxis, xMin, yAxis + tickLength);
+                      sketch.line(xMax, yAxis, xMax, yAxis + tickLength);
+                      */
+                      sketch.noStroke();
+                      sketch.textSize(12);
 
-                    sketch.textAlign(sketch.RIGHT);
-                    sketch.text(minValueStr, xMin, yLabel);
+                      sketch.textAlign(sketch.RIGHT);
+                      sketch.text(minValueStr, xMin, yLabel);
 
-                    sketch.textAlign(sketch.LEFT);
-                    sketch.text(maxValueStr, xMax, yLabel);
-                    
-                    sketch.textAlign(sketch.CENTER); 
-                    sketch.textSize(14);
-                    sketch.text(title, xCenter, yTitle);
+                      sketch.textAlign(sketch.LEFT);
+                      sketch.text(maxValueStr, xMax, yLabel);
+                      
+                      sketch.textAlign(sketch.CENTER); 
+                      sketch.textSize(14);
+                      sketch.text(title, xCenter, yTitle);
 
-                    sketch.pop();
+                      sketch.pop();
+                    }
                   }
                 }
               }
@@ -6099,26 +6139,26 @@ document.addEventListener("DOMContentLoaded", () => {
                   // ---------------------------------------------------------
                   // Line Plot: (using vertex)
                   // ---------------------------------------------------------
+                  
+                  // Check for Discontinuity (Section/Hole Change)
+                  if (isPlotting && d>0) {
+                    const prevData = drawData.data[d - 1];
+                    if (pData.hname !== prevData.hname || (pData.sname !== prevData.sname && objOpts.plot.lineplot_split_sections)) {
+                        sketch.endShape();
+                        objCounts = 0;
+                        isPlotting = false;    
+                    }
+                  }
+
                   // Check Delimiter
                   if (!Number.isFinite(pData.pos_y) || !Number.isFinite(pData.pos_x)) {
-                    if (isPlotting) {
+                    if (isPlotting && !objOpts.plot.lineplot_ignore_invalid) {
                         sketch.endShape();
                         objCounts = 0;
                         isPlotting = false;
                     }
                     //to next loop
                     continue;
-                  }
-
-                  // ---------------------------------------------------------
-                  // Check for Discontinuity (Section/Hole Change)
-                  if (isPlotting && d>0) {
-                    const prevData = drawData.data[d - 1];
-                    if (pData.hname !== prevData.hname || pData.sname !== prevData.sname) {
-                        sketch.endShape();
-                        objCounts = 0;
-                        isPlotting = false;    
-                    }
                   }
 
                   // ---------------------------------------------------------
@@ -6946,6 +6986,8 @@ document.addEventListener("DOMContentLoaded", () => {
     //call from main process
     LCPlotData= null;
     objOpts.plotter.selected_options = [];
+
+    updateView();
 
     if(["root","developer"].includes(objOpts.developer.mode)){
       console.log(LCPlotData)
@@ -8307,20 +8349,29 @@ function getPlotPosiotion(data, LCCore, objOpts){
 
 function drawPointDataset(){
   const output = {
-    id: null,
-    name: null,
-    version: null,
+    //id: null,
+    //name: null,
+    //version: null,
 
     zoom_level: 0,
     max: null,
     min: null,
-    data: []
+
+    data: [],
+    depth_map:{
+      drilling_depth:[],
+      composite_depth:[],
+      event_free_depth:[],
+      age:[],
+    },
   };
+
   return output
 }
 function drawPointData(data=null, LCCore=null){
   const output = {
     id: null,
+    idx:null,
     type: null,
     name: null,
     header: null,
@@ -8373,11 +8424,11 @@ function drawPointData(data=null, LCCore=null){
 
   if(LCCore){
     LCCore.projects.forEach((project, p)=>{
-      if(project.name === output.pname){
+      if(equalName(project.name, output.pname)){
         project.holes.forEach((hole, h)=>{
-          if(hole.name === output.hname){
+          if(equalName(hole.name, output.hname)){
             hole.sections.forEach((section, s)=>{
-              if(section.name === output.sname){
+              if(equalName(section.name, output.sname)){
                 output.pidx = p;
                 output.hidx = h;
                 output.sidx = s;
@@ -8391,28 +8442,27 @@ function drawPointData(data=null, LCCore=null){
 
   return output;
 }
-function resamplePointData(numeratorDataset0, th, objOpts){
-  //sketch.height * dpir
+function resamplePointData(inDataset, th, objOpts){
   const numeratorDataset1 = drawPointDataset();
 
   let idxs = [];
   let val_max = -Infinity;
   let val_min = Infinity;
-  for(let d=0; d<numeratorDataset0.data.length; d++){
+  for(let d=0; d<inDataset[0].data.length; d++){
     idxs.push(d);
 
     if(idxs.length==1){
       //start              
       continue
     }else{
-      const startProjName = numeratorDataset0.data[idxs[0]].pname;
-      const startHoleName = numeratorDataset0.data[idxs[0]].hname;
-      const startSecName  = numeratorDataset0.data[idxs[0]].sname;
-      const currtProjName = numeratorDataset0.data[d].pname;
-      const currtHoleName = numeratorDataset0.data[d].hname;
-      const currtSecName  = numeratorDataset0.data[d].sname;
-      const startPos      = numeratorDataset0.data[idxs[0]][objOpts.canvas.depth_scale];
-      const currtPos      = numeratorDataset0.data[d][objOpts.canvas.depth_scale];
+      const startProjName = inDataset[0].data[idxs[0]].pname;
+      const startHoleName = inDataset[0].data[idxs[0]].hname;
+      const startSecName  = inDataset[0].data[idxs[0]].sname;
+      const currtProjName = inDataset[0].data[d].pname;
+      const currtHoleName = inDataset[0].data[d].hname;
+      const currtSecName  = inDataset[0].data[d].sname;
+      const startPos      = inDataset[0].data[idxs[0]][objOpts.canvas.depth_scale];
+      const currtPos      = inDataset[0].data[d][objOpts.canvas.depth_scale];
 
       if(startProjName === currtProjName && startHoleName === currtHoleName && startSecName === currtSecName){
         //if same section                 
@@ -8423,38 +8473,39 @@ function resamplePointData(numeratorDataset0, th, objOpts){
           //if out of threshold
           const nextIdx = idxs.pop();
           // composite_depth
-          let vals = idxs.map(i => { const val = numeratorDataset0.data[i].composite_depth; return val === null ? NaN : Number(val); }).filter(Number.isFinite);
+          let vals = idxs.map(i => { const val = inDataset[0].data[i].composite_depth; return val === null ? NaN : Number(val); }).filter(Number.isFinite);
           const mCD = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
 
           // event_free_depth
-          vals = idxs.map(i => { const val = numeratorDataset0.data[i].event_free_depth; return val === null ? NaN : Number(val); }).filter(Number.isFinite);
+          vals = idxs.map(i => { const val = inDataset[0].data[i].event_free_depth; return val === null ? NaN : Number(val); }).filter(Number.isFinite);
           const mEFD = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
 
           // drilling_depth
-          vals = idxs.map(i => { const val = numeratorDataset0.data[i].drilling_depth; return val === null ? NaN : Number(val); }).filter(Number.isFinite);
+          vals = idxs.map(i => { const val = inDataset[0].data[i].drilling_depth; return val === null ? NaN : Number(val); }).filter(Number.isFinite);
           const mDD = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
 
           // age
-          vals = idxs.map(i => { const val = numeratorDataset0.data[i].age; return val === null ? NaN : Number(val); }).filter(Number.isFinite);
+          vals = idxs.map(i => { const val = inDataset[0].data[i].age; return val === null ? NaN : Number(val); }).filter(Number.isFinite);
           const mAge = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
 
           // ageu
-          vals = idxs.map(i => { const val = numeratorDataset0.data[i].ageu; return val === null ? NaN : Number(val); }).filter(Number.isFinite);
+          vals = idxs.map(i => { const val = inDataset[0].data[i].ageu; return val === null ? NaN : Number(val); }).filter(Number.isFinite);
           const mAgeu = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
 
           // agel
-          vals = idxs.map(i => { const val = numeratorDataset0.data[i].agel; return val === null ? NaN : Number(val); }).filter(Number.isFinite);
+          vals = idxs.map(i => { const val = inDataset[0].data[i].agel; return val === null ? NaN : Number(val); }).filter(Number.isFinite);
           const mAgel = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
 
           // dist
-          vals = idxs.map(i => { const val = numeratorDataset0.data[i].dist; return val === null ? NaN : Number(val); }).filter(Number.isFinite);
+          vals = idxs.map(i => { const val = inDataset[0].data[i].dist; return val === null ? NaN : Number(val); }).filter(Number.isFinite);
           const mDist = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
 
           // val
-          vals = idxs.map(i => { const val = numeratorDataset0.data[i].val; return val === null ? NaN : Number(val); }).filter(Number.isFinite);
+          vals = idxs.map(i => { const val = inDataset[0].data[i].val; return val === null ? NaN : Number(val); }).filter(Number.isFinite);
           const mVal = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
 
-          const names = `${numeratorDataset0.data[idxs[0]].name}<->${numeratorDataset0.data[idxs[idxs.length-1]].name} [N=${idxs.length}]`;
+          //name
+          const names = `${inDataset[0].data[idxs[0]].name}<->${inDataset[0].data[idxs[idxs.length-1]].name} [N=${idxs.length}]`;
 
 
           //calc max/min
@@ -8471,20 +8522,20 @@ function resamplePointData(numeratorDataset0, th, objOpts){
           //apply
           const newPointData = drawPointData()
 
-          newPointData.id = numeratorDataset0.data[idxs[0]].id;
-          newPointData.type = numeratorDataset0.data[idxs[0]].type
+          newPointData.id = inDataset[0].data[idxs[0]].id;
+          newPointData.type = inDataset[0].data[idxs[0]].type
           newPointData.name = names;
-          newPointData.header = numeratorDataset0.data[idxs[0]].header;
-          newPointData.unit   = numeratorDataset0.data[idxs[0]].unit;
+          newPointData.header = inDataset[0].data[idxs[0]].header;
+          newPointData.unit   = inDataset[0].data[idxs[0]].unit;
           newPointData.val = mVal;
 
           newPointData.pname = startProjName;
           newPointData.hname = startHoleName;
           newPointData.sname = startSecName;
 
-          newPointData.pidx  = numeratorDataset0.data[idxs[0]].pidx;
-          newPointData.hidx  = numeratorDataset0.data[idxs[0]].hidx;
-          newPointData.sidx  = numeratorDataset0.data[idxs[0]].sidx;
+          newPointData.pidx  = inDataset[0].data[idxs[0]].pidx;
+          newPointData.hidx  = inDataset[0].data[idxs[0]].hidx;
+          newPointData.sidx  = inDataset[0].data[idxs[0]].sidx;
 
           newPointData.dist  = mDist;
           newPointData.composite_depth  = mCD;
@@ -8493,12 +8544,17 @@ function resamplePointData(numeratorDataset0, th, objOpts){
           newPointData.age    = mAge;
           newPointData.ageu   = mAgeu;
           newPointData.agel   = mAgel;
-          newPointData.source = numeratorDataset0.data[idxs[0]].source;
+          newPointData.source = inDataset[0].data[idxs[0]].source;
 
-          newPointData.pos_x = numeratorDataset0.data[idxs[0]].pos_x;
-          newPointData.pos_y = numeratorDataset0.data[idxs[0]].pos_y;
+          newPointData.pos_x = inDataset[0].data[idxs[0]].pos_x;
+          newPointData.pos_y = inDataset[0].data[idxs[0]].pos_y;
 
+          //submit
           numeratorDataset1.data.push(newPointData);
+          numeratorDataset1.depth_map.drilling_depth.push({idx:d, value:mDD});
+          numeratorDataset1.depth_map.composite_depth.push({idx:d, value:mCD});
+          numeratorDataset1.depth_map.event_free_depth.push({idx:d, value:mEFD});
+          numeratorDataset1.depth_map.age.push({idx:d, value:mAge});
 
           //initialise
           idxs = [nextIdx];
@@ -8508,38 +8564,38 @@ function resamplePointData(numeratorDataset0, th, objOpts){
         //if out of threshold
           const nextIdx = idxs.pop();
           // composite_depth
-          let vals = idxs.map(i => { const val = numeratorDataset0.data[i].composite_depth; return val === null ? NaN : Number(val); }).filter(Number.isFinite);
+          let vals = idxs.map(i => { const val = inDataset[0].data[i].composite_depth; return val === null ? NaN : Number(val); }).filter(Number.isFinite);
           const mCD = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
 
           // event_free_depth
-          vals = idxs.map(i => { const val = numeratorDataset0.data[i].event_free_depth; return val === null ? NaN : Number(val); }).filter(Number.isFinite);
+          vals = idxs.map(i => { const val = inDataset[0].data[i].event_free_depth; return val === null ? NaN : Number(val); }).filter(Number.isFinite);
           const mEFD = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
 
           // drilling_depth
-          vals = idxs.map(i => { const val = numeratorDataset0.data[i].drilling_depth; return val === null ? NaN : Number(val); }).filter(Number.isFinite);
+          vals = idxs.map(i => { const val = inDataset[0].data[i].drilling_depth; return val === null ? NaN : Number(val); }).filter(Number.isFinite);
           const mDD = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
 
           // age
-          vals = idxs.map(i => { const val = numeratorDataset0.data[i].age; return val === null ? NaN : Number(val); }).filter(Number.isFinite);
+          vals = idxs.map(i => { const val = inDataset[0].data[i].age; return val === null ? NaN : Number(val); }).filter(Number.isFinite);
           const mAge = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
 
           // ageu
-          vals = idxs.map(i => { const val = numeratorDataset0.data[i].ageu; return val === null ? NaN : Number(val); }).filter(Number.isFinite);
+          vals = idxs.map(i => { const val = inDataset[0].data[i].ageu; return val === null ? NaN : Number(val); }).filter(Number.isFinite);
           const mAgeu = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
 
           // agel
-          vals = idxs.map(i => { const val = numeratorDataset0.data[i].agel; return val === null ? NaN : Number(val); }).filter(Number.isFinite);
+          vals = idxs.map(i => { const val = inDataset[0].data[i].agel; return val === null ? NaN : Number(val); }).filter(Number.isFinite);
           const mAgel = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
 
           // dist
-          vals = idxs.map(i => { const val = numeratorDataset0.data[i].dist; return val === null ? NaN : Number(val); }).filter(Number.isFinite);
+          vals = idxs.map(i => { const val = inDataset[0].data[i].dist; return val === null ? NaN : Number(val); }).filter(Number.isFinite);
           const mDist = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
 
           // val
-          vals = idxs.map(i => { const val = numeratorDataset0.data[i].val; return val === null ? NaN : Number(val); }).filter(Number.isFinite);
+          vals = idxs.map(i => { const val = inDataset[0].data[i].val; return val === null ? NaN : Number(val); }).filter(Number.isFinite);
           const mVal = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
 
-          const names = `${numeratorDataset0.data[idxs[0]].name}<-|${numeratorDataset0.data[idxs[idxs.length-1]].name} [N=${idxs.length}]`;
+          const names = `${inDataset[0].data[idxs[0]].name}<-|${inDataset[0].data[idxs[idxs.length-1]].name} [N=${idxs.length}]`;
 
           //calc max/min
           if (Number.isFinite(mVal)){
@@ -8555,20 +8611,20 @@ function resamplePointData(numeratorDataset0, th, objOpts){
           //apply
           const newPointData = drawPointData()
 
-          newPointData.id = numeratorDataset0.data[idxs[0]].id;
-          newPointData.type = numeratorDataset0.data[idxs[0]].type
+          newPointData.id = inDataset[0].data[idxs[0]].id;
+          newPointData.type = inDataset[0].data[idxs[0]].type
           newPointData.name = names;
-          newPointData.header = numeratorDataset0.data[idxs[0]].header;
-          newPointData.unit   = numeratorDataset0.data[idxs[0]].unit;
+          newPointData.header = inDataset[0].data[idxs[0]].header;
+          newPointData.unit   = inDataset[0].data[idxs[0]].unit;
           newPointData.val = mVal;
 
           newPointData.pname = startProjName;
           newPointData.hname = startHoleName;
           newPointData.sname = startSecName;
 
-          newPointData.pidx  = numeratorDataset0.data[idxs[0]].pidx;
-          newPointData.hidx  = numeratorDataset0.data[idxs[0]].hidx;
-          newPointData.sidx  = numeratorDataset0.data[idxs[0]].sidx;
+          newPointData.pidx  = inDataset[0].data[idxs[0]].pidx;
+          newPointData.hidx  = inDataset[0].data[idxs[0]].hidx;
+          newPointData.sidx  = inDataset[0].data[idxs[0]].sidx;
 
           newPointData.dist  = mDist;
           newPointData.composite_depth  = mCD;
@@ -8577,12 +8633,17 @@ function resamplePointData(numeratorDataset0, th, objOpts){
           newPointData.age    = mAge;
           newPointData.ageu   = mAgeu;
           newPointData.agel   = mAgel;
-          newPointData.source = numeratorDataset0.data[idxs[0]].source;
+          newPointData.source = inDataset[0].data[idxs[0]].source;
 
-          newPointData.pos_x = numeratorDataset0.data[idxs[0]].pos_x;
-          newPointData.pos_y = numeratorDataset0.data[idxs[0]].pos_y;
+          newPointData.pos_x = inDataset[0].data[idxs[0]].pos_x;
+          newPointData.pos_y = inDataset[0].data[idxs[0]].pos_y;
 
+          //submit
           numeratorDataset1.data.push(newPointData);
+          numeratorDataset1.depth_map.drilling_depth.push({idx:d, value:mDD});
+          numeratorDataset1.depth_map.composite_depth.push({idx:d, value:mCD});
+          numeratorDataset1.depth_map.event_free_depth.push({idx:d, value:mEFD});
+          numeratorDataset1.depth_map.age.push({idx:d, value:mAge});
 
           //initialise
           idxs = [nextIdx];
@@ -8596,38 +8657,38 @@ function resamplePointData(numeratorDataset0, th, objOpts){
   // This block finalizes and outputs the remaining accumulated points.
   if(idxs.length>0){
     // composite_depth
-    let vals = idxs.map(i => { const val = numeratorDataset0.data[i].composite_depth; return val === null ? NaN : Number(val); }).filter(Number.isFinite);
+    let vals = idxs.map(i => { const val = inDataset[0].data[i].composite_depth; return val === null ? NaN : Number(val); }).filter(Number.isFinite);
     const mCD = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
 
     // event_free_depth
-    vals = idxs.map(i => { const val = numeratorDataset0.data[i].event_free_depth; return val === null ? NaN : Number(val); }).filter(Number.isFinite);
+    vals = idxs.map(i => { const val = inDataset[0].data[i].event_free_depth; return val === null ? NaN : Number(val); }).filter(Number.isFinite);
     const mEFD = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
 
     // drilling_depth
-    vals = idxs.map(i => { const val = numeratorDataset0.data[i].drilling_depth; return val === null ? NaN : Number(val); }).filter(Number.isFinite);
+    vals = idxs.map(i => { const val = inDataset[0].data[i].drilling_depth; return val === null ? NaN : Number(val); }).filter(Number.isFinite);
     const mDD = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
 
     // age
-    vals = idxs.map(i => { const val = numeratorDataset0.data[i].age; return val === null ? NaN : Number(val); }).filter(Number.isFinite);
+    vals = idxs.map(i => { const val = inDataset[0].data[i].age; return val === null ? NaN : Number(val); }).filter(Number.isFinite);
     const mAge = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
 
     // ageu
-    vals = idxs.map(i => { const val = numeratorDataset0.data[i].ageu; return val === null ? NaN : Number(val); }).filter(Number.isFinite);
+    vals = idxs.map(i => { const val = inDataset[0].data[i].ageu; return val === null ? NaN : Number(val); }).filter(Number.isFinite);
     const mAgeu = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
 
     // agel
-    vals = idxs.map(i => { const val = numeratorDataset0.data[i].agel; return val === null ? NaN : Number(val); }).filter(Number.isFinite);
+    vals = idxs.map(i => { const val = inDataset[0].data[i].agel; return val === null ? NaN : Number(val); }).filter(Number.isFinite);
     const mAgel = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
 
     // dist
-    vals = idxs.map(i => { const val = numeratorDataset0.data[i].dist; return val === null ? NaN : Number(val); }).filter(Number.isFinite);
+    vals = idxs.map(i => { const val = inDataset[0].data[i].dist; return val === null ? NaN : Number(val); }).filter(Number.isFinite);
     const mDist = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
 
     // val
-    vals = idxs.map(i => { const val = numeratorDataset0.data[i].val; return val === null ? NaN : Number(val); }).filter(Number.isFinite);
+    vals = idxs.map(i => { const val = inDataset[0].data[i].val; return val === null ? NaN : Number(val); }).filter(Number.isFinite);
     const mVal = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
 
-    const names = `${numeratorDataset0.data[idxs[0]].name}<-||${numeratorDataset0.data[idxs[idxs.length-1]].name} [N=${idxs.length}]`;
+    const names = `${inDataset[0].data[idxs[0]].name}<-||${inDataset[0].data[idxs[idxs.length-1]].name} [N=${idxs.length}]`;
 
     //calc max/min
     if (Number.isFinite(mVal)){
@@ -8643,20 +8704,20 @@ function resamplePointData(numeratorDataset0, th, objOpts){
     //apply
     const newPointData = drawPointData()
 
-    newPointData.id = numeratorDataset0.data[idxs[0]].id;
-    newPointData.type = numeratorDataset0.data[idxs[0]].type
+    newPointData.id = inDataset[0].data[idxs[0]].id;
+    newPointData.type = inDataset[0].data[idxs[0]].type
     newPointData.name = names;
-    newPointData.header = numeratorDataset0.data[idxs[0]].header;
-    newPointData.unit   = numeratorDataset0.data[idxs[0]].unit;
+    newPointData.header = inDataset[0].data[idxs[0]].header;
+    newPointData.unit   = inDataset[0].data[idxs[0]].unit;
     newPointData.val = mVal;
 
-    newPointData.pname = numeratorDataset0.data[idxs[0]].pname;
-    newPointData.hname = numeratorDataset0.data[idxs[0]].hname;
-    newPointData.sname = numeratorDataset0.data[idxs[0]].sname;
+    newPointData.pname = inDataset[0].data[idxs[0]].pname;
+    newPointData.hname = inDataset[0].data[idxs[0]].hname;
+    newPointData.sname = inDataset[0].data[idxs[0]].sname;
 
-    newPointData.pidx  = numeratorDataset0.data[idxs[0]].pidx;
-    newPointData.hidx  = numeratorDataset0.data[idxs[0]].hidx;
-    newPointData.sidx  = numeratorDataset0.data[idxs[0]].sidx;
+    newPointData.pidx  = inDataset[0].data[idxs[0]].pidx;
+    newPointData.hidx  = inDataset[0].data[idxs[0]].hidx;
+    newPointData.sidx  = inDataset[0].data[idxs[0]].sidx;
 
     newPointData.dist  = mDist;
     newPointData.composite_depth  = mCD;
@@ -8665,12 +8726,18 @@ function resamplePointData(numeratorDataset0, th, objOpts){
     newPointData.age    = mAge;
     newPointData.ageu   = mAgeu;
     newPointData.agel   = mAgel;
-    newPointData.source = numeratorDataset0.data[idxs[0]].source;
+    newPointData.source = inDataset[0].data[idxs[0]].source;
 
-    newPointData.pos_x = numeratorDataset0.data[idxs[0]].pos_x;
-    newPointData.pos_y = numeratorDataset0.data[idxs[0]].pos_y;
+    newPointData.pos_x = inDataset[0].data[idxs[0]].pos_x;
+    newPointData.pos_y = inDataset[0].data[idxs[0]].pos_y;
 
+    //submit
     numeratorDataset1.data.push(newPointData);    
+    numeratorDataset1.depth_map.drilling_depth.push({idx:numeratorDataset1.depth_map.drilling_depth.length, value:mDD});
+    numeratorDataset1.depth_map.composite_depth.push({idx:numeratorDataset1.depth_map.composite_depth.length, value:mCD});
+    numeratorDataset1.depth_map.event_free_depth.push({idx:numeratorDataset1.depth_map.event_free_depth.length, value:mEFD});
+    numeratorDataset1.depth_map.age.push({idx:numeratorDataset1.depth_map.age.length, value:mAge});
+
   }
 
   //
@@ -8692,10 +8759,11 @@ function dividePlotData(numeratorDataSeries, denominatorDataSeries){
         for(let d = 0; d < numeratorDataSeries[i].data.length; d++){
           const nPdata = numeratorDataSeries[i].data[d];
           const dPdata = denominatorDataSeries[i].data[d];
-          const ndPdata= drawPointData(); //base is numerator
-          
+          const ndPdata= drawPointData(); //base is numerator          
           
           //set val
+          ndPdata.id    = nPdata.id;                 
+          ndPdata.idx   = nPdata.idx;
           ndPdata.type  = nPdata.type;                 
           ndPdata.pname = nPdata.pname;
           ndPdata.hname = nPdata.hname;
@@ -8715,12 +8783,13 @@ function dividePlotData(numeratorDataSeries, denominatorDataSeries){
           //divide
           ndPdata.name   = nPdata.name+"/"+dPdata.name;
           ndPdata.header = nPdata.header+"/"+dPdata.header;
-          const numeratorValue  = (Number.isFinite(nPdata.val)&&nPdata.val!==null) ? nPdata.val : NaN;
-          const denominatorValue= (Number.isFinite(dPdata.val)&&dPdata.val!==null) ? dPdata.val : NaN;
-          ndPdata.val    = numeratorValue / denominatorValue;
-          const numeratorUnit   = nPdata.unit!=="" ? nPdata.unit : "1";
-          const denominatorUnit = dPdata.unit!=="" ? "/"+dPdata.unit : "";
+          const numeratorUnit   = nPdata.unit!=="" ? nPdata.unit : "";
+          const denominatorUnit = dPdata.unit!=="" ? "·"+dPdata.unit+"⁻¹" : "";
           ndPdata.unit   = numeratorUnit + denominatorUnit;
+
+          const nv = Number(nPdata.val);
+          const dv = Number(dPdata.val);
+          ndPdata.val = (Number.isFinite(nv) && Number.isFinite(dv) && dv !== 0) ? nv / dv : NaN;
 
           //calc max/min
           if(ndPdata.val<val_min){
@@ -8732,43 +8801,18 @@ function dividePlotData(numeratorDataSeries, denominatorDataSeries){
 
           //submit
           dividedDataset.data.push(ndPdata);
+
+          //set depth map
+          dividedDataset.depth_map.composite_depth.push({ idx:d, value: ndPdata.composite_depth });
+          dividedDataset.depth_map.drilling_depth.push({ idx:d, value: ndPdata.drilling_depth });
+          dividedDataset.depth_map.event_free_depth.push({ idx:d, value: ndPdata.event_free_depth });
+          dividedDataset.depth_map.age.push({ idx:d, value: ndPdata.age });
         }   
 
         //submit
         dividedDataset.max = Number.isFinite(val_max) ? val_max : null;
         dividedDataset.min = Number.isFinite(val_min) ? val_min : null;
         dividedDataset.zoom_level = numeratorDataSeries[i].zoom_level;
-
-        //sort
-        if(dividedDataset.data.length > 0){
-          if(dividedDataset.data[0].source == "trinity"){
-            dividedDataset.data.sort((a, b) =>
-              a.hname.localeCompare(b.hname)
-            );
-          }
-        }
-
-        //get cd map
-        const depthMap = {
-          composite_depth: [],
-          drilling_depth: [],
-          event_free_depth: [],
-          age: [],
-        };
-        dividedDataset.data.forEach((item, idx) => {
-          depthMap.composite_depth.push({ idx, value: item.composite_depth });
-          depthMap.drilling_depth.push({ idx, value: item.drilling_depth });
-          depthMap.event_free_depth.push({ idx, value: item.event_free_depth });
-          depthMap.age.push({ idx, value: item.age });
-        });
-
-        // map sort
-        depthMap.composite_depth.sort((a, b) => a.value - b.value);
-        depthMap.drilling_depth.sort((a, b) => a.value - b.value);
-        depthMap.event_free_depth.sort((a, b) => a.value - b.value);
-        depthMap.age.sort((a, b) => a.value - b.value);
-
-        dividedDataset.depth_map = depthMap;
 
         dividedDataSeries.push(dividedDataset);        
       }
@@ -8780,46 +8824,21 @@ function dividePlotData(numeratorDataSeries, denominatorDataSeries){
         let val_max = -Infinity;
         let val_min = Infinity;
         for(let d = 0; d < numeratorDataSeries[i].data.length; d++){
+          //divide point data 
           const nPdata = numeratorDataSeries[i].data[d];
           //submit
           dividedDataset.data.push(nPdata);
-        }   
 
+          //set depth map
+          dividedDataset.depth_map.composite_depth.push({ idx:d, value: nPdata.composite_depth });
+          dividedDataset.depth_map.drilling_depth.push({ idx:d, value: nPdata.drilling_depth });
+          dividedDataset.depth_map.event_free_depth.push({ idx:d, value: nPdata.event_free_depth });
+          dividedDataset.depth_map.age.push({ idx:d, value: nPdata.age });
+        }   
         //submit
         dividedDataset.max = numeratorDataSeries[i].max;
         dividedDataset.min = numeratorDataSeries[i].min;
         dividedDataset.zoom_level = numeratorDataSeries[i].zoom_level;
-
-        //sort
-        if(dividedDataset.data.length > 0){
-          if(dividedDataset.data[0].source == "trinity"){
-            dividedDataset.data.sort((a, b) =>
-              a.hname.localeCompare(b.hname)
-            );
-          }
-        }
-
-        //get cd map
-        const depthMap = {
-          composite_depth: [],
-          drilling_depth: [],
-          event_free_depth: [],
-          age: [],
-        };
-        dividedDataset.data.forEach((item, idx) => {
-          depthMap.composite_depth.push({ idx, value: item.composite_depth });
-          depthMap.drilling_depth.push({ idx, value: item.drilling_depth });
-          depthMap.event_free_depth.push({ idx, value: item.event_free_depth });
-          depthMap.age.push({ idx, value: item.age });
-        });
-
-        // map sort
-        depthMap.composite_depth.sort((a, b) => a.value - b.value);
-        depthMap.drilling_depth.sort((a, b) => a.value - b.value);
-        depthMap.event_free_depth.sort((a, b) => a.value - b.value);
-        depthMap.age.sort((a, b) => a.value - b.value);
-
-        dividedDataset.depth_map = depthMap;
 
         dividedDataSeries.push(dividedDataset);        
       }
@@ -8837,6 +8856,8 @@ function dividePlotData(numeratorDataSeries, denominatorDataSeries){
           const ndPdata= drawPointData(); //base is numerator
                     
           //set val
+          ndPdata.id    = dPdata.id;                 
+          ndPdata.idx   = dPdata.idx;
           ndPdata.type  = dPdata.type;                 
           ndPdata.pname = dPdata.pname;
           ndPdata.hname = dPdata.hname;
@@ -8856,9 +8877,11 @@ function dividePlotData(numeratorDataSeries, denominatorDataSeries){
           //divide
           ndPdata.name   = "1/"+dPdata.name;
           ndPdata.header = "1/"+dPdata.header;
-          const denominatorValue= (Number.isFinite(dPdata.val)&&dPdata.val!==null) ? dPdata.val : NaN;
-          ndPdata.val    = 1 / denominatorValue;
-          ndPdata.unit   = ("1/" + dPdata.unit)!=="1/" ? "1/" + dPdata.unit : "-";
+          ndPdata.unit   = dPdata.unit!=="" ? dPdata.unit+"⁻¹" : "";
+
+          "·"+dPdata.unit
+          const dv = Number(dPdata.val);//check value
+          ndPdata.val = Number.isFinite(dv) && dv !== 0 ? 1 / dv : NaN;
 
           //calc max/min
           if(ndPdata.val<val_min){
@@ -8870,43 +8893,18 @@ function dividePlotData(numeratorDataSeries, denominatorDataSeries){
 
           //submit
           dividedDataset.data.push(ndPdata);
+
+          //set depth map
+          dividedDataset.depth_map.composite_depth.push({ idx:d, value: ndPdata.composite_depth });
+          dividedDataset.depth_map.drilling_depth.push({ idx:d, value: ndPdata.drilling_depth });
+          dividedDataset.depth_map.event_free_depth.push({ idx:d, value: ndPdata.event_free_depth });
+          dividedDataset.depth_map.age.push({ idx:d, value: ndPdata.age });
         }   
 
         //submit
         dividedDataset.max = Number.isFinite(val_max) ? val_max : null;
         dividedDataset.min = Number.isFinite(val_min) ? val_min : null;
         dividedDataset.zoom_level = denominatorDataSeries[i].zoom_level;
-
-        //sort
-        if(dividedDataset.data.length > 0){
-          if(dividedDataset.data[0].source == "trinity"){
-            dividedDataset.data.sort((a, b) =>
-              a.hname.localeCompare(b.hname)
-            );
-          }
-        }
-
-        //get cd map
-        const depthMap = {
-          composite_depth: [],
-          drilling_depth: [],
-          event_free_depth: [],
-          age: [],
-        };
-        dividedDataset.data.forEach((item, idx) => {
-          depthMap.composite_depth.push({ idx, value: item.composite_depth });
-          depthMap.drilling_depth.push({ idx, value: item.drilling_depth });
-          depthMap.event_free_depth.push({ idx, value: item.event_free_depth });
-          depthMap.age.push({ idx, value: item.age });
-        });
-
-        // map sort
-        depthMap.composite_depth.sort((a, b) => a.value - b.value);
-        depthMap.drilling_depth.sort((a, b) => a.value - b.value);
-        depthMap.event_free_depth.sort((a, b) => a.value - b.value);
-        depthMap.age.sort((a, b) => a.value - b.value);
-
-        dividedDataset.depth_map = depthMap;
 
         dividedDataSeries.push(dividedDataset);        
       }
@@ -9002,7 +9000,13 @@ function calcDrawPosition(drawPointDataset, LCCore, objOpts, pOptions){
         drawData.pos_x = age_shift_x + shift_x * xMag + pad_x - objOpts.age.incon_size * 1.2;
         drawData.pos_y = (drawData[objOpts.canvas.depth_scale] + shift_y) * yMag + pad_y - objOpts.age.incon_size / 2;
       }else{
-        drawData.pos_x = ((drawData.val - val_min) * amp[0] + shift_x) * xMag + 20;
+        let relative_x = (drawData.val - val_min) * amp[0];
+
+        if(isFlip){
+          relative_x = objOpts.hole.width - relative_x;
+        }
+
+        drawData.pos_x = (relative_x + shift_x) * xMag + 20;
         drawData.pos_y = (drawData[objOpts.canvas.depth_scale] * amp[1] + shift_y) * yMag + pad_y;
       }
     }
@@ -9010,5 +9014,16 @@ function calcDrawPosition(drawPointDataset, LCCore, objOpts, pOptions){
 
   return drawPointDataset
 }
+function equalName(a, b) {
+  const isNumLike = v =>
+    typeof v === "number" ||
+    (typeof v === "string" && /^[0-9]+$/.test(v));
+
+  if (isNumLike(a) && isNumLike(b)) {
+    return Number(a) === Number(b);
+  }
+  return String(a) === String(b);
+}
+
 
 //============================================================================================

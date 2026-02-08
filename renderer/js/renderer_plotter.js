@@ -71,8 +71,19 @@ document.addEventListener("DOMContentLoaded", () => {
         updateView();
     });
     document.getElementById('plot_list').addEventListener("change", async (e) => {
+        const target = e.target;//changed data
+        const rowId = target.id;//changed line
+        const settingName = target.dataset.name;//chnaged target name
+         
+        console.log(`Changed Line:${rowId} / Changed Setting:${settingName}`);
+        
         updateView();
-        sendToRenderer("update");
+        if(["numerator","denominator"].includes(settingName)){
+            sendToRenderer("updateDataset");
+        }else{
+            sendToRenderer("updateSetting");
+        }
+        
     });
     document.getElementById('bt_add').addEventListener("click", async (e) => {
         console.log("[Plotter]: Add process called")
@@ -97,27 +108,107 @@ document.addEventListener("DOMContentLoaded", () => {
             const seriesCheck = document.createElement("input");
             seriesDiv.style.paddingLeft = "0px";
             seriesCheck.type    = "checkbox";
-            seriesCheck.id      = numSeries;
+            seriesCheck.id      = "visible_"+numSeries;
             seriesCheck.checked = true;
-            seriesCheck.title = "Visible(Show/Hide)";            
+            seriesCheck.dataset.name = "visible"; 
+            
+            //checkbox custom
+            seriesCheck.style.display = "none";
+            // --- Visible Icon (Eye mark) ---
+            const seriesCheckLabel = document.createElement("label");
+            seriesCheckLabel.htmlFor = seriesCheck.id;
+            seriesCheckLabel.style.cursor = "pointer";
+            seriesCheckLabel.style.fontSize = "16px";
+            seriesCheckLabel.style.userSelect = "none";
+            seriesCheckLabel.textContent = "👁";//👁○
+            seriesCheckLabel.style.marginLeft = "8px";
+            seriesCheckLabel.title = "Visible (Click to Show/Hide)";
+
+            seriesCheck.addEventListener('change', (e) => {
+                if (e.target.checked) {
+                    seriesCheckLabel.textContent = "👁";
+                    seriesCheckLabel.style.textDecoration = "none";
+                    seriesCheckLabel.style.opacity = "1";
+                    seriesCheckLabel.title = "Visible (Click to Hide)";
+                    seriesCheckLabel.style.marginLeft = "8px";
+                } else {
+                    seriesCheckLabel.textContent = "◡";
+                    //seriesCheckLabel.style.textDecoration = "line-through";
+                    //seriesCheckLabel.style.textDecorationColor = "red";
+                    seriesCheckLabel.style.opacity = "01"; 
+                    seriesCheckLabel.title = "Hidden (Click to Show)";
+                    seriesCheckLabel.style.marginLeft = "8px";
+                }
+            });
+
+            // --- Axis Checkbox (Hidden) ---
+            const axisCheck = document.createElement("input");
+            seriesDiv.style.paddingLeft = "0px";
+            axisCheck.type    = "checkbox";
+            axisCheck.id      = "axis_" + numSeries;
+            axisCheck.checked = true;
+            axisCheck.dataset.name = "axisVisible";
+            axisCheck.checked = false;
+            
+            //checkbox custom
+            axisCheck.style.display = "none";
+
+            // --- Axis Icon (L-shape mark) ---
+            const axisCheckLabel = document.createElement("label");
+            axisCheckLabel.htmlFor = axisCheck.id;
+            axisCheckLabel.style.cursor = "pointer";
+            axisCheckLabel.style.fontSize = "16px";
+            axisCheckLabel.style.fontWeight = "bold";
+            axisCheckLabel.style.userSelect = "none";
+            axisCheckLabel.style.marginLeft = "8px";
+            axisCheckLabel.style.display = "inline-block";
+            
+            // （OFF）
+            //axisCheckLabel.textContent = "∟"; //ON
+            //axisCheckLabel.title = "Axis Visible (Click to Hide)";//ON
+            axisCheckLabel.textContent = "∟";
+            axisCheckLabel.style.textDecoration = "line-through"; 
+            axisCheckLabel.style.textDecorationColor = "red";     
+            axisCheckLabel.style.opacity = "0.4";                
+            axisCheckLabel.title = "Axis Hidden (Click to Show)";
+
+            axisCheck.addEventListener('change', (e) => {
+                if (e.target.checked) {
+                    // ON
+                    axisCheckLabel.textContent = "∟";
+                    axisCheckLabel.style.textDecoration = "none";
+                    axisCheckLabel.style.opacity = "1";
+                    axisCheckLabel.title = "Axis Visible (Click to Hide)";
+                } else {
+                    // OFF
+                    axisCheckLabel.textContent = "∟";
+                    axisCheckLabel.style.textDecoration = "line-through";
+                    axisCheckLabel.style.textDecorationColor = "red"; 
+                    axisCheckLabel.style.opacity = "0.4"; 
+                    axisCheckLabel.title = "Axis Hidden (Click to Show)";
+                }
+            });
 
             //data No
             const Nolabel = document.createElement("label");
             Nolabel.htmlFor = numSeries;
             Nolabel.textContent = numSeries.toString().padStart(2, "0");
             Nolabel.style.marginRight = "5px";
-            Nolabel.title = "Source: " + LCPlot.data_collections[selectedIdx].name;            
+            Nolabel.title = "Source: " + LCPlot.data_collections[selectedIdx].name;       
+            Nolabel.dataset.name = "label";     
 
             //data name
             const serieslabel = document.createElement("label");
             serieslabel.htmlFor = numSeries;
             serieslabel.dataset.value = LCPlot.data_collections[selectedIdx].id;
             serieslabel.style.marginRight = "5px";
+            serieslabel.dataset.name = "name";
 
             //separator
             const separatorlabel = document.createElement("label");
             separatorlabel.htmlFor = 0;
             separatorlabel.textContent = "/";
+            separatorlabel.dataset.name = "separator";
             
             //numerator
             const numeratorDropdown             = document.createElement("select");
@@ -125,6 +216,7 @@ document.addEventListener("DOMContentLoaded", () => {
             numeratorDropdown.style.marginRight = "5px";
             numeratorDropdown.id                = numSeries;
             numeratorDropdown.title             = "Numerator";
+            numeratorDropdown.dataset.name       = "numerator";
 
             const option1       = document.createElement("option");
             option1.value       = 0;
@@ -146,6 +238,7 @@ document.addEventListener("DOMContentLoaded", () => {
             denominatorDropdown.style.marginLeft = "5px";
             denominatorDropdown.id               = numSeries;
             denominatorDropdown.title            = "Denominator";
+            denominatorDropdown.dataset.name      = "denominator";
 
             const option0       = document.createElement("option");
             option0.value       = 0;
@@ -170,8 +263,9 @@ document.addEventListener("DOMContentLoaded", () => {
             //plotColour.className = "color-picker";                        
             //plotColour.value = "red";
             plotColour.style.width = "40px";
-            plotColour.style.marginLeft= "40px";
+            plotColour.style.marginLeft= "10px";//"40px";
             plotColour.title = "Plot colour";
+            plotColour.dataset.name = "colour";
 
             //amplification options(spinner)
             const amplification = document.createElement("input");
@@ -182,7 +276,8 @@ document.addEventListener("DOMContentLoaded", () => {
             amplification.style.width = "40px";
             amplification.title = "Set Amplitude gain (section width=2)";
             amplification.style.marginLeft = "5px";
-            amplification.className = "no-spin";
+            //amplification.className = "no-spin";
+            amplification.dataset.name = "amplification";
 
             //plot direction
             const plotDirection = document.createElement("select");
@@ -190,6 +285,7 @@ document.addEventListener("DOMContentLoaded", () => {
             plotDirection.style.marginLeft = "5px";
             plotDirection.id = numSeries;
             plotDirection.title = "Plot Direction";
+            plotDirection.dataset.name = "direction";
 
             const flipOptNormal = document.createElement("option");
             flipOptNormal.value = "false";
@@ -207,6 +303,7 @@ document.addEventListener("DOMContentLoaded", () => {
             plotTypeDropdown.style.marginLeft = "5px";
             plotTypeDropdown.id = numSeries;
             plotTypeDropdown.title = "Plot type";
+            plotTypeDropdown.dataset.name = "plotType";
 
             //const plotType = ["line", "scatter","bar"];
             const plotType = ["line", "scatter", "bar"];
@@ -222,6 +319,7 @@ document.addEventListener("DOMContentLoaded", () => {
             deleteBtn.textContent = "×";
             deleteBtn.title = "Close plot";
             deleteBtn.style.marginLeft = "10px";
+            deleteBtn.dataset.name = "delete";
             deleteBtn.addEventListener("click", () => {
                 const parentElement = document.getElementById("plot_list");
                 const grandChild = seriesDiv.querySelector("input[type='checkbox']");
@@ -231,8 +329,29 @@ document.addEventListener("DOMContentLoaded", () => {
                 }
                 seriesDiv.remove();
                 updateView();
-                });
+            });
             
+
+            deleteBtn.addEventListener("click", () => {
+                /*
+                const parentElement = document.getElementById("plot_list");
+                const grandChild = seriesDiv.querySelector("input[type='checkbox']");
+                if (grandChild) {
+                    grandChild.checked = false;
+                    parentElement.dispatchEvent(new Event('change'));
+                }
+                */
+
+                seriesDiv.remove();
+                const parentElement = document.getElementById("plot_list");
+                parentElement.dispatchEvent(new Event('change', { bubbles: true }));
+
+                updateView();
+
+                
+                
+            });
+
 
             //stack
             seriesDiv.appendChild(deleteBtn);
@@ -245,8 +364,10 @@ document.addEventListener("DOMContentLoaded", () => {
             seriesDiv.appendChild(amplification);
             seriesDiv.appendChild(plotTypeDropdown);
             seriesDiv.appendChild(plotDirection);
+            seriesDiv.appendChild(axisCheck);
+            seriesDiv.appendChild(axisCheckLabel);
             seriesDiv.appendChild(seriesCheck);
-            
+            seriesDiv.appendChild(seriesCheckLabel);
 
             container.appendChild(seriesDiv);
 
@@ -393,6 +514,20 @@ document.addEventListener("DOMContentLoaded", () => {
                 plotType:"line",
             };
 
+            const visibleCheckbox     = child.querySelector("input[data-name='visible']");
+            const numeratorDropdown   = child.querySelector("select[data-name='numerator']");
+            const denominatorDropdown = child.querySelector("select[data-name='denominator']");
+            const plotColour          = child.querySelector("input[data-name='colour']");
+            const amplification       = child.querySelector("input[data-name='amplification']");
+            const plotTypeDropdown    = child.querySelector("select[data-name='plotType']");
+            const noLabel             = child.querySelector("label[data-name='label']");
+            const plotDirection       = child.querySelector("select[data-name='direction']");
+            const axisCheckbox        = child.querySelector("input[data-name='axisVisible']");
+
+            const parentCollection    = child.querySelector("label[data-name='name']");
+            const splitLabel          = child.querySelector("label[data-name='separator']");
+
+            /*
             const checkbox            = child.querySelector("input[type='checkbox']");
             const numeratorDropdown   = child.querySelector("select:nth-of-type(1)");
             const denominatorDropdown = child.querySelector("select:nth-of-type(2)");
@@ -403,8 +538,10 @@ document.addEventListener("DOMContentLoaded", () => {
             const noLabel             = child.querySelector("label:nth-of-type(1)");
             const splitLabel          = child.querySelector("label:nth-of-type(2)");
             const plotDirection       = child.querySelector("select:nth-of-type(4)");
+            */
             
-            const checkboxValue      = checkbox ? checkbox.checked : null;
+            const visibleValue       = visibleCheckbox ? visibleCheckbox.checked : null;
+            const axisValue          = axisCheckbox ? axisCheckbox.checked : null;
             const numeratorId        = numeratorDropdown ? numeratorDropdown.value : null;
             const denominatorId      = denominatorDropdown ? denominatorDropdown.value : null;
             const collectionId       = parentCollection ? parentCollection.dataset.value : null;
@@ -412,8 +549,7 @@ document.addEventListener("DOMContentLoaded", () => {
             const amplificationValue = amplification ? amplification.value : null;
             const plotType           = plotTypeDropdown ? plotTypeDropdown.value : "line";
             const plotDirectionValue = plotDirection ? (plotDirection.value==="true") : false;
-
-
+            
             //set colour value
             numeratorDropdown.style.color   = colourValue;
             denominatorDropdown.style.color = colourValue;
@@ -425,7 +561,8 @@ document.addEventListener("DOMContentLoaded", () => {
             plotDirection.style.color       = colourValue;
             //plotColour.style.color = colourValue;
 
-            result.isDraw = checkboxValue;
+            result.isDraw        = visibleValue;
+            result.isAxis        = axisValue;
             result.collectionId  = collectionId;
             result.numeratorId   = parseInt(numeratorId);
             result.denominatorId = parseInt(denominatorId);
@@ -459,7 +596,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
             //clear loaded plot data
             await initialiseLCPlotDataCollection();
-            getSelectedData();
+            //getSelectedData();
             updateView();
             //await window.PlotterApi.PlotterClose();
         } 

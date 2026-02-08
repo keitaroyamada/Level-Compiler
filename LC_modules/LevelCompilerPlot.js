@@ -64,15 +64,14 @@ class LevelCompilerPlot {
       return {ok: false, type: 1, reason: "There is no target data."}
     }
 
-    //sort
-    this.sortDataBy("composite_depth");
-    //this.sortDataBy("trinity");
-
     //calc depth
     for (let c = 0; c < this.data_collections.length; c++) {
+
       const dataset = this.data_collections[c];
      
       if(dataset.rows.length==0){continue}
+      const calcType = dataset.rows[0][12];//data source depth
+
       for (let r = 0; r < dataset.rows.length; r++) {
         const data = dataset.rows[r];
         /*
@@ -93,7 +92,7 @@ class LevelCompilerPlot {
         */
 
         //get info
-        const calcType = data[12];
+        
         let targetProjectId = null;
         LCCore.projects.forEach(p=>{
           if(p.name === data[2]){
@@ -157,13 +156,17 @@ class LevelCompilerPlot {
           continue;
         }
       }
+
+      //sort
+      this.sortDataBy(c, calcType);
+
     }
     console.log("LCPlot: Data point CD/EFD/DD/Age are calculated.")
     return {ok: true, type: 0, reason: ""}
   }
 
   
-  sortDataBy(target){
+  sortDataBy(idx=0, target){
    /*
     0 "id"
     1 "name"
@@ -181,32 +184,37 @@ class LevelCompilerPlot {
     13~...dataHeader]
     */
 
-    let targetIdx = 6;
-    if(target == "composite_depth" || target == "trinity"){
-      targetIdx = 6;
-    }else if(target == "event_free_depth"){
-      targetIdx = 7;
-    }else if(target == "age"){
-      targetIdx = 9;
-    }
-
-    this.data_collections.forEach(dataSet => {
+    const dataSet = this.data_collections[idx];
+    if(target == "trinity"){
       dataSet.rows.sort((a, b) => {
-        const x = Number(a[targetIdx]);
-        const y = Number(b[targetIdx]);
-        if (!Number.isFinite(x) && !Number.isFinite(y)) return 0;
-        if (!Number.isFinite(x)) return 1;  
-        if (!Number.isFinite(y)) return -1;
-        return x - y;      
+        if (a.hole !== b.hole) {
+          return a.hole.localeCompare(b.hole);
+        }
+        if (a.section !== b.section) {
+          return a.section.localeCompare(b.section);
+        }
+        return a.distance - b.distance;
       });
-    });
+    }else{
+      let targetIdx = [6];
+      if(target == "composite_depth"){
+        targetIdx = [6];
+      }else if(target == "event_free_depth"){
+        targetIdx = [7];
+      }else if(target == "age"){
+        targetIdx = [9];
+      }
 
-    if(target=="trinity"){
-      this.data_collections.forEach(dataSet => {
+      targetIdx.forEach(ti=>{
         dataSet.rows.sort((a, b) => {
-          return String(a[3] ?? "").localeCompare(String(b[3] ?? ""));        
-        })
-      });
+          const x = Number(a[ti]);
+          const y = Number(b[ti]);
+          if (!Number.isFinite(x) && !Number.isFinite(y)) return 0;
+          if (!Number.isFinite(x)) return 1;  
+          if (!Number.isFinite(y)) return -1;
+          return x - y;      
+        });
+      })
     }
    
     console.log("LCPlot: Plot Data is sorted by "+target);

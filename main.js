@@ -3123,6 +3123,14 @@ function createMainWIndow() {
         globalTempData = null;
         return res
       }else if(options.outType == "import"){
+        if (options.sourceType == "age"){
+          //check age model exist
+          if(LCAge.AgeModels.length == 0 || !LCAge.selected_id){
+            //there is no selected age model
+            return {ok:false, reason: "No age model found. Please load an age model first."}
+          }          
+        }
+        
         progressBar = progressDialog(converterWindow, "Depth Converter", "Now importing...", true);
         await new Promise((resolve) => {
           progressBar.on("ready", resolve);
@@ -3846,10 +3854,10 @@ function createMainWIndow() {
         //calc each depth 
         let send_data = [];
         let td = new Trinity();
-        td.name         = data[0];
-        td.project_name = data[1][0];
-        td.hole_name    = data[1][1];
-        td.section_name = data[1][2];
+        td.name         = String(data[0]).trim();
+        td.project_name = String(data[1][0]).trim();
+        td.hole_name    = String(data[1][1]).trim();
+        td.section_name = String(data[1][2]).trim();
         td.distance     = parseFloat(data[1][3]);
         if(td.hole_name==null||td.section_name==null||td.distance==null){
           continue
@@ -5136,6 +5144,12 @@ function progressDialog(window, tit, txt, indeterminate){
 async function updateProgress(progress, n, N){
   if (!progress) return null;
 
+  const now = Date.now();
+  if (n < N && progress._lastUpdate && now - progress._lastUpdate < 100) {
+    return progress;
+  }
+  progress._lastUpdate = now;
+
   try{
     const w = progress._window;
     if (w && !w.isDestroyed()){
@@ -5154,6 +5168,8 @@ async function updateProgress(progress, n, N){
     const pct = (n / N) * 100;
     progress.value = pct;
     progress.detail = "Please wait..." + n + "/" + N + "  (" + lcfnc.round(pct, 2) + "%)";
+
+    await new Promise(resolve => setTimeout(resolve, 0));
 
     if (n >= N) {
       if (!progress.isCompleted()) {
