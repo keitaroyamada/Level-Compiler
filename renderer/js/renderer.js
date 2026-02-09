@@ -1020,6 +1020,30 @@ document.addEventListener("DOMContentLoaded", () => {
           //calc divided values
           const dividedDataSeries = dividePlotData(numeratorDataSeries, denominatorDataSeries);
 
+          //resample
+          /*
+          const bin_width = target.resampleWidth;
+          if(bin_width>0){
+            if(dividedDataSeries[0].data.composite_depth){
+              //if CD exist
+              dividedDataSeries[0].data.sort(
+                (a, b) => a.composite_depth - b.composite_depth
+              );
+            }else{
+              //if no CD
+              dividedDataSeries[0].data.sort(
+                (a, b) => a.drilling_depth - b.drilling_depth
+              );
+            }
+            
+            //resample
+            const resampledDataset = resamplePointData(dividedDataSeries, [bin_width], objOpts);
+            const sortedDataset = sortDataSetRowsByModelOrder(resampledDataset, LCCore);
+
+            dividedDataSeries[0] = sortedDataset;
+               console.log(dividedDataSeries)
+          }
+
           //resample based on zoom level1
           /*
           if(objOpts.plot.use_resample_by_scale){
@@ -3962,6 +3986,9 @@ document.addEventListener("DOMContentLoaded", () => {
           }
         }
 
+        //To avoid errors
+        objOpts.canvas.zoom_level = [4, 3];
+
         console.log("[Renderer]: Settings are loaded.", objOpts)        
       }  
     }    
@@ -4050,20 +4077,7 @@ document.addEventListener("DOMContentLoaded", () => {
   });
   //============================================================================================
   //mouse move position event
-  document.addEventListener("click", async function (event) {
-    let rect = document.getElementById("p5Canvas").getBoundingClientRect(); // Canvas position and size  
-    var mouseX = event.clientX - rect.left;
-    var mouseY = event.clientY - rect.top;
 
-    //hittest
-    const ht = JSON.parse(JSON.stringify(getClickedItemIdx(mouseX, mouseY, LCCore, objOpts)));
-    objOpts.edit.hittest = ht;
-
-    //update mouse position
-    mousePos = [mouseX, mouseY];
-
-    updateView();
-  })
   document.addEventListener("mousemove", async function (event) {
     if(!LCCore){return}
 
@@ -4630,8 +4644,11 @@ document.addEventListener("DOMContentLoaded", () => {
         
         const gridStepY = fitScaler(objOpts.canvas.zoom_level[1], yMag / age_mod); //pix
 
-        const gridMaxY = parseInt(canvasBase.style.height.match(/\d+/)[0], 10);
-        const gridMaxX = parseInt(canvasBase.style.width.match(/\d+/)[0], 10);
+        //const gridMaxY = parseInt(canvasBase.style.height.match(/\d+/)[0], 10);
+        //const gridMaxX = parseInt(canvasBase.style.width.match(/\d+/)[0], 10);
+        const gridMaxY = parseInt(getComputedStyle(canvasBase).height, 10);
+        const gridMaxX = parseInt(getComputedStyle(canvasBase).width, 10);
+
 
         const gridMinY = objOpts.canvas.shift_y; //pix
 
@@ -8516,6 +8533,7 @@ function drawPointData(data=null, LCCore=null){
   return output;
 }
 function resamplePointData(inDataset, th, objOpts){
+  //resample top dataset
   const numeratorDataset1 = drawPointDataset();
 
   let idxs = [];
@@ -9097,6 +9115,54 @@ function equalName(a, b) {
     return Number(a) === Number(b);
   }
   return String(a) === String(b);
+}
+function sortDataSetRowsByModelOrder(dataSet, LCCore){
+  // sort order based on model
+  const order = {};
+  LCCore.projects.forEach(project=>{
+    project.holes.forEach(hole=>{
+      order[hole.name] = [];
+      hole.sections.forEach(sec=>{
+        order[hole.name].push(sec.name);
+      });
+    });
+  });
+
+  const holeOrder = Object.keys(order);
+  const holeIndex = new Map(holeOrder.map((v, i) => [v, i]));
+
+  const sectionIndex = {};
+  for (const h in order) {
+    sectionIndex[h] = new Map(order[h].map((v, i) => [v, i]));
+  }
+
+  // sort
+  dataSet.data.sort((a, b) => {
+    const h = (holeIndex.get(a.hname) ?? Infinity) - (holeIndex.get(b.hname) ?? Infinity);
+    if (h !== 0) return h;
+
+    const s = (sectionIndex[a.hname]?.get(a.sname) ?? Infinity) - (sectionIndex[b.hname]?.get(b.sname) ?? Infinity);
+    if (s !== 0) return s;
+
+    return a.dist - b.dist;
+  });
+
+  //update map
+  dataSet.depth_map = {
+    drilling_depth: [],
+    composite_depth: [],
+    event_free_depth: [],
+    age: []
+  }
+
+  dataSet.data.forEach((d, i)=>{
+    dataSet.depth_map.drilling_depth.push({idx: i, value: d.drilling_depth});
+    dataSet.depth_map.composite_depth.push({idx: i, value: d.composite_depth});
+    dataSet.depth_map.event_free_depth.push({idx: i, value: d.event_free_depth});
+    dataSet.depth_map.age.push({idx: i, value: d.age});
+  })
+  
+  return dataSet
 }
 
 

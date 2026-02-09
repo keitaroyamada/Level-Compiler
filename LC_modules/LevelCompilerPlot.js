@@ -188,41 +188,7 @@ class LevelCompilerPlot {
     console.log(target)
     if(target == "trinity"){
       //sort based on model
-      const order    = {};
-      LCCore.projects.forEach(project=>{
-        project.holes.forEach(hole=>{
-          order[hole.name] = [];
-          hole.sections.forEach(sec=>{
-            order[hole.name].push(sec.name);
-          })
-        })
-      })
-      const holeOrder = Object.keys(order);
-      const holeIndex = new Map(holeOrder.map((v, i) => [v, i]));
-
-      const sectionIndex = {};
-      for (const h in order) {
-        sectionIndex[h] = new Map(order[h].map((v, i) => [v, i]));
-      }
-
-      //sort
-      dataSet.rows.sort((a, b) => {
-        // hole
-        const h =
-          (holeIndex.get(a[3]) ?? Infinity) -
-          (holeIndex.get(b[3]) ?? Infinity);
-        if (h !== 0) return h;
-
-        // section（each hole）
-        const s =
-          (sectionIndex[a[3]]?.get(a[4]) ?? Infinity) -
-          (sectionIndex[b[3]]?.get(b[4]) ?? Infinity);
-        if (s !== 0) return s;
-
-        // distance
-        return a[5] - b[5];
-      });
-
+      this.sortDataSetRowsByModelOrder(dataSet, LCCore);
     }else if(target == "trinity_name"){
       dataSet.rows.sort((a, b) => {
         if (a[3] !== b[3]) {
@@ -256,6 +222,44 @@ class LevelCompilerPlot {
     }
    
     console.log("LCPlot: Plot Data is sorted by "+target);
+  }
+
+  sortDataSetRowsByModelOrder(dataSet, LCCore){
+    // sort order based on model
+    const order = {};
+    LCCore.projects.forEach(project=>{
+      project.holes.forEach(hole=>{
+        order[hole.name] = [];
+        hole.sections.forEach(sec=>{
+          order[hole.name].push(sec.name);
+        });
+      });
+    });
+
+    const holeOrder = Object.keys(order);
+    const holeIndex = new Map(holeOrder.map((v, i) => [v, i]));
+
+    const sectionIndex = {};
+    for (const h in order) {
+      sectionIndex[h] = new Map(order[h].map((v, i) => [v, i]));
+    }
+
+    // sort
+    dataSet.rows.sort((a, b) => {
+      const h =
+        (holeIndex.get(a[3]) ?? Infinity) -
+        (holeIndex.get(b[3]) ?? Infinity);
+      if (h !== 0) return h;
+
+      const s =
+        (sectionIndex[a[3]]?.get(a[4]) ?? Infinity) -
+        (sectionIndex[b[3]]?.get(b[4]) ?? Infinity);
+      if (s !== 0) return s;
+
+      return a[5] - b[5];
+    });
+
+    return dataSet;
   }
 
   /*  sortDataBy(target) {
