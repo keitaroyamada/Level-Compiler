@@ -3977,17 +3977,26 @@ document.addEventListener("DOMContentLoaded", () => {
         console.log("[Renderer]: Beta-format settings detected. Replacing with the current version.", settings)
       }else{
         //case: same version (or app is older than saved settings)
+        const updateDeny = new Set([
+          "canvas.zoom_level" //To avoid errors
+        ]);
         for (const k in data) {
           if (!objOpts[k]) continue;
+
           if (typeof data[k] === "object" && typeof objOpts[k] === "object") {
-            Object.assign(objOpts[k], data[k]);
+
+            const filtered = {};
+            for (const subk in data[k]) {
+              if (updateDeny.has(`${k}.${subk}`)) continue;
+              filtered[subk] = data[k][subk];
+            }
+
+            Object.assign(objOpts[k], filtered);
+
           } else {
             objOpts[k] = data[k];
           }
         }
-
-        //To avoid errors
-        objOpts.canvas.zoom_level = [4, 3];
 
         console.log("[Renderer]: Settings are loaded.", objOpts)        
       }  
