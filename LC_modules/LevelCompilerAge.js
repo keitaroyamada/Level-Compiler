@@ -117,6 +117,12 @@ class LevelCompilerAge {
         ageData.trinityData.section_name = lcfnc.zeroPadding(csv_data[r][2]); //section
         ageData.trinityData.distance     = parseFloat(csv_data[r][3]); //distance
 
+        //calc idex
+        let ageDataIdx = LCCore.getIdxFromTrinity(targetProjectId, [ageData.trinityData.hole_name, ageData.trinityData.section_name, ageData.trinityData.distance]);
+        ageData.pidx = ageDataIdx[0];
+        ageData.hidx = ageDataIdx[1];
+        ageData.sidx = ageDataIdx[2];
+
         //calc EFD
         const [[sectionId, efd, rank]] = LCCore.getDepthFromTrinity(targetProjectId, [ageData.trinityData],"event_free_depth");
         if (isNaN(efd)) {
@@ -295,6 +301,12 @@ class LevelCompilerAge {
       for(let a=0;a<this.AgeModels[m].ages.length;a++){
         const ageData = this.AgeModels[m].ages[a];
         if(ageData.original_depth_type == "trinity"){
+          //calc idex
+          let ageDataIdx = LCCore.getIdxFromTrinity(LCCore.base_project_id, [ageData.trinityData.hole_name, ageData.trinityData.section_name, ageData.trinityData.distance]);
+          ageData.pidx = ageDataIdx[0];
+          ageData.hidx = ageDataIdx[1];
+          ageData.sidx = ageDataIdx[2];
+          
           //case trinity data
           const efdData = LCCore.getDepthFromTrinity([null,null,null,null], [ageData.trinityData], "event_free_depth");
           const cdData  = LCCore.getDepthFromTrinity([null,null,null,null], [ageData.trinityData], "composite_depth");
@@ -315,6 +327,16 @@ class LevelCompilerAge {
           const efdval = LCCore.getEFDfromCD(ageData.composite_depth);
           if (efdval !== NaN) {
             ageData.event_free_depth = efdval;
+            //calc idex
+            let pidx = null;
+            for(let p=0; p<LCCore.projects.length;p++){
+              if(LCCore.projects[p].name == LCCore.base_project_id){
+                pidx = p;
+              }
+            }
+            ageData.pidx = pidx;
+            ageData.hidx = null;
+            ageData.sidx = null;
           } else {
             console.log("Comsposite depth is out of model definition. :" + csv_data[r][0]);
           }

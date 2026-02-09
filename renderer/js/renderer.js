@@ -140,7 +140,7 @@ document.addEventListener("DOMContentLoaded", () => {
     objOpts.marker.ignore_zoom_level = 0.4;
     objOpts.marker.font = "Arial";
     objOpts.marker.font_size = 12;
-    objOpts.marker.font_colour = "#000000";
+    objOpts.marker.font_colour = "#414141";
     
     objOpts.event.line_colour = "#ff0000";
     objOpts.event.face_colour = {
@@ -190,6 +190,10 @@ document.addEventListener("DOMContentLoaded", () => {
     objOpts.age.age_precision = 0;
     objOpts.age.incon_size = 20;
     objOpts.age.alt_radius = 3;     
+    objOpts.age.show_age_name = false;
+    objOpts.age.font_colour = "#000000";
+    objOpts.age.font = "Arial";
+    objOpts.age.font_size = 15;
     objOpts.age.incon_list = {
       terrestrial: ["", "#008000"],
       terrestrial_unreliable: ["", "#008000"],
@@ -4046,6 +4050,20 @@ document.addEventListener("DOMContentLoaded", () => {
   });
   //============================================================================================
   //mouse move position event
+  document.addEventListener("click", async function (event) {
+    let rect = document.getElementById("p5Canvas").getBoundingClientRect(); // Canvas position and size  
+    var mouseX = event.clientX - rect.left;
+    var mouseY = event.clientY - rect.top;
+
+    //hittest
+    const ht = JSON.parse(JSON.stringify(getClickedItemIdx(mouseX, mouseY, LCCore, objOpts)));
+    objOpts.edit.hittest = ht;
+
+    //update mouse position
+    mousePos = [mouseX, mouseY];
+
+    updateView();
+  })
   document.addEventListener("mousemove", async function (event) {
     if(!LCCore){return}
 
@@ -4089,7 +4107,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
     //update mouse position
     mousePos = [mouseX, mouseY];
-
   });
   document.querySelector('.hole_menu').addEventListener('mousedown', (e) => {
     isHoleMenuDragging = true;
@@ -5778,71 +5795,127 @@ document.addEventListener("DOMContentLoaded", () => {
           let startIndex = binarySearchIndex(ageList, searchTop, (d) => d[objOpts.canvas.depth_scale]);
           let endIndex   = binarySearchIndex(ageList, searchBot, (d) => d[objOpts.canvas.depth_scale]);
 
-          for (let a = startIndex; a < endIndex; a++) {    
-            let pData = {
-              type: ageList[a].data_type ? ageList[a].data_type : "", //used
-              amplification_x: 1,//used
-              amplification_y: 1, //used
-              original_depth_type: ageList[a].original_depth_type,//used
+          //convert age point
+          let val_max = -Infinity;
+          let val_min = Infinity;
+          const ageDataSet = drawPointDataset();
+          for (let a = startIndex; a < endIndex; a++) {   
+            //set values
+            const ageData = drawPointData();
+            ageData.id          = ageList[a].id;
+            ageData.enable      = ageList[a].enable;
+            ageData.reliable    = ageList[a].reliable;
+            ageData.age         = ageList[a].age_mid;
+            ageData.name        = ageList[a].name;
+            ageData.type        = ageList[a].data_type;
+            ageData.source_type = ageList[a].source_type;//e.g. tephra
+            ageData.source_code = ageList[a].source_code;//e.g. c4
+            ageData.unit        = ageList[a].unit;
+            ageData.source      = ageList[a].original_depth_type;
 
-              x: ageList[a].age_mid, //used
-              min_x:NaN,
+            ageData.hname = ageList[a].original_depth_type=="trinity" ? ageList[a].trinityData.hole_name    : null;
+            ageData.sname = ageList[a].original_depth_type=="trinity" ? ageList[a].trinityData.section_name : null;
+            ageData.dist  = ageList[a].original_depth_type=="trinity" ? ageList[a].trinityData.distance     : null;
+            ageData.pidx  = ageList[a].pidx;
+            ageData.hidx  = ageList[a].hidx;
+            ageData.sidx  = ageList[a].sidx;
 
-              hole_name:    ageList[a].original_depth_type=="trinity" ? ageList[a].trinityData.hole_name    : null, //used
-              section_name: ageList[a].original_depth_type=="trinity" ? ageList[a].trinityData.section_name : null,
-              distance:     ageList[a].original_depth_type=="trinity" ? ageList[a].trinityData.distance     : null,
-              composite_depth: ageList[a].composite_depth,//used
-              evemnt_free_depth: ageList[a].event_free_depth,//used
-              age: ageList[a].age_mid,//used
-            } 
+            ageData.drilling_depth  = ageList[a].drilling_depth;
+            ageData.composite_depth = ageList[a].composite_depth;
+            ageData.event_free_depth= ageList[a].event_free_depth;
+           
+            //calc max/min
+            if (Number.isFinite(ageData.age)){
+              if(ageData.age < val_min){
+                val_min = ageData.age;
+              }
 
-            const result = getPlotPosiotion( pData, LCCore, objOpts);
+              if(ageData.age > val_max){
+                val_max = ageData.age;
+              }
+            }
 
-            const posX = result.pos_canvas_x;
-            const posY = result.pos_canvas_y;
+            //submit
+            ageDataSet.data.push(ageData);
+            ageDataSet.depth_map.drilling_depth.push({idx:a, value:ageData.drilling_depth });
+            ageDataSet.depth_map.composite_depth.push({idx:a, value:ageData.composite_depth});
+            ageDataSet.depth_map.event_free_depth.push({idx:a, value:ageData.event_free_depth});
+            ageDataSet.depth_map.age.push({idx:a, value:ageData.age});
+          }
 
-            //plot main
-            if (ageList[a].source_type == "" || agePlotIcons[ageList[a].source_type] == undefined) {
+          //set max/min
+          ageDataSet.min = val_max;
+          ageDataSet.min = val_min;
+
+          //calc draw position
+          const drawDataSet = calcDrawPosition(ageDataSet, LCCore, objOpts, null);
+ 
+          //draw age point main
+          for(let d=0; d<drawDataSet.data.length; d++){
+            const drawData = drawDataSet.data[d];
+            
+            if (drawData.source_type == "" || agePlotIcons[drawData.source_type] == undefined) {
+              //case: Unknown source type
               sketch.image(
                 agePlotIcons["none"],
-                posX,
-                posY,
+                drawData.pos_x,
+                drawData.pos_y,
                 objOpts.age.incon_size,
                 objOpts.age.incon_size
               );
-            } else { 
-              if(ageList[a].enable==true){
-                if(ageList[a].reliable == true){
+            } else {
+              //case: known source type
+              if(drawData.enable==true){
+                //case: enable data
+                if(drawData.reliable == true){
+                  //case: reliable(normal data)
                   sketch.image(
-                    agePlotIcons[ageList[a].source_type],
-                    posX,
-                    posY,
+                    agePlotIcons[drawData.source_type],
+                    drawData.pos_x,
+                    drawData.pos_y,
                     objOpts.age.incon_size,
                     objOpts.age.incon_size
                   );
                 }else{
+                  //case: unreliable(reversed data, but used for age model)
                   sketch.image(
-                    agePlotIcons[ageList[a].source_type+"_unreliable"],
-                    posX,
-                    posY,
+                    agePlotIcons[drawData.source_type+"_unreliable"],
+                    drawData.pos_x,
+                    drawData.pos_y,
                     objOpts.age.incon_size,
                     objOpts.age.incon_size
                   );
                 }
               }else{
+                //case: disable data(reversed data, not used for age model)
                 sketch.image(
-                  agePlotIcons[ageList[a].source_type+"_disable"],
-                  posX,
-                  posY,
+                  agePlotIcons[drawData.source_type+"_disable"],
+                  drawData.pos_x,
+                  drawData.pos_y,
                   objOpts.age.incon_size,
                   objOpts.age.incon_size
                 );
-              }                
+              }     
+              
+              if(objOpts.age.show_age_name){
+                sketch.push();
+                sketch.fill(objOpts.age.font_colour);
+                sketch.noStroke();
+                sketch.textFont(objOpts.age.font);
+                sketch.textSize(objOpts.age.font_size);
+
+                sketch.text(
+                  drawData.name, 
+                  drawData.pos_x+objOpts.age.incon_size+10, 
+                  drawData.pos_y+objOpts.age.incon_size*0.7
+                );
+                sketch.pop();
+              }
+
               
             }
           }
-        }
-        
+        }        
       }
       
       //==========================================================================================
@@ -5913,8 +5986,8 @@ document.addEventListener("DOMContentLoaded", () => {
               const searchBot  = scrollerBotRealScale + bufferVal;
               //if changed resample option after plotted, depth_map error
               const depthArr   = drawDataset.depth_map[objOpts.canvas.depth_scale]; 
-              const startIndex = binarySearchIndex(depthArr, searchTop, (e) => e.value);
-              const endIndex   = binarySearchIndex(depthArr, searchBot, (e) => e.value);
+              let startIndex = binarySearchIndex(depthArr, searchTop, (e) => e.value);
+              let endIndex   = binarySearchIndex(depthArr, searchBot, (e) => e.value);
 
               const targetIdxs = depthArr.slice(startIndex, endIndex).map(e => e.idx).sort((a, b) => a - b);
               const numPoints = targetIdxs.length;
@@ -8093,7 +8166,7 @@ function getClickedItemIdx(mouseX, mouseY, LCCore, objOpts){
 
   let results = {
     x:x, 
-    y:y, 
+    y:y, //real scale
     relative_x:null,
     relative_y:null,
     raw_x:mouseX,
@@ -8914,6 +8987,7 @@ function dividePlotData(numeratorDataSeries, denominatorDataSeries){
   }
   return dividedDataSeries
 }
+
 function calcDrawPosition(drawPointDataset, LCCore, objOpts, pOptions){
   if(drawPointDataset.data.length==0){
     console.log("[Renderer]: There is no target point data.")
@@ -8921,7 +8995,7 @@ function calcDrawPosition(drawPointDataset, LCCore, objOpts, pOptions){
   }
 
   //initialise
-  const isFlip = pOptions.isFlip ? pOptions.isFlip : false;
+  const isFlip = pOptions?.isFlip ? pOptions.isFlip : false;
   const xMag  = objOpts.canvas.zoom_level[0] * objOpts.canvas.dpir;
   let yMag    = objOpts.canvas.zoom_level[1] * objOpts.canvas.dpir;
   const pad_x = objOpts.canvas.pad_x;
@@ -8935,7 +9009,7 @@ function calcDrawPosition(drawPointDataset, LCCore, objOpts, pOptions){
 
   const val_min = drawPointDataset.min;
   const val_max = drawPointDataset.max;
-  const amp     = [(objOpts.hole.width / 2) * pOptions.amplification / (val_max - val_min), 1];
+  const amp     = pOptions?.amplification ? [(objOpts.hole.width / 2) * pOptions.amplification / (val_max - val_min), 1] : 1;
 
   //get enable hole num
   let numEnable  = 0;

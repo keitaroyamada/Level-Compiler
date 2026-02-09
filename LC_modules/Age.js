@@ -16,8 +16,13 @@ class Age {
     this.data_type = "age";
     this.trinityData = new Trinity();
     this.section_id = [null, null, null, null];
+    this.Drilling_depth = null;
     this.composite_depth = null;
     this.event_free_depth = null;
+
+    this.pidx = null;
+    this.hidx = null;
+    this.sidx = null;
 
     this.source_type = "general"; //"general", "terrestrial", "marine", "tephra", "orbital", "climate"
     this.source_code = "";

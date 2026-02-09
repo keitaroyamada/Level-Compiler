@@ -277,7 +277,7 @@ function createMainWIndow() {
     LCAge.selected_id = age_id;
 
     //get model name
-    const ageModel = LCAge.getModelData();
+    const ageModel = LCAge.getModelData(); 
     if (ageModel == null) {
       return null;
     }

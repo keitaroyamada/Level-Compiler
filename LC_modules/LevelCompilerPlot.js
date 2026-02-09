@@ -158,7 +158,7 @@ class LevelCompilerPlot {
       }
 
       //sort
-      this.sortDataBy(c, calcType);
+      this.sortDataBy(LCCore, c, calcType);
 
     }
     console.log("LCPlot: Data point CD/EFD/DD/Age are calculated.")
@@ -166,7 +166,7 @@ class LevelCompilerPlot {
   }
 
   
-  sortDataBy(idx=0, target){
+  sortDataBy(LCCore, idx=0, target){
    /*
     0 "id"
     1 "name"
@@ -185,15 +185,53 @@ class LevelCompilerPlot {
     */
 
     const dataSet = this.data_collections[idx];
+    console.log(target)
     if(target == "trinity"){
+      //sort based on model
+      const order    = {};
+      LCCore.projects.forEach(project=>{
+        project.holes.forEach(hole=>{
+          order[hole.name] = [];
+          hole.sections.forEach(sec=>{
+            order[hole.name].push(sec.name);
+          })
+        })
+      })
+      const holeOrder = Object.keys(order);
+      const holeIndex = new Map(holeOrder.map((v, i) => [v, i]));
+
+      const sectionIndex = {};
+      for (const h in order) {
+        sectionIndex[h] = new Map(order[h].map((v, i) => [v, i]));
+      }
+
+      //sort
       dataSet.rows.sort((a, b) => {
-        if (a.hole !== b.hole) {
-          return a.hole.localeCompare(b.hole);
+        // hole
+        const h =
+          (holeIndex.get(a[3]) ?? Infinity) -
+          (holeIndex.get(b[3]) ?? Infinity);
+        if (h !== 0) return h;
+
+        // section（each hole）
+        const s =
+          (sectionIndex[a[3]]?.get(a[4]) ?? Infinity) -
+          (sectionIndex[b[3]]?.get(b[4]) ?? Infinity);
+        if (s !== 0) return s;
+
+        // distance
+        return a[5] - b[5];
+      });
+
+    }else if(target == "trinity_name"){
+      dataSet.rows.sort((a, b) => {
+        if (a[3] !== b[3]) {
+          return a[3].localeCompare(b[3]);
         }
-        if (a.section !== b.section) {
-          return a.section.localeCompare(b.section);
+        if (a[4] !== b[4]) {
+          return a[4].localeCompare(b[4]);
         }
-        return a.distance - b.distance;
+        return a[5] - b[5];
       });
     }else{
       let targetIdx = [6];
