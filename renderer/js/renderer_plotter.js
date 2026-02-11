@@ -254,17 +254,17 @@ document.addEventListener("DOMContentLoaded", () => {
             })
 
             //resample options(spinner)
-            //const resample = document.createElement("input");
-            //resample.type  = "number";
-            //resample.id    = numSeries;
-            //resample.placeholder = 1;
-            //resample.value = 0;
-            //resample.min  = 0;
-            //resample.style.width = "40px";
-            //resample.title = "Set Resample Width (cm)";
-            //resample.style.marginLeft = "5px";
+            const resample = document.createElement("input");
+            resample.type  = "number";
+            resample.id    = numSeries;
+            resample.placeholder = 1;
+            resample.value = 0;
+            resample.min  = 0;
+            resample.style.width = "40px";
+            resample.title = "Set Resample Width (cm)";
+            resample.style.marginLeft = "5px";
             //amplification.className = "no-spin";
-            //resample.dataset.name = "resample";
+            resample.dataset.name = "resample";
 
             //plot colour options
             const plotColour = document.createElement("input");
@@ -372,7 +372,7 @@ document.addEventListener("DOMContentLoaded", () => {
             seriesDiv.appendChild(numeratorDropdown);
             seriesDiv.appendChild(separatorlabel);
             seriesDiv.appendChild(denominatorDropdown);
-            //seriesDiv.appendChild(resample);
+            seriesDiv.appendChild(resample);
             seriesDiv.appendChild(plotColour);
             seriesDiv.appendChild(serieslabel);
             seriesDiv.appendChild(amplification);
@@ -532,7 +532,7 @@ document.addEventListener("DOMContentLoaded", () => {
             const visibleCheckbox     = child.querySelector("input[data-name='visible']");
             const numeratorDropdown   = child.querySelector("select[data-name='numerator']");
             const denominatorDropdown = child.querySelector("select[data-name='denominator']");
-            //const resample            = child.querySelector("input[data-name='resample']");
+            const resample            = child.querySelector("input[data-name='resample']");
             const plotColour          = child.querySelector("input[data-name='colour']");
             const amplification       = child.querySelector("input[data-name='amplification']");
             const plotTypeDropdown    = child.querySelector("select[data-name='plotType']");
@@ -565,7 +565,7 @@ document.addEventListener("DOMContentLoaded", () => {
             const amplificationValue = amplification ? amplification.value : null;
             const plotType           = plotTypeDropdown ? plotTypeDropdown.value : "line";
             const plotDirectionValue = plotDirection ? (plotDirection.value==="true") : false;
-            //const resampleWidth      = resample ? resample.value : null;
+            const resampleWidth      = resample ? resample.value : null;
             
             //set colour value
             numeratorDropdown.style.color   = colourValue;
@@ -576,7 +576,7 @@ document.addEventListener("DOMContentLoaded", () => {
             plotTypeDropdown.style.color    = colourValue;
             amplification.style.color       = colourValue;
             plotDirection.style.color       = colourValue;
-            //resample.style.color            = colourValue;
+            resample.style.color            = colourValue;
             //plotColour.style.color = colourValue;
 
             result.isDraw        = visibleValue;
@@ -589,7 +589,7 @@ document.addEventListener("DOMContentLoaded", () => {
             result.amplification = parseFloat(amplificationValue);
             result.plotType      = plotType;
             result.isFlip        = plotDirectionValue;
-            //result.resampleWidth = parseFloat(resampleWidth);
+            result.resampleWidth = parseFloat(resampleWidth);
 
             results.push(result);
         });

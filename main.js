@@ -1280,6 +1280,19 @@ function createMainWIndow() {
               },
             ]
           }, 
+          {
+            label:"Calc",
+            submenu:[
+              { 
+                label: 'Calc Composite Depth', 
+                click: () => {
+                  console.log('MAIN: Recalc composite depth'); 
+                  resolve("calcCD"); 
+                 
+                } 
+              },
+            ]
+          },
           { type: 'separator' },
           {
             label:"Image",
@@ -4197,10 +4210,10 @@ function createMainWIndow() {
       return null;
     }
   }
-  function registerAgeFromCsv(fullpath){
+  function registerAgeFromCsv(fullpath, type="LC"){
     try{
       // loadAgeFromCsv
-      LCAge.loadAgeFromCsv(LCCore, fullpath);
+      LCAge.loadAgeFromCsv(LCCore, fullpath, type);
       //apply latest age model to the depth model
 
       //register        
@@ -4208,6 +4221,7 @@ function createMainWIndow() {
       console.log("MAIN: Registered age model from " + fullpath);
 
       return true
+      
     }catch(err){
       console.log(err)
     }
@@ -4462,10 +4476,12 @@ function createMainWIndow() {
               {
                 label: "Import Age Model for Level Finder",
                 click: async() => {
-                  const fullpath = await getfile(mainWindow, "Please Chose Age Model (for LF)", [{name: "CSV file", extensions: ["csv"]}]);
+                  const fullpath = await getfile(mainWindow, "Please chose Age model CSV file", [{name: "CSV file", extensions: ["csv"]}]);
                   if(fullpath){
-                    console.log("MAIN: Import age model for Level Finder from", fullpath)
-                    mainWindow.webContents.send("ImportAgeModelForLFMenuClicked");
+                    console.log(fullpath)
+                    //register
+                    registerAgeFromCsv(fullpath, "LF");
+                    mainWindow.webContents.send("UpdateViewFromMain");
                   }
                 },
               },

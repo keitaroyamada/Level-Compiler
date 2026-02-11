@@ -171,8 +171,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
     objOpts.plot.is_visible = false;
     objOpts.plot.is_draw_axis = true;
-    //objOpts.plot.use_resample_by_scale = false;// To enable this option, adjustments arising from data sorting are required.
+    objOpts.plot.use_resample_method = "block";//"block", "moving"
     objOpts.plot.barplot_width = 1;
+    objOpts.plot.scatterplot_size = 3;
     objOpts.plot.lineplot_stroke = 1;
     objOpts.plot.lineplot_split_sections = true;
     objOpts.plot.lineplot_ignore_invalid = true;
@@ -1021,42 +1022,28 @@ document.addEventListener("DOMContentLoaded", () => {
           const dividedDataSeries = dividePlotData(numeratorDataSeries, denominatorDataSeries);
 
           //resample
-          /*
           const bin_width = target.resampleWidth;
           if(bin_width>0){
-            if(dividedDataSeries[0].data.composite_depth){
-              //if CD exist
-              dividedDataSeries[0].data.sort(
-                (a, b) => a.composite_depth - b.composite_depth
-              );
-            }else{
-              //if no CD
-              dividedDataSeries[0].data.sort(
-                (a, b) => a.drilling_depth - b.drilling_depth
-              );
-            }
             
-            //resample
-            const resampledDataset = resamplePointData(dividedDataSeries, [bin_width], objOpts);
+            let resampledDataset;
+            if(objOpts.plot.use_resample_method=="moving"){
+              //moving averaging
+              resampledDataset = movingAvPointData(dividedDataSeries, [bin_width], objOpts);
+            }else{
+              //block averaging
+              resampledDataset = resamplePointData(dividedDataSeries, [bin_width], objOpts);
+            }
+
+            0
             const sortedDataset = sortDataSetRowsByModelOrder(resampledDataset, LCCore);
 
-            dividedDataSeries[0] = sortedDataset;
-               console.log(dividedDataSeries)
-          }
+            //fix max/min
+            sortedDataset.min = dividedDataSeries[0].min;
+            sortedDataset.max = dividedDataSeries[0].max;
 
-          //resample based on zoom level1
-          /*
-          if(objOpts.plot.use_resample_by_scale){
-            for (let t=0; t<th.length; t++){                          
-              //if resample option is true, add resample data
-              //if use this function, input dataseries must be sort by the depth scale
-              const resampledDataset = resamplePointData(dividedDataSeries, th[t], objOpts)
-              resampledDataset.zoom_level = t + 1;
-              //submit
-              dividedDataSeries.push(resampledDataset);
-            }
+            dividedDataSeries[0] = sortedDataset;//overwrite
+            dividedDataSeries[0].is_resampled = true;
           }
-          */
 
           //2. sort dataset map by composite depth(if not exist, keep original order)
           dividedDataSeries.forEach(dividedData => {
@@ -1358,6 +1345,8 @@ document.addEventListener("DOMContentLoaded", () => {
         objOpts.edit.handleClick = null;
       }
       document.addEventListener("mousemove", objOpts.edit.handleMove);
+    }else if(clickResult == "calcCD"){
+      await loadModel(true, true);
     }else if(clickResult == "deleteMarker"){
       objOpts.edit.contextmenu_enable = false;
       objOpts.edit.hittest = null;
@@ -6226,6 +6215,9 @@ document.addEventListener("DOMContentLoaded", () => {
               let isPlotting = false;
               let objCounts  = 0;
               let linePlotStroke = objOpts.plot.lineplot_stroke;
+              if(drawDataset.is_resampled){
+                linePlotStroke += 1;
+              }
               const numCut = 2000;
               //main roop
               for(let d=0; d<drawData.data.length; d++){
@@ -6297,7 +6289,7 @@ document.addEventListener("DOMContentLoaded", () => {
                   if (!isPlotting) {
                     sketch.beginShape(sketch.POINTS);
                     sketch.stroke(pOptions.colour);
-                    sketch.strokeWeight(3);
+                    sketch.strokeWeight(objOpts.plot.scatterplot_size);
                     isPlotting = true;
                   }
 
@@ -8455,6 +8447,7 @@ function drawPointDataset(){
     zoom_level: 0,
     max: null,
     min: null,
+    is_resampled: false,
 
     data: [],
     depth_map:{
@@ -8846,6 +8839,143 @@ function resamplePointData(inDataset, th, objOpts){
 
   return numeratorDataset1;
 }
+function movingAvPointData(inDataset, th, objOpts){
+  //resample top dataset
+  const numeratorDataset1 = drawPointDataset();
+
+  let val_max = -Infinity;
+  let val_min = Infinity;
+
+  const half = th / 2;
+
+  for(let d=0; d<inDataset[0].data.length; d++){
+
+    const currProjName = inDataset[0].data[d].pname;
+    const currHoleName = inDataset[0].data[d].hname;
+    const currSecName  = inDataset[0].data[d].sname;
+
+    const currPos = inDataset[0].data[d][objOpts.canvas.depth_scale];
+    const posMin  = currPos - half;
+    const posMax  = currPos + half;
+
+    // ---- centre ----
+    let idxs = [];
+
+    // backward
+    for(let i=d; i>=0; i--){
+      const r = inDataset[0].data[i];
+      if(r.pname !== currProjName || r.hname !== currHoleName || r.sname !== currSecName){
+        break;
+      }
+      const p = r[objOpts.canvas.depth_scale];
+      if(p < posMin){
+        break;
+      }
+      idxs.push(i);
+    }
+
+    // forward
+    for(let i=d+1; i<inDataset[0].data.length; i++){
+      const r = inDataset[0].data[i];
+      if(r.pname !== currProjName || r.hname !== currHoleName || r.sname !== currSecName){
+        break;
+      }
+      const p = r[objOpts.canvas.depth_scale];
+      if(p > posMax){
+        break;
+      }
+      idxs.push(i);
+    }
+
+    // sort indices (because backward added in reverse)
+    idxs.sort((a,b)=>a-b);
+
+    // composite_depth
+    let vals = idxs.map(i => { const val = inDataset[0].data[i].composite_depth; return val === null ? NaN : Number(val); }).filter(Number.isFinite);
+    const mCD = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
+
+    // event_free_depth
+    vals = idxs.map(i => { const val = inDataset[0].data[i].event_free_depth; return val === null ? NaN : Number(val); }).filter(Number.isFinite);
+    const mEFD = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
+
+    // drilling_depth
+    vals = idxs.map(i => { const val = inDataset[0].data[i].drilling_depth; return val === null ? NaN : Number(val); }).filter(Number.isFinite);
+    const mDD = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
+
+    // age
+    vals = idxs.map(i => { const val = inDataset[0].data[i].age; return val === null ? NaN : Number(val); }).filter(Number.isFinite);
+    const mAge = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
+
+    // ageu
+    vals = idxs.map(i => { const val = inDataset[0].data[i].ageu; return val === null ? NaN : Number(val); }).filter(Number.isFinite);
+    const mAgeu = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
+
+    // agel
+    vals = idxs.map(i => { const val = inDataset[0].data[i].agel; return val === null ? NaN : Number(val); }).filter(Number.isFinite);
+    const mAgel = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
+
+    // dist
+    vals = idxs.map(i => { const val = inDataset[0].data[i].dist; return val === null ? NaN : Number(val); }).filter(Number.isFinite);
+    const mDist = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
+
+    // val
+    vals = idxs.map(i => { const val = inDataset[0].data[i].val; return val === null ? NaN : Number(val); }).filter(Number.isFinite);
+    const mVal = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
+
+    //name
+    const names = `${inDataset[0].data[idxs[0]].name}<~>${inDataset[0].data[idxs[idxs.length-1]].name} [W=${th},N=${idxs.length}]`;
+
+    //calc max/min
+    if (Number.isFinite(mVal)){
+      if(mVal < val_min){ val_min = mVal; }
+      if(mVal > val_max){ val_max = mVal; }
+    }
+
+    //apply
+    const newPointData = drawPointData()
+
+    newPointData.id = inDataset[0].data[d].id;
+    newPointData.type = inDataset[0].data[d].type
+    newPointData.name = names;
+    newPointData.header = inDataset[0].data[d].header;
+    newPointData.unit   = inDataset[0].data[d].unit;
+    newPointData.val = mVal;
+
+    newPointData.pname = currProjName;
+    newPointData.hname = currHoleName;
+    newPointData.sname = currSecName;
+
+    newPointData.pidx  = inDataset[0].data[d].pidx;
+    newPointData.hidx  = inDataset[0].data[d].hidx;
+    newPointData.sidx  = inDataset[0].data[d].sidx;
+
+    newPointData.dist  = mDist;
+    newPointData.composite_depth  = mCD;
+    newPointData.event_free_depth = mEFD;
+    newPointData.drilling_depth   = mDD;
+    newPointData.age    = mAge;
+    newPointData.ageu   = mAgeu;
+    newPointData.agel   = mAgel;
+    newPointData.source = inDataset[0].data[d].source;
+
+    newPointData.pos_x = inDataset[0].data[d].pos_x;
+    newPointData.pos_y = inDataset[0].data[d].pos_y;
+
+    //submit
+    numeratorDataset1.data.push(newPointData);
+    numeratorDataset1.depth_map.drilling_depth.push({idx:d, value:mDD});
+    numeratorDataset1.depth_map.composite_depth.push({idx:d, value:mCD});
+    numeratorDataset1.depth_map.event_free_depth.push({idx:d, value:mEFD});
+    numeratorDataset1.depth_map.age.push({idx:d, value:mAge});
+  }
+
+  numeratorDataset1.max = Number.isFinite(val_max) ? val_max : null;
+  numeratorDataset1.min = Number.isFinite(val_min) ? val_min : null;
+
+  return numeratorDataset1;
+}
+
+
 function dividePlotData(numeratorDataSeries, denominatorDataSeries){
   const dividedDataSeries = [];
   if(numeratorDataSeries.length>0){              

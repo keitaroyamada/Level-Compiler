@@ -218,7 +218,7 @@ class LevelCompilerCore extends EventEmitter{
       const newHoleId = lcfnc.getUniqueId();
 
       holeData.id = [newProjectId, newHoleId, null, null];
-      holeData.name = lcfnc.zeroPadding(holeList[h][1]);
+      holeData.name = lcfnc.zeroPadding(holeList[h][1]).trim();
       holeData.type = holeList[h][2];
       holeData.order = h;
 
@@ -232,7 +232,7 @@ class LevelCompilerCore extends EventEmitter{
         //add info
         const newSectionId = lcfnc.getUniqueId();
         sectionData.id = [newProjectId, newHoleId, newSectionId, null];
-        sectionData.name = lcfnc.zeroPadding(sectionList[s][2]);
+        sectionData.name = lcfnc.zeroPadding(sectionList[s][2]).trim();
         sectionData.order = s;
 
         //get marker list
@@ -1880,7 +1880,7 @@ class LevelCompilerCore extends EventEmitter{
             Idx = upperIdxs[0];
           }
 
-          if(!Idx){
+          if(!Number.isFinite(Idx)){
             output.push([null, null, null, null, null]);
             continue;
           }
@@ -2272,6 +2272,7 @@ class LevelCompilerCore extends EventEmitter{
                 bottomStr +
                 " ]"
               )
+              console.log("L2275",topSplitStr , bottomSplitStr)
             console.log(
               "ERROR: E025: Section names between top and bottom does not matched.[Line: " +
                 topIndices[i][0] +
@@ -3357,6 +3358,10 @@ class LevelCompilerCore extends EventEmitter{
       const incompletedList = polationList.filter(item => item[0] !== "floating");
       skippedList = polationList;
 
+      skippedList.forEach(s=>{
+        //console.log("L3361: ",this.getMarkerNameFromId(s[2]))
+      })
+
       if(polationList.length>0){        
         if(floatingList.length>0){
           for (const [type, upperId, targetId, lowerId] of floatingList) {
@@ -3378,7 +3383,7 @@ class LevelCompilerCore extends EventEmitter{
         
     }
         
-    console.log("LCCore: from applyMarkerPolation ")
+    //console.log("LCCore: from applyMarkerPolation ")
     if(this._measurePerformance ){
       console.log(this._performance)
     }
@@ -3404,6 +3409,8 @@ class LevelCompilerCore extends EventEmitter{
                 numConnections+=1;
               }
             })
+
+           
 
             if(isIsolated !== "none" && (isIsolated !== (numConnections===0))){
               continue;
@@ -3431,6 +3438,7 @@ class LevelCompilerCore extends EventEmitter{
     return polationList;
   }
   polation(polationList, calcType, interpolationType="interpolation"){
+   
     this.setStatus("running","start polation");
     if(polationList.length==0){
       this.setError("","E054: Input polation list is empty.");
@@ -3445,7 +3453,8 @@ class LevelCompilerCore extends EventEmitter{
     if(interpolationType == "interpolation"){
       //make group between the same markers
       const groupedList = {};
-      for (const [type, upperId, targetId, lowerId] of polationList) {
+      for (let i = 0; i < polationList.length; i++) {
+        const [type, upperId, targetId, lowerId] = polationList[i];
         if(type !== interpolationType){
           skippedList.push(polationList[i]);
           continue
@@ -3506,7 +3515,8 @@ class LevelCompilerCore extends EventEmitter{
     }else if(interpolationType == "extrapolation"){
       //make group between the same markers
       const groupedList = {};
-      for (const [type, upperId, targetId, lowerId] of polationList) {
+      for (let i = 0; i < polationList.length; i++) {
+        const [type, upperId, targetId, lowerId] = polationList[i];
         if(type !== interpolationType){
           skippedList.push(polationList[i]);
           continue
@@ -3657,7 +3667,7 @@ class LevelCompilerCore extends EventEmitter{
         const depth = lowerMarkerData[calcType] + exDistance;
 
 
-        if(!depth){
+        if(!Number.isFinite(depth)){
           continue
         }
 
@@ -3687,7 +3697,7 @@ class LevelCompilerCore extends EventEmitter{
         const exDistance = this.calcMarkerDistance(targetMarkerData, upperMarkerData, calcType);
         const depth = upperMarkerData[calcType] + exDistance;
 
-        if(!depth){
+        if(!Number.isFinite(depth)){
           continue
         }
        
@@ -4940,7 +4950,7 @@ class LevelCompilerCore extends EventEmitter{
     this.setStatus("running","start addHole");
     this.updateSearchIdx()
     const projectIdx = this.search_idx_list[projectId.toString()];
-    if(!projectIdx) return false
+    if(!Number.isFinite(projectIdx)) return false
     let newHole = new Hole();
 
     const newHoleId = [projectId[0], lcfnc.getUniqueId(), null, null];
@@ -5198,7 +5208,7 @@ class LevelCompilerCore extends EventEmitter{
 
       this.moveHoleToProject(moveList[i], this.base_project_id); //delete hole function included
     }
-    console.log(this.projects)
+    //console.log(this.projects)
 
     //delete projects
     let deleteList = [];
@@ -5975,7 +5985,9 @@ class LevelCompilerCore extends EventEmitter{
       let masterHole = "";
       let curMasterHole = [];      
       for(let p=0; p<this.projects.length;p++){
-
+        if(this.projects[p].id !== targetProjectID){
+          continue;
+        }
         for(let h=0; h<this.projects[p].holes.length; h++){
           const holeData = this.projects[p].holes[h];
           let cellsData = []; //[name, distance, drilling depth]
@@ -5987,7 +5999,11 @@ class LevelCompilerCore extends EventEmitter{
         
           for(let c=0;c<ids.length;c++){
             const id = ids[c];          
-            const idx = this.search_idx_list[id.toString()];    
+            const idx = this.search_idx_list[id.toString()];   
+            if(!idx){
+              //case: undifined(e.g. disconnected project)
+              continue
+            } 
             const sectionData = this.getDataByIdx([idx[0],idx[1],idx[2],null]);       
             const markerData  = this.getDataByIdx(idx);
             if(holeData.id.toString() == [id[0],id[1],null,null].toString()){              
@@ -6283,6 +6299,29 @@ class LevelCompilerCore extends EventEmitter{
       modelType = "duo";
     }
 
+    //check is jump hole necessary
+    let isSpacer = false;
+    let isJumpSec = false;
+    for(let r=1; r<modelData.length; r++){
+      if(modelData[r][0].includes("-")){
+        //if jump point
+        if(modelData[r-1][0].slice(1).trim() !== modelData[r+1][0].slice(1).trim()){
+          if(isJumpSec){
+            //If jump point appears consecutively
+            isSpacer = true;
+            break;
+          }
+          isJumpSec = true;          
+        }else{
+          //irregular jump point
+          isSpacer = true;
+          break;
+        }
+      }else{
+        isJumpSec = false;
+      }
+    }
+
     //header
     let header = ["Master"];
     if(modelType=="duo"){
@@ -6307,12 +6346,22 @@ class LevelCompilerCore extends EventEmitter{
         }
       }      
     }
+
+    if(isSpacer){
+      header.push("Lamina name (jump)[general]"); //lamina name
+      header.push("Distance from core top (cm)"); //distance
+      header.push("Drilling depth (cm)"); //drilling depth
+      header.push("Event"); // event
+    }
     outModelData.push(header);
 
     //body
+    let jumpSecType = "";
+    let isSteppedJumpSec = false;
     for(let r=1; r<modelData.length; r++){
       let fromRow = modelData[r];
       let toRow   = [];
+      jumpSecType = "";
 
       //master hole
       let masterHole = "";
@@ -6323,12 +6372,41 @@ class LevelCompilerCore extends EventEmitter{
       if(fromRow[0].includes("-")){
         //if jump point
         if(modelData[r-1][0].slice(1) == modelData[r+1][0].slice(1)){
-          masterHole += modelData[r-1][0].slice(1);
+          if(isSteppedJumpSec){
+            masterHole += "jump";
+            jumpSecType = "";
+          }else{
+            masterHole += modelData[r-1][0].slice(1);
+            jumpSecType = "";
+          }
+          
+           console.log(masterHole)
         }else{
-          masterHole += modelData[r-1][0].slice(1)+"/"+modelData[r+1][0].slice(1);
+          
+
+
+          if(!modelData[r+1][0].includes("-") && !modelData[r-1][0].includes("-")){
+            masterHole += modelData[r-1][0].slice(1)+"/"+modelData[r+1][0].slice(1);
+            jumpSecType = "";           
+          }else{
+            if(isSpacer && r<modelData.length-1 && modelData[r+1][0].includes("-")){
+              //if spacer necessary
+              masterHole += modelData[r-1][0].slice(1)+"/jump";
+              jumpSecType = "top";
+              isSteppedJumpSec = true;
+              console.log(masterHole)
+            }
+            if(isSpacer && isSteppedJumpSec && r>1 && modelData[r-1][0].includes("-")){
+              //if spacer necessary
+              masterHole += "jump/"+modelData[r+1][0].slice(1);
+              jumpSecType = "bottom";
+              isSteppedJumpSec = false;
+              console.log(masterHole)
+            }
+          }
         }        
       }else{
-        //others
+        //others        
         masterHole += fromRow[0].slice(1);
       }
 
@@ -6356,15 +6434,34 @@ class LevelCompilerCore extends EventEmitter{
 
       //hole data
       for(let h=0; h<numHoles; h++){
-        let name   = (fromRow[startPos+3*h].slice(1) == "9999") ? ""   : fromRow[startPos+3*h].slice(1);
+        let name   = (fromRow[startPos+3*h].slice(1) == "9999")   ? "" : fromRow[startPos+3*h].slice(1);
         const dist = (fromRow[startPos+1+3*h].slice(1) == "9999") ? "" : fromRow[startPos+1+3*h].slice(1);
         const dd   = (fromRow[startPos+2+3*h].slice(1) == "9999") ? "" : fromRow[startPos+2+3*h].slice(1);
         const event= "";
 
-        name = name.replace(" top","-top");
-        name = name.replace(" bottom","-bottom");
+        if(name.includes("top")){
+          name = name.replace(" top","");
+          name = name.trim();//remove end space
+          name += "-top";
+        }
+        if(name.includes("bottom")){
+          name = name.replace(" bottom","");
+          name = name.trim();//remove end space
+          name += "-bottom";
+        }
 
         toRow.push(name, dist, dd, event);
+      }
+
+      if(isSpacer){
+        if(jumpSecType==""){
+          toRow.push("","","","");
+        }else if(jumpSecType=="top"){
+          toRow.push("jump-00-top", "0", modelData[r][13].slice(1), "");
+        }else if(jumpSecType=="bottom"){
+          toRow.push("jump-00-bottom", String(Number(modelData[r][13].slice(1))-Number(modelData[r-1][13].slice(1))), modelData[r][13].slice(1), "");
+        }
+          
       }
       outModelData.push(toRow);
     }

@@ -17,7 +17,7 @@ class LevelCompilerAge {
     this.unreliable_ids=[];
   }
 
-  loadAgeFromCsv(LCCore, age_path) {
+  loadAgeFromCsv(LCCore, age_path, type="LC") {
     //target
     LCCore.sortModelByOrder();
     const targetProjectId = LCCore.base_project_id;
@@ -63,13 +63,16 @@ class LevelCompilerAge {
 
     if (match) {
       //check model type
-      if (!match[1].toLowerCase().includes("age")) {
-        console.error("LCAge: Registered file is not age model.");
-        return;
-      }
+      if (type == "LC"){
 
-      if (!match[1].toLowerCase().includes("age") && match[1] !== "") {
-        console.log("LCAge: There is no identifier for age model, but continue.");
+        if (!match[1].toLowerCase().includes("age")) {
+          console.error("LCAge: Registered file is not age model.");
+          return;
+        }
+      }else{
+         if (!match[1].toLowerCase().includes("age") && match[1] !== "") {
+          console.log("LCAge: There is no identifier for age model, but continue.");
+        }
       }
 
       model.name = match[2];
@@ -82,26 +85,60 @@ class LevelCompilerAge {
     //reconstruct age model
     let ageDataSet     = new AgeSet();
     ageDataSet.id      = num_age_dataset + 1;
-    ageDataSet.name    = model.name;
+    ageDataSet.name    = model.name;    
     ageDataSet.version = model.version;
     this.selected_id   = num_age_dataset + 1;
+
+    //get index
+    let idxAgeName = 0;
+    let idxHoleName = 1;
+    let idxSectionName = 2;
+    let idxDistance = 3;
+    let idxCD = 4;
+    let idxEFD= 5;
+    let idxAgeUpper1st = 6;
+    let idxAgeMid = 7;
+    let idxAgeLower1st = 8;
+    let idxSourceType = 9;
+    let idxSourceCode = 10;
+    let idxUnit = 11;
+    let idxNote = 12;
+    
+    if(type == "LF"){
+      idxAgeName = 0;
+      idxHoleName = 1;
+      idxSectionName = 2;
+      idxDistance = 3;
+      idxCD = 4;
+      idxEFD= null;
+      idxAgeUpper1st = 5;
+      idxAgeMid = 6;
+      idxAgeLower1st = 7;
+      idxSourceType = null;
+      idxSourceCode = 8;
+      idxUnit = 9;
+      idxNote = 10;
+    }
+
+    //set unit
+    const modelUnit = csv_data[0][idxAgeMid].slice(csv_data[0][idxAgeMid].indexOf("(")+1, csv_data[0][idxAgeMid].lastIndexOf(")"));   
 
     for (let r = 1; r < csv_data.length; r++) {
       //get age data
       const ageData = new Age();
-      ageData.name = csv_data[r][0];
-      ageData.age_mid = parseFloat(csv_data[r][7]);
-      ageData.age_upper_1std = parseFloat(csv_data[r][6]);
-      ageData.age_lower_1std = parseFloat(csv_data[r][8]);
+      ageData.name = csv_data[r][idxAgeName];
+      ageData.age_mid = parseFloat(csv_data[r][idxAgeMid]);
+      ageData.age_upper_1std = parseFloat(csv_data[r][idxAgeUpper1st]);
+      ageData.age_lower_1std = parseFloat(csv_data[r][idxAgeLower1st]);      
 
       if (csv_data[r][9] == "") {
         ageData.source_type = "general"; //"general", "terrestrial", "marine", "tephra", "orbital", "climate"
       } else {
-        ageData.source_type = csv_data[r][9];
+        ageData.source_type = idxSourceType ? csv_data[r][idxSourceType] : null;
       }
-      ageData.source_code = csv_data[r][10];
-      ageData.unit = csv_data[r][11];
-      ageData.note = csv_data[r][12];
+      ageData.source_code = csv_data[r][idxSourceCode];
+      ageData.unit = csv_data[r][idxUnit];
+      ageData.note = csv_data[r][idxNote];
 
       //ids
       ageDataSet.reserved_age_ids.push(r);
@@ -109,13 +146,17 @@ class LevelCompilerAge {
       ageData.order = r;
 
       //get position
-      if (csv_data[r][1] !== "" || csv_data[r][2] !== "" || csv_data[r][3] !== "") {
+      if (
+        (type=="LC" && csv_data[r][idxHoleName] !== "" )   || (type=="LF" && csv_data[r][idxHoleName] !== "9999") &&
+        (type=="LC" && csv_data[r][idxSectionName] !== "") || (type=="LF" && csv_data[r][idxSectionName] !== "9999") && 
+        (type=="LC" && csv_data[r][idxDistance] !== "")    || (type=="LF" && csv_data[r][idxDistance] !== "9999")
+      ) {
         //case defined by trinity--------------------------------------------------------
         ageData.original_depth_type      = "trinity";
-        ageData.trinityData.name         = csv_data[r][0];
-        ageData.trinityData.hole_name    = lcfnc.zeroPadding(csv_data[r][1]); //hole
-        ageData.trinityData.section_name = lcfnc.zeroPadding(csv_data[r][2]); //section
-        ageData.trinityData.distance     = parseFloat(csv_data[r][3]); //distance
+        ageData.trinityData.name         = csv_data[r][idxAgeName];
+        ageData.trinityData.hole_name    = lcfnc.zeroPadding(csv_data[r][idxHoleName]); //hole
+        ageData.trinityData.section_name = lcfnc.zeroPadding(csv_data[r][idxSectionName]); //section
+        ageData.trinityData.distance     = parseFloat(csv_data[r][idxDistance]); //distance
 
         //calc idex
         let ageDataIdx = LCCore.getIdxFromTrinity(targetProjectId, [ageData.trinityData.hole_name, ageData.trinityData.section_name, ageData.trinityData.distance]);
@@ -126,7 +167,7 @@ class LevelCompilerAge {
         //calc EFD
         const [[sectionId, efd, rank]] = LCCore.getDepthFromTrinity(targetProjectId, [ageData.trinityData],"event_free_depth");
         if (isNaN(efd)) {
-          console.log(csv_data[r][0] + ":" + csv_data[r][1] + "-" + csv_data[r][2] + "-" + csv_data[r][3] + "cm EFD:" + efd);
+          console.log(csv_data[r][idxAgeName] + ":" + csv_data[r][idxHoleName] + "-" + csv_data[r][idxSectionName] + "-" + csv_data[r][idxDistance] + "cm EFD:" + efd);
         }
 
         if (sectionId == null) {
@@ -136,42 +177,57 @@ class LevelCompilerAge {
           ageData.event_free_depth = efd;
           ageData.section_id = sectionId;
         }
-      } else if (csv_data[r][4] !== "") {
+      } else if ((type=="LC" && csv_data[r][idxCD] !== "") || (type=="LF" && csv_data[r][idxCD] !== "9999")) {
         //defined by CD-----------------------------------------------------------------
         //check model version
         //console.log(ageData.name + ": The age data is defined by composite depth.");
         ageData.original_depth_type = "composite_depth";
         if (ageDataSet.version == LCCore.projects[targetProjectIdx[0]].correlation_version) {
-          ageData.composite_depth = csv_data[r][4]; //cd
+          ageData.composite_depth = csv_data[r][idxCD]; //cd
 
           //convert CD => EFD
         } else {
           //console.log("Correlation Model Versions do not match between Core model and Age model.");
           //Scheduled to be deleted in the future
-          ageData.composite_depth = parseFloat(csv_data[r][4]);
+          ageData.composite_depth = parseFloat(csv_data[r][idxCD]);
           //convert CD => EFD
           const efdval = LCCore.getEFDfromCD(ageData.composite_depth);
           if (efdval !== NaN) {
             ageData.event_free_depth = efdval;
           } else {
-            console.log("Comsposite depth is out of model definition. :" + csv_data[r][0]);
+            console.log("Comsposite depth is out of model definition. :" + csv_data[r][idxAgeName]);
           }
           //
         }
-      } else if (csv_data[r][5] !== "") {
+      } else if ((type=="LC" && idxEFD && csv_data[r][idxEFD] !== "")) {
         //defined by EFD---------------------------------------------------------------
         //check model version
         //console.log();
         ageData.original_depth_type = "event_free_depth";
         if (ageDataSet.version == LCCore.projects[targetProjectIdx[0]].correlation_version) {
-          ageData.event_free_depth = csv_data[r][5]; //efd
+          ageData.event_free_depth = csv_data[r][idxEFD]; //efd
         } else {
           //console.log("Correlation Model Versions do not match between Core model and Age model." );
-          ageData.event_free_depth = csv_data[r][5]; //Scheduled to be deleted in the future
+          ageData.event_free_depth = csv_data[r][idxEFD]; //Scheduled to be deleted in the future
         }
       }else{
         console.log("LCAge: [" + model.name +"] '"+ ageData.name + "' is not defined any depth.");
       }
+
+      //===== age convert ==============================================
+      // Check if the unit requires conversion
+      const dataUnit = ageData.unit;
+      if (dataUnit === "calBP") {
+        // pass-through
+      } else if (dataUnit === "AD") {
+        ageData.age_mid = 1950 - ageData.age_mid;
+      } else if (dataUnit === "BC") {
+        ageData.age_mid = 1950 - (1 - ageData.age_mid);
+      }
+
+      //===== age convert ==============================================
+
+      //submit
       ageDataSet.ages.push(ageData);
     }
 
