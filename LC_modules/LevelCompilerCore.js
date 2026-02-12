@@ -6275,6 +6275,8 @@ class LevelCompilerCore extends EventEmitter{
       return value;
     }));
   }
+
+  /*
   convertLF2LC(filepath){
     //this function is converting correlation model csv for Level Finder to correlation model csv for Level Compiler
     
@@ -6329,6 +6331,7 @@ class LevelCompilerCore extends EventEmitter{
     }
 
     let numHoles = 0;    
+    let holeNames = new Set();
     for(let i=0; i<4; i++){
       //count holes
       
@@ -6337,6 +6340,8 @@ class LevelCompilerCore extends EventEmitter{
 
         if(match && match[1]){     
           numHoles++;   
+          holeNames.add((modelData[0][1+3*i].slice(1).match(/\(([^)]+)\)/) || [,""])[1]);
+          
 
           //LF model has 4 holes
           header.push(modelData[0][1+3*i].slice(1)+"[general]"); //lamina name
@@ -6354,6 +6359,7 @@ class LevelCompilerCore extends EventEmitter{
       header.push("Event"); // event
     }
     outModelData.push(header);
+      console.log(holeNames)
 
     //body
     let jumpSecType = "";
@@ -6369,7 +6375,8 @@ class LevelCompilerCore extends EventEmitter{
         masterHole += "top/";
       }
 
-      if(fromRow[0].includes("-")){
+      //if(fromRow[0].includes("-")){
+      if(!holeNames.has(fromRow[0].slice(1))){
         //if jump point
         if(modelData[r-1][0].slice(1) == modelData[r+1][0].slice(1)){
           if(isSteppedJumpSec){
@@ -6383,7 +6390,6 @@ class LevelCompilerCore extends EventEmitter{
            console.log(masterHole)
         }else{
           
-
 
           if(!modelData[r+1][0].includes("-") && !modelData[r-1][0].includes("-")){
             masterHole += modelData[r-1][0].slice(1)+"/"+modelData[r+1][0].slice(1);
@@ -6463,6 +6469,221 @@ class LevelCompilerCore extends EventEmitter{
         }
           
       }
+      outModelData.push(toRow);
+    }
+
+    return {name: modelName, type:modelType, version: version, model: outModelData};
+  }
+    */
+  convertLF2LC(filepath){
+    //this function is converting correlation model csv for Level Finder to correlation model csv for Level Compiler
+    
+    let outModelData = [];
+
+    //load model
+    const modelData = lcfnc.readcsv(filepath);
+    
+    //check
+    let version = "";
+    let modelName = "";
+    var fileName = filepath.split(/[/\\]/).pop();
+    const patern = /\[?(.*?)\]?([^\[\]()]*)(?:\((.*?)\))?\.csv$/; // ^(.*?)\((.*?)\)\.csv$/)
+    var match = fileName.match(patern);
+    if(match && match[1] && match[2]){    
+      modelName = match[2]; 
+      version = match[3];
+    }
+
+    let modelType = "correlation";
+    if(modelData[0][14] !== undefined && modelData[0][15] !== undefined && modelData[0][16] !== undefined){
+      modelType = "duo";
+    }
+
+    //check is jump hole necessary
+    let isSpacer = false;
+    let isJumpSec = false;
+    for(let r=1; r<modelData.length; r++){
+      if(modelData[r][0].includes("-")){
+        //if jump point
+        if(modelData[r-1][0].slice(1).trim() !== modelData[r+1][0].slice(1).trim()){
+          if(isJumpSec){
+            //If jump point appears consecutively
+            isSpacer = true;
+            break;
+          }
+          isJumpSec = true;          
+        }else{
+          //irregular jump point
+          isSpacer = true;
+          break;
+        }
+      }else{
+        isJumpSec = false;
+      }
+    }
+
+    //header
+    let header = ["Master"];
+    if(modelType=="duo"){
+      header.push("Master hole",	"Master section",	"Master distance (cm)",	"Master lamina name");
+    }
+
+    let numHoles = 0;    
+    let holeNames = new Set();
+    for(let i=0; i<4; i++){
+      //count holes
+      
+      if(modelData[0][1+3*i]){
+        const match = modelData[0][1+3*i].slice(1).match(/\(([^)]*)\)/);
+
+        if(match && match[1]){     
+          numHoles++;   
+          holeNames.add((modelData[0][1+3*i].slice(1).match(/\(([^)]+)\)/) || [,""])[1]);
+          
+
+          //LF model has 4 holes
+          header.push(modelData[0][1+3*i].slice(1)+"[general]"); //lamina name
+          header.push("Distance from core top (cm)"); //distance
+          header.push("Drilling depth (cm)"); //drilling depth
+          header.push("Event"); // event
+        }
+      }      
+    }
+
+    if(isSpacer){
+      header.push("Lamina name (jump)[general]"); //lamina name
+      header.push("Distance from core top (cm)"); //distance
+      header.push("Drilling depth (cm)"); //drilling depth
+      header.push("Event"); // event
+    }
+    outModelData.push(header);
+
+    //body
+    let jumpSec = "";
+    let jumpTopCD = null;
+    for(let r=1; r<modelData.length; r++){
+      let fromRow = modelData[r];
+      let toRow   = [];
+
+      //master hole
+      let masterHole = "";
+      if(r==1){
+        masterHole += "top/";
+      }
+
+      if(!holeNames.has(fromRow[0].slice(1))){
+        //step layer
+        if(jumpSec===""){
+          //not jumped
+          //normal or top
+          const upperMaster = modelData[r-1][0].slice(1);
+          const lowerMaster = modelData[r+1][0].slice(1);
+          if(r>1 && r<modelData.length-1){
+            if(holeNames.has(upperMaster)){
+              if(holeNames.has(lowerMaster)){
+                if(upperMaster !== lowerMaster){
+                  //normal step
+                  masterHole += modelData[r-1][0].slice(1)+"/"+modelData[r+1][0].slice(1);
+                  jumpSec = "";
+                }else{
+                  //irregular jump(same hole)
+                  masterHole += modelData[r-1][0].slice(1)+"/jump";
+                  jumpSec = "top";
+                  jumpTopCD = Number(modelData[r][13].slice(1));
+                  //console.log(1, r)
+                }                  
+              }else{
+                //jump top
+                masterHole += modelData[r-1][0].slice(1)+"/jump";
+                jumpSec = "top";
+                jumpTopCD = Number(modelData[r][13].slice(1));
+                //console.log(2, r)
+              }
+            }
+          }
+        }else{
+          //jumped
+          //case: bottom
+          if(r<modelData.length-1){
+            masterHole += "jump/"+modelData[r+1][0].slice(1);
+            jumpSec = "bottom";// use below
+            //console.log(3, r)
+          }        
+        }        
+      }else{
+        //continue layer
+        if(jumpSec===""){
+          //not jumped
+          masterHole += modelData[r][0].slice(1);
+          jumpSec = "";
+        }else{
+          //jumped
+          masterHole += "jump";
+          jumpSec = "continue";
+        }        
+      }
+
+      if(r==modelData.length-1){
+        masterHole += "/bottom";
+      }
+
+      //add zero point
+      if(r==1){
+        masterHole += "("+modelData[1][13].slice(1)+")";        
+      }
+      
+      toRow.push(masterHole);
+
+      //add master connection
+      let startPos = 1;
+      if(modelType=="duo"){
+        const masterHole = (fromRow[14].slice(1) == "9999") ? "" : fromRow[14].slice(1);
+        const masterSec  = (fromRow[15].slice(1) == "9999") ? "" : fromRow[15].slice(1);
+        const masterDist = (fromRow[16].slice(1) == "9999") ? "" : fromRow[16].slice(1);
+        const masterName = (fromRow[17].slice(1) == "9999") ? "" : fromRow[17].slice(1);
+
+        toRow.push(masterHole, masterSec, masterDist, masterName);
+      }
+
+      //hole data
+      for(let h=0; h<numHoles; h++){
+        let name   = (fromRow[startPos+3*h].slice(1) == "9999")   ? "" : fromRow[startPos+3*h].slice(1);
+        const dist = (fromRow[startPos+1+3*h].slice(1) == "9999") ? "" : fromRow[startPos+1+3*h].slice(1);
+        const dd   = (fromRow[startPos+2+3*h].slice(1) == "9999") ? "" : fromRow[startPos+2+3*h].slice(1);
+        const event= "";
+
+        if(name.includes("top")){
+          name = name.replace(" top","");
+          name = name.trim();//remove end space
+          name += "-top";
+        }
+        if(name.includes("bottom")){
+          name = name.replace(" bottom","");
+          name = name.trim();//remove end space
+          name += "-bottom";
+        }
+
+        toRow.push(name, dist, dd, event);
+      }
+
+      if(isSpacer){
+        if(jumpSec==""){
+          toRow.push("","","","");
+        }else if(jumpSec=="bottom"){
+          toRow.push("jump-00-bottom", String(Number(modelData[r][13].slice(1))-jumpTopCD), modelData[r][13].slice(1), "");
+          jumpSec = "";
+          jumpTopCD = null;
+          //console.log("jump-00-bottom", String(Number(modelData[r][13].slice(1))-Number(modelData[r-1][13].slice(1))), modelData[r][13].slice(1), "")
+        }else if(jumpSec=="top"){
+          toRow.push("jump-00-top", "0", modelData[r][13].slice(1), "");
+          //console.log("jump-00-top", "0", modelData[r][13].slice(1), "")
+        }else if(jumpSec=="continue"){
+          toRow.push("","","","");
+          //console.log("_","_","_","_")
+        }
+          
+      }
+      
       outModelData.push(toRow);
     }
 
