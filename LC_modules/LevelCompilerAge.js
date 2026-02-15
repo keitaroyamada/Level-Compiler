@@ -353,6 +353,7 @@ class LevelCompilerAge {
     if(this.AgeModels.length==0){
       return;
     }
+    let errorCounts = 0;
     for(let m=0; m<this.AgeModels.length; m++){
       for(let a=0;a<this.AgeModels[m].ages.length;a++){
         const ageData = this.AgeModels[m].ages[a];
@@ -371,7 +372,20 @@ class LevelCompilerAge {
           const [sectionId2,cd,  rank2,polationType2,sectionType2] = cdData[0];
 
           if (sectionId == null) {
-            console.log("Could not determine the position of " + ageData.trinityData.name);
+            errorCounts++;
+            if(errorCounts==1){  
+              console.log("LCCAge: Could not determine the position: CD:",cd,"EFD:",efd);
+            }
+            
+            if(errorCounts<4){  
+              console.log("      > "+ageData.trinityData.name);
+            }else if(m == this.AgeModels.length-1 && a ==this.AgeModels[m].ages.length-1){
+              console.log("        ...and more " + errorCounts);
+            }
+            
+            ageData.event_free_depth = null;
+            ageData.composite_depth  = null;
+            ageData.section_id = null;
             continue;
           } else {
             ageData.event_free_depth = efd;

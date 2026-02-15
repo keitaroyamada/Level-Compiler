@@ -583,6 +583,18 @@ function createMainWIndow() {
           worker.on("exit", (code) => {
             if (isShowMemory) setImmediate(() => console.log('after exit (code=' + code + ')', process.memoryUsage()));
 
+            releasedWorkers += 1;
+
+            if(releasedWorkers >= NUM_WORKERS){ 
+              console.log("MAIN: All workers have been successfully closed and resources are released.");
+              resolve();
+            }
+          });
+
+          /*
+          worker.on("exit", (code) => {
+            if (isShowMemory) setImmediate(() => console.log('after exit (code=' + code + ')', process.memoryUsage()));
+
             //count num releases
             releasedWorkers +=1;
 
@@ -594,6 +606,7 @@ function createMainWIndow() {
               processNextTask([{type:"exit"}], idleWorkers); // next close task
             }
           });
+          */
         });
       });
 
@@ -621,6 +634,7 @@ function createMainWIndow() {
           if (isShowMemory) console.log('baseline(after spawn #' + i + ')', process.memoryUsage());
 
           // when completed//errored
+          /*
           worker.on("message", async(result) => {
             if(isShowMemory) console.log('recv', process.memoryUsage());
             //console.log("MAIN: Worker finished task.");
@@ -630,7 +644,7 @@ function createMainWIndow() {
             mergeMissingKeys(taskResults, result);
 
             if (isShowMemory) console.log('after release', process.memoryUsage());
-             if (isShowMemory) setImmediate(() => console.log('next tick after recv', process.memoryUsage()));
+            if (isShowMemory) setImmediate(() => console.log('next tick after recv', process.memoryUsage()));
       
             if (tasks.length > 0) {
               idleWorkers.push(worker); // reuse worker
@@ -671,6 +685,58 @@ function createMainWIndow() {
               }                       
             }
           });
+          */
+          worker.on("message", async(result) => {
+            if(isShowMemory) console.log('recv', process.memoryUsage());
+
+            n += 1;
+            progressBar = await updateProgress(progressBar, n, numTotalTasks);
+
+            mergeMissingKeys(taskResults, result);
+
+            if (tasks.length > 0) {
+              if(!idleWorkers.includes(worker)) idleWorkers.push(worker); 
+              processNextTask(tasks, idleWorkers);
+            } else {
+              if(!worker._exitSent){
+                worker._exitSent = true;
+                worker.postMessage({type:"exit"});
+              }
+              while(idleWorkers.length > 0){
+                const w = idleWorkers.pop();
+                if(w && !w._exitSent){
+                  w._exitSent = true;
+                  w.postMessage({type:"exit"});
+                }
+              }
+            }
+          });
+          worker.on("error", async(err) => {
+            if (isShowMemory) console.log('error recv', process.memoryUsage());
+
+            n += 1;
+            progressBar = await updateProgress(progressBar, n, numTotalTasks);
+            console.error("Worker error:", err);
+
+            if (tasks.length > 0) {
+              if(!idleWorkers.includes(worker)) idleWorkers.push(worker);
+              processNextTask(tasks, idleWorkers);
+            } else {
+              if(!worker._exitSent){
+                worker._exitSent = true;
+                worker.postMessage({type:"exit"});
+              }
+              while(idleWorkers.length > 0){
+                const w = idleWorkers.pop();
+                if(w && !w._exitSent){
+                  w._exitSent = true;
+                  w.postMessage({type:"exit"});
+                }
+              }
+            }
+          });
+          
+
     
         }
         return workers;
@@ -823,46 +889,56 @@ function createMainWIndow() {
     } 
   });
   ipcMain.handle("floatingImageViewer", async (_e, targetId) => {
-    const loadOptions = {
-      targetIds: [targetId], 
-      operations: ["drilling_depth"],
-      dpcm: 100,
-    };
-    const sectionImage = await loadCoreImages(loadOptions, "core_images");
-    const metadata = await sharp(sectionImage["drilling_depth"][Object.keys(sectionImage["drilling_depth"])[0]]).metadata();
+    try{
+      const loadOptions = {
+        targetIds: [targetId], 
+        operations: ["drilling_depth"],
+        dpcm: 100,
+      };
+      const sectionImage = await loadCoreImages(loadOptions, "core_images");
 
-    if (imageViewerWindow) {
-      imageViewerWindow.focus();
-      return;
-    }
+      const key = Object.keys(sectionImage?.drilling_depth || {})[0];
+      const buf = sectionImage?.drilling_depth?.[key];
+      //const metadata = await sharp(buf).metadata();
+      const metadata = await sharp(sectionImage["drilling_depth"][Object.keys(sectionImage["drilling_depth"])[0]]).metadata();
 
-    //create finder window
-    imageViewerWindow = new BrowserWindow({
-      title: "imageViewer",
-      parent: mainWindow,
-      frame: false,
-      width: 300,//metadata.width,
-      height: 800,
-      webPreferences: {preload: path.join(__dirname, "preload", "preload_image_viewer.js"),},
-    });
-    
-    //converterWindow.setAlwaysOnTop(true, "normal");
-    imageViewerWindow.on("closed", () => {
-      imageViewerWindow = null;
-      mainWindow.webContents.send("ImageViewerClosed", "");
-    });
-    imageViewerWindow.setMenu(null);
+      if (imageViewerWindow) {
+        imageViewerWindow.focus();
+        return;
+      }
 
-    imageViewerWindow.loadFile(path.join(__dirname, "./renderer/image_viewer.html"));
-
-    imageViewerWindow.once("ready-to-show", () => {
-      imageViewerWindow.show();
-      //imageViewerWindow.setAlwaysOnTop(true, "floating");
-      //imageViewerWindow.webContents.openDevTools();
+      //create finder window
+      imageViewerWindow = new BrowserWindow({
+        title: "imageViewer",
+        parent: mainWindow,
+        frame: false,
+        width: 300,//metadata.width,
+        height: 800,
+        webPreferences: {preload: path.join(__dirname, "preload", "preload_image_viewer.js"),},
+      });
+      
       //converterWindow.setAlwaysOnTop(true, "normal");
-      imageViewerWindow.webContents.send("ImageViewerMenuClicked", sectionImage);
-    });
+      imageViewerWindow.on("closed", () => {
+        imageViewerWindow = null;
+        mainWindow.webContents.send("ImageViewerClosed", "");
+      });
+      imageViewerWindow.setMenu(null);
 
+      imageViewerWindow.loadFile(path.join(__dirname, "./renderer/image_viewer.html"));
+
+      imageViewerWindow.once("ready-to-show", () => {
+        imageViewerWindow.show();
+        //imageViewerWindow.setAlwaysOnTop(true, "floating");
+        //imageViewerWindow.webContents.openDevTools();
+        //converterWindow.setAlwaysOnTop(true, "normal");
+        imageViewerWindow.webContents.send("ImageViewerMenuClicked", sectionImage);
+      });
+
+      return true;
+    }catch(err){
+      console.error("MAIN:floatingImageViewer failed", err);
+      throw err;
+    }     
   });
  //============================================================================================
   ipcMain.handle("addSectionFromLcsection", async (_e,pathHandle) => {
@@ -2635,6 +2711,7 @@ function createMainWIndow() {
         LCCore = initialiseLCCore();
         Object.assign(LCCore, result.state);
         LCCore.calcCompositeDepth();
+        LCCore.calcEventFreeDepth();
         LCCore.updateSearchIdx();
 
         //get changed sections

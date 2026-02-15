@@ -81,7 +81,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }   
   });
   async function initialise(){
-    tempCore = await window.LabelerApi.InitialiseTempCore();
+    tempCore = await window.LabelerApi.InitialiseTempCore(); 
     console.log("[Labeler]: Initiarised. ",tempCore)
 
     zoom_rate = [0.3, 0.05];
@@ -173,7 +173,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if((orderLC.length==0 && orderImage.length==0) || orderLC.length>1 || orderImage.length>1){
       return
     }
-    if(tempCore.projects[0].holes[0].sections.length>0){
+    if(tempCore.projects[0].holes[0]?.sections.length>1){
       return
     }
 
@@ -226,13 +226,17 @@ document.addEventListener("DOMContentLoaded", () => {
         console.log("Section data detected.");
         //load model
         console.log(holeName, sectionName)
-        tempCore = await loadSectionModel(dirPath, fileName+".lcsection");
+        const res1 = await loadSectionModel(dirPath, fileName+".lcsection");
+        if(res1){
+          tempCore = res1;
+        }
+
         await undo("save", "Load Model");//undo
         console.log("Load annotation data: \n",tempCore);
 
         //load image
-        const res = await window.LabelerApi.RegisterCoreImage(dirPath, "labeler");
-        if(res==true){
+        const res2 = await window.LabelerApi.RegisterCoreImage(dirPath, "labeler");
+        if(res2==true){
           //load images
           modelImages = await loadCoreImages(modelImages, tempCore, objOpts, ["drilling_depth"]);
           console.log(modelImages)
@@ -252,7 +256,10 @@ document.addEventListener("DOMContentLoaded", () => {
         console.log("There is no model data. Make new model and Load image.");
         //make model
         console.log(holeName, sectionName)
-        tempCore = await addSectionData(holeName, sectionName);
+        const res2 = await addSectionData(holeName, sectionName);
+        if(res2){
+          tempCore = res2;
+        }
         console.log("Load annotation data: \n",tempCore);
 
         //load image
@@ -865,13 +872,17 @@ document.addEventListener("DOMContentLoaded", () => {
         console.log("[Labeler]: Add marker");
         
         const result = await addMarkerData(response, ht.distance, ht.relative_x);
+        console.log(result)
  
         if(result){
           tempCore = result;
           console.log("Annotation data: \n",tempCore);
           await undo("save", "Add Marker");//undo
+          updateView();
+        }else{
+          console.log("[Labeler]: Fail to add..", tempCore)
         }
-        updateView();
+        
       }
     }
 
@@ -1194,7 +1205,10 @@ document.addEventListener("DOMContentLoaded", () => {
   }
   async function addSectionData(holeName, sectionName){
     return new Promise(async (resolve, reject) => {
-      tempCore = await window.LabelerApi.addSectionData(holeName, sectionName);
+      const res = await window.LabelerApi.addSectionData(holeName, sectionName);
+      if(res){
+        tempCore = res;
+      }
 
       resolve(tempCore)
     });

@@ -633,10 +633,20 @@ class LevelCompilerCore extends EventEmitter{
       loadedProjectIds.push(project.id[0]);
     })
 
+
     //if old id, update to new id
     this.replaceNewId();
           
     this.updateSearchIdx();
+
+    //connect duo
+    if(this.projects.length>1){
+      const baseIdx = this.search_idx_list[this.base_project_id];
+      if(this.projects[baseIdx[0]].model_type == "correlation"){
+        this.connectDuoModel();
+      }
+    }
+
   }
   loadEventListFromCsv(filepath){
     if(this.projects.length==0) return false;
@@ -863,6 +873,15 @@ class LevelCompilerCore extends EventEmitter{
     if (this.projects.length < 1) {
       return;
     }
+
+    //get base project idx
+    let baseProjectIdx;
+    this.projects.forEach((project, p)=>{
+      if(this.equalName(project.id[0], this.base_project_id[0])){
+        baseProjectIdx = p;
+      }
+    })
+    
     for (let p = 0; p < this.projects.length; p++) {
       if (this.projects[p].model_type !== "duo") {
         continue;
@@ -875,49 +894,50 @@ class LevelCompilerCore extends EventEmitter{
             const markerData = this.projects[p].holes[h].sections[s].markers[m];
             //get master connection
             const masterTrinity = this.projects[p]._duo_connection[markerData.id.toString()];
+            //console.log(masterTrinity)
             if (masterTrinity == undefined) {
               continue;
             }
+
             //search previously loaded model
             let connectedMarkerIdx = [];
-            for (let i = 0; i < 1; i++) {
-              //search only in master
-              //for (let i = 0; i < p; i++) {
-              let tempIdx = this.getIdxFromTrinity(this.projects[i].id, masterTrinity);
-              if (tempIdx[3] == null) {
-                this.setError("","E010: There is no correlated marker with :" + masterTrinity.join("-")+"cm");
-                console.log("LCCore: E010: There is no correlated marker with :" + masterTrinity.join("-")+"cm");
-                if(isAllowAddMarker == true){
-                  try{
-                    let targetData = new Trinity();
-                    targetData.name = "";
-                    targetData.project_name = this.projects[tempIdx[0]].name;
-                    targetData.hole_name = masterTrinity[0];
-                    targetData.section_name = masterTrinity[1];
-                    targetData.distance = masterTrinity[2];
-                    
-                    const targetId = this.projects[tempIdx[0]].holes[tempIdx[1]].sections[tempIdx[2]].id;
-                    const depth = this.getDepthFromTrinity(targetId, [targetData], "composite_depth")
-                    const result = this.addMarker(targetId, depth[0][1], "composite_depth");
-                    if(result == true){
-                      this.updateSearchIdx();
-                      tempIdx = this.getIdxFromTrinity(this.projects[i].id, masterTrinity);
-  
-                      this.projects[tempIdx[0]].holes[tempIdx[1]].sections[tempIdx[2]].markers[tempIdx[3]].name = "duo_connection";
-                      this.setStatus("running","Add a new marker of "+masterTrinity.join("-")+"cm");
-                      console.log("        -> Add a new marker of "+masterTrinity.join("-")+"cm");
-                      connectedMarkerIdx.push(tempIdx);
-                    }                  
-                  }catch(err){
-                    this.setError(err,"E011: Failed to add a new connection.")
-                    console.log("        -> E011: Failed to add a new connection.", err);
-                    continue
-                  } 
-                }
-                               
-              } else {
-                connectedMarkerIdx.push(tempIdx);
+            //search only in master
+            //for (let i = 0; i < p; i++) {
+            let tempIdx = this.getIdxFromTrinity(this.projects[baseProjectIdx].id, masterTrinity);
+
+            if (tempIdx[3] == null) {
+              this.setError("","E010: There is no correlated marker with :" + masterTrinity.join("-")+"cm");
+              console.log("LCCore: E010: There is no correlated marker with :" + masterTrinity.join("-")+"cm");
+              if(isAllowAddMarker == true){
+                try{
+                  let targetData = new Trinity();
+                  targetData.name = "";
+                  targetData.project_name = this.projects[tempIdx[0]].name;
+                  targetData.hole_name = masterTrinity[0];
+                  targetData.section_name = masterTrinity[1];
+                  targetData.distance = masterTrinity[2];
+                  
+                  const targetId = this.projects[tempIdx[0]].holes[tempIdx[1]].sections[tempIdx[2]].id;
+                  const depth = this.getDepthFromTrinity(targetId, [targetData], "composite_depth")
+                  const result = this.addMarker(targetId, depth[0][1], "composite_depth");
+                  if(result == true){
+                    this.updateSearchIdx();
+                    tempIdx = this.getIdxFromTrinity(this.projects[baseProjectIdx].id, masterTrinity);
+
+                    this.projects[tempIdx[0]].holes[tempIdx[1]].sections[tempIdx[2]].markers[tempIdx[3]].name = "duo_connection";
+                    this.setStatus("running","Add a new marker of "+masterTrinity.join("-")+"cm");
+                    console.log("        -> Add a new marker of "+masterTrinity.join("-")+"cm");
+                    connectedMarkerIdx.push(tempIdx);
+                  }                  
+                }catch(err){
+                  this.setError(err,"E011: Failed to add a new connection.")
+                  console.log("        -> E011: Failed to add a new connection.", err);
+                  continue
+                } 
               }
+                              
+            } else {
+              connectedMarkerIdx.push(tempIdx);
             }
 
             //check connection
@@ -936,7 +956,7 @@ class LevelCompilerCore extends EventEmitter{
             const duoId = this.projects[p].holes[h].sections[s].markers[m].id;
 
             //connect master and duo
-            this.connectMarkers(duoId, msId, "horizontal");
+            this.connectMarkers(duoId, msId, "horizontal", false);// [,,,alert disconnection]
             //this.projects[p].holes[h].sections[s].markers[m].h_connection
           }
         }
@@ -945,7 +965,7 @@ class LevelCompilerCore extends EventEmitter{
     this.setStatus("completed","Connected duo model.")
     console.timeEnd("        Connect duo")
   }
-  calcCompositeDepth() {
+  calcCompositeDepth(emitUpdate=false) {
     console.time("        Calc CD")
     this.setStatus("running","start calcCompositeDepth");
     this.InitialiseCDEFD();
@@ -956,11 +976,14 @@ class LevelCompilerCore extends EventEmitter{
     this.convertDepthDuo2Master("composite_depth");
     
     console.log("LCCore: Calced composite depth.");
-    this.setUpdateDepth();//LCAge, LCPlot
+    if(emitUpdate){
+      this.setUpdateDepth();//LCAge, LCPlot
+    }
+    
     this.setStatus("completed","Calced composite depth.")
     console.timeEnd("        Calc CD")
   }
-  calcEventFreeDepth() {
+  calcEventFreeDepth(emitUpdate=true) {
     console.time("        Calc EFD")
     this.setStatus("running","start calcEventFreeDepth");
        
@@ -969,7 +992,10 @@ class LevelCompilerCore extends EventEmitter{
     this.convertDepthDuo2Master("event_free_depth");
  
     console.log("LCCore: Calced event free depth.");
-    this.setUpdateDepth();//LCAge, LCPlot 
+    if(emitUpdate){
+      this.setUpdateDepth();//LCAge, LCPlot 
+    }
+    
     this.setStatus("completed","Calced Event Free Depth.")
     console.timeEnd("        Calc EFD")
   }
@@ -1752,7 +1778,7 @@ class LevelCompilerCore extends EventEmitter{
       let lowerIdxs = [];
 
       if(trinityList[t].hole_name==null || trinityList[t].section_name==null || trinityList[t].distance==null){
-        output.push([null, null, null, null, null]);
+        output.push([null, null, null, null, null]);        
         continue;
       } 
       const holeName    = lcfnc.zeroPadding(trinityList[t].hole_name);
@@ -1778,8 +1804,8 @@ class LevelCompilerCore extends EventEmitter{
                   for (let m = 0; m < this.projects[p].holes[h].sections[s].markers.length - 1; m++) {
 
                     //check name and distance
-                    if (holeData.name === holeName) {
-                      if (sectionData.name === sectionName) {
+                    if (this.equalName(holeData.name, holeName)) {
+                      if (this.equalName(sectionData.name, sectionName)) {
                         if (allowExtrapolation){
                           if(m == 0){
                             tempLowerIdx = [p, h, s, m];
@@ -2126,14 +2152,39 @@ class LevelCompilerCore extends EventEmitter{
     //  return;
     //}
 
+    //check mater model connection
+    let isMasterModelConnected = false;
+    let masterIdx = null
+    this.projects.forEach((p,i)=>{
+      if(p.id[0] === this.base_project_id[0] && p.model_type==="correlation"){
+        isMasterModelConnected = true;
+        masterIdx = i;
+      }
+    })
+
+    if(!isMasterModelConnected){
+      //initiarise
+      this.projects.forEach(p=>{
+        p.holes.forEach(h=>{
+          h.sections.forEach(s=>{
+            s.markers.forEach(m=>{
+              m.age = null;
+            })
+          })
+        })
+      })
+      return
+    }
+
+    //calc main
     for (let p = 0; p < this.projects.length; p++) {
+      //check connection
+      const isConnected = this.isConnectMasterProject(this.projects[p].id);
+      console.log("LCCore: Master Project Connection: "+this.projects[p].name, isConnected)
+
       for (let h = 0; h < this.projects[p].holes.length; h++) {
         for (let s = 0; s < this.projects[p].holes[h].sections.length; s++) {
-          for (
-            let m = 0;
-            m < this.projects[p].holes[h].sections[s].markers.length;
-            m++
-          ) {
+          for (let m = 0; m < this.projects[p].holes[h].sections[s].markers.length; m++) {
             const marker = this.projects[p].holes[h].sections[s].markers[m];
 
             if(LCAge.AgeModels.length == 0){
@@ -2141,8 +2192,12 @@ class LevelCompilerCore extends EventEmitter{
               this.projects[p].holes[h].sections[s].markers[m].age = null;
             }else{
               if (marker.event_free_depth !== null) {
-                const age = LCAge.getAgeFromEFD(marker.event_free_depth, "linear"); //{age: { type: null, mid: null, upper: null, lower: null }, age_idx:null};
-                this.projects[p].holes[h].sections[s].markers[m].age = age.age.mid;
+                if(isConnected){
+                  const age = LCAge.getAgeFromEFD(marker.event_free_depth, "linear"); //{age: { type: null, mid: null, upper: null, lower: null }, age_idx:null};
+                  this.projects[p].holes[h].sections[s].markers[m].age = age.age.mid;
+                }else{
+                  this.projects[p].holes[h].sections[s].markers[m].age = null;
+                }                
               }
             }
 
@@ -3971,7 +4026,7 @@ class LevelCompilerCore extends EventEmitter{
     this.setStatus("completed","");
     return output;
   }
-  connectMarkers(fromId, toId, direction) {
+  connectMarkers(fromId, toId, direction, isAlertDisconnection=true) {
     this.setStatus("running","start connectMarkers");
     if(fromId.toString()==toId.toString()){
       return;
@@ -4095,7 +4150,9 @@ class LevelCompilerCore extends EventEmitter{
           let newhconnected = hconnected.filter(item => item.toString() !== c.toString());
           this.projects[ci[0]].holes[ci[1]].sections[ci[2]].markers[ci[3]].h_connection = newhconnected;
         }else{
-          console.log("LCCore: disconnected marker detected.")
+          if(isAlertDisconnection){
+            console.log("LCCore: disconnected marker detected.",c)
+          }          
         }        
       });
       return true
@@ -4950,7 +5007,8 @@ class LevelCompilerCore extends EventEmitter{
     this.setStatus("running","start addHole");
     this.updateSearchIdx()
     const projectIdx = this.search_idx_list[projectId.toString()];
-    if(!Number.isFinite(projectIdx)) return false
+
+    if(!projectIdx) return false
     let newHole = new Hole();
 
     const newHoleId = [projectId[0], lcfnc.getUniqueId(), null, null];
@@ -4967,6 +5025,7 @@ class LevelCompilerCore extends EventEmitter{
     this.projects[projectIdx[0]].holes.push(newHole);
     this.sortModel();
 
+    //console.log("LCCore: Add hole.")
     this.setStatus("completed","");
     return true;
   }
@@ -5129,7 +5188,9 @@ class LevelCompilerCore extends EventEmitter{
     }
 
     this.projects.push(newProject);
+    this.updateSearchIdx();
 
+    //console.log("LCCore: Add Project.")
     this.setStatus("completed","");
     return true;
 
@@ -5577,13 +5638,11 @@ class LevelCompilerCore extends EventEmitter{
     let idx = [projectIdx[0], null, null, null];
     for (let h = 0; h < this.projects[projectIdx[0]].holes.length; h++) {
       const hole = this.projects[projectIdx[0]].holes[h];
-      if (hole.name == lcfnc.zeroPadding(holeName)) {
+      if (this.equalName(hole.name, holeName)) {
         idx[1] = h;
         for (let s = 0; s < hole.sections.length; s++) {
           const section = hole.sections[s];
-          if (
-            lcfnc.zeroPadding(section.name) == lcfnc.zeroPadding(sectionName)
-          ) {
+          if (this.equalName(section.name, sectionName)) {
             idx[2] = s;
             for (let m = 0; m < section.markers.length; m++) {
               const marker = section.markers[m];
@@ -6723,6 +6782,44 @@ class LevelCompilerCore extends EventEmitter{
     }
     return String(a) === String(b);
   }
+  isConnectMasterProject(targetId){
+    let masterProjectId = null;
+    for(let p=0; p<this.projects.length; p++){
+      if(this.projects[p].model_type=="correlation" && this.projects[p].id[0] == this.base_project_id[0]){
+        masterProjectId = this.projects[p].id;
+        if(this.projects[p].id[0] === targetId[0]){
+          //target is master project
+          return true
+        }
+      }
+    }
+
+    if(!masterProjectId){
+      return false;
+    }
+
+    for(let p=0; p<this.projects.length; p++){
+      if(this.projects[p].id[0] !== targetId[0]){
+        continue
+      }
+      if(this.projects[p].model_type!=="duo"){
+        continue
+      }
+      for(let h=0; h<this.projects[p].holes.length; h++){
+        for(let s=0; s<this.projects[p].holes[h].sections.length; s++){
+          for(let m=0; m<this.projects[p].holes[h].sections[s].markers.length; m++){
+            const marker = this.projects[p].holes[h].sections[s].markers[m];
+            for(let hc=0; hc<marker.h_connection.length; hc++){
+              if(marker.h_connection[hc][0]===masterProjectId[0]){
+                return true;                
+              }
+            }
+          }
+        }
+      }
+    }
+    return false
+  }
   leaveOneOut(target="in"){
     const data = [];
 
@@ -6803,6 +6900,7 @@ class LevelCompilerCore extends EventEmitter{
     console.log("Done")
     return data;
   }
+
   
 }
 

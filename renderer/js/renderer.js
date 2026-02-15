@@ -71,7 +71,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     //=========== public properties =========== 
     objOpts.information.version = 2.1;
-    objOpts.developer.mode = "user";//"user";"developer";"root"; 
+    objOpts.developer.mode = "developer";//"user";"developer";"root"; 
     
     objOpts.canvas.depth_scale = "composite_depth";
     objOpts.canvas.background_colour = "#ffffff";//"#f4f5f7";//"#f7f7f7"//"#f8fbff";//"#fffdfa";//""white    
@@ -286,14 +286,15 @@ document.addEventListener("DOMContentLoaded", () => {
       let order = [];
 
       //check LCMODEL first
+      let numModel = 0;
       dataList.forEach((data,i)=>{
         if(data.type == "lcmodel"){
           order.push(i);
+          numModel++;
         }
       })
 
       //check correlation model
-      let numModel = 0;
       dataList.forEach((data,i)=>{
         if(data.name.includes("[correlation]")){
           order.push(i);
@@ -382,6 +383,7 @@ document.addEventListener("DOMContentLoaded", () => {
       for(let i=0;i<order.length;i++){
         const droppedData = dataList[order[i]];//type,name,path
         if(droppedData.type == "lcmodel"){
+          numModel--;
           console.log("[Renderer]: LCmodel load from drop..");
           //await initialiseCorrelationModel();
           //await initialiseAgeModel();
@@ -393,22 +395,28 @@ document.addEventListener("DOMContentLoaded", () => {
           //load into LCCore (load process is in receive("RegisteredLCModel")
           await registerLCModel(droppedData.path);
           //load registered model from main to renderer with making up hole list view
-          await loadModel(true, true);
-          //updateView();
-          const selected_age_model_id = document.getElementById("AgeModelSelect").value; 
-          await loadAge(selected_age_model_id);//load age data included LCCore
+          if(numModel===0){
+            //if load all model
+            await loadModel(true, true);
+            //updateView();
+            const selected_age_model_id = document.getElementById("AgeModelSelect").value; 
+            await loadAge(selected_age_model_id);//load age data included LCCore
 
-          await loadPlotData("age");
-          await loadPlotData("data")
+            await loadPlotData("age");
+            await loadPlotData("data")
+          }
+          
         }else if(droppedData.type == "csv"){
           if(droppedData.name.includes("[correlation]") || droppedData.name.includes("[duo]") ){
+            numModel--;
             //case model file
             console.log("[Renderer]: Correlation model file load from drop.");
             //register correlation model
             console.log(droppedData.path)
             await registerModel(droppedData.path);
 
-            if(numModel==i+1){
+            if(numModel===0){
+              //if load all model
               await loadModel(true, true);
             }
           } else if(droppedData.name.includes("[age]")){
@@ -807,7 +815,12 @@ document.addEventListener("DOMContentLoaded", () => {
 
     let isConnected = true;
     for(let p=0; p<LCCore.projects.length; p++){
-      if(!includesString(LCCore.projects[p], LCCore.base_project_id[0])){
+      if(LCCore.projects[p].id[0] === LCCore.base_project_id[0]){
+        //if base project
+        continue;
+      }
+
+      if(!isConnectMasterProject(LCCore, LCCore.projects[p].id)){
         isConnected = false;
       }
     }
@@ -3532,6 +3545,7 @@ document.addEventListener("DOMContentLoaded", () => {
         if (target_id[1] == "") {
           //case project selected
           LCCore.projects[target_idx[0]].enable = setVal;
+          console.log("[Renderer]: Project "+LCCore.projects[target_idx[0]].name +" is "+setType+".");
           //backup
           backup_hole_enable[LCCore.projects[target_idx[0]].id.toString()] = setVal;
           for(let h=0; h<LCCore.projects[target_idx[0]].holes.length;h++){
@@ -4591,7 +4605,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
       const scrollerTopRealScale   = (scroller.scrollTop - pad_y) / yMag - shift_y;//cm
       const scrollerBotRealScale   = (scroller.scrollTop + window.innerHeight - pad_y) / yMag - shift_y;//cm
-      const bufferVal = (scrollerBotRealScale-scrollerTopRealScale) * objOpts.canvas.buffer_depth * yMag;
+      const xBufferVal = objOpts.hole.width * 5 * xMag;
+      const yBufferVal = (scrollerBotRealScale-scrollerTopRealScale) * objOpts.canvas.buffer_depth * yMag;
       
       //-----------------------------------------------------------------------------------------
       //draw grid
@@ -4673,7 +4688,7 @@ document.addEventListener("DOMContentLoaded", () => {
             width: gridMaxX - 120,
             height: 1,
           };
-          if (!isInside(view_rect, grid_rect, bufferVal)) {
+          if (!isInside(view_rect, grid_rect, [xBufferVal, yBufferVal])) {
             continue;
           }
           //grid
@@ -4699,7 +4714,7 @@ document.addEventListener("DOMContentLoaded", () => {
             width: gridMaxX - 120,
             height: 1,
           };
-          if (!isInside(view_rect, grid_rect, bufferVal)) {
+          if (!isInside(view_rect, grid_rect, [xBufferVal,yBufferVal])) {
             continue;
           }
 
@@ -4832,10 +4847,16 @@ document.addEventListener("DOMContentLoaded", () => {
           ); 
 
           //show project area
+          //check master project connection
+          if(!isConnectMasterProject(LCCore, project.id)){
+            objOpts.project.is_show_area = true;
+            objOpts.project.area_colour_disconnected = "#f96a6a";
+          }
+
           if(objOpts.project.is_show_area){
             sketch.push();//save
             //check connection to base correlation model
-            if(isBaseProjectMaster && includesString(project, LCCore.base_project_id[0])){
+            if(isBaseProjectMaster && isConnectMasterProject(LCCore, project.id)){
               //connected master model
               sketch.fill(objOpts.project.area_colour+"50");//HEX+alpha rate                            
             }else{
@@ -4998,7 +5019,7 @@ document.addEventListener("DOMContentLoaded", () => {
               };
 
               //draw section-----------------------------------------------------
-              if (!isInside(view_rect, sec_rect, objOpts.canvas.buffer_depth * yMag)) {
+              if (!isInside(view_rect, sec_rect, [xBufferVal,yBufferVal])) {
                 continue;
               }
               //sketch.drawingContext.setLineDash([]);
@@ -6724,11 +6745,12 @@ document.addEventListener("DOMContentLoaded", () => {
     if (results) {
       //load model
       LCCore = results;
+
       let isConnected = true;
       
       //check model
       for(let p=0; p<LCCore.projects.length; p++){
-        if(!includesString(LCCore.projects[p], LCCore.base_project_id[0])){
+        if(!isConnectMasterProject(LCCore, LCCore.projects[p].id)){
           isConnected = false;
         }
       }
@@ -7241,22 +7263,43 @@ function binarySearchIndex(arr, target, getValueFn = (item) => item) {
   }
   return low; 
 }
-function includesString(obj, target) {
-  if (obj === null || obj === undefined) return false;
-
-  if (typeof obj === "string") {
-    return obj.includes(target);
+function isConnectMasterProject(LCCpre, targetId){
+  let masterProjectId = null;
+  for(let p=0; p<LCCpre.projects.length; p++){
+    if(LCCpre.projects[p].model_type=="correlation" && LCCpre.projects[p].id[0] == LCCpre.base_project_id[0]){
+      masterProjectId = LCCpre.projects[p].id;
+      if(LCCpre.projects[p].id[0] === targetId[0]){
+        //target is master project
+        return true
+      }
+    }
   }
 
-  if (Array.isArray(obj)) {
-    return obj.some(item => includesString(item, target));
+  if(!masterProjectId){
+    return false;
   }
 
-  if (typeof obj === "object") {
-    return Object.values(obj).some(value => includesString(value, target));
+  for(let p=0; p<LCCpre.projects.length; p++){
+    if(LCCpre.projects[p].id[0] !== targetId[0]){
+      continue
+    }
+    if(LCCpre.projects[p].model_type!=="duo"){
+      continue
+    }
+    for(let h=0; h<LCCpre.projects[p].holes.length; h++){
+      for(let s=0; s<LCCpre.projects[p].holes[h].sections.length; s++){
+        for(let m=0; m<LCCpre.projects[p].holes[h].sections[s].markers.length; m++){
+          const marker = LCCpre.projects[p].holes[h].sections[s].markers[m];
+          for(let hc=0; hc<marker.h_connection.length; hc++){
+            if(marker.h_connection[hc][0]===masterProjectId[0]){
+              return true;                
+            }
+          }
+        }
+      }
+    }
   }
-
-  return false;
+  return false
 }
 
 function rotateText(ctx, txt, degree, center, objOpts) {
@@ -7848,16 +7891,16 @@ async function createCircleImage(p, canvasSize, radius, color) {
   return fallbackImg;
 }
 
-function isInside(rectA, rectB, pad) {
+function isInside(rectA, rectB, pad=[0,0]) {
   if (
-    rectA.x + rectA.width + pad < rectB.x ||
-    rectB.x + rectB.width < rectA.x - pad
+    rectA.x + rectA.width + pad[0] < rectB.x ||
+    rectB.x + rectB.width < rectA.x - pad[0]
   ) {
     return false;
   }
   if (
-    rectA.y + rectA.height + pad < rectB.y ||
-    rectB.y + rectB.height < rectA.y - pad
+    rectA.y + rectA.height + pad[1] < rectB.y ||
+    rectB.y + rectB.height < rectA.y - pad[1]
   ) {
     return false;
   }
@@ -8010,10 +8053,11 @@ async function loadCoreImages(modelImages, LCCore, objOpts, operations) {
       await new Promise(async(p5resolve,p5reject) => {
         try{
           //load image
-          const imageBuffers = await new Promise(async(resolve, reject)=>{
-            const imBufferDict = await window.LCapi.LoadCoreImage(loadOptions,"core_images");
-            resolve(imBufferDict)
-          }) 
+          const imageBuffers = await window.LCapi.LoadCoreImage(loadOptions, "core_images");
+          //const imageBuffers = await new Promise(async(resolve, reject)=>{
+          //  const imBufferDict = await window.LCapi.LoadCoreImage(loadOptions,"core_images");
+          //  resolve(imBufferDict)
+          //}) 
 
           results = await assignCoreImages(results, imageBuffers);
 
@@ -9147,7 +9191,7 @@ function dividePlotData(numeratorDataSeries, denominatorDataSeries){
 
 function calcDrawPosition(drawPointDataset, LCCore, objOpts, pOptions){
   if(drawPointDataset.data.length==0){
-    console.log("[Renderer]: There is no target point data.")
+    //console.log("[Renderer]: There is no target point data.")
     return drawPointDataset
   }
 
@@ -9174,10 +9218,12 @@ function calcDrawPosition(drawPointDataset, LCCore, objOpts, pOptions){
   const holeEnableList = [];
   for(let p=0; p< LCCore.projects.length; p++){  
     
-    if (p > 0) {
-      numEnable += objOpts.project.interval;
+    if(LCCore.projects[p].enable){
+      if (p > 0) {
+        numEnable += objOpts.project.interval;
+      }      
     }
-
+    
     const hCounts = [];
     for(let h=0; h< LCCore.projects[p].holes.length; h++){
       
