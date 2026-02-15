@@ -6711,6 +6711,7 @@ class LevelCompilerCore extends EventEmitter{
         const dd   = (fromRow[startPos+2+3*h].slice(1) == "9999") ? "" : fromRow[startPos+2+3*h].slice(1);
         const event= "";
 
+        /*
         if(name.includes("top")){
           name = name.replace(" top","");
           name = name.trim();//remove end space
@@ -6720,6 +6721,21 @@ class LevelCompilerCore extends EventEmitter{
           name = name.replace(" bottom","");
           name = name.trim();//remove end space
           name += "-bottom";
+        }
+          */
+        const regexTop = /\s*(top)$/i;
+        if (regexTop.test(name)) {
+          name = name.replace(regexTop, "");
+          
+          name = name.trim();
+          name += "-top"; 
+        }
+        const regexBottom = /\s*(bottom|bottm|bttom|botom)$/i;
+        if (regexBottom.test(name)) {
+          name = name.replace(regexBottom, "");
+          
+          name = name.trim();
+          name += "-bottom"; 
         }
 
         toRow.push(name, dist, dd, event);

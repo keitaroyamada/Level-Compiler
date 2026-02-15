@@ -392,7 +392,7 @@ document.addEventListener("DOMContentLoaded", () => {
           selected_hole_id = hole[0];
         }
       }
-      
+
       let sec_idx = null;
       let selected_sec_id = null;
       for(let s=0;s<sectionList[hole_idx].length;s++){

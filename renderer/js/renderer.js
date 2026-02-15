@@ -70,8 +70,8 @@ document.addEventListener("DOMContentLoaded", () => {
     };
 
     //=========== public properties =========== 
-    objOpts.information.version = 2.1;
-    objOpts.developer.mode = "developer";//"user";"developer";"root"; 
+    objOpts.information.version = 2.2;
+    objOpts.developer.mode = "user";//"user";"developer";"root"; 
     
     objOpts.canvas.depth_scale = "composite_depth";
     objOpts.canvas.background_colour = "#ffffff";//"#f4f5f7";//"#f7f7f7"//"#f8fbff";//"#fffdfa";//""white    
@@ -93,6 +93,7 @@ document.addEventListener("DOMContentLoaded", () => {
     objOpts.canvas.shift_y = 100; //[cm]
     objOpts.canvas.bottom_pad = 100; //[cm]
     objOpts.canvas.buffer_depth = 0.1; //[rate]
+    objOpts.canvas.buffer_width = 0.3; //[rate]
     
     objOpts.project.interval = 1;
     objOpts.project.is_show_area = true;
@@ -3882,15 +3883,19 @@ document.addEventListener("DOMContentLoaded", () => {
     document.getElementById("bt_finder").style.backgroundColor = "#f0f0f0";
   });
   //mouse click (send depth to finder)
-  scroller.addEventListener("click", async function () {
+  scroller.addEventListener("click", async function (event) {
     //send to finder
     if (finderEnable) {
       //get depth scale position
-      var mouseX = mousePos[0];
-      var mouseY = mousePos[1];
+      //var mouseX = mousePos[0];
+      //var mouseY = mousePos[1];
+      const rect = document.getElementById("p5Canvas").getBoundingClientRect(); 
+      const mouseX = event.clientX - rect.left;
+      const mouseY = event.clientY - rect.top;
 
       //calc position
-      const ht = getClickedItemIdx(mouseX, mouseY, LCCore, objOpts);
+      const ht = JSON.parse(JSON.stringify(getClickedItemIdx(mouseX, mouseY, LCCore, objOpts)));
+      console.log(ht)
       objOpts.edit.hittest = ht;
  
       await window.LCapi.SendDepthToFinder(ht);
@@ -4603,9 +4608,11 @@ document.addEventListener("DOMContentLoaded", () => {
       const shift_x = objOpts.canvas.shift_x;
       const shift_y = objOpts.canvas.shift_y;
 
+      const scrollerLeftRealScale  = (scroller.scrollLeft - pad_x) / xMag - shift_x;//cm
+      const scrollerRightRealScale = (scroller.scrollLeft + window.innerWidth - pad_x) / xMag - shift_x;//cm
       const scrollerTopRealScale   = (scroller.scrollTop - pad_y) / yMag - shift_y;//cm
       const scrollerBotRealScale   = (scroller.scrollTop + window.innerHeight - pad_y) / yMag - shift_y;//cm
-      const xBufferVal = objOpts.hole.width * 5 * xMag;
+      const xBufferVal = (scrollerRightRealScale-scrollerLeftRealScale) * objOpts.canvas.buffer_width * xMag;
       const yBufferVal = (scrollerBotRealScale-scrollerTopRealScale) * objOpts.canvas.buffer_depth * yMag;
       
       //-----------------------------------------------------------------------------------------
@@ -4738,6 +4745,7 @@ document.addEventListener("DOMContentLoaded", () => {
       //-----------------------------------------------------------------------------------------
       //initialise
       //draw finder target line
+      //111111111111111
       if(finderEnable){        
         //get pos
         let num_disable = {total: 0, hole: 0};
@@ -4800,6 +4808,10 @@ document.addEventListener("DOMContentLoaded", () => {
       for (let p = 0; p < LCCore.projects.length; p++) {
         //make project objects===================================================================================
         const project = LCCore.projects[p];
+        if(!LCCore.projects[p].enable){
+          num_disable.hole += objOpts.project.interval;
+        }
+
 
         //get position
         let prj_num_enable_right = 0;
@@ -4810,9 +4822,20 @@ document.addEventListener("DOMContentLoaded", () => {
           }
         })
         
+        /*
         let prj_num_enable_left = 0;
         LCCore.projects.filter(p=>p.order<project.order).forEach(p=>p.holes.forEach(h=>{if(h.enable){prj_num_enable_left++;}}))
         prj_num_enable_left += objOpts.project.interval * project.order;
+        */
+
+        const active_projects_before = LCCore.projects.filter(p => p.order < project.order && p.enable).length;
+        let prj_num_enable_left = 0;
+        LCCore.projects.filter(p => p.order < project.order).forEach(p => 
+          p.holes.forEach(h => {
+            if(h.enable){ prj_num_enable_left++; }
+          })
+        );
+        prj_num_enable_left += objOpts.project.interval * active_projects_before;
 
         const prj_padx = objOpts.project.pad_x;//objOpts.hole.distance * xMag;
         const prj_pady = objOpts.project.pad_y;
@@ -5825,9 +5848,9 @@ document.addEventListener("DOMContentLoaded", () => {
           //result.pos_canvas_y  = (data[objOpts.canvas.depth_scale] * data.amplification_y + shift_y) * yMag + pad_y;
           const scrollerTopRealScale   = (scroller.scrollTop - pad_y) / yMag - shift_y;//cm
           const scrollerBotRealScale   = (scroller.scrollTop + window.innerHeight - pad_y) / yMag - shift_y;//cm
-          const bufferVal = (scrollerBotRealScale-scrollerTopRealScale) * objOpts.canvas.buffer_depth * yMag;
-          const searchTop = scrollerTopRealScale - bufferVal;
-          const searchBot = scrollerBotRealScale + bufferVal;
+          const yBufferVal = (scrollerBotRealScale-scrollerTopRealScale) * objOpts.canvas.buffer_depth * yMag;
+          const searchTop = scrollerTopRealScale - yBufferVal;
+          const searchBot = scrollerBotRealScale + yBufferVal;
           let startIndex = binarySearchIndex(ageList, searchTop, (d) => d[objOpts.canvas.depth_scale]);
           let endIndex   = binarySearchIndex(ageList, searchBot, (d) => d[objOpts.canvas.depth_scale]);
 
@@ -6018,8 +6041,8 @@ document.addEventListener("DOMContentLoaded", () => {
               //check inside
               //const bufferVal = (scrollerBotRealScale-scrollerTopRealScale) * objOpts.canvas.buffer_depth * yMag;
 
-              const searchTop  = scrollerTopRealScale - bufferVal;
-              const searchBot  = scrollerBotRealScale + bufferVal;
+              const searchTop  = scrollerTopRealScale - yBufferVal;
+              const searchBot  = scrollerBotRealScale + yBufferVal;
               //if changed resample option after plotted, depth_map error
               const depthArr   = drawDataset.depth_map[objOpts.canvas.depth_scale]; 
               let startIndex = binarySearchIndex(depthArr, searchTop, (e) => e.value);
@@ -7365,7 +7388,9 @@ function fitScaler(zoom_level, mag) {
 
   return step;
 }
+/*
 function getNearestConnectedMarkerIdx(LCCore, idFrom, objOpts) {
+  //objOpts.project.interval
   //temp function
   const getListIdx = (list, p, h) => {
     let output = null;
@@ -7527,6 +7552,213 @@ function getNearestConnectedMarkerIdx(LCCore, idFrom, objOpts) {
     const idxTo = this.getIdxById(LCCore, connectedMarkerData.id);
     if ((betweenRange[1] - betweenRange[0] - numBetweenDisable) == 1) {
       isNext = true;
+    }
+
+    const output = {
+      num_total: numTotal,
+      num_projects: numProject,
+      num_total_disable: numTotalDisable,
+      num_between: numBetween,
+      num_between_disable: numBetweenDisable,
+      connected_id: connectedMarkerData.id,
+      connected_idx: idxTo,
+      isNext: isNext,
+      is_master_connection: isMasterConnection,
+    };
+
+    return output;
+  }
+}
+  */
+function getNearestConnectedMarkerIdx(LCCore, idFrom, objOpts) {
+  // --- (Helper & List Generation logic remains the same) ---
+  const getListIdx = (list, p, h) => {
+    let output = null;
+    list.forEach((hl) => {
+      if (hl[3] == p && hl[4] == h) {
+        output = hl[0];
+      }
+    });
+    return output;
+  };
+
+  let holeList = [];
+  for (let p = 0; p < LCCore.projects.length; p++) {
+    for (let h = 0; h < LCCore.projects[p].holes.length; h++) {
+      holeList.push([
+        null, //0: Total Order
+        LCCore.projects[p].order, //1
+        LCCore.projects[p].holes[h].order, //2
+        p, //3: Project Index
+        h, //4: Hole Index
+        LCCore.projects[p].enable, //5: Project Enable
+        LCCore.projects[p].holes[h].enable, //6: Hole Enable
+      ]);
+    }
+  }
+
+  holeList.sort((a, b) => (a[2] < b[2] ? -1 : 1));
+  holeList.sort((a, b) => (a[1] < b[1] ? -1 : 1));
+
+  holeList.forEach((h, i) => {
+    h[0] = i;
+  });
+
+  // --- (Start Marker & Connection Check logic remains same) ---
+  const idxFrom  = this.getIdxById(LCCore, idFrom);
+  const listFrom = getListIdx(holeList, idxFrom[0], idxFrom[1]);
+  const currentTotalOrder  = holeList[listFrom][0];
+  const currentMarkerData  = LCCore.projects[idxFrom[0]].holes[idxFrom[1]].sections[idxFrom[2]].markers[idxFrom[3]];
+  const currentHoleData    = LCCore.projects[idxFrom[0]].holes[idxFrom[1]];
+  const currentProjectData = LCCore.projects[idxFrom[0]];
+
+  let isMasterConnection = 0;
+  if (currentMarkerData.h_connection == null || currentMarkerData.h_connection.length == 0) {
+    return null;
+  } else {
+    currentMarkerData.h_connection.forEach((c) => {
+      const idx = this.getIdxById(LCCore, c);
+      if (idx.every(id=>id!==null)){
+        if (LCCore.projects[idx[0]].holes[idx[1]].sections[idx[2]].markers[idx[3]].isMaster) {
+          isMasterConnection += 1;
+        }
+      }
+    });
+  }
+
+  // --- (Find Nearest Connection Logic) ---
+  let connectedMarkerData  = null;
+  let connectedHoleData    = null;
+  let connectedProjectData = null;
+
+  if(currentMarkerData.h_connection.length==0) return null;
+  let idTo;
+  let idxTo;
+  let listTo;
+  let connectedTotalOrder = Infinity;
+  
+  for (let i = 0; i < currentMarkerData.h_connection.length; i++) {
+    idTo = currentMarkerData.h_connection[i];
+    idxTo = this.getIdxById(LCCore, idTo);
+    if(idxTo.every(id=>id===null)) continue
+    listTo = getListIdx(holeList, idxTo[0], idxTo[1]);
+
+    // Check Project & Hole Enable
+    const isTargetEnable = LCCore.projects[idxTo[0]].enable && LCCore.projects[idxTo[0]].holes[idxTo[1]].enable;
+
+    if (connectedHoleData !== null) {
+      if (holeList[listTo][0] > currentTotalOrder && holeList[listTo][0] < connectedTotalOrder && isTargetEnable ) {
+        connectedMarkerData  = LCCore.projects[idxTo[0]].holes[idxTo[1]].sections[idxTo[2]].markers[idxTo[3]];
+        connectedHoleData    = LCCore.projects[idxTo[0]].holes[idxTo[1]];
+        connectedProjectData = LCCore.projects[idxTo[0]];
+        connectedTotalOrder  = holeList[listTo][0];
+      }
+    } else {
+      if (holeList[listTo][0] > currentTotalOrder && isTargetEnable) {
+        connectedMarkerData  = LCCore.projects[idxTo[0]].holes[idxTo[1]].sections[idxTo[2]].markers[idxTo[3]];
+        connectedHoleData    = LCCore.projects[idxTo[0]].holes[idxTo[1]];
+        connectedProjectData = LCCore.projects[idxTo[0]];
+        connectedTotalOrder  = holeList[listTo][0];
+      }
+    }
+  }
+  if(connectedTotalOrder===Infinity) return null
+
+  // --- (Range Calculation) ---
+  if (connectedHoleData == null) return null;
+
+  let betweenRange = [];
+  holeList.forEach((btl, b) => {
+    if (btl[1] == currentProjectData.order && btl[2] == currentHoleData.order) {
+      betweenRange[0] = b;
+    }
+    if (btl[1] == connectedProjectData.order && btl[2] == connectedHoleData.order) {
+      betweenRange[1] = b;
+    }
+  });
+
+  const numBetween = betweenRange[1] - betweenRange[0];
+  const numTotal = betweenRange[1] - 0;
+  
+  // --- [Correction] Calculate disabled spaces ---
+  let numProject = 0;
+  let numBetweenDisable = 0;
+  let numTotalDisable = 0;
+
+  // Get interval value (default to 0 if undefined)
+  const projectInterval = (objOpts && objOpts.project && objOpts.project.interval) ? objOpts.project.interval : 0;
+
+  // 1. Total Range Loop (0 to End)
+  let totalDisabledProjects = new Set();
+  for (let i = 0; i < betweenRange[1]; i++) {
+    // Check if Project is disabled
+    if (holeList[i][5] === false) {
+      numTotalDisable += 1; // Add hole count
+      totalDisabledProjects.add(holeList[i][1]); // Record Project ID
+    } 
+    // Check if Project is enabled but Hole is disabled
+    else if (holeList[i][6] === false) {
+      numTotalDisable += 1;
+    }
+  }
+  // Add (number of disabled projects * interval) to total disabled count
+  numTotalDisable += (totalDisabledProjects.size * projectInterval);
+
+
+  // 2. Between Range Loop (Start to End)
+  let projList = new Set();
+  let betweenDisabledProjects = new Set();
+
+  for (let b = betweenRange[0]; b < betweenRange[1] + 1; b++) {
+    // Count numProject only if Project is enabled
+    if (holeList[b][5] === true) {
+      if (!projList.has(holeList[b][1])) {
+        projList.add(holeList[b][1]);
+        numProject += 1;
+      }
+      
+      // If Project is enabled and Hole is disabled, count as disable
+      if (holeList[b][6] === false) {
+        numBetweenDisable += 1;
+      }
+    } else {
+      // If Project is disabled
+      numBetweenDisable += 1; // Add hole count
+      betweenDisabledProjects.add(holeList[b][1]); // Record Project ID
+    }
+  }
+  // Add (number of disabled projects * interval) to between disabled count
+  numBetweenDisable += (betweenDisabledProjects.size * projectInterval);
+
+
+  // --- (Output & Next Logic) ---
+  if (connectedMarkerData == null) {
+    return null;
+  } else {
+    let isBiconnect = false;
+    connectedMarkerData.h_connection.forEach(hc=>{
+      if(hc.toString() === idFrom.toString()){
+        isBiconnect = true;
+      }
+    });
+    if(!isBiconnect) return null;
+
+    let isNext = false;
+    const idxTo = this.getIdxById(LCCore, connectedMarkerData.id);
+    
+    // Effective distance (in Hole units) = Raw distance - (Disabled holes + Interval of disabled projects)
+    const validDistance = betweenRange[1] - betweenRange[0] - numBetweenDisable;
+
+    if (validDistance == 1) {
+      isNext = true;
+      
+      // If projects are different and an interval is set, there is a physical gap 
+      // even if no disabled projects exist in between, so returns false.
+      if (currentProjectData.order !== connectedProjectData.order) {
+         if (projectInterval > 0) {
+            isNext = false;
+         }
+      }
     }
 
     const output = {
@@ -8252,12 +8484,17 @@ function getClickedItemIdx(mouseX, mouseY, LCCore, objOpts){
 
   breakpoint:
   for(let p=0; p<LCCore.projects.length; p++){
+    if(!LCCore.projects[p].enable){
+      num_hole.disable += objOpts.project.interval;
+    }
+
     let num_enable_right = 0;
     LCCore.projects[p].holes.forEach(hc=>{
       if(hc.enable){
         num_enable_right++;
       }
     })
+    /*
     let num_enable_left = 0;
     LCCore.projects.filter(p1=>p1.order<LCCore.projects[p].order).forEach(p2=>p2.holes.forEach(h1=>{if(h1.enable){num_enable_left++;}}))
       
@@ -8266,8 +8503,18 @@ function getClickedItemIdx(mouseX, mouseY, LCCore, objOpts){
     //const project_x0 = -objOpts.project.pad_x + ((objOpts.section.width + objOpts.hole.distance) * prj_num_enable_left + shift_x) * xMag + pad_x
     const project_x0 = -objOpts.project.pad_x/xMag + (objOpts.section.width + objOpts.hole.distance) * (num_enable_left + objOpts.project.interval*p);//  + 1;
     let project_w    = -objOpts.project.pad_x/xMag + (objOpts.section.width + objOpts.hole.distance)  * (num_enable_right + 1);
-    
-    
+    */
+    const active_projects_before = LCCore.projects.filter(proj => proj.order < LCCore.projects[p].order && proj.enable).length;
+
+    let num_enable_left = 0;
+    LCCore.projects.filter(p1 => p1.order < LCCore.projects[p].order && p1.enable).forEach(p2 => {
+      p2.holes.forEach(h1 => {
+        if(h1.enable){ num_enable_left++; }
+      });
+    });
+
+    const project_x0 = -objOpts.project.pad_x/xMag + (objOpts.section.width + objOpts.hole.distance) * (num_enable_left + objOpts.project.interval * active_projects_before);
+    let project_w = -objOpts.project.pad_x/xMag + (objOpts.section.width + objOpts.hole.distance) * (num_enable_right + 1);
     
     if(num_enable_right == 0){
       project_w = (objOpts.hole.distance + objOpts.hole.width);
@@ -9188,7 +9435,7 @@ function dividePlotData(numeratorDataSeries, denominatorDataSeries){
   }
   return dividedDataSeries
 }
-
+/*
 function calcDrawPosition(drawPointDataset, LCCore, objOpts, pOptions){
   if(drawPointDataset.data.length==0){
     //console.log("[Renderer]: There is no target point data.")
@@ -9222,6 +9469,10 @@ function calcDrawPosition(drawPointDataset, LCCore, objOpts, pOptions){
       if (p > 0) {
         numEnable += objOpts.project.interval;
       }      
+    }else{
+      if (p > 0) {
+        numDisable += objOpts.project.interval;
+      } 
     }
     
     const hCounts = [];
@@ -9280,6 +9531,140 @@ function calcDrawPosition(drawPointDataset, LCCore, objOpts, pOptions){
         let relative_x = (drawData.val - val_min) * amp[0];
 
         if(isFlip){
+          relative_x = objOpts.hole.width - relative_x;
+        }
+
+        drawData.pos_x = (relative_x + shift_x) * xMag + 20;
+        drawData.pos_y = (drawData[objOpts.canvas.depth_scale] * amp[1] + shift_y) * yMag + pad_y;
+      }
+    }
+  }
+
+  return drawPointDataset
+}
+*/
+function calcDrawPosition(drawPointDataset, LCCore, objOpts, pOptions) {
+  if (drawPointDataset.data.length == 0) {
+    //console.log("[Renderer]: There is no target point data.")
+    return drawPointDataset
+  }
+
+  //initialise
+  const isFlip = pOptions?.isFlip ? pOptions.isFlip : false;
+  const xMag = objOpts.canvas.zoom_level[0] * objOpts.canvas.dpir;
+  let yMag = objOpts.canvas.zoom_level[1] * objOpts.canvas.dpir;
+  const pad_x = objOpts.canvas.pad_x;
+  let pad_y = objOpts.canvas.pad_y;
+  if (objOpts.canvas.depth_scale == "age") {
+    yMag = yMag * objOpts.canvas.age_zoom_correction[0];
+    pad_y = pad_y + objOpts.canvas.age_zoom_correction[1];
+  }
+  const shift_x = objOpts.canvas.shift_x;
+  const shift_y = objOpts.canvas.shift_y;
+
+  const val_min = drawPointDataset.min;
+  const val_max = drawPointDataset.max;
+  const amp = pOptions?.amplification ? [(objOpts.hole.width / 2) * pOptions.amplification / (val_max - val_min), 1] : 1;
+
+  //get enable hole num
+  let numEnable = 0;
+  let numDisable = 0;
+  const holeEnableList = [];
+
+  // [Correction] Flag to track if we have encountered any visible project yet.
+  // This ensures the first visible project starts at 0 without adding an interval gap.
+  let hasVisibleProject = false;
+
+  const projectInterval = (objOpts.project && objOpts.project.interval) ? objOpts.project.interval : 0;
+
+  for (let p = 0; p < LCCore.projects.length; p++) {
+
+    const isProjectEnable = LCCore.projects[p].enable;
+
+    if (isProjectEnable) {
+      // Add interval ONLY if there is a preceding visible project.
+      // If this is the first visible project (even if p > 0), no interval is added before it.
+      if (hasVisibleProject) {
+        numEnable += projectInterval;
+      }
+      hasVisibleProject = true; // Mark that we have seen a visible project
+    } else {
+      // If project is disabled, we count the interval as disabled space 
+      // (assuming an interval typically exists between projects).
+      if (p > 0) {
+        numDisable += projectInterval;
+      }
+    }
+
+    const hCounts = [];
+    for (let h = 0; h < LCCore.projects[p].holes.length; h++) {
+
+      // [Correction] Check Project Enable status as well.
+      // If Project is disabled, its holes should not increment numEnable,
+      // regardless of the hole's individual enable status.
+      if (isProjectEnable && LCCore.projects[p].holes[h].enable) {
+        numEnable += 1;
+      } else {
+        numDisable += 1;
+      }
+      hCounts.push({
+        enable: numEnable,
+        disable: numDisable
+      });
+    }
+    holeEnableList.push(hCounts);
+  }
+
+  //calc
+  for (let i = 0; i < drawPointDataset.data.length; i++) {
+    const drawData = drawPointDataset.data[i];
+
+    if (drawData.source === "trinity") {
+      if (drawData.pidx !== null && drawData.hidx !== null) {
+        if (!LCCore.projects[drawData.pidx].holes[drawData.hidx].enable) {
+          drawData.pos_x = NaN;
+          drawData.pos_y = NaN;
+          continue;
+        }
+        
+        // If the project itself is disabled, the point should not be drawn
+        if (!LCCore.projects[drawData.pidx].enable) {
+          drawData.pos_x = NaN;
+          drawData.pos_y = NaN;
+          continue;
+        }
+
+        const enableHoles = holeEnableList[drawData.pidx][drawData.hidx];
+        //calc        
+        if (drawData.type == "age") {
+          //age xpos is fixed. adjust icon size
+          drawData.pos_x = ((objOpts.hole.distance + objOpts.hole.width) * (enableHoles.enable - 1) + shift_x) * xMag + pad_x + objOpts.hole.width * xMag - objOpts.age.incon_size * 1.2;
+          drawData.pos_y = (drawData[objOpts.canvas.depth_scale] + shift_y) * yMag + pad_y - objOpts.age.incon_size / 2;
+        } else {
+          //data xpos, without adjust
+          if (Number.isFinite(drawData.val)) {
+            let relative_x = (drawData.val - val_min) * amp[0];
+            if (isFlip) {
+              relative_x = objOpts.hole.width - relative_x;
+            }
+            drawData.pos_x = ((objOpts.hole.distance + objOpts.hole.width) * (enableHoles.enable - 1) + relative_x + shift_x) * xMag + pad_x;
+          } else {
+            drawData.pos_x = NaN;
+          }
+
+          drawData.pos_y = (drawData[objOpts.canvas.depth_scale] * amp[1] + shift_y) * yMag + pad_y;
+        }
+      }
+    } else {
+      //case depth source is CD, EFD, AGE
+      if (drawData.type == "age") {
+        const age_shift_x = -50;
+        drawData.pos_x = age_shift_x + shift_x * xMag + pad_x - objOpts.age.incon_size * 1.2;
+        drawData.pos_y = (drawData[objOpts.canvas.depth_scale] + shift_y) * yMag + pad_y - objOpts.age.incon_size / 2;
+      } else {
+        let relative_x = (drawData.val - val_min) * amp[0];
+
+        if (isFlip) {
           relative_x = objOpts.hole.width - relative_x;
         }
 
