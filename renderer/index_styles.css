@@ -307,6 +307,20 @@ html {
   width: 100%;
   z-index: 10;
 }
+#bt_source {
+  flex-shrink: 0;  
+  box-sizing: border-box;
+  width: 40px;
+  height: 40px;
+  border: 1px solid gray;
+  z-index: 10;
+}
+
+#bt_source img {
+  height: 75%;
+  width: 100%;
+  z-index: 10;
+}
 #bt_core_model {
   flex-shrink: 0;  
   box-sizing: border-box;

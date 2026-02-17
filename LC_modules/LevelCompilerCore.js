@@ -1778,7 +1778,7 @@ class LevelCompilerCore extends EventEmitter{
       let lowerIdxs = [];
 
       if(trinityList[t].hole_name==null || trinityList[t].section_name==null || trinityList[t].distance==null){
-        output.push([null, null, null, null, null]);        
+        output.push([null, null, null, null, null, null]);        
         continue;
       } 
       const holeName    = lcfnc.zeroPadding(trinityList[t].hole_name);
@@ -1836,7 +1836,6 @@ class LevelCompilerCore extends EventEmitter{
           }
         }
       }
-
       //check num of detection
       if (upperIdxs.length > 1 || lowerIdxs.length > 1) {
         console.log(upperIdxs, lowerIdxs)
@@ -1865,7 +1864,6 @@ class LevelCompilerCore extends EventEmitter{
         );
         output.push([null, null, null, null, null]);
       }
-
 
       //extrapolation case
       if(upperIdxs.length == 0 || lowerIdxs.length == 0){        
@@ -1906,13 +1904,13 @@ class LevelCompilerCore extends EventEmitter{
             Idx = upperIdxs[0];
           }
 
-          if(!Number.isFinite(Idx)){
+          if(Idx===null || Idx === undefined){
             output.push([null, null, null, null, null]);
             continue;
           }
 
           const sectionId = this.projects[Idx[0]].holes[Idx[1]].sections[Idx[2]].id;
-
+          
           //calc
           const D3   = this.projects[Idx[0]].holes[Idx[1]].sections[Idx[2]].markers[Idx[3]][calcType];
           const d1   = distance;
@@ -1923,7 +1921,7 @@ class LevelCompilerCore extends EventEmitter{
 
           const new_rank = D3_rank + 2;
 
-          output.push([sectionId, D1, new_rank,"extrapolation", "Parallel Section"]);
+          output.push([sectionId, D1, new_rank,"extrapolation", "Parallel (outside)", this.projects[Idx[0]].model_type]);
           continue;
         }
 
@@ -1935,33 +1933,26 @@ class LevelCompilerCore extends EventEmitter{
 
 
       //check duo connection
-      let isMasterExist = false;
+      const isMasterExist = this.projects.some(p=>{return p.model_type=="correlation"});
       let isConnectedMaster = false;
-      if(this.projects[masterIdx[0]].model_type == "correlation"){
-        isMasterExist = true;
-      }
-      if(this.projects[upperIdxs[0][0]].model_type == "duo"){
-        outer: for(let h=0; h< this.projects[upperIdxs[0][0]].holes.length;h++){
-            for(let s=0; s< this.projects[upperIdxs[0][0]].holes[h].sections.length;s++){
-              for(let m=0; m< this.projects[upperIdxs[0][0]].holes[h].sections[s].markers.length;m++){
-                for(let c=0; c< this.projects[upperIdxs[0][0]].holes[h].sections[s].markers[m].h_connection.length;c++){
-                  const hc = this.projects[upperIdxs[0][0]].holes[h].sections[s].markers[m].h_connection[c];
-                  if(hc[0]==this.base_project_id[0]){
-                    isConnectedMaster = true;
-                    break outer;
-                  }
-                }          
-              }
-            }
-          }  
+
+      if(isMasterExist && this.projects[upperIdxs[0][0]].model_type == "duo"){
+        isConnectedMaster =
+        this.projects[upperIdxs[0][0]].holes.some(h =>
+          h.sections.some(s =>
+            s.markers.some(m =>
+              m.h_connection.some(hc =>
+                hc[0] === this.base_project_id[0]
+              )
+            )
+          )
+        ) ?? false;
          
-      }else{
-        isMasterExist = true;
+      }else if(this.projects[upperIdxs[0][0]].model_type == "correlation"){
         isConnectedMaster = true;
       }
 
       //calc duo depth
-      isForce = true;
       if(isForce || (isMasterExist && isConnectedMaster)){
         //calc depth
         //get nearest cd/efd data
@@ -1981,7 +1972,7 @@ class LevelCompilerCore extends EventEmitter{
           //console.log("ERROR: " + calcType + " of value is empty.");
           //console.log("D1:" + D1 + "/D3:" + D3 + "/d1:" + d1 + "/d3:" + d3);
 
-          output.push([null, null, null, null, null]);
+          output.push([null, null, null, null, null, null]);
           continue;
         }
 
@@ -1991,14 +1982,14 @@ class LevelCompilerCore extends EventEmitter{
         const interpolatedDepth = this.linearInterp(D1, D3, d2d1, d3d1);
         const new_rank = Math.max(...[D1_rank, D3_rank]) + 1;
         if(D1_master && D3_master){
-          output.push([sectionId, interpolatedDepth, new_rank, "interpolation", "Master Section"]);
+          output.push([sectionId, interpolatedDepth, new_rank, "interpolation", "Master", this.projects[upperIdxs[0][0]].model_type ]);
         }else{
-          output.push([sectionId, interpolatedDepth, new_rank, "interpolation", "Parallel Section"]);
+          output.push([sectionId, interpolatedDepth, new_rank, "interpolation", "Parallel", this.projects[upperIdxs[0][0]].model_type ]);
         }
         
       }else{
         //case not calc depth
-        output.push([null, null, null, null, null]);
+        output.push([null, null, null, null, null, null]);
       }
 
 
@@ -3240,8 +3231,8 @@ class LevelCompilerCore extends EventEmitter{
       let hNeighbors = this.getNeighborSet(markerId, calcType, "horizontal");
       let vNeighbors = this.getNeighborSet(markerId, calcType, "vertical");
       
-      let hasHMaster = hNeighbors.some(n => n.master);
-      let hasVMaster = vNeighbors.some(n => n.master);
+      let hasHMaster = hNeighbors.some(n => n.master) ?? false;
+      let hasVMaster = vNeighbors.some(n => n.master) ?? false;
 
       let nextTargets = [];
       if (hasHMaster && hasVMaster) {

@@ -59,6 +59,7 @@ class LevelCompilerPlot {
   }
   calcDataCollectionPosition(LCCore, LCAge) {
     const allowExtrapolation = true;
+    const forced = true;
 
     if(this.data_collections.length == 0){
       return {ok: false, type: 1, reason: "There is no target data."}
@@ -112,9 +113,9 @@ class LevelCompilerPlot {
           td.distance     = parseFloat(data[5]);
 
           //calc
-          const cd  = LCCore.getDepthFromTrinity( targetProjectId, [td], "composite_depth", allowExtrapolation );
-          const efd = LCCore.getDepthFromTrinity( targetProjectId, [td], "event_free_depth", allowExtrapolation );
-          const dd  = LCCore.getDepthFromTrinity( targetProjectId, [td], "drilling_depth", allowExtrapolation );
+          const cd  = LCCore.getDepthFromTrinity( targetProjectId, [td], "composite_depth", allowExtrapolation, forced );
+          const efd = LCCore.getDepthFromTrinity( targetProjectId, [td], "event_free_depth", allowExtrapolation, forced);
+          const dd  = LCCore.getDepthFromTrinity( targetProjectId, [td], "drilling_depth", allowExtrapolation, forced);
           const age = LCAge.getAgeFromEFD( efd[0][1], "linear" );
 
           //add

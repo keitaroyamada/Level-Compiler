@@ -70,18 +70,18 @@ document.addEventListener("DOMContentLoaded", () => {
     };
 
     //=========== public properties =========== 
-    objOpts.information.version = 2.2;
+    objOpts.information.version = "2.2";
     objOpts.developer.mode = "user";//"user";"developer";"root"; 
     
     objOpts.canvas.depth_scale = "composite_depth";
     objOpts.canvas.background_colour = "#ffffff";//"#f4f5f7";//"#f7f7f7"//"#f8fbff";//"#fffdfa";//""white    
     objOpts.canvas.display_height = 20.2;
-    objOpts.canvas.is_draw_model = true;
-    objOpts.canvas.is_event = true;
-    objOpts.canvas.is_connection = true;
-    objOpts.canvas.is_target = false;//mouse target
-    objOpts.canvas.draw_core_photo = false;
-    objOpts.canvas.is_grid = false;
+    objOpts.canvas.is_model_visible = true;
+    objOpts.canvas.is_event_expanded = true;
+    objOpts.canvas.is_connection_visible = true;
+    objOpts.canvas.is_target_visible = false;//mouse target
+    objOpts.canvas.is_core_photo_visible = false;
+    objOpts.canvas.is_grid_visible = false;
     objOpts.canvas.grid_width = 0.5;
     objOpts.canvas.grid_colour = "#565656";
     objOpts.canvas.zoom_level = [4, 3]; //[x, y](300pix/1m)
@@ -96,7 +96,7 @@ document.addEventListener("DOMContentLoaded", () => {
     objOpts.canvas.buffer_width = 0.3; //[rate]
     
     objOpts.project.interval = 1;
-    objOpts.project.is_show_area = true;
+    objOpts.project.is_area_visible = true;
     objOpts.project.area_colour = "#EBEBEB";
     objOpts.project.area_colour_disconnected = "#f96a6a";
     objOpts.project.pad_x = 80;
@@ -123,10 +123,10 @@ document.addEventListener("DOMContentLoaded", () => {
     objOpts.section.font_pos_x = -10;
     objOpts.section.font_colour = "#000000";
 
-    objOpts.marker.show_name_labels = true;
-    objOpts.marker.show_position_labels = true;
-    objOpts.marker.emphasise_reversed = true;
-    objOpts.marker.is_rank = false;
+    objOpts.marker.is_name_labels_visible = true;
+    objOpts.marker.is_position_labels_visible = true;
+    objOpts.marker.is_reverse_highlighted = true;
+    objOpts.marker.is_rank_visible = false;
     objOpts.marker.line_colour = "#808080";
     objOpts.marker.line_width = 1;
     objOpts.marker.width = 20;    
@@ -153,46 +153,46 @@ document.addEventListener("DOMContentLoaded", () => {
       earthquake: "#008000"  // green
     };
     objOpts.event.line_width = 1;
-    objOpts.event.line_colour = "#808080"; //rate
     objOpts.event.folded_width  = 0.1;//rate
     objOpts.event.face_height = 0.98;//rate
   
-    objOpts.connection.emphasise_master_connections = true;
+    objOpts.connection.is_master_connections_highlighted = true;
     objOpts.connection.master_section_line_width = 4;
     objOpts.connection.base_master_section_colour = "#0000FF"
     objOpts.connection.duo_master_section_colour = "#73A7D1";
     objOpts.connection.line_colour = "#000000";
     objOpts.connection.line_width = 1.5;
-    objOpts.connection.indexWidth = objOpts.hole.distance * 0.7; //20;
-    objOpts.connection.emphasise_non_horizontal = false;
-    objOpts.connection.show_remote_connections = true;
-    objOpts.connection.emphasise_remote_connections = true;
+    objOpts.connection.tab_length = objOpts.hole.distance * 0.7; //20;
+    objOpts.connection.is_non_horizontal_connections_highlighted = false;
+    objOpts.connection.is_remote_connections_visible = true;
+    objOpts.connection.is_remote_connections_highlighted = true;
+    objOpts.connection.is_source_visible = false;
   
     objOpts.plotter.selected_options = [];// store plot options from plotter
 
-    objOpts.plot.is_visible = false;
-    objOpts.plot.is_draw_axis = true;
-    objOpts.plot.use_resample_method = "block";//"block", "moving"
+    objOpts.plot.is_plot_visible = false;
+    objOpts.plot.is_axis_visible = true;
+    objOpts.plot.resample_method = "block";//"block", "moving"
     objOpts.plot.barplot_width = 1;
     objOpts.plot.scatterplot_size = 3;
     objOpts.plot.lineplot_stroke = 1;
     objOpts.plot.lineplot_split_sections = true;
     objOpts.plot.lineplot_ignore_invalid = true;
-    objOpts.plot.invalid_value = ["-9999","na", "n/a", "null", "none", "nan","missing"];
+    objOpts.plot.invalid_values = ["-9999","na", "n/a", "null", "none", "nan","missing"];
     
     objOpts.pen.colour = "#ff0000";
 
-    objOpts.image.draw_core_photo_plot = false;
+    objOpts.image.is_core_photo_visible = false;
     objOpts.image.photo_plot_colour = "#ff0000";
     objOpts.image.dpcm = 24;
-    objOpts.image.dpcm_high = 200;
-    objOpts.image.enable_load = {composite_depth: true, event_free_depth: true, age: true};
+    objOpts.image.dpcm_highresolution = 200;
+    objOpts.image.is_load_enabled = {composite_depth: true, event_free_depth: true, age: true};
 
-    objOpts.age.is_visible = true;
+    objOpts.age.is_age_visible = true;
     objOpts.age.age_precision = 0;
     objOpts.age.incon_size = 20;
     objOpts.age.alt_radius = 3;     
-    objOpts.age.show_age_name = false;
+    objOpts.age.is_age_label_visible = false;
     objOpts.age.font_colour = "#000000";
     objOpts.age.font = "Arial";
     objOpts.age.font_size = 15;
@@ -318,7 +318,7 @@ document.addEventListener("DOMContentLoaded", () => {
       })
 
       if(!LCCore && order.length == 0){
-        alert("There is no correlation/duo model. Please load correlation model first.");
+        alert("No correlation/duo model is loaded. Please load a correlation model first.");
         return;
       }
 
@@ -350,7 +350,7 @@ document.addEventListener("DOMContentLoaded", () => {
       }else{
         dataList.forEach((data,i)=>{
           if(data.type == "lcsection"){
-            alert("The section model can only be loaded in edit mode.")
+            alert("The section model can only be loaded in Edit mode.")
             return;
           }
         })
@@ -366,7 +366,7 @@ document.addEventListener("DOMContentLoaded", () => {
       })
 
       if(numIm>0){
-        alert("To load images, please drop the folder where they are saved. The image names also must be 'holeName-sectionName'.")
+        alert("To load images, drop the folder containing them. Image names must follow the format 'holeName-sectionName'.")
         return
       }
 
@@ -444,7 +444,7 @@ document.addEventListener("DOMContentLoaded", () => {
             console.log(LCCore)
           }else{
             console.log("[Renderer]: Failed to load section data"+result);
-            alert("Failed to load lcsectoion because: "+result);
+            alert("Failed to load LC section: "+result);
             await window.LCapi.clearProgressbar()
             return
           }
@@ -516,12 +516,12 @@ document.addEventListener("DOMContentLoaded", () => {
   //target
   document.getElementById("bt_target").addEventListener("click", async (event) => {
       var target_line = document.getElementById("horizontal_target");
-      if (objOpts.canvas.is_target) {
-        objOpts.canvas.is_target = false;
+      if (objOpts.canvas.is_target_visible) {
+        objOpts.canvas.is_target_visible = false;
         document.getElementById("bt_target").style.backgroundColor = "#f0f0f0";
         target_line.style.display = "none";
       } else {
-        objOpts.canvas.is_target = true;
+        objOpts.canvas.is_target_visible = true;
         document.getElementById("bt_target").style.backgroundColor = "#ccc";
         target_line.style.display = "block";
       }
@@ -531,11 +531,11 @@ document.addEventListener("DOMContentLoaded", () => {
   //show model
   document.getElementById("bt_core_model").addEventListener("click", async (event) => {
     if(LCCore){
-      if (objOpts.canvas.is_draw_model) {
-        objOpts.canvas.is_draw_model = false;
+      if (objOpts.canvas.is_model_visible) {
+        objOpts.canvas.is_model_visible = false;
         document.getElementById("bt_core_model").style.backgroundColor = "#f0f0f0";
       } else {
-        objOpts.canvas.is_draw_model = true;
+        objOpts.canvas.is_model_visible = true;
         document.getElementById("bt_core_model").style.backgroundColor = "#ccc";
       }
       updateView();
@@ -546,10 +546,10 @@ document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("bt_connection").addEventListener("click", async (event) => {
     if(LCCore){
       if (objOpts.canvas.is_connection) {
-        objOpts.canvas.is_connection = false;
+        objOpts.canvas.is_connection_visible = false;
         document.getElementById("bt_connection").style.backgroundColor = "#f0f0f0";
       } else {
-        objOpts.canvas.is_connection = true;
+        objOpts.canvas.is_connection_visible = true;
         document.getElementById("bt_connection").style.backgroundColor = "#ccc";
       }
       updateView();
@@ -559,11 +559,11 @@ document.addEventListener("DOMContentLoaded", () => {
   //show event layers
   document.getElementById("bt_event_layer").addEventListener("click", async (event) => {
     if(LCCore){
-      if (objOpts.canvas.is_event) {
-        objOpts.canvas.is_event = false;
+      if (objOpts.canvas.is_event_expanded) {
+        objOpts.canvas.is_event_expanded = false;
         document.getElementById("bt_event_layer").style.backgroundColor = "#f0f0f0";
       } else {
-        objOpts.canvas.is_event = true;
+        objOpts.canvas.is_event_expanded = true;
         document.getElementById("bt_event_layer").style.backgroundColor = "#ccc";
       }
       updateView();
@@ -575,11 +575,11 @@ document.addEventListener("DOMContentLoaded", () => {
     if (Object.keys(modelImages[objOpts.canvas.depth_scale]).length === 0) {
       return
     }
-    if (objOpts.canvas.draw_core_photo) {
-      objOpts.canvas.draw_core_photo = false;
+    if (objOpts.canvas.is_core_photo_visible) {
+      objOpts.canvas.is_core_photo_visible = false;
       document.getElementById("bt_core_photo").style.backgroundColor = "#f0f0f0";
     } else {
-      objOpts.canvas.draw_core_photo = true;
+      objOpts.canvas.is_core_photo_visible = true;
       document.getElementById("bt_core_photo").style.backgroundColor = "#ccc";
     }
     updateView();
@@ -589,12 +589,26 @@ document.addEventListener("DOMContentLoaded", () => {
   //rank
   document.getElementById("bt_rank").addEventListener("click", async (event) => {
     if(LCCore){
-      if (objOpts.marker.is_rank) {
-        objOpts.marker.is_rank = false;
+      if (objOpts.marker.is_rank_visible) {
+        objOpts.marker.is_rank_visible = false;
         document.getElementById("bt_rank").style.backgroundColor = "#f0f0f0";
       } else {
-        objOpts.marker.is_rank = true;
+        objOpts.marker.is_rank_visible = true;
         document.getElementById("bt_rank").style.backgroundColor = "#ccc";
+      }
+      updateView();
+    }      
+  });
+  //============================================================================================
+  //rank
+  document.getElementById("bt_source").addEventListener("click", async (event) => {
+    if(LCCore){
+      if (objOpts.connection.is_source_visible) {
+        objOpts.connection.is_source_visible = false;
+        document.getElementById("bt_source").style.backgroundColor = "#f0f0f0";
+      } else {
+        objOpts.connection.is_source_visible = true;
+        document.getElementById("bt_source").style.backgroundColor = "#ccc";
       }
       updateView();
     }      
@@ -603,11 +617,11 @@ document.addEventListener("DOMContentLoaded", () => {
   //grid
   document.getElementById("bt_grid").addEventListener("click", async (event) => {
     if(LCCore){
-      if (objOpts.canvas.is_grid) {
-        objOpts.canvas.is_grid = false;
+      if (objOpts.canvas.is_grid_visible) {
+        objOpts.canvas.is_grid_visible = false;
         document.getElementById("bt_grid").style.backgroundColor = "#f0f0f0";
       } else {
-        objOpts.canvas.is_grid = true;
+        objOpts.canvas.is_grid_visible = true;
         document.getElementById("bt_grid").style.backgroundColor = "#ccc";
       }
       updateView();
@@ -617,28 +631,28 @@ document.addEventListener("DOMContentLoaded", () => {
   //show labels
   document.getElementById("bt_show_labels").addEventListener("click", async (event) => {
     if(LCCore){
-      if (objOpts.marker.show_name_labels || objOpts.marker.show_position_labels) {      
+      if (objOpts.marker.is_name_labels_visible || objOpts.marker.is_position_labels_visible) {      
         if (event.shiftKey){
-          objOpts.marker.show_name_labels = false;
-          objOpts.marker.show_position_labels = true;
+          objOpts.marker.is_name_labels_visible = false;
+          objOpts.marker.is_position_labels_visible = true;
         } else if (event.ctrlKey){
-          objOpts.marker.show_name_labels = true;
-          objOpts.marker.show_position_labels = false;
+          objOpts.marker.is_name_labels_visible = true;
+          objOpts.marker.is_position_labels_visible = false;
         } else {
-          objOpts.marker.show_name_labels = false;
-          objOpts.marker.show_position_labels = false;
+          objOpts.marker.is_name_labels_visible = false;
+          objOpts.marker.is_position_labels_visible = false;
           document.getElementById("bt_show_labels").style.backgroundColor = "#f0f0f0";
         }
       } else {
         if (event.shiftKey){
-          objOpts.marker.show_name_labels = false;
-          objOpts.marker.show_position_labels = true;
+          objOpts.marker.is_name_labels_visible = false;
+          objOpts.marker.is_position_labels_visible = true;
         } else if (event.ctrlKey){
-          objOpts.marker.show_name_labels = true;
-          objOpts.marker.show_position_labels = false;
+          objOpts.marker.is_name_labels_visible = true;
+          objOpts.marker.is_position_labels_visible = false;
         } else {
-          objOpts.marker.show_name_labels = true;
-          objOpts.marker.show_position_labels = true;
+          objOpts.marker.is_name_labels_visible = true;
+          objOpts.marker.is_position_labels_visible = true;
         }
         document.getElementById("bt_show_labels").style.backgroundColor = "#ccc";
       }
@@ -827,9 +841,10 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     if(!objOpts.edit.editable && !isConnected){
-      alert("Please note that loaded model includes a project that is not connected to the master.\n"+
-            "The project will have its own CD, EFD calculated."
-          );
+      alert(
+        "The loaded model contains a project not connected to the master.\n" +
+        "CD and EFD will be calculated independently for that project."
+      );
     }
     
     updateView();
@@ -877,7 +892,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
       //get plotter options
       objOpts.plotter.selected_options = data.data;
-      objOpts.plot.is_visible = true;
+      objOpts.plot.is_plot_visible = true;
       document.getElementById("bt_chart").style.backgroundColor = "#ccc";
 
       //emit type: new: start plot, add: add new data, updateDataset: update data values, updateSetting: update only setting
@@ -890,7 +905,7 @@ document.addEventListener("DOMContentLoaded", () => {
       }
 
       //initiarise
-      const invalidSet = new Set(objOpts.plot.invalid_value);
+      const invalidSet = new Set(objOpts.plot.invalid_values);
 
       //calc plotvaluse
       if(objOpts.plotter.selected_options !== null && LCPlotData.data_collections.length>0){
@@ -1040,7 +1055,7 @@ document.addEventListener("DOMContentLoaded", () => {
           if(bin_width>0){
             
             let resampledDataset;
-            if(objOpts.plot.use_resample_method=="moving"){
+            if(objOpts.plot.resample_method=="moving"){
               //moving averaging
               resampledDataset = movingAvPointData(dividedDataSeries, [bin_width], objOpts);
             }else{
@@ -1125,7 +1140,7 @@ document.addEventListener("DOMContentLoaded", () => {
       response = await window.LCapi.inputdialog(askData);
       if(response !==null){
         if(response !== objOpts.edit.passwards){
-          alert("Please input correct passwords.");
+          alert("Please enter the correct passwords.");
           return
         }
       }else{
@@ -1184,7 +1199,7 @@ document.addEventListener("DOMContentLoaded", () => {
       const holeName = LCCore.projects[targetIdx[0]].holes[targetIdx[1]].name;
       const sectionName = LCCore.projects[targetIdx[0]].holes[targetIdx[1]].sections[targetIdx[2]].name;
 
-      modelImages.image_resolution[holeName+"-"+sectionName] = objOpts.image.dpcm_high;
+      modelImages.image_resolution[holeName+"-"+sectionName] = objOpts.image.dpcm_highresolution;
 
       modelImages = await loadCoreImages(modelImages, LCCore, objOpts, ["drilling_depth", "composite_depth","event_free_depth","age"]);
       
@@ -1624,7 +1639,8 @@ document.addEventListener("DOMContentLoaded", () => {
     }else if(clickResult == "addProject"){
       if(LCCore){
         if(LCCore.projects[LCCore.projects.length-1].holes.length  <= 0){
-          alert("Previous project is empty. Please add a hole to the previous project first.");
+          alert("The previous project is empty. Please add a hole to it first.");
+
           return
         }else{
           ProjectAdd();
@@ -1709,7 +1725,7 @@ document.addEventListener("DOMContentLoaded", () => {
           updateView();   
 
         }else if (result == "duplicate_holes"){
-          alert("There are duplicate hole names. Please rename to unique hole name first.")
+          alert("Duplicate hole names detected. Please rename them to unique names.");
         }
       }    
     }else if(clickResult == "loadHighResolutionImage"){
@@ -1720,7 +1736,7 @@ document.addEventListener("DOMContentLoaded", () => {
       const holeName = LCCore.projects[targetIdx[0]].holes[targetIdx[1]].name;
       const sectionName = LCCore.projects[targetIdx[0]].holes[targetIdx[1]].sections[targetIdx[2]].name;
 
-      modelImages.image_resolution[holeName+"-"+sectionName] = objOpts.image.dpcm_high;
+      modelImages.image_resolution[holeName+"-"+sectionName] = objOpts.image.dpcm_highresolution;
 
       modelImages = await loadCoreImages(modelImages, LCCore, objOpts, ["drilling_depth","composite_depth","event_free_depth", "age"]);
       updateView();
@@ -2200,7 +2216,7 @@ document.addEventListener("DOMContentLoaded", () => {
             const regex = new RegExp(`^${objOpts.edit.marker_from.holeName}-${objOpts.edit.marker_from.sectionName}-(top|bottom)$`);
             if(!regex.test(response)){
               isProcessing = false;
-              alert("Invalid name format. Please use the format: <Hole Name>-<Section Name>-top/bottom");
+              alert("Invalid name format. Use: <Hole Name>-<Section Name>-top/bottom");
               return
             }
           }          
@@ -2266,7 +2282,8 @@ document.addEventListener("DOMContentLoaded", () => {
           }          
         }
         if(numMaster>2){
-          alert("Only up to 2 master markers can beset in the same horizon. Please delete any unnecessary masters first.");
+          alert("Only up to two master markers can be set in the same horizon. Please remove any unnecessary ones first.");
+
           return;
         }
         
@@ -2697,14 +2714,15 @@ document.addEventListener("DOMContentLoaded", () => {
             const changedData = await getUpdatedSectionIds("depth");          
             console.log("[Renderer]: Affected sections:",changedData);
             //const affectedSections = getConnectedSectionIds([upperId, lowerId]);
-            if(changedData.ids.length>0 && (objOpts.image.enable_load.event_free_depth || objOpts.image.enable_load.age)){
+            if(changedData.ids.length>0 && (objOpts.image.is_load_enabled.event_free_depth || objOpts.image.is_load_enabled.age)){
               modelImages.load_target_ids = changedData.ids;
               modelImages = await loadCoreImages(modelImages, LCCore, objOpts, changedData.details);
             }
 
             console.log("[Renderer]: Add a new event.]");
           }else if(result == "occupied"){
-            alert("The input deposition type of event has already used between the markers.");
+            alert("This event deposition type is already used between the markers.");
+
           }
         }        
       }
@@ -2732,7 +2750,7 @@ document.addEventListener("DOMContentLoaded", () => {
           const changedData = await getUpdatedSectionIds("depth");
           console.log("[Renderer]: Affected sections:",changedData);
           //const affectedSections = getConnectedSectionIds([upperId, lowerId]);
-          if(changedData.ids.length>0 && (objOpts.image.enable_load.event_free_depth || objOpts.image.enable_load.age)){
+          if(changedData.ids.length>0 && (objOpts.image.is_load_enabled.event_free_depth || objOpts.image.is_load_enabled.age)){
             modelImages.load_target_ids = changedData.ids;
             modelImages = await loadCoreImages(modelImages, LCCore, objOpts, changedData.details);
           }
@@ -2811,8 +2829,9 @@ document.addEventListener("DOMContentLoaded", () => {
         
         const result = await window.LCapi.changeSection(targetId, target, response);
         if(result=="used"){
-          console.log("[Renderer]: "+response+" has already been used. Please input a unique name that has not been used.");
-          alert("[ "+response+" ] has already been used. Please input a unique name that has not been used.");
+          console.log(`[Renderer]: "${response}" is already in use. Please enter a unique name.`);
+          alert(`"${response}" is already in use. Please enter a unique name.`);
+
         }else if(result==true){
           await undo("save","Change Section Name");//undo
           await loadModel(false,false);
@@ -2945,8 +2964,9 @@ document.addEventListener("DOMContentLoaded", () => {
             console.log("[Renderer]: Failed to add section.")
           }
         }else{
-          alert("Incrrect input values are detected.")
-          console.log("[Renderer]: Input data is incorrect values.")
+          alert("Incorrect input values detected.");
+          console.log("[Renderer]: Input data contains incorrect values.");
+
         }
       }else{
         return;
@@ -3171,8 +3191,9 @@ document.addEventListener("DOMContentLoaded", () => {
         
         const result = await window.LCapi.changeHole(targetId, target, response);
         if(result=="used"){
-          console.log("[Renderer]: "+response+" has already been used. Please input a unique name that has not been used.");
-          alert("[ "+response+" ] has already been used. Please input a unique name that has not been used.");
+          console.log(`[Renderer]: "${response}" is already in use. Please enter a unique name.`);
+          alert(`"${response}" is already in use. Please enter a unique name.`);
+
         }else if(result==true){
           await undo("save","Change Hole Name");//undo
           await loadModel(false,false);
@@ -3263,8 +3284,9 @@ document.addEventListener("DOMContentLoaded", () => {
           await loadPlotData("data")
           updateView();
         }else if(result=="used"){
-          console.log("[Renderer]: "+response+" has already been used. Please input a unique name that has not been used.");
-          alert("[ "+response+" ] has already been used. Please input a unique name that has not been used.");
+          console.log(`[Renderer]: "${response}" is already in use. Please enter a unique name.`);
+          alert(`"${response}" is already in use. Please enter a unique name.`);
+
         }
       }
     }
@@ -3343,20 +3365,20 @@ document.addEventListener("DOMContentLoaded", () => {
           await loadPlotData("data")
           updateView();
         }else if(result=="used"){
-          console.log("[Renderer]: "+response+" has already been used. Please input a unique name that has not been used.");
-          alert("[ "+response+" ] has already been used. Please input a unique name that has not been used.");
+          console.log(`[Renderer]: "${response}" is already in use. Please enter a unique name.`);
+          alert(`"${response}" is already in use. Please enter a unique name.`);
         }else if(result == "correlation_exist"){
-          console.log("[Renderer]: Base Correlation Model has already been registered. Please use duo model.");
-          alert("Base Correlation Model has already been registered. Please use duo model.");
+          console.log("[Renderer]: A base correlation model already exists. Please use a duo model.");
+          alert("A base correlation model already exists. Please use a duo model.");
         }else if(result == "no_correlation"){
-          console.log("[Renderer]: 'Duo' model requires Base Correlation Model. Please use correlation model first.");
-          alert("'Duo' model requires Base Correlation Model. Please use correlation model first.");
+          console.log("[Renderer]: A duo model requires a base correlation model. Please load a correlation model first.");
+          alert("A duo model requires a base correlation model. Please load a correlation model first.");
         }
-        
-      }else{
-        console.log("[Renderer]: "+response+" is incorrect type. Please select the type from 'correlation' or 'duo'.");
-        alert("[ "+response+" ] is incorrect type. Please select the type from 'correlation' or 'duo'.");
-      }
+
+        }else{
+          console.log(`[Renderer]: "${response}" is an invalid type. Please select 'correlation' or 'duo'.`);
+          alert(`"${response}" is an invalid type. Please select 'correlation' or 'duo'.`);
+        }
     }
     document.removeEventListener("click", objOpts.edit.handleClick);
     document.removeEventListener("mousemove", objOpts.edit.handleMove);
@@ -3417,8 +3439,9 @@ document.addEventListener("DOMContentLoaded", () => {
           //await loadPlotData("age");
           updateView();
         }else if(result=="used"){
-          console.log("[Renderer]: "+response+" has already been used. Please input a unique name that has not been used.");
-          alert("[ "+response+" ] has already been used. Please input a unique name that has not been used.");
+          console.log(`[Renderer]: "${response}" is already in use. Please enter a unique name.`);
+          alert(`"${response}" is already in use. Please enter a unique name.`);
+
         }
       }
     }else if(objOpts.edit.mode == "move_hole_to_project"){
@@ -3447,8 +3470,8 @@ document.addEventListener("DOMContentLoaded", () => {
           await loadPlotData("data")
           updateView();
         }else if(result==false){
-          console.log("[Renderer]: Failed to move hole to this project.");
-          //alert("[ "+response+" ] has already been used. Please input a unique name that has not been used.");
+          console.log("[Renderer]: Failed to move the hole to the selected project.");
+          // alert(`"${response}" is already in use. Please enter a unique name.`);
         }
       }
     }
@@ -3514,12 +3537,12 @@ document.addEventListener("DOMContentLoaded", () => {
   //============================================================================================
   document.getElementById("bt_chart").addEventListener("click", async () => {
     if (LCCore) {
-      if (!objOpts.plot.is_visible ) {
-        objOpts.plot.is_visible = true;
+      if (!objOpts.plot.is_plot_visible ) {
+        objOpts.plot.is_plot_visible = true;
         document.getElementById("bt_chart").style.backgroundColor = "#ccc";
         updateView();
       } else {
-        objOpts.plot.is_visible = false;
+        objOpts.plot.is_plot_visible = false;
         document.getElementById("bt_chart").style.backgroundColor = "#f0f0f0";
         updateView();
       }
@@ -3646,13 +3669,13 @@ document.addEventListener("DOMContentLoaded", () => {
           //change hole distance
           event.preventDefault();
           objOpts.hole.distance -= 1;
-          objOpts.connection.indexWidth = objOpts.hole.distance * 0.7;
-          //objOpts.connection.indexWidth += 0.015 * deltaY;
-          if (objOpts.connection.indexWidth < 0) {
-            objOpts.connection.indexWidth = 0;
+          objOpts.connection.tab_length = objOpts.hole.distance * 0.7;
+          //objOpts.connection.tab_length += 0.015 * deltaY;
+          if (objOpts.connection.tab_length < 0) {
+            objOpts.connection.tab_length = 0;
           }
-          if (objOpts.connection.indexWidth > 20) {
-            objOpts.connection.indexWidth = 20;
+          if (objOpts.connection.tab_length > 20) {
+            objOpts.connection.tab_length = 20;
           }
         }else {
           objOpts.canvas.zoom_level[1] -= 2;
@@ -3788,13 +3811,13 @@ document.addEventListener("DOMContentLoaded", () => {
           //change hole distance
           event.preventDefault();
           objOpts.hole.distance += 1;
-          objOpts.connection.indexWidth = objOpts.hole.distance * 0.7;
-          //objOpts.connection.indexWidth += 0.015 * deltaY;
-          if (objOpts.connection.indexWidth < 0) {
-            objOpts.connection.indexWidth = 0;
+          objOpts.connection.tab_length = objOpts.hole.distance * 0.7;
+          //objOpts.connection.tab_length += 0.015 * deltaY;
+          if (objOpts.connection.tab_length < 0) {
+            objOpts.connection.tab_length = 0;
           }
-          if (objOpts.connection.indexWidth > 20) {
-            objOpts.connection.indexWidth = 20;
+          if (objOpts.connection.tab_length > 20) {
+            objOpts.connection.tab_length = 20;
           }
         }else{
           objOpts.canvas.zoom_level[1] += 2;
@@ -3969,25 +3992,37 @@ document.addEventListener("DOMContentLoaded", () => {
 
       //back to settings menu
       const settings = makeSendSettingData();
-        
       await window.LCapi.sendSettings(settings, "settings");
     }else{
       //call saved settings
+      let isOldFormat = false;
 
-      if(!Number.isFinite(data.information?.version) || (data.information?.version < objOpts.information.version)){
-        // case: old beta version format(<v1.1.1), older version format
-        //overwrite the saved settings with app settings
+      const savedVersion = String(data.information?.version ?? "0").split('.').map(n=>parseInt(n,10)||0);
+      const currentVersion = String(objOpts.information.version).split('.').map(n=>parseInt(n,10)||0);
+
+      for(let i=0;i<Math.max(savedVersion.length,currentVersion.length);i++){
+        const s = savedVersion[i]||0;
+        const c = currentVersion[i]||0;
+        if(s < c){ isOldFormat = true; break; }
+        if(s > c){ break; }
+      }
+
+      if(isOldFormat){
+        // case: old beta version format, older version format
+        // overwrite the saved settings with app settings
 
         const settings = makeSendSettingData()
 
-        await window.LCapi.sendSettings({ data: settings, editable, options }, "save");
-        
-        console.log("[Renderer]: Beta-format settings detected. Replacing with the current version.", settings)
+        await window.LCapi.sendSettings(settings, "save");
+              
+        console.log("[Renderer]: Legacy-format settings detected. Replacing with the current version.", settings)
+
       }else{
         //case: same version (or app is older than saved settings)
         const updateDeny = new Set([
           "canvas.zoom_level" //To avoid errors
         ]);
+
         for (const k in data) {
           if (!objOpts[k]) continue;
 
@@ -4007,7 +4042,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }
 
         console.log("[Renderer]: Settings are loaded.", objOpts)        
-      }  
+      }
     }    
     
     updateView();
@@ -4181,13 +4216,13 @@ document.addEventListener("DOMContentLoaded", () => {
         //change hole distance
         event.preventDefault();
         objOpts.hole.distance += 0.01 * deltaY;
-        objOpts.connection.indexWidth = objOpts.hole.distance * 0.7;
-        //objOpts.connection.indexWidth += 0.015 * deltaY;
-        if (objOpts.connection.indexWidth < 0) {
-          objOpts.connection.indexWidth = 0;
+        objOpts.connection.tab_length = objOpts.hole.distance * 0.7;
+        //objOpts.connection.tab_length += 0.015 * deltaY;
+        if (objOpts.connection.tab_length < 0) {
+          objOpts.connection.tab_length = 0;
         }
-        if (objOpts.connection.indexWidth > 20) {
-          objOpts.connection.indexWidth = 20;
+        if (objOpts.connection.tab_length > 20) {
+          objOpts.connection.tab_length = 20;
         }
 
         //update plot
@@ -4617,7 +4652,7 @@ document.addEventListener("DOMContentLoaded", () => {
       
       //-----------------------------------------------------------------------------------------
       //draw grid
-      if (LCCore && objOpts.canvas.is_grid) {
+      if (LCCore && objOpts.canvas.is_grid_visible) {
         //function
         const title = (tickType) => {
           if (tickType == "age") {
@@ -4658,7 +4693,8 @@ document.addEventListener("DOMContentLoaded", () => {
           }
         } catch (err){
           console.error(err)
-          alert("An unexpected error has occurred. There may be a problem with the LC cache or temporary files.");
+          alert("An unexpected error occurred. The LC cache or temporary files may be corrupted.");
+
           return
         }
         
@@ -4871,12 +4907,14 @@ document.addEventListener("DOMContentLoaded", () => {
 
           //show project area
           //check master project connection
-          if(!isConnectMasterProject(LCCore, project.id)){
-            objOpts.project.is_show_area = true;
+          /*
+          if(!isConnectMasterProject(LCCore, project.id) && ["user"].includes(objOpts.developer.mode)){
+            objOpts.project.is_area_visible = true;
             objOpts.project.area_colour_disconnected = "#f96a6a";
           }
+            */
 
-          if(objOpts.project.is_show_area){
+          if(objOpts.project.is_area_visible){
             sketch.push();//save
             //check connection to base correlation model
             if(isBaseProjectMaster && isConnectMasterProject(LCCore, project.id)){
@@ -4972,7 +5010,7 @@ document.addEventListener("DOMContentLoaded", () => {
             sketch.pop();
           }
 
-          if(objOpts.canvas.is_draw_model){
+          if(objOpts.canvas.is_model_visible){
             //get plot order for hit test--------------------------------------
             let section_plot_order = [];
             for (let i = 0; i < hole.sections.length; i++) {
@@ -5077,7 +5115,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
               //add section photo-------------------------------------------------
               let isPhtoExist = false;
-              if (objOpts.canvas.draw_core_photo) {
+              if (objOpts.canvas.is_core_photo_visible) {
                 try {
                   let ptoto_depth_scale;
                     ptoto_depth_scale = objOpts.canvas.depth_scale;
@@ -5096,7 +5134,7 @@ document.addEventListener("DOMContentLoaded", () => {
                         sec_w,
                         sec_h
                       );
-                      if(objOpts.image.draw_core_photo_plot && modelImages.plot_colour[hole.name + "-" + section.name]){
+                      if(objOpts.image.is_core_photo_visible && modelImages.plot_colour[hole.name + "-" + section.name]){
                         const getWidth = 10;
                         const scanWidth = (getWidth*2)+1;
                         const imCx = img.width / 2;
@@ -5177,7 +5215,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
                 //first, draw event
                 let ew = 1;
-                if (!objOpts.canvas.is_event) {
+                if (!objOpts.canvas.is_event_expanded) {
                   ew = objOpts.event.folded_width;
                 }
                 
@@ -5242,7 +5280,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 //draw markers
                 sketch.drawingContext.setLineDash([]);
                 sketch.strokeWeight(objOpts.marker.line_width);
-                if(objOpts.canvas.draw_core_photo){
+                if(objOpts.canvas.is_core_photo_visible){
                   sketch.stroke("Magenta"); //(markerLineColour);
                 }else{
                   sketch.stroke(objOpts.marker.line_colour); //(markerLineColour);
@@ -5250,12 +5288,12 @@ document.addEventListener("DOMContentLoaded", () => {
                 
                 let mw = 1;
                 
-                if (!objOpts.canvas.is_event) {
+                if (!objOpts.canvas.is_event_expanded) {
                   mw = objOpts.event.folded_width;
                 }
 
                 //check reversed
-                if(objOpts.marker.emphasise_reversed){
+                if(objOpts.marker.is_reverse_highlighted){
                   if(m!==0){
                     if(section.markers[m-1][objOpts.canvas.depth_scale] > marker[objOpts.canvas.depth_scale]){
                       sketch.stroke("Cyan"); 
@@ -5403,7 +5441,7 @@ document.addEventListener("DOMContentLoaded", () => {
                   
                 }
 
-                if(["developer","root"].includes(objOpts.developer.mode)){
+                if(objOpts.connection.is_source_visible){
                     //data depth source arrow
                     sketch.drawingContext.setLineDash([]);
                     sketch.strokeWeight(1);                    
@@ -5474,7 +5512,7 @@ document.addEventListener("DOMContentLoaded", () => {
                   }
 
                 //add rank marker-------------------------------------------
-                if (objOpts.marker.is_rank) {
+                if (objOpts.marker.is_rank_visible) {
                   sketch.fill("#000000");
                   sketch.noStroke();
                   sketch.textFont("Arial");
@@ -5553,7 +5591,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 }
                 
                 //add marker name without top/bottom name
-                if(objOpts.marker.show_name_labels){
+                if(objOpts.marker.is_name_labels_visible){
                   //add marker name--------------------------------------------
                   if (m !== 0 && m !== section.markers.length - 1) {
                     let markerDispName = marker.name;
@@ -5571,7 +5609,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     );
                   }
                 }
-                if(objOpts.marker.show_position_labels){
+                if(objOpts.marker.is_position_labels_visible){
                   //add marker distance----------------------------------------
                   sketch.fill(objOpts.marker.font_colour);
                   sketch.noStroke();
@@ -5596,7 +5634,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 //-----------------------------------------------------------
                 //make connection objects=================================================================================
                 //add connection
-                if( objOpts.canvas.is_connection){
+                if( objOpts.canvas.is_connection_visible){
                   let connection_colour = objOpts.connection.line_colour;
                   let connection_line_width = objOpts.connection.line_width;
 
@@ -5686,17 +5724,17 @@ document.addEventListener("DOMContentLoaded", () => {
                   //get connector position
                   const cn_x0 = (hole_x0 + shift_x + objOpts.marker.width) * xMag + pad_x;
                   const cn_y0 = (marker_top + shift_y) * yMag + pad_y;
-                  const cn_x1 = cn_x0 + objOpts.connection.indexWidth;
+                  const cn_x1 = cn_x0 + objOpts.connection.tab_length;
                   const cn_y1 = cn_y0;
                   const cn_x3 = (connectedHole_x0 + shift_x) * xMag + pad_x;
                   const cn_y3 = (connectedMarker_top + shift_y) * yMag + pad_y;
-                  const cn_x2 = cn_x3 - objOpts.connection.indexWidth;
+                  const cn_x2 = cn_x3 - objOpts.connection.tab_length;
                   const cn_y2 = cn_y3;
 
                   //get style
                   if (cn_y0 !== cn_y3) {
                     //not horizontal
-                    if (objOpts.connection.emphasise_non_horizontal && objOpts.canvas.depth_scale !== "drilling_depth"){
+                    if (objOpts.connection.is_non_horizontal_connections_highlighted && objOpts.canvas.depth_scale !== "drilling_depth"){
                       sketch.fill(objOpts.marker.font_colour);
                       sketch.noStroke();
                       sketch.textFont(objOpts.marker.font);
@@ -5746,7 +5784,7 @@ document.addEventListener("DOMContentLoaded", () => {
                       
                       connection_line_width = objOpts.connection.line_width;
 
-                      if(objOpts.connection.emphasise_master_connections){
+                      if(objOpts.connection.is_master_connections_highlighted){
                         connection_line_width = connection_line_width * 2;
                       }               
                       
@@ -5755,8 +5793,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
                   if (connectionData.isNext == false) {
                     //connected core is not located at the next
-                    if (objOpts.connection.show_remote_connections){
-                      if(objOpts.connection.emphasise_remote_connections){
+                    if (objOpts.connection.is_remote_connections_visible){
+                      if(objOpts.connection.is_remote_connections_highlighted){
+                        sketch.drawingContext.globalAlpha = 0.25;
                         sketch.drawingContext.setLineDash([5, 5]);
                       }
                     }else{
@@ -5772,7 +5811,7 @@ document.addEventListener("DOMContentLoaded", () => {
                   sketch.line(cn_x1, cn_y1, cn_x2, cn_y2); //index left
                   sketch.line(cn_x2, cn_y2, cn_x3, cn_y3); //index right
 
-                  if(["developer","root"].includes(objOpts.developer.mode)){
+                  if(objOpts.connection.is_source_visible){
                     //source arrow
                     let dir = null;
                     if(marker.depth_source[1]){
@@ -5821,6 +5860,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     }
 
                   }
+                  sketch.drawingContext.globalAlpha = 1;
 
                   //------------------------------------------------------------                
                 } 
@@ -5835,7 +5875,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
       //==========================================================================================      
       //draw age points      
-      if (objOpts.canvas.is_draw_model && objOpts.age.is_visible && LCPlotAge !== null &&  LCPlotAge.ages.length > 0) {
+      if (objOpts.canvas.is_model_visible && objOpts.age.is_age_visible && LCPlotAge !== null &&  LCPlotAge.ages.length > 0) {
         //if(LCPlotAge.id == document.getElementById("AgeModelSelect").value) //if check id
         
         //get age data(because age data, age series is single)
@@ -5956,7 +5996,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 );
               }     
               
-              if(objOpts.age.show_age_name){
+              if(objOpts.age.is_age_label_visible){
                 sketch.push();
                 sketch.fill(objOpts.age.font_colour);
                 sketch.noStroke();
@@ -5980,7 +6020,7 @@ document.addEventListener("DOMContentLoaded", () => {
       //==========================================================================================
       //==========================================================================================
       //draw data points     //0000000000000000000000000000
-      if(objOpts.plot.is_visible == true){
+      if(objOpts.plot.is_plot_visible == true){
         if(objOpts.plotter.selected_options !== null){          
           sketch.drawingContext.setLineDash([]);
           if(LCPlotData){
@@ -6127,7 +6167,7 @@ document.addEventListener("DOMContentLoaded", () => {
                         zeroDataDict[hole.name] = zeroDataset.data;
 
                         //========== X axis for trinity===============                        
-                        if (objOpts.plot.is_draw_axis) {
+                        if (objOpts.plot.is_axis_visible) {
                           if(pOptions.isAxis){
                             let yAxis = 100 + scroller.scrollTop + 60 * t;
 
@@ -6208,7 +6248,7 @@ document.addEventListener("DOMContentLoaded", () => {
                   zeroDataDict["global"] = zeroDataset.data;
 
                   //========== X axis for global ===============
-                  if (objOpts.plot.is_draw_axis) {
+                  if (objOpts.plot.is_axis_visible) {
                     if(pOptions.isAxis){
                       let yAxis = 200 + scroller.scrollTop;
                         
@@ -6778,9 +6818,12 @@ document.addEventListener("DOMContentLoaded", () => {
         }
       }
       
-      if(!objOpts.edit.editable && !isConnected){
-        alert("Please note that loaded model includes a project that is not connected to the master.\n"+
-              "The UNCONNECTED project will have its own CD, EFD calculated."
+      if(!objOpts.edit.editable && !isConnected && ["user"].includes(objOpts.developer.mode)){
+        objOpts.project.is_area_visible = true;
+        objOpts.project.area_colour_disconnected = "#f96a6a";
+        alert(
+              "Please note that the loaded model contains a project not connected to the master.\n"+
+              "CD and EFD will be calculated independently for that project."
             );
       }
 
@@ -8208,8 +8251,8 @@ async function loadCoreImages(modelImages, LCCore, objOpts, operations) {
 
   //check operations
   
-  for (const op in objOpts.image.enable_load) {
-    if(!objOpts.image.enable_load[op]){
+  for (const op in objOpts.image.is_load_enabled) {
+    if(!objOpts.image.is_load_enabled[op]){
       operations = operations.filter(item => item !== op);
     }
   }  

@@ -813,6 +813,7 @@ function createMainWIndow() {
       bt_pen:         path.join(resourcePath, "resources","tool","pen.png"),
       bt_divider:     path.join(resourcePath, "resources","tool","divider.png"),
       bt_grid:        path.join(resourcePath, "resources","tool","grid.png"),
+      bt_source:      path.join(resourcePath, "resources","tool","source.png"),
       bt_rank:        path.join(resourcePath, "resources","tool","rank.png"),
       bt_target:      path.join(resourcePath, "resources","tool","target.png"),
       bt_event_layer: path.join(resourcePath, "resources","tool","event.png"),
@@ -2337,7 +2338,7 @@ function createMainWIndow() {
           td_cr.section_name = depthList[0].section_name;
           td_cr.distance     = (direction == "act->def") ? D1 : d1;
 
-          const cd_list = LCCore.getDepthFromTrinity(depthList[0].section_id, [td_cr], "composite_depth", true); //output:[sec id, cd, rank] fource calc extrapolation
+          const cd_list = LCCore.getDepthFromTrinity(depthList[0].section_id, [td_cr], "composite_depth", true, true); //output:[sec id, cd, rank] fource calc extrapolation
           const D1cd = cd_list[0][1];
 
           const idx2 = LCCore.getIdxFromTrinity(depthList[0].section_id, [depthList[0].hole_name, depthList[0].section_name, (direction == "act->def") ? D2 : d2]);
@@ -2376,7 +2377,7 @@ function createMainWIndow() {
           td_cr.section_name = depthList[0].section_name;
           td_cr.distance     = (direction == "act->def") ? D2 : d2;
 
-          const cd_list = LCCore.getDepthFromTrinity(depthList[0].section_id, [td_cr], "composite_depth"); //output:[sec id, cd, rank]
+          const cd_list = LCCore.getDepthFromTrinity(depthList[0].section_id, [td_cr], "composite_depth", true, true); //output:[sec id, cd, rank]
           const D2cd = cd_list[0][1];
           
           const idx1 = LCCore.getIdxFromTrinity(depthList[0].section_id, [depthList[0].hole_name, depthList[0].section_name, (direction == "act->def") ? D1 : d1]);
@@ -2983,7 +2984,9 @@ function createMainWIndow() {
   });
   ipcMain.handle("cvtConverter", async (_e, options) => {
     options = await unzipData(options);
+    if(!globalTempData){
 
+    }
     if(globalTempData.from == "converter" && globalTempData.id == options.id){
       //mage submit indata for depthconverter
       let indataList = [];
@@ -3075,6 +3078,7 @@ function createMainWIndow() {
 
       //submit data into depthConverter
       const calcedDataList = await depthConverter(indataList, options);
+
       if(calcedDataList===null){
         return {ok:false, reason: "Usear cancelled."}
       }
@@ -3095,21 +3099,25 @@ function createMainWIndow() {
           "Hole",
           "Section",
           "Position (cm)",
+          "Drilling depth (cm)",
+          "Source Type",
+          " ",
+          "Depth basis",
           "Composite depth (cm)",
           "Eventfree depth (cm)",
-          "Drilling depth (cm)",
           "Age mid (calBP)",
           "Age upper (calBP)",
           "Age lower (calBP)",
-
-          "Connection",
+          " ",          
           "Connection Rank",
-          "Source Type",
-          "Calc Type",
+          "Section type",          
+          //"Calc Type",
+          " ",
           "Correlation Model Version",
-          "Event Model Version",
+          //"Event Model Version",
           "Age Model Version",
-          "Description"
+          "Description",
+          " ",
         ];
         if(globalTempData.data[0].length>dataStartFromIdx +1){
           for(let d=dataStartFromIdx +1; d<globalTempData.data[0].length; d++){
@@ -3121,6 +3129,12 @@ function createMainWIndow() {
         //main
         if (globalTempData.data === null || calcedDataList === null) {
           globalTempData = null;
+          if(converterWindow){
+            console.log("Converter Close called.")
+            converterWindow.removeAllListeners("close");
+            converterWindow.close();
+            converterWindow = null;
+          } 
           return {ok:false, reason: "There is no valid data for convertion."}
         }
 
@@ -3136,17 +3150,6 @@ function createMainWIndow() {
 
           //update header
           if(i==0){
-            if(calcedData.is_main_model===false){
-              header[5] += " [DUO]";
-              header[6] += " [DUO]";
-              header[13]+= " [DUO]";
-              header[14]+= " [DUO]";
-            }else{
-              header[5] += " [MAIN]";
-              header[6] += " [MAIN]";
-              header[13]+= " [MAIN]";
-              header[14]+= " [MAIN]";
-            }
             if(options.sourceType !== "trinity"){
               header[1] += " [PASEUDO]";
               header[2] += " [PASEUDO]";
@@ -3155,13 +3158,21 @@ function createMainWIndow() {
             }
           }
 
-          let correlationType = "";        
-          
-          if(calcedData.section_type === "Master Section"){
-            correlationType = "MAIN " + calcedData.section_type;            
-          }else if(calcedData.section_type === "Parallel Section"){
-            correlationType = "DUO " + calcedData.section_type;
+          let correlationType = "";                  
+          if(calcedData.project_type === "correlation"){
+            correlationType = "Main " + calcedData.section_type;            
+          }else if(calcedData.project_type === "duo"){
+            correlationType = "Duo " + calcedData.section_type;
           }          
+
+          let basis = null;
+          const baseIdx = LCCore.search_idx_list[LCCore.base_project_id.toString()];
+
+          if(calcedData.is_main_model_connected===false){
+            basis = calcedData.project;
+          }else{
+            basis = LCCore.projects[baseIdx[0]].name;
+          }
 
           //make output array
           let rowData = [
@@ -3170,22 +3181,24 @@ function createMainWIndow() {
             calcedData.hole, //hole name
             calcedData.section, //section name
             parseFloat(calcedData.distance).toFixed(options.precision), //distance
-            parseFloat(calcedData.cd).toFixed(options.precision), //composite depth
-            parseFloat(calcedData.efd).toFixed(options.precision), //event free depth
             parseFloat(calcedData.dd).toFixed(options.precision), //drilling depth
+            calcedData.source_type,
+            "",
+            basis,
+            parseFloat(calcedData.cd).toFixed(options.precision), //composite depth
+            parseFloat(calcedData.efd).toFixed(options.precision), //event free depth            
             parseFloat(calcedData.age_mid).toFixed(options.precision), //age mid
             parseFloat(calcedData.age_upper).toFixed(options.precision), //age upper
             parseFloat(calcedData.age_lower).toFixed(options.precision), //age lower
-
-            correlationType,//calcedData.is_main_model ? "MAIN " + calcedData.section_type : "DUO " + calcedData.section_type, // MAIN master section/parallel section
-            calcedData.correlation_rank,  //connection rank
-
-            calcedData.source_type,
-            calcedData.calc_type,
-            calcedData.is_main_model ? "[MAIN]" + calcedData.correlation_model_version : "[DUO]" + calcedData.correlation_model_version,
-            calcedData.is_main_model ? "[MAIN]" + calcedData.event_model_version : "[DUO]" + calcedData.event_model_version,
-            calcedData.age_model_version ? "[MAIN]" + calcedData.age_model_version : "",
+            "",//separator            
+            calcedData.correlation_rank,  //connection rank    
+            correlationType,//calcedData.is_main_model_connected ? "MAIN " + calcedData.section_type : "DUO " + calcedData.section_type, // MAIN master section/parallel section                    
+            //calcedData.calc_type,
+            "",
+            calcedData.correlation_model_version,
+            calcedData.age_model_version,
             calcedData.description, 
+            "",
           ];
 
           //add data
@@ -3211,6 +3224,12 @@ function createMainWIndow() {
           progressBar = null;
         }
         globalTempData = null;
+        if(converterWindow){
+          console.log("Converter Close called.")
+          converterWindow.removeAllListeners("close");
+          converterWindow.close();
+          converterWindow = null;
+        } 
         return res
       }else if(options.outType == "import"){
         if (options.sourceType == "age"){
@@ -3228,6 +3247,12 @@ function createMainWIndow() {
         //main convertion
         if (globalTempData.data === null || calcedDataList === null) {
           globalTempData = null;
+          if(converterWindow){
+            console.log("Converter Close called.")
+            converterWindow.removeAllListeners("close");
+            converterWindow.close();
+            converterWindow = null;
+          } 
           return {ok:false, reason: "There is no valid data for convertion."}
         }
 
@@ -3309,11 +3334,23 @@ function createMainWIndow() {
             });
 
             globalTempData = null;
+            if(converterWindow){
+              console.log("Converter Close called.")
+              converterWindow.removeAllListeners("close");
+              converterWindow.close();
+              converterWindow = null;
+            } 
             return {ok: false, reason: err}
           }
 
         }else if(options.callFrom == "converter"){    
           globalTempData = null; 
+          if(converterWindow){
+            console.log("Converter Close called.")
+            converterWindow.removeAllListeners("close");
+            converterWindow.close();
+            converterWindow = null;
+          } 
           return {ok: false, reason: "There is no actions."}     
         }
         
@@ -3323,6 +3360,12 @@ function createMainWIndow() {
           //progressBar = null;
         }
         globalTempData = null;
+        if(converterWindow){
+          console.log("Converter Close called.")
+          converterWindow.removeAllListeners("close");
+          converterWindow.close();
+          converterWindow = null;
+        } 
         return {ok: true}        
       } else {
         console.log("[MAIN]: Unkown convertion type detected.")
@@ -3332,6 +3375,12 @@ function createMainWIndow() {
           progressBar = null;
         }
         globalTempData = null;
+        if(converterWindow){
+          console.log("Converter Close called.")
+          converterWindow.removeAllListeners("close");
+          converterWindow.close();
+          converterWindow = null;
+        } 
         return {ok: false, reason:"Unkown convertion type detected"} 
       } 
     }
@@ -3845,7 +3894,7 @@ function createMainWIndow() {
     }catch(err){
 
     }
-    
+
     const type = options.sourceType
     const method = options.polationType;
     const allowExtrapolation = options.allowOutside;
@@ -3919,23 +3968,20 @@ function createMainWIndow() {
         hole_id: null,
         section_id: null,
         marker_id: null,
+
+        project_type:null,
         section_type: null,
         correlation_rank: null,
         correlation_model_version: null,
         event_model_version: null,
         age_model_version: null,
         description: null,
+
         source_type:null,
-        is_main_model: false,
+        is_main_model_connected: false,
+        model_type:null,
         distance_confrictionduplicate: false
       };
-
-      if(LCCore.base_project_id){
-        const baseIdx = LCCore.search_idx_list[LCCore.base_project_id.toString()];
-        if(LCCore.projects[baseIdx[0]].model_type == "correlation"){
-          results.is_main_model = true;
-        }        
-      }
 
       //main
       const data = dataList[i];
@@ -3956,18 +4002,18 @@ function createMainWIndow() {
         let targetId  = data[2];
 
         //convert depth (listed for function)
-        const cd_list = LCCore.getDepthFromTrinity(targetId, send_data, "composite_depth", allowExtrapolation); //output:[sec id, cd, rank]
+        const cd_list = LCCore.getDepthFromTrinity(targetId, send_data, "composite_depth", allowExtrapolation, options.isForceCalculation); //output:[sec id, cd, rank]
 
         const cd = [];
         cd.push(cd_list[0][1]);
         let calcedId = cd_list[0][0];
         
         //
-        const efd_list = LCCore.getDepthFromTrinity(targetId, send_data, "event_free_depth", allowExtrapolation); //output:[sec id, efd, rank]
+        const efd_list = LCCore.getDepthFromTrinity(targetId, send_data, "event_free_depth", allowExtrapolation, options.isForceCalculation); //output:[sec id, efd, rank]
         const efd = efd_list[0][1];
         const new_rank = efd_list[0][2];
 
-        const dd_list = LCCore.getDepthFromTrinity(targetId, send_data, "drilling_depth", allowExtrapolation); //output:[sec id, efd, rank]
+        const dd_list = LCCore.getDepthFromTrinity(targetId, send_data, "drilling_depth", allowExtrapolation, options.isForceCalculation); //output:[sec id, efd, rank]
         const dd = dd_list[0][1];
 
         //calc age
@@ -3985,33 +4031,66 @@ function createMainWIndow() {
         let calcedIdx;
         if(calcedId == null){
           calcedIdx = null;
-          console.log(cd)
           console.log("MAIN: "+ send_data[0].hole_name +"-"+send_data[0].section_name+"-"+send_data[0].distance+"cm is out of section.");
         } else {
           calcedIdx = LCCore.search_idx_list[calcedId.toString()];
-        }       
+        } 
+        
+        //check model connection
+        if(calcedIdx){
+          results.is_main_model_connected = 
+          LCCore.projects[calcedIdx[0]].holes.some(h=>(
+            h.sections.some(s=>(
+              s.markers.some(m=>(
+                m.h_connection.some(hc=> hc[0]===LCCore.base_project_id[0])
+              ))
+            ))
+          )) ?? false;
+        }
+
+        let modelVersion = null;
+        if(calcedIdx){
+          if(results.is_main_model_connected){
+            const masterIdx = LCCore.search_idx_list[LCCore.base_project_id.toString()];
+            if(masterIdx[0] === calcedIdx[0]){
+              modelVersion = " [MAIN] "+LCCore.projects[masterIdx[0]].correlation_version;
+            }else{
+              modelVersion = "[MAIN] "+LCCore.projects[masterIdx[0]].correlation_version + 
+                " / [DUO] " +
+                LCCore.projects[calcedIdx[0]].correlation_version;
+            }            
+          }else{
+            const masterIdx = LCCore.search_idx_list[LCCore.base_project_id.toString()];
+            modelVersion = "[DUO] " + LCCore.projects[calcedIdx[0]].correlation_version;
+          }
+          }else{
+          modelVersion = "";
+        }
 
         //stack
-        results.name     = send_data[0] !== undefined ? send_data[0].name : NaN;
-        results.project  = calcedIdx !== null && calcedIdx !== undefined ? LCCore.projects[calcedIdx[0]].name : NaN;
-        results.hole     = send_data[0] !== undefined ? send_data[0].hole_name : NaN;
-        results.section  = send_data[0] !== undefined ? send_data[0].section_name : NaN;
-        results.distance = send_data[0] !== undefined ? send_data[0].distance : NaN;
-        results.cd  = cd[0] !== null ? cd[0] : NaN;
-        results.efd = efd !== null ? efd : NaN;
-        results.dd  = dd !== null ? dd : NaN;
-        results.age_mid   = age.age.mid   !== null ? age.age.mid   : NaN;
-        results.age_upper = age.age.upper !== null ? age.age.upper : NaN;
-        results.age_lower = age.age.lower !== null ? age.age.lower : NaN;
-        results.section_id =  calcedIdx !== null ?  [cd_list[0][0][0], cd_list[0][0][1], cd_list[0][0][2], null] : [null, null, null, null];
-        results.section_type = cd_list[0][4] !== null ? cd_list[0][4] : "";
-        results.correlation_rank = new_rank !== null ? new_rank : NaN;
-        results.correlation_model_version = calcedIdx !== null ? LCCore.projects[calcedIdx[0]].correlation_version : NaN;
-        results.event_model_version       = calcedIdx !== null ? LCCore.projects[calcedIdx[0]].correlation_version : NaN;
-        results.age_model_version         = LCAge.AgeModels[ageIdx] !== undefined ? LCAge.AgeModels[ageIdx].version : NaN;
+        results.name        = send_data[0] !== undefined ? send_data[0].name : NaN;
+        results.project     = calcedIdx !== null && calcedIdx !== undefined ? LCCore.projects[calcedIdx[0]].name : NaN;
+        results.hole        = send_data[0] !== undefined ? send_data[0].hole_name : NaN;
+        results.section     = send_data[0] !== undefined ? send_data[0].section_name : NaN;
+        results.distance    = send_data[0] !== undefined ? send_data[0].distance : NaN;
+        results.cd          = cd[0] !== null ? cd[0] : NaN;
+        results.efd         = efd !== null ? efd : NaN;
+        results.dd          = dd !== null ? dd : NaN;
+        results.age_mid     = age.age.mid   !== null ? age.age.mid   : NaN;
+        results.age_upper   = age.age.upper !== null ? age.age.upper : NaN;
+        results.age_lower   = age.age.lower !== null ? age.age.lower : NaN;
+        results.project_id  = calcedIdx !== null ?  [cd_list[0][0][0], null, null, null] : [null, null, null, null];
+        results.hole_id     = calcedIdx !== null ?  [cd_list[0][0][0], cd_list[0][0][1], null, null] : [null, null, null, null];
+        results.section_id  = calcedIdx !== null ?  [cd_list[0][0][0], cd_list[0][0][1], cd_list[0][0][2], null] : [null, null, null, null];
+        results.project_type= cd_list[0][5] !== null ? cd_list[0][5] : "";
+        results.section_type= cd_list[0][4] !== null ? cd_list[0][4] : "";
+        results.correlation_rank          = new_rank !== null ? new_rank : NaN;
+        results.correlation_model_version = calcedIdx !== null ? modelVersion  : NaN;
+        results.event_model_version       = calcedIdx !== null ? modelVersion  : NaN;
+        results.age_model_version         = calcedIdx !== null ? (LCAge.AgeModels[ageIdx] !== undefined ? LCAge.AgeModels[ageIdx].version : NaN) : NaN;
         results.description               = "";
-        results.source_type = type;
-        results.calc_type = cd_list[0][3];
+        results.source_type = calcedIdx !== null ? type: NaN;
+        results.calc_type   = cd_list[0][3];
       } else if (type == "composite_depth") {
         //get cd
         const name     = data[0];
@@ -4110,11 +4189,11 @@ function createMainWIndow() {
         send_data.push(td);
 
         //calc cd
-        const cd_list = LCCore.getDepthFromTrinity(targetId, send_data, "composite_depth"); //output:[sec id, cd]
+        const cd_list = LCCore.getDepthFromTrinity(targetId, send_data, "composite_depth", options.isForceCalculation); //output:[sec id, cd]
         const cd = cd_list[0][1];
 
         //calc efd
-        const efd_list = LCCore.getDepthFromTrinity(targetId, send_data, "event_free_depth"); //output:[sec id, efd]
+        const efd_list = LCCore.getDepthFromTrinity(targetId, send_data, "event_free_depth", options.isForceCalculation); //output:[sec id, efd]
         const efd = efd_list[0][1];
         const new_rank = efd_list[0][2];
 

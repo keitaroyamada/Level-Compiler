@@ -17,12 +17,13 @@ document.addEventListener("DOMContentLoaded", () => {
 
     if(output_type == "export"){
       document.getElementById("cvt_bt_convert").textContent = "Export";
-      document.querySelectorAll('.check_outside, .precision_output').forEach(el => el.style.display = 'flex');
+      document.querySelectorAll('.check_outside, .precision_output, .check_unconnected').forEach(el => el.style.display = 'flex');
     } else if (output_type == "import"){
       document.getElementById("cvt_bt_convert").textContent = "Import";
       document.querySelectorAll('.precision_output').forEach(el => el.style.display = 'none');
-      document.querySelectorAll('.check_outside').forEach(el => el.style.display = 'flex');
+      document.querySelectorAll('.check_outside','.check_unconnected').forEach(el => el.style.display = 'flex');
       document.querySelectorAll('.check_outside input[type="checkbox"]').forEach(el => el.checked = true);
+      document.querySelectorAll('.check_unconnected input[type="checkbox"]').forEach(el => el.checked = true);
     }
 
     //make model chooser
@@ -273,6 +274,7 @@ document.addEventListener("DOMContentLoaded", () => {
       const sourceType   = document.getElementById("cvt_source_type").value;
       let depthMaxIdx    = 0;
       const allowOutside = document.getElementById("allow_outside_data").checked;
+      const allowUnconnected = document.getElementById("allow_unconnected_models").checked;
       
       //make send data
       const sendData = {
@@ -295,6 +297,7 @@ document.addEventListener("DOMContentLoaded", () => {
         returnType: "min",
         outType: output_type,//"export" or "import"
         allowOutside: allowOutside,
+        isForceCalculation: allowUnconnected,// disable safety for model whitch not connect master model
         callFrom: (output_type == "export") ? "converter" : "plotter",
         isZip: true,
         precision:precision        
