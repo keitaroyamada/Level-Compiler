@@ -61,6 +61,7 @@ window.addEventListener("DOMContentLoaded", () => {
       });
     } 
     function createInput(value) {
+      console.log(value, typeof value)
       let input;
 
       const isColor = (() => {
@@ -104,7 +105,12 @@ window.addEventListener("DOMContentLoaded", () => {
         "Yu Gothic",
       ];
 
-
+      let isString = false;
+      if(value === null){
+        isString = true;
+      }
+        
+        
       if (typeof value === "string" && isColor) {
         const dummy = document.createElement("div");
         dummy.style.color = value;
@@ -136,7 +142,7 @@ window.addEventListener("DOMContentLoaded", () => {
           }
           input.appendChild(option);
         });
-      }else if (typeof value === "string") {
+      }else if (typeof value === "string" || isString) {
         input = document.createElement("input");
         input.type = "text";
         input.value = value;
@@ -151,8 +157,15 @@ window.addEventListener("DOMContentLoaded", () => {
         input.style.marginTop = "15px";
         input.style.marginBottom = "15px";
       } else {
-        throw new Error("Unsupported type data detected.", typeof value, value);
-      }
+        console.log(value, typeof value)
+      
+        throw new Error("Unsupported type data detected.");
+      }  
+
+      //add event
+      input.addEventListener("change", function(e){
+        console.log("");
+      });
       return input;
     }
     function parseInputValue(input, originalValue) {

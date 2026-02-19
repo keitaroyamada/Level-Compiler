@@ -779,39 +779,58 @@ class LevelCompilerCore extends EventEmitter{
     let newIds = {};
     let hasError = false;
     this.projects.forEach(p => {
-      if (p.id[0] != null && p.id[0].length !== 22){
-        newIds[p.id.toString()] = [lcfnc.getUniqueId(), null, null, null];
+      if (p.id[0] != null){
+        if(p.id[0].length == 22){
+          newIds[p.id.toString()] = p.id;          
+        }else{
+          newIds[p.id.toString()] = [lcfnc.getUniqueId(), null, null, null];
+        }        
       }
+      
       p.holes.forEach(h=>{
-        if (h.id[1] != null && h.id[1].length !== 22){
-          const newParentId = newIds[[h.id[0], null, null, null].toString()];
-          if (!newParentId) {
-            this.setErrorAlert("error_alert", "LCCore: E071: Missing parent ID for hole");
-            hasError = true;
-            return;
-          }
-          newIds[h.id.toString()] = [newParentId[0], lcfnc.getUniqueId(), null, null];
-        }
-        h.sections.forEach(s=>{
-          if (s.id[2] != null && s.id[2].length !== 22){
-            const newParentId = newIds[[s.id[0], s.id[1], null, null].toString()];
+        if (h.id[1] != null){
+          if(h.id[0].length == 22 && h.id[1].length == 22){
+            newIds[h.id.toString()] = h.id;            
+          }else{
+            const newParentId = newIds[[h.id[0], null, null, null].toString()];
             if (!newParentId) {
-              this.setErrorAlert("error_alert", "LCCore: E071: Missing parent ID for section");
+              this.setErrorAlert("error_alert", "LCCore: E071: Missing parent ID for hole", h);
               hasError = true;
               return;
             }
-            newIds[s.id.toString()] = [newParentId[0], newParentId[1], lcfnc.getUniqueId(), null];
+            newIds[h.id.toString()] = [newParentId[0], lcfnc.getUniqueId(), null, null];
           }
-          s.markers.forEach(m=>{
-            if (m.id[3] != null && m.id[3].length !== 22){
-              const newParentId = newIds[[m.id[0], m.id[1], m.id[2], null].toString()];
+        }
+        h.sections.forEach(s=>{
+          if (s.id[2] != null){
+            if(s.id[0].length == 22 && s.id[1].length == 22 && s.id[2].length == 22){
+              newIds[s.id.toString()] = s.id;
+            }else{
+              const newParentId = newIds[[s.id[0], s.id[1], null, null].toString()];
               if (!newParentId) {
-                this.setErrorAlert("error_alert", "LCCore: E071: Missing parent ID for marker");
+                this.setErrorAlert("error_alert", "LCCore: E071: Missing parent ID for section",s);
                 hasError = true;
                 return;
               }
-              newIds[m.id.toString()] = [newParentId[0], newParentId[1], newParentId[2], lcfnc.getUniqueId()];
+              newIds[s.id.toString()] = [newParentId[0], newParentId[1], lcfnc.getUniqueId(), null];
             }
+            
+          }
+          s.markers.forEach(m=>{
+            if (m.id[3] != null){
+              if(m.id[0].length == 22 && m.id[1].length == 22 && m.id[2].length == 22 && m.id[3].length == 22){
+                newIds[m.id.toString()] = m.id;
+              }else{
+                const newParentId = newIds[[m.id[0], m.id[1], m.id[2], null].toString()];
+                if (!newParentId) {
+                  this.setErrorAlert("error_alert", "LCCore: E071: Missing parent ID for marker");
+                  console.log("   "+h.name+"-"+s.name+": "+m.id[3])
+                  hasError = true;
+                  return;
+                }
+                newIds[m.id.toString()] = [newParentId[0], newParentId[1], newParentId[2], lcfnc.getUniqueId()];
+              }
+            }              
           })
         })
       })
@@ -1144,6 +1163,11 @@ class LevelCompilerCore extends EventEmitter{
   }
 
   convertDepthDuo2Master(calcType){
+    if(calcType !== "composite_depth" && calcType !=="event_free_depth"){
+      this.setError("","E000: Unsupported calcType for convertDepthDuo2Master: "+calcType);
+      this.setStatus("completed","convertDepthDuo2Master aborted (unsupported calcType).");
+      return;
+    }
     this.setStatus("running","start convertDepthDuo2Master");
     //get correlation CD/EFD list between base and duo
     let comparisonChart = [];
@@ -1171,6 +1195,17 @@ class LevelCompilerCore extends EventEmitter{
                     visited.add(this.projects[p].holes[h].sections[s].markers[m].h_connection[n].toString());
                   } 
                   const hConnectedMarkerData = JSON.parse(JSON.stringify(this.getDataByIdx(this.search_idx_list[hConnectedId.toString()])));
+                  if(hConnectedMarkerData[calcType]!==null && currentMarkerData[calcType]!==null){
+                    comparisonData.push([
+                      hConnectedMarkerData.id,
+                      hConnectedMarkerData.composite_depth,
+                      hConnectedMarkerData.event_free_depth,
+                      currentMarkerData.id,
+                      currentMarkerData.composite_depth,
+                      currentMarkerData.event_free_depth
+                    ]);
+                  }
+                  /*                  
                   if(hConnectedMarkerData[calcType]!==null){
                     comparisonData.push([
                       hConnectedMarkerData.id,              //[0] base project
@@ -1181,6 +1216,7 @@ class LevelCompilerCore extends EventEmitter{
                       currentMarkerData.event_free_depth    //[5] duo project
                     ]);
                   }
+                  */
                   
                 }
               }
@@ -1189,8 +1225,9 @@ class LevelCompilerCore extends EventEmitter{
         }
       }
 
-      comparisonData.sort((a,b)=>a[1] - b[1]);//sort by base composite depth
-     
+      //comparisonData.sort((a,b)=>a[1] - b[1]);//sort by base composite depth
+      comparisonData.sort((a,b)=> (calcType=="event_free_depth" ? a[5]-b[5] : a[4]-b[4]));
+
       comparisonChart.push([this.projects[p].id.toString(), comparisonData]);      
     }
 
@@ -3743,10 +3780,6 @@ class LevelCompilerCore extends EventEmitter{
         const exDistance = this.calcMarkerDistance(targetMarkerData, upperMarkerData, calcType);
         const depth = upperMarkerData[calcType] + exDistance;
 
-        if(!Number.isFinite(depth)){
-          continue
-        }
-       
         targetMarkerData[calcType] = depth;
         targetMarkerData.connection_rank = upperMarkerData.connection_rank + extrapolationRank;
         targetMarkerData.depth_source = ["extrapolation", upperMarkerData.id, null];

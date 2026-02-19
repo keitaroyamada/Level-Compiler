@@ -11,7 +11,7 @@ document.addEventListener("DOMContentLoaded", () => {
   let previousValue = {project:null,hole:null,section:null,distance:null,cd:null,efd:null,age:null,ageUpper:null,ageLower:null};
   let bookmarks = {};
   bookmarks["Please select"] = {holeName: null, holeId: null, sectionName:null, sectionId:null, distance:null};
-
+  let settings = {enableRealtimeUpdate: false};
   //-------------------------------------------------------------------------------------------
   //when startup
   window.FinderApi.receive("FinderToolClicked", async () => {
@@ -70,20 +70,39 @@ document.addEventListener("DOMContentLoaded", () => {
   //-------------------------------------------------------------------------------------------
   //distance
   document.getElementById("distanceInput").addEventListener("change", async (event) => {
-      //calc
-      await limitDistance();
-      if(parseFloat(event.target.value) > document.getElementById("distanceInput").max){
-        document.getElementById("distanceInput").value = document.getElementById("distanceInput").max;
-      }
-      if(parseFloat(event.target.value) < document.getElementById("distanceInput").min){
-        document.getElementById("distanceInput").value = document.getElementById("distanceInput").min;
-      }
-      await window.FinderApi.rendererLog(`[Finder]: Distance is changed to : ${event.target.value} cm`);
-      
-      isCalledFinder = true;
-      targetId = [null,null,null,null];
-      await calc("trinity");
-    });
+    if(settings.enableRealtimeUpdate) return;
+
+    //calc
+    await limitDistance();
+    if(parseFloat(event.target.value) > document.getElementById("distanceInput").max){
+      document.getElementById("distanceInput").value = document.getElementById("distanceInput").max;
+    }
+    if(parseFloat(event.target.value) < document.getElementById("distanceInput").min){
+      document.getElementById("distanceInput").value = document.getElementById("distanceInput").min;
+    }
+    await window.FinderApi.rendererLog(`[Finder]: Distance is changed to : ${event.target.value} cm`);
+    
+    isCalledFinder = true;
+    targetId = [null,null,null,null];
+    await calc("trinity");
+  });
+  document.getElementById("distanceInput").addEventListener("input", async (event) => {
+    if(!settings.enableRealtimeUpdate) return;
+
+    //calc
+    await limitDistance();
+    if(parseFloat(event.target.value) > document.getElementById("distanceInput").max){
+      document.getElementById("distanceInput").value = document.getElementById("distanceInput").max;
+    }
+    if(parseFloat(event.target.value) < document.getElementById("distanceInput").min){
+      document.getElementById("distanceInput").value = document.getElementById("distanceInput").min;
+    }
+    await window.FinderApi.rendererLog(`[Finder]: Distance is changed to : ${event.target.value} cm`);
+    
+    isCalledFinder = true;
+    targetId = [null,null,null,null];
+    await calc("trinity");
+  });
   //-------------------------------------------------------------------------------------------
   //hole
   document.getElementById("holeOptions").addEventListener("change", async (event) => {
@@ -115,30 +134,57 @@ document.addEventListener("DOMContentLoaded", () => {
   //-------------------------------------------------------------------------------------------
   //cd
   document.getElementById("cdInput").addEventListener("change", async (event) => {
-      //calc
-      await window.FinderApi.rendererLog(`[Finder]: CD is changed to : ${event.target.value} cm`);
- 
-      isCalledFinder = true;
-      await calc("composite_depth");
-    });
+    if(settings.enableRealtimeUpdate) return;
+    //calc
+    await window.FinderApi.rendererLog(`[Finder]: CD is changed to : ${event.target.value} cm`);
+
+    isCalledFinder = true;
+    await calc("composite_depth");
+  });
+  document.getElementById("cdInput").addEventListener("input", async (event) => {
+    if(!settings.enableRealtimeUpdate) return;
+    //calc
+    await window.FinderApi.rendererLog(`[Finder]: CD is changed to : ${event.target.value} cm`);
+
+    isCalledFinder = true;
+    await calc("composite_depth");
+  });
   //-------------------------------------------------------------------------------------------
   //efd
   document.getElementById("efdInput").addEventListener("change", async (event) => {
-      //calc
-      await window.FinderApi.rendererLog(`[Finder]: EFD is changed to : ${event.target.value} cm`);
+    if(settings.enableRealtimeUpdate) return;  
+    //calc
+    await window.FinderApi.rendererLog(`[Finder]: EFD is changed to : ${event.target.value} cm`);
 
-      isCalledFinder = true;
-      await calc("event_free_depth");
-    });
+    isCalledFinder = true;
+    await calc("event_free_depth");
+  });
+  document.getElementById("efdInput").addEventListener("input", async (event) => {
+    if(!settings.enableRealtimeUpdate) return;  
+    //calc
+    await window.FinderApi.rendererLog(`[Finder]: EFD is changed to : ${event.target.value} cm`);
+
+    isCalledFinder = true;
+    await calc("event_free_depth");
+  });
   //-------------------------------------------------------------------------------------------
   //age
   document.getElementById("ageInput").addEventListener("change", async (event) => {
-      //calc
-      await window.FinderApi.rendererLog(`[Finder]: Age is changed to : ${event.target.value} calBP`);
+    if(settings.enableRealtimeUpdate) return;  
+    //calc
+    await window.FinderApi.rendererLog(`[Finder]: Age is changed to : ${event.target.value} calBP`);
 
-      isCalledFinder = true;
-      await calc("age");
-    });
+    isCalledFinder = true;
+    await calc("age");
+  });
+  document.getElementById("ageInput").addEventListener("input", async (event) => {
+    if(!settings.enableRealtimeUpdate) return;  
+    //calc
+    await window.FinderApi.rendererLog(`[Finder]: Age is changed to : ${event.target.value} calBP`);
+
+    isCalledFinder = true;
+    await calc("age");
+  });
   //-------------------------------------------------------------------------------------------
   //-------------------------------------------------------------------------------------------
   async function limitDistance() {
@@ -587,6 +633,13 @@ document.addEventListener("DOMContentLoaded", () => {
       
     }
   });
+
+  //-------------------------------------------------------------------------------------------
+  window.FinderApi.receive("updateModeChanged", async (data) => {
+    settings.enableRealtimeUpdate = data;
+    console.log("Finder: update mode is changed to ", data)
+  });
+  
   //-------------------------------------------------------------------------------------------
 
   document.getElementById("add_bookmark").addEventListener("click", async (event) => {

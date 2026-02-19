@@ -72,7 +72,7 @@ document.addEventListener("DOMContentLoaded", () => {
     //=========== public properties =========== 
     objOpts.information.version = "2.2";
     objOpts.developer.mode = "user";//"user";"developer";"root"; 
-    
+    objOpts.canvas.use_touchpad_mode = true;
     objOpts.canvas.depth_scale = "composite_depth";
     objOpts.canvas.background_colour = "#ffffff";//"#f4f5f7";//"#f7f7f7"//"#f8fbff";//"#fffdfa";//""white    
     objOpts.canvas.display_height = 20.2;
@@ -1499,6 +1499,58 @@ document.addEventListener("DOMContentLoaded", () => {
         objOpts.edit.handleClick = null;
       }
       document.addEventListener("mousemove", objOpts.edit.handleMove);
+    }else if(clickResult == "showSectionProperties"){
+      if(LCCore){
+        if(objOpts.edit.hittest.section!==null){
+          const ht = objOpts.edit.hittest;
+          let sectionProperties = {
+            options:{
+              title:"Properties: ",
+              editable:false,
+            },
+            editable:{},
+            data:null,
+          };
+          LCCore.projects.forEach(p=>{
+            if(p.id[0]==ht.project){
+              p.holes.forEach(h=>{
+                if(h.id[1]==ht.hole){
+                  h.sections.forEach(s=>{
+                    if(s.id[2]==ht.section){
+                      console.log(p.name)
+                      sectionProperties.options.title += p.name+" "+h.name+"-"+s.name; 
+
+                      //replace marker => position(becase definition)
+                      const secData = structuredClone(s);
+                      secData.markers.forEach((m,i)=>{
+                        m.position = s.markers[i].distance;
+                        delete m.distance;
+                      })
+                      
+                      //send to window
+                      sectionProperties.data = secData;
+                    }
+                  })
+                }              
+              })
+            }
+          })
+          if(sectionProperties.data!==null){
+            
+            const editable = {};
+            for(let key in sectionProperties.data){
+              if(key !=="id"){
+                sectionProperties.editable[key] = false;
+              }
+              
+            }             
+
+            console.log("[Renderer]: Send section properties: ", sectionProperties)
+
+            await window.LCapi.sendSettings(sectionProperties, "settings");
+          }
+        }
+      }   
     }else if(clickResult == "changeSectionName"){
       objOpts.edit.contextmenu_enable = false;
       objOpts.edit.hittest = null;
@@ -3905,25 +3957,41 @@ document.addEventListener("DOMContentLoaded", () => {
     updateView();
     document.getElementById("bt_finder").style.backgroundColor = "#f0f0f0";
   });
-  //mouse click (send depth to finder)
+  //mouse click (send depth to finder)   1111111111111111111111111
   scroller.addEventListener("click", async function (event) {
+    //calc position
+    const rect = document.getElementById("p5Canvas").getBoundingClientRect(); 
+    const mouseX = event.clientX - rect.left;
+    const mouseY = event.clientY - rect.top;
+    const ht = JSON.parse(JSON.stringify(getClickedItemIdx(mouseX, mouseY, LCCore, objOpts)));
+    objOpts.edit.hittest = ht;
+
     //send to finder
     if (finderEnable) {
-      //get depth scale position
-      //var mouseX = mousePos[0];
-      //var mouseY = mousePos[1];
-      const rect = document.getElementById("p5Canvas").getBoundingClientRect(); 
-      const mouseX = event.clientX - rect.left;
-      const mouseY = event.clientY - rect.top;
-
-      //calc position
-      const ht = JSON.parse(JSON.stringify(getClickedItemIdx(mouseX, mouseY, LCCore, objOpts)));
-      console.log(ht)
-      objOpts.edit.hittest = ht;
- 
       await window.LCapi.SendDepthToFinder(ht);
       console.log("[Renderer]: Send the clicked depth to Finder", ht.y, objOpts.canvas.depth_scale);
     }
+
+    //update section order
+    if(ht.projectIdx!==null && ht.holeIdx!==null &&ht.sectionIdx!==null ){
+      const targetHole = LCCore.projects[ht.projectIdx].holes[ht.holeIdx];
+
+      //upper
+      for(let s=0; s<ht.sectionIdx; s++){
+        targetHole.sections[s].order = s;
+      }
+
+      //target
+      targetHole.sections[ht.sectionIdx].order = targetHole.sections.length-1;
+
+      //lower
+      for(let s=ht.sectionIdx+1; s<targetHole.sections.length; s++){
+        targetHole.sections[s].order = s-1;
+      }
+
+      updateView();
+    }     
+
   });
   //============================================================================================
   window.LCapi.receive("rendererLog", async (data) => {
@@ -4183,24 +4251,27 @@ document.addEventListener("DOMContentLoaded", () => {
   //============================================================================================
   //scroll event
   scroller.addEventListener("scroll",async function (event) {
-      //hittest
-      const ht = JSON.parse(JSON.stringify(getClickedItemIdx(mousePos[0], mousePos[1], LCCore, objOpts)));
-      objOpts.edit.hittest = ht;
+    //console.log("[SCROLL]", { left: scroller.scrollLeft, top: scroller.scrollTop });
 
-      const txt = await getFooterInfo(LCCore, objOpts.edit.hittest, objOpts);
-      document.getElementById("footerRightText").textContent = txt;
+    //hittest
+    const ht = JSON.parse(JSON.stringify(getClickedItemIdx(mousePos[0], mousePos[1], LCCore, objOpts)));
+    objOpts.edit.hittest = ht;
 
-      ///scroller position
-      canvasPos[0] = scroller.scrollLeft;//* xMag;
-      canvasPos[1] = scroller.scrollTop;//* yMag;
+    const txt = await getFooterInfo(LCCore, objOpts.edit.hittest, objOpts);
+    document.getElementById("footerRightText").textContent = txt;
 
-      //update plot
-      updateView();
-    },
-    { passive: false }
+    ///scroller position
+    canvasPos[0] = scroller.scrollLeft;//* xMag;
+    canvasPos[1] = scroller.scrollTop;//* yMag;
+
+    //update plot
+    updateView();
+  },
+  { passive: false }
   );
   //============================================================================================
   //Scroll + Alt (zoom)
+  /*
   document.addEventListener( "wheel",  function (event) {
       //wheel event
       var deltaX = event.deltaX;
@@ -4277,6 +4348,138 @@ document.addEventListener("DOMContentLoaded", () => {
     },
     { passive: false }
   );
+  */
+
+  document.addEventListener("wheel", function (event) {
+      // 1. Setup Variables
+      var deltaX = event.deltaX;
+      var deltaY = event.deltaY;
+
+      const isMac = /Mac|iPhone|iPad|iPod/.test(navigator.platform);
+      const USE_TOUCHPAD_MODE = !!(objOpts.canvas && objOpts.canvas.use_touchpad_mode);
+
+      // Unified zoom direction (deltaY < 0 => zoom in)
+      const ZOOM_SIGN = -1;
+
+      // Pinch heuristic
+      const isPinch =
+        event.ctrlKey &&
+        event.deltaMode === 0 &&
+        Math.abs(deltaY) < 50;
+      const gain = isPinch ? 0.02 : 0.01;
+
+      // Common helper for distance adjustment
+      const updateHoleDistance = (delta) => {
+        objOpts.hole.distance += 0.01 * delta;
+        objOpts.connection.tab_length = objOpts.hole.distance * 0.7;
+
+        //if (objOpts.hole.distance < 0.1) objOpts.hole.distance = 0.1;
+        if (objOpts.connection.tab_length < 0) objOpts.connection.tab_length = 0;
+        if (objOpts.connection.tab_length > 20) objOpts.connection.tab_length = 20;
+
+        updateView();
+      };
+
+      // ============================================================
+      // MODE A: TOUCHPAD MODE
+      // ============================================================
+      if (USE_TOUCHPAD_MODE) {
+
+        // ---- 1. Zoom Logic (Ctrl is pressed) ----
+        // Handle both Ctrl-only (vertical) and Ctrl+Alt (horizontal) here
+        if (event.ctrlKey) {
+          event.preventDefault();
+
+          const viewH = scroller.clientHeight;
+          const rect = scroller.getBoundingClientRect();
+          const mouseX = event.clientX - rect.left;
+
+          // [Step A] Calculate Anchors
+          const relative_pos_y =
+            (scroller.scrollTop + viewH / 2 - canvasBase.offsetTop) / objOpts.canvas.zoom_level[1];
+
+          const relative_ratio_x =
+            (scroller.scrollLeft + mouseX - objOpts.canvas.pad_x) / scroller.scrollWidth;
+
+          // [Step B] Apply Zoom
+          if (event.altKey) {
+            // Ctrl + Alt: zoom in X direction (horizontal zoom)
+            objOpts.canvas.zoom_level[0] += ZOOM_SIGN * gain * deltaY;
+            if (objOpts.canvas.zoom_level[0] < 0.1) objOpts.canvas.zoom_level[0] = 0.1;
+          } else {
+            // Ctrl only: zoom in Y direction (vertical zoom)
+            objOpts.canvas.zoom_level[1] += ZOOM_SIGN * gain * deltaY;
+            if (objOpts.canvas.zoom_level[1] < 0.1) objOpts.canvas.zoom_level[1] = 0.1;
+          }
+
+          // [Step C] Render & Restore
+          makeP5CanvasBase();
+          const canvasBase_width = parseInt(canvasBase.style.width.match(/\d+/)[0], 10);
+
+          const new_scroll_pos_x =
+            (canvasBase_width * relative_ratio_x) - mouseX + objOpts.canvas.pad_x;
+
+          const new_scroll_pos_y =
+            relative_pos_y * objOpts.canvas.zoom_level[1] - viewH / 2 + canvasBase.offsetTop;
+
+          scroller.scrollTo(new_scroll_pos_x, new_scroll_pos_y);
+          canvasPos = [new_scroll_pos_x, new_scroll_pos_y];
+
+          updateView();
+        }
+
+        // ---- 2. Hole Distance (Alt Only) ----
+        // When Ctrl is not pressed and Alt is pressed
+        else if (event.altKey) {
+          event.preventDefault();
+          updateHoleDistance(deltaY);
+        }
+
+        // ---- 3. Horizontal Scroll (Shift) ----
+        else if (event.shiftKey) {
+          event.preventDefault();
+          const d = Math.abs(deltaX) > Math.abs(deltaY) ? deltaX : deltaY;
+          scroller.scrollBy({ left: d, behavior: "auto" });
+        }
+
+        return;
+      }
+
+      // ============================================================
+      // MODE B: LEGACY MODE (Mouse Wheel Optimized)
+      // ============================================================
+
+      // Enable horizontal zoom with Ctrl+Alt in legacy mode as well
+      if (event.ctrlKey && event.altKey) {
+        event.preventDefault();
+        // Horizontal zoom logic (simplified)
+        objOpts.canvas.zoom_level[0] += ZOOM_SIGN * 0.01 * deltaY;
+        if (objOpts.canvas.zoom_level[0] < 0.1) objOpts.canvas.zoom_level[0] = 0.1;
+
+        makeP5CanvasBase();
+        updateView(); // legacy mode: simple refresh
+      }
+      // Alt only -> distance adjustment
+      else if (event.altKey) {
+        event.preventDefault();
+        updateHoleDistance(deltaY);
+      }
+      // Ctrl only -> horizontal scroll
+      else if (event.ctrlKey) {
+        event.preventDefault();
+        scroller.scrollBy({ left: deltaY * 1, behavior: "auto" });
+      }
+      // Shift/Cmd -> distance adjustment (keep existing behavior)
+      else if ((!isMac && event.shiftKey) || (isMac && event.metaKey)) {
+        event.preventDefault();
+        const d = isMac ? (Math.abs(deltaX) > Math.abs(deltaY) ? deltaX : deltaY) : deltaY;
+        updateHoleDistance(d);
+      }
+    },
+    { passive: false }
+  );
+
+  
   //============================================================================================
   //YAxis dropdown changed event
   document.getElementById("YAxisSelect").addEventListener("change", async (event) => {
@@ -4781,7 +4984,7 @@ document.addEventListener("DOMContentLoaded", () => {
       //-----------------------------------------------------------------------------------------
       //initialise
       //draw finder target line
-      //111111111111111
+
       if(finderEnable){        
         //get pos
         let num_disable = {total: 0, hole: 0};
@@ -5014,8 +5217,9 @@ document.addEventListener("DOMContentLoaded", () => {
             //get plot order for hit test--------------------------------------
             let section_plot_order = [];
             for (let i = 0; i < hole.sections.length; i++) {
-              section_plot_order.push(i);
+              section_plot_order.push([i, hole.sections[i].order]);
             }
+            section_plot_order.sort((a, b) => a[1] - b[1]);
 
             //show live hitttest
             if(objOpts.edit.hittest){
@@ -5049,7 +5253,7 @@ document.addEventListener("DOMContentLoaded", () => {
             }
 
             for (let s_o = 0; s_o < hole.sections.length; s_o++) {
-              const s = section_plot_order[s_o];
+              const s = section_plot_order[s_o][0];
 
               //make section objects===================================================================================
               //load section data
@@ -5273,15 +5477,18 @@ document.addEventListener("DOMContentLoaded", () => {
 
                 //make marker objects=================================================================================
                 // remove top and bottom markers
-                let topBot = 0;
-                if (m == 0 || m == section.markers.length - 1) {
-                  topBot -= objOpts.marker.width * xMag; //or +20
-                }
+                
                 //draw markers
                 sketch.drawingContext.setLineDash([]);
                 sketch.strokeWeight(objOpts.marker.line_width);
+                let topBot = 0;
+                               
                 if(objOpts.canvas.is_core_photo_visible){
                   sketch.stroke("Magenta"); //(markerLineColour);
+                  if (m == 0 || m == section.markers.length - 1) {
+                    topBot -= objOpts.marker.width * xMag; //or +20
+                    sketch.strokeWeight(objOpts.marker.line_width*3);
+                  } 
                 }else{
                   sketch.stroke(objOpts.marker.line_colour); //(markerLineColour);
                 }
@@ -8325,31 +8532,26 @@ async function loadCoreImages(modelImages, LCCore, objOpts, operations) {
       console.log(loadOptions)
       
       //main Progress   
-      await new Promise(async(p5resolve,p5reject) => {
-        try{
-          //load image
-          const imageBuffers = await window.LCapi.LoadCoreImage(loadOptions, "core_images");
-          //const imageBuffers = await new Promise(async(resolve, reject)=>{
-          //  const imBufferDict = await window.LCapi.LoadCoreImage(loadOptions,"core_images");
-          //  resolve(imBufferDict)
-          //}) 
+      try{
+        //load image
+        const imageBuffers = await window.LCapi.LoadCoreImage(loadOptions, "core_images");
+        //const imageBuffers = await new Promise(async(resolve, reject)=>{
+        //  const imBufferDict = await window.LCapi.LoadCoreImage(loadOptions,"core_images");
+        //  resolve(imBufferDict)
+        //}) 
 
-          results = await assignCoreImages(results, imageBuffers);
+        results = await assignCoreImages(results, imageBuffers);
 
-          for (const ds of Object.keys(imageBuffers || {})) {                 
-            for (const k in imageBuffers[ds]) delete imageBuffers[ds][k];     
-            delete imageBuffers[ds];                                          
-          } 
+        for (const ds of Object.keys(imageBuffers || {})) {                 
+          for (const k in imageBuffers[ds]) delete imageBuffers[ds][k];     
+          delete imageBuffers[ds];                                          
+        } 
 
 
-          results.load_target_ids = [];
-          p5resolve();
-        }catch(err){
-          console.error(err)
-          p5reject();
-        }
-        
-      });
+        results.load_target_ids = [];
+      }catch(err){
+        console.error(err)
+      }
       
       resolve(results);
     }catch(err){
@@ -8521,6 +8723,10 @@ function getClickedItemIdx(mouseX, mouseY, LCCore, objOpts){
     holeName:null,
     sectionName:null,
     markerName:null,
+    projectIdx:null,
+    holeIdx:null,
+    sectionIdx:null,
+    markerIdx:null,
   };
   
   if(!LCCore){return results}
@@ -8566,6 +8772,7 @@ function getClickedItemIdx(mouseX, mouseY, LCCore, objOpts){
     if(x >= project_x0 && x <= project_x1){
       results.project = LCCore.projects[p].id[0];
       results.projectName = LCCore.projects[p].name;
+      results.projectIdx  = p;
     }
 
     for(let h=0; h<LCCore.projects[p].holes.length; h++){     
@@ -8578,7 +8785,16 @@ function getClickedItemIdx(mouseX, mouseY, LCCore, objOpts){
         results.hole    = LCCore.projects[p].holes[h].id[1];
         results.relative_x = (x-hole_x0)/(hole_x1-hole_x0);
         results.holeName = LCCore.projects[p].holes[h].name;
+        results.holeIdx = h;
+
+        const section_order=[];
         for(let s=0; s<LCCore.projects[p].holes[h].sections.length; s++){
+          section_order.push([s, LCCore.projects[p].holes[h].sections[s].order])
+        }
+        section_order.sort((a,b)=>b[1]-a[1]);
+
+        for(let so=0; so<LCCore.projects[p].holes[h].sections.length; so++){
+          const s= section_order[so][0];
           const sec_y0 = LCCore.projects[p].holes[h].sections[s].markers[0][objOpts.canvas.depth_scale];//cd/efd
           const sec_y1 = LCCore.projects[p].holes[h].sections[s].markers.slice(-1)[0][objOpts.canvas.depth_scale];//cd/efd
 
@@ -8586,7 +8802,7 @@ function getClickedItemIdx(mouseX, mouseY, LCCore, objOpts){
             results.section = LCCore.projects[p].holes[h].sections[s].id[2];
             results.relative_y = (y-sec_y0)/(sec_y1-sec_y0);
             results.sectionName = LCCore.projects[p].holes[h].sections[s].name;
-
+            results.sectionIdx = s;
             let upperIdx = null;
             let lowerIdx = null;
             let lowerDistance = Infinity;
@@ -8641,6 +8857,7 @@ function getClickedItemIdx(mouseX, mouseY, LCCore, objOpts){
             results.nearest_marker   = LCCore.projects[p].holes[h].sections[s].markers[nearestIdx].id[3];   
             results.markerName       = LCCore.projects[p].holes[h].sections[s].markers[nearestIdx].name;
             results.upper_marker     = LCCore.projects[p].holes[h].sections[s].markers[upperIdx].id[3];
+            results.markerIdx = nearestIdx;
             if(lowerIdx !== null){
               results.lower_marker = LCCore.projects[p].holes[h].sections[s].markers[lowerIdx].id[3];
             }            

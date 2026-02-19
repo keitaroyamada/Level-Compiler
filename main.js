@@ -466,7 +466,8 @@ function createMainWIndow() {
   async function loadCoreImages(loadOptions, type){
     const isShowMemory = false;
     progressBar   = progressDialog(mainWindow, "Load modeled section images", "Now converting...", false);    
-    await new Promise(r => progressBar.on('ready', r));
+    //await new Promise(r => progressBar.on('ready', r));
+    await new Promise(r => progressBar.once('ready', r));
 
     //console.log("   Load core image called")
     let releasedWorkers = 0;
@@ -700,13 +701,15 @@ function createMainWIndow() {
             } else {
               if(!worker._exitSent){
                 worker._exitSent = true;
-                worker.postMessage({type:"exit"});
+                //worker.postMessage({type:"exit"});
+                worker.terminate();
               }
               while(idleWorkers.length > 0){
                 const w = idleWorkers.pop();
                 if(w && !w._exitSent){
                   w._exitSent = true;
-                  w.postMessage({type:"exit"});
+                  //w.postMessage({type:"exit"});
+                  worker.terminate();
                 }
               }
             }
@@ -1287,6 +1290,12 @@ function createMainWIndow() {
                 } 
               },
               { type: 'separator' },
+              { 
+                label: 'Properties', 
+                click: () => {
+                  resolve("showSectionProperties");                      
+                } 
+              },
               { 
                 label: 'Edit name', 
                 click: () => {
@@ -2529,6 +2538,30 @@ function createMainWIndow() {
         }
       }
     });
+
+
+    const customMenu = Menu.buildFromTemplate([
+      {
+        label: "Settings",
+        submenu: [
+          {
+            label: "Real-time update",
+            type: "checkbox",
+            checked: false,
+            click: (menuItem) => {
+              if (finderWindow && !finderWindow.isDestroyed()) {
+                finderWindow.webContents.send("updateModeChanged", menuItem.checked);
+              }
+            }
+          },
+        ]
+      }
+    ]);
+
+    finderWindow.webContents.on('context-menu', (_event, params) => {
+      customMenu.popup({ window: finderWindow, x: params.x, y: params.y });
+    });
+  
     finderWindow.setMenu(null);
 
     finderWindow.loadFile(path.join(__dirname, "./renderer/finder.html"));
@@ -4277,8 +4310,8 @@ function createMainWIndow() {
 
     if(progressBar!==null){
       //progressBar   = await updateProgress(progressBar, 1, 1);
-      progressBar.close();
-      progressBar = null;
+      //progressBar.close();
+      //progressBar = null;
     }
 
     return resultList;
@@ -5291,6 +5324,7 @@ function createMainWIndow() {
 //===================================================================================================================================
 
 //--------------------------------------------------------------------------------------------------
+/*
 function progressDialog(window, tit, txt, indeterminate){
   let progress = new ProgressBar({
     title: tit,
@@ -5311,6 +5345,64 @@ function progressDialog(window, tit, txt, indeterminate){
     closeOnComplete:true,
   });
   
+  return progress;
+}
+*/
+function progressDialog(window, tit, txt, indeterminate){
+  let progress = new ProgressBar({
+    title: tit,
+    icon: "./icon/levelcompiler.png",
+    indeterminate: indeterminate,
+    text: txt,
+    detail: "Please wait...",
+    browserWindow: {
+      parent: window,
+      modal: false,
+      resizable: true,
+      closable: false,
+      sandbox: true,
+      webPreferences: {
+        nodeIntegration: true,
+        contextIsolation: false,
+      },
+    },
+    closeOnComplete:true,
+  });
+
+  // ---- normalize event API (on/once/off) ----
+  if (typeof progress.off !== "function") {
+    if (typeof progress.removeListener === "function") {
+      progress.off = progress.removeListener.bind(progress);
+    } else if (typeof progress.removeEventListener === "function") {
+      progress.off = progress.removeEventListener.bind(progress);
+    }
+  }
+
+  if (typeof progress.once !== "function" && typeof progress.on === "function") {
+    progress.once = function (event, listener) {
+      const wrapped = (...args) => {
+        if (typeof this.off === "function") this.off(event, wrapped);
+        listener(...args);
+      };
+      this.on(event, wrapped);
+      
+      return this;
+    };
+  }
+  // ------------------------------------------
+  //for debug
+  /*
+  progress.on("completed", () => console.log("ProgressBar: completed"));
+  progress.on("aborted",   () => console.log("ProgressBar: aborted"));
+  
+  if (typeof progress.close === "function") {
+    const _close = progress.close.bind(progress);
+    progress.close = (...args) => {
+      console.trace("ProgressBar.close() called");
+      return _close(...args);
+    };
+  }
+    */
   return progress;
 }
 async function updateProgress(progress, n, N){
