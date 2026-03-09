@@ -32,7 +32,51 @@ The detailed usage will be uploaded by this summer.
 - 1.5. Calc sampling depth -Divider- ['Divider Usage (English / 日本語)'](https://youtu.be/WAslven5zdE)
 - 2.1. Description on core image -Labeler-   ['Labeler Usage (English / 日本語)'](https://youtu.be/SkIqG0wph_U)
 - 2.2. Make model from GUI  ['Make model by GUI (English / 日本語)'](https://youtu.be/iKafKTT8cCY)
-- 2.3. Make model from spreadsheet  ['Make model by csv (English / 日本語)'](https://youtu.be/sbdBxqxL3Cc)  
+- 2.3. Make model from spreadsheet  ['Make model by csv (English / 日本語)'](https://youtu.be/sbdBxqxL3Cc)
+  
+### 3.1 Loading a Model
+
+Loading a model is very simple. A model can be loaded either by **dragging and dropping the file into the Level Compiler (LC) window** or by using **File → Load Model**.
+
+LC supports the following **native LC model formats**:
+
+* `*.lcmodel` (recommended)
+* `*.csv` (LC model CSV)
+
+The **`.lcmodel` format is strongly recommended**, because it preserves the internal structure of the model and records modifications consistently.
+
+When using an **LC CSV model**, the **file name must follow the required LC naming convention**, for example:
+
+[correlation]Test Model for LC(2026-03-09 )
+
+where `[correlation]` indicates the **model type**, `Test Model for LC` is the **model name**, and `(2026-03-09 )` is the **version name**.
+
+Both **`.lcmodel` and LC CSV models** can be loaded using **drag-and-drop** or **File → Load Model**.
+
+LC can also import **Level Finder (LF) CSV models**, but **LF CSV files use a different format and are not treated as LC models**. Therefore:
+
+* LF CSV files **must be loaded using File → Import**
+* LF CSV files **cannot be loaded using drag-and-drop or Load Model**
+* LF CSV files **do not use the LC file naming convention**
+
+During import, the LF model is **converted into an LC-compatible model**.
+
+### 3.2 Loading Images
+
+Image files stored in a folder with the **same name as the project** can be loaded by **dragging and dropping them into the Level Compiler**, and they will be displayed on the corresponding sections.
+
+Image file names must follow the required naming convention:
+
+`hole name + "-" + section name`
+
+For example:
+
+`P-01.tif`  
+`Q-311.jpg`
+
+Compressed folders (`.zip`) can also be loaded. However, note that the images must be **extracted before use**, which may require **additional processing time and disk space**.
+
+
 
 ## 4. Build from code(optional)
   __This section is optional.__ If it is not necessary, please proceed to [the next section](#3-Install).
