@@ -74,8 +74,30 @@ For example:
 `P-01.tif`  
 `Q-311.jpg`
 
-Compressed folders (`.zip`) can also be loaded. However, note that the images must be **extracted before use**, which may require **additional processing time and disk space**.
+Compressed folders (`.zip`) can also be loaded. However, note that the images must be **extracted before use**, which may require **additional processing time and disk space**. For best performance, keep images in normal folders whenever possible. If compression is necessary, use a single zip file. Avoid nested zip files (zip inside zip), because they require repeated decompression and can significantly slow down image loading and increase memory usage.
 
+Recommended structure:
+
+```
+workspace/
+  project A/
+    B-45.jpg
+    ...
+  project B/
+    H-51.jpg
+    ...
+```
+
+Acceptable alternative:
+```
+workspace.zip/
+  project A/
+    B-45.jpg
+    ...
+  project B/
+    H-51.jpg
+    ...
+```
 
 
 ## 4. Build from code(optional)
