@@ -84,6 +84,7 @@ document.addEventListener("DOMContentLoaded", () => {
     objOpts.canvas.is_grid_visible = false;
     objOpts.canvas.grid_width = 0.5;
     objOpts.canvas.grid_colour = "#565656";
+    objOpts.canvas.finder_colour = "#ff0000";
     objOpts.canvas.zoom_level = [4, 3]; //[x, y](300pix/1m)
     objOpts.canvas.age_zoom_correction = [1/10, 100];//[zoom level, pad level]
     objOpts.canvas.dpir = 1; //window.devicePixelRatio || 1;
@@ -169,7 +170,7 @@ document.addEventListener("DOMContentLoaded", () => {
     objOpts.connection.is_source_visible = false;
   
     objOpts.plotter.selected_options = [];// store plot options from plotter
-
+    
     objOpts.plot.is_plot_visible = false;
     objOpts.plot.is_axis_visible = true;
     objOpts.plot.resample_method = "block";//"block", "moving"
@@ -233,13 +234,14 @@ document.addEventListener("DOMContentLoaded", () => {
     objOpts.edit.handleClick = null;
     objOpts.edit.handleMove = null;
     objOpts.edit.passwards = "admin";    
+    objOpts.edit.is_full_snapshot = false;
     
     let resourceIcons = window.LCapi.GetResources();
     objOpts.interface.icon_list = resourceIcons.tool;
     for(const key in objOpts.age.incon_list){
       objOpts.age.incon_list[key][0] = resourceIcons.plot[key];
     }
-    objOpts.interface.finder_y = 0;
+    objOpts.interface.finder_data = null;
 
     return objOpts;
   }
@@ -707,13 +709,20 @@ document.addEventListener("DOMContentLoaded", () => {
   //snapshot
   document.getElementById("bt_snapshot").addEventListener("click", async (event) => {
     if(LCCore!==null){
-      //download vector image from p5 canvas
       isSVG = true;
+
       const targetCanvas = new p5(p5Sketch);
+      targetCanvas.redraw();
       targetCanvas.save("model.svg");
+
       const annotationCanvas = new p5(penSketch);
+      annotationCanvas.redraw();
       annotationCanvas.save("model_annotation.svg");
-      //targetCanvas.save("model.png");
+
+      targetCanvas.remove();
+      annotationCanvas.remove();
+
+      objOpts.edit.is_full_snapshot = false;
       isSVG = false;
       console.log("[Renderer]: Take snapshot as svg.");
     }
@@ -3925,7 +3934,7 @@ document.addEventListener("DOMContentLoaded", () => {
         finderEnable = true;
         document.getElementById("bt_finder").style.backgroundColor = "#ccc";
         await LCapi.OpenFinder("OpenFinder", async () => {});
-        objOpts.interface.finder_y = 0;
+        objOpts.interface.finder_data = null;
 
       } else {
         finderEnable = false;
@@ -4136,7 +4145,16 @@ document.addEventListener("DOMContentLoaded", () => {
   window.LCapi.receive("ZoomactualMenuClicked", async () => {
     document.getElementById("bt_zoomactual").click();
   });
-  window.LCapi.receive("SnapshotMenuClicked", async () => {
+  window.LCapi.receive("SnapshotMenuClicked", async (data) => {
+
+    const isShift = data?.isShift === true;
+
+    if (isShift) {
+      objOpts.edit.is_full_snapshot = true;
+    } else {
+      objOpts.edit.is_full_snapshot = false;
+    }
+
     document.getElementById("bt_snapshot").click();
   });
   window.LCapi.receive("MeasureMenuClicked", async () => {
@@ -4158,40 +4176,38 @@ document.addEventListener("DOMContentLoaded", () => {
     //move position based on finder
       //get location
     let pos_y = data[objOpts.canvas.depth_scale];
-    objOpts.interface.finder_y = pos_y;
+    objOpts.interface.finder_data = data;
     console.log("[Renderer]: Received data from Finder: ", pos_y, objOpts.canvas.depth_scale);
     if(data.isMove){
-      if (objOpts.canvas.depth_scale !== "drilling_depth") {
-        let rect = document.getElementById("p5Canvas").getBoundingClientRect(); // Canvas position and size
+      //let rect = document.getElementById("p5Canvas").getBoundingClientRect(); // Canvas position and size
 
-        //convert scale from depth to pix
-        //const canvasPosY =  yMag  * age_mod * (pos_y + shift_y) + pad_y - scroller.scrollTop;
-        let canvasPosY = null;
-        if (objOpts.canvas.depth_scale == "age") {
-          canvasPosY = ((pos_y + objOpts.canvas.shift_y) * (objOpts.canvas.dpir * objOpts.canvas.zoom_level[1]) + objOpts.canvas.pad_y + objOpts.canvas.age_zoom_correction[1])  * objOpts.canvas.age_zoom_correction[0];
-        } else {
-          canvasPosY = (pos_y + objOpts.canvas.shift_y) * (objOpts.canvas.dpir * objOpts.canvas.zoom_level[1]) + objOpts.canvas.pad_y;
-        }
-
-        //update footer
-        //const txt = await getFooterInfo(LCCore, objOpts.edit.hittest, objOpts);
-        //document.getElementById("footerLeftText").innerText = txt;
-
-        //move scroller
-        scroller.scrollTop = canvasPosY - scroller.clientHeight / 2;
-        //scroller.moveTo(scroller.scrollLeft, pos_y);
-
-        //move canvas
-        let newPosY = canvasPosY - scroller.clientHeight / 2;
-        if(newPosY <= 0){
-          newPosY = 0;
-        }
-        canvasPos[1] = newPosY;
-
-        //target line
-        var target_line = document.getElementById("horizontal_target");
-        target_line.style.top = scroller.clientHeight / 2 + "px";
+      //convert scale from depth to pix
+      //const canvasPosY =  yMag  * age_mod * (pos_y + shift_y) + pad_y - scroller.scrollTop;
+      let canvasPosY = null;
+      if (objOpts.canvas.depth_scale == "age") {
+        canvasPosY = ((pos_y + objOpts.canvas.shift_y) * (objOpts.canvas.dpir * objOpts.canvas.zoom_level[1]) + objOpts.canvas.pad_y + objOpts.canvas.age_zoom_correction[1])  * objOpts.canvas.age_zoom_correction[0];
+      } else {
+        canvasPosY = (pos_y + objOpts.canvas.shift_y) * (objOpts.canvas.dpir * objOpts.canvas.zoom_level[1]) + objOpts.canvas.pad_y;
       }
+
+      //update footer
+      //const txt = await getFooterInfo(LCCore, objOpts.edit.hittest, objOpts);
+      //document.getElementById("footerLeftText").innerText = txt;
+
+      //move scroller
+      scroller.scrollTop = canvasPosY - scroller.clientHeight / 2;
+      //scroller.moveTo(scroller.scrollLeft, pos_y);
+
+      //move canvas
+      let newPosY = canvasPosY - scroller.clientHeight / 2;
+      if(newPosY <= 0){
+        newPosY = 0;
+      }
+      canvasPos[1] = newPosY;
+
+      //target line
+      var target_line = document.getElementById("horizontal_target");
+      target_line.style.top = scroller.clientHeight / 2 + "px";
     }
     updateView();
   });
@@ -4782,19 +4798,20 @@ document.addEventListener("DOMContentLoaded", () => {
     //setup p5 canvas instance forma=======================================================================
     sketch.setup = () => {
       let sketchCanvas = null;
+      let w, h;
+
+      if (objOpts.edit.is_full_snapshot) {
+        w = scroller.scrollWidth;
+        h = scroller.scrollHeight;
+      } else {
+        w = scroller.clientWidth;
+        h = scroller.clientHeight;
+      }
 
       if (isSVG) {
-        sketchCanvas = sketch.createCanvas(
-          scroller.clientWidth,
-          scroller.clientHeight,
-          sketch.SVG
-        );
+        sketchCanvas = sketch.createCanvas(w, h, sketch.SVG);
       } else {
-        sketchCanvas = sketch.createCanvas(
-          scroller.clientWidth,
-          scroller.clientHeight,
-          sketch.P2D
-        );
+        sketchCanvas = sketch.createCanvas(w, h, sketch.P2D);
       }
 
       sketch.strokeWeight(2);
@@ -4934,9 +4951,12 @@ document.addEventListener("DOMContentLoaded", () => {
             width: gridMaxX - 120,
             height: 1,
           };
-          if (!isInside(view_rect, grid_rect, [xBufferVal, yBufferVal])) {
-            continue;
+          if(!objOpts.edit.is_full_snapshot){
+            if (!isInside(view_rect, grid_rect, [xBufferVal, yBufferVal])) {
+              continue;
+            }
           }
+          
           //grid
           sketch.drawingContext.setLineDash([]);
           sketch.strokeWeight(objOpts.canvas.grid_width);
@@ -4960,9 +4980,13 @@ document.addEventListener("DOMContentLoaded", () => {
             width: gridMaxX - 120,
             height: 1,
           };
-          if (!isInside(view_rect, grid_rect, [xBufferVal,yBufferVal])) {
-            continue;
+          if(!objOpts.edit.is_full_snapshot){
+            if (!isInside(view_rect, grid_rect, [xBufferVal,yBufferVal])) {
+              continue;
+            }
           }
+
+          
 
           //grid
           sketch.drawingContext.setLineDash([]);
@@ -4982,56 +5006,6 @@ document.addEventListener("DOMContentLoaded", () => {
         
       }
       //-----------------------------------------------------------------------------------------
-      //initialise
-      //draw finder target line
-
-      if(finderEnable){        
-        //get pos
-        let num_disable = {total: 0, hole: 0};
-        let maxHoleOrder = 0;
-        let hole_x1 = 0;
-        for (let p = 0; p < LCCore.projects.length; p++) {
-          for (let h = 0; h < LCCore.projects[p].holes.length; h++) {
-            maxHoleOrder = LCCore.projects[p].holes[h].order;
-            if (!LCCore.projects[p].holes[h].enable) {
-              //case not plot, count
-              num_disable.hole += 1;
-              
-              continue;
-            }
-            hole_x1 = 20 + (objOpts.hole.distance + objOpts.hole.width) * (num_disable.total + LCCore.projects[p].holes[h].order - num_disable.hole);
-          }
-          num_disable.total += LCCore.projects[p].holes.length + objOpts.project.interval;
-        } 
-
-        //fix position
-        const target_y = (objOpts.interface.finder_y + shift_y) * yMag + pad_y;
-        //const target_x0 = 140;
-        //const target_x1 = (hole_x1 + shift_x + objOpts.hole.width / 2) * xMag + pad_x;
-        const target_x0 = canvasPos[0] + 20;
-        const target_x1 = canvasPos[0] + scroller.clientWidth - 20;
-        
-
-        sketch.strokeWeight(1);
-        sketch.stroke("#ff0000");
-        sketch.line(
-          target_x0,
-          target_y,
-          target_x1,
-          target_y
-        );
-        sketch.fill("#ff0000");
-        sketch.triangle(
-          target_x0,      target_y,
-          target_x0 - 10, target_y + 5, 
-          target_x0 - 10, target_y - 5
-          );
-          sketch.triangle(
-            target_x1,      target_y,
-            target_x1 + 10, target_y + 5, 
-            target_x1 + 10, target_y - 5
-            );
-      }
 
       //========================================================================================== 
       //========================================================================================== 
@@ -5213,6 +5187,61 @@ document.addEventListener("DOMContentLoaded", () => {
             sketch.pop();
           }
 
+          //finder target lines---------------------------------------------------
+          //draw finder target line
+
+          if(finderEnable){
+            sketch.push();      
+            //fix position
+            let finder_pos_y = objOpts.interface.finder_data[objOpts.canvas.depth_scale];
+            const target_y = (finder_pos_y + shift_y) * yMag + pad_y;
+            //const target_x0 = 140;//for full
+            //const target_x1 = (hole_x1 + shift_x + objOpts.hole.width / 2) * xMag + pad_x;//for full
+          
+            const target_x0 = ((hole_x0 + shift_x) - (objOpts.hole.distance/2)) * xMag + pad_x;
+            const target_x1 = target_x0 +(objOpts.hole.width + objOpts.hole.distance) * xMag; 
+
+            if(objOpts.canvas.depth_scale =="drilling_depth"){
+              if(hole.id[1]==objOpts.interface.finder_data.trinity.holeId[1]){
+                sketch.strokeWeight(1);
+                sketch.stroke(objOpts.canvas.finder_colour);
+                sketch.line(
+                  target_x0,
+                  target_y,
+                  target_x1,
+                  target_y
+                );
+              }
+            }else{
+              sketch.strokeWeight(1);
+              sketch.stroke(objOpts.canvas.finder_colour);
+              sketch.line(
+                target_x0,
+                target_y,
+                target_x1,
+                target_y
+              );
+            }
+
+            //(hole_x0 + shift_x) * xMag + pad_x;
+            //let hole_x0 = (objOpts.hole.distance + objOpts.hole.width) * (num_disable.total + hole.order - num_disable.hole);
+            
+            /*
+            sketch.fill("#ff0000");
+            sketch.triangle(
+              target_x0,      target_y,
+              target_x0 - 10, target_y + 5, 
+              target_x0 - 10, target_y - 5
+            );
+            sketch.triangle(
+              target_x1,      target_y,
+              target_x1 + 10, target_y + 5, 
+              target_x1 + 10, target_y - 5
+            );
+            */
+            sketch.pop();
+          }
+          
           if(objOpts.canvas.is_model_visible){
             //get plot order for hit test--------------------------------------
             let section_plot_order = [];
@@ -5284,9 +5313,12 @@ document.addEventListener("DOMContentLoaded", () => {
               };
 
               //draw section-----------------------------------------------------
-              if (!isInside(view_rect, sec_rect, [xBufferVal,yBufferVal])) {
-                continue;
+              if(!objOpts.edit.is_full_snapshot){
+                if (!isInside(view_rect, sec_rect, [xBufferVal,yBufferVal])) {
+                  continue;
+                }
               }
+              
               //sketch.drawingContext.setLineDash([]);
               sketch.strokeWeight(objOpts.section.line_width);
               sketch.stroke(objOpts.section.line_colour);
@@ -5401,7 +5433,7 @@ document.addEventListener("DOMContentLoaded", () => {
               sketch.rotate((objOpts.section.font_angle / 180) * Math.PI);
               sketch.text(secDispName, 0, 0);
               sketch.pop();
-              
+
               //make marker objects=================================================================================
               let msaterDirection = "none";
               for (let m = 0; m < section.markers.length; m++) {
@@ -6371,8 +6403,15 @@ document.addEventListener("DOMContentLoaded", () => {
                         zeroDrawDataset.data[2].hidx  = h;
 
                         zeroDataset = calcDrawPosition(zeroDrawDataset, LCCore, objOpts, pOptions);
+                        for(let z=0; z<zeroDataset.data.length;z++){
+                                                  
+                          if(pOptions.position == "rightside"){
+                            zeroDataset.data[z].pos_x = zeroDataset.data[z].pos_x + objOpts.hole.width * xMag;
+                          }else if(pOptions.position == "leftside"){
+                            zeroDataset.data[z].pos_x = zeroDataset.data[z].pos_x - objOpts.hole.width * xMag;
+                          }
+                        }
                         zeroDataDict[hole.name] = zeroDataset.data;
-
                         //========== X axis for trinity===============                        
                         if (objOpts.plot.is_axis_visible) {
                           if(pOptions.isAxis){
@@ -6515,6 +6554,11 @@ document.addEventListener("DOMContentLoaded", () => {
                 objCounts += 1;
                 //get data
                 const pData = drawData.data[d];
+                if(pOptions.position == "rightside"){
+                  pData.pos_x = pData.pos_x + objOpts.hole.width * xMag;
+                }else if(pOptions.position == "leftside"){
+                  pData.pos_x = pData.pos_x - objOpts.hole.width * xMag;
+                }
 
                 //if valid data exist, plot
                 if(pOptions.plotType == "line"){
@@ -7422,6 +7466,7 @@ document.addEventListener("DOMContentLoaded", () => {
     await window.LCapi.InitialisePaths();
   }
   function updateView() {
+    objOpts.edit.is_full_snapshot = false;
     if(isProcessing || !LCCore){return}
     //update
     if (vectorObjects == null) {

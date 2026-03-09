@@ -1997,7 +1997,7 @@ function createMainWIndow() {
     converterWindow = new BrowserWindow({
       parent: plotWindow ? plotWindow : mainWindow, 
       title: "Converter",
-      width: 700,
+      width: 750,
       height: 800,
       webPreferences: {preload: path.join(__dirname, "preload", "preload_converter.js"),},
     });
@@ -3187,7 +3187,16 @@ function createMainWIndow() {
               header[1] += " [PASEUDO]";
               header[2] += " [PASEUDO]";
               header[3] += " [PASEUDO]";
-              header[4] += " [PASEUDO]";
+              header[4] += " [PASEUDO]";   
+              if(options.sourceType ==="event_free_depth" || options.sourceType ==="age"){
+                header[9] += " [PASEUDO]";
+              }else if(options.sourceType ==="drilling_depth"){
+                header[9] += " [PASEUDO]";
+                header[10] += " [PASEUDO]";
+                header[11] += " [PASEUDO]";
+                header[12] += " [PASEUDO]";
+                header[13] += " [PASEUDO]";
+              }           
             }
           }
 
@@ -3208,13 +3217,14 @@ function createMainWIndow() {
           }
 
           //make output array
+          const allowPaseudoTrinity = false;
           let rowData = [
             calcedData.name, //data name
-            calcedData.project, //project name
-            calcedData.hole, //hole name
-            calcedData.section, //section name
-            parseFloat(calcedData.distance).toFixed(options.precision), //distance
-            parseFloat(calcedData.dd).toFixed(options.precision), //drilling depth
+            allowPaseudoTrinity ? calcedData.project : "", //project name
+            allowPaseudoTrinity ? calcedData.hole : "", //hole name
+            allowPaseudoTrinity ? calcedData.section : "", //section name
+            allowPaseudoTrinity ? parseFloat(calcedData.distance).toFixed(options.precision) : "", //distance
+            allowPaseudoTrinity ? parseFloat(calcedData.dd).toFixed(options.precision) : "", //drilling depth
             calcedData.source_type,
             "",
             basis,
@@ -4136,6 +4146,8 @@ function createMainWIndow() {
         //calc efd
         const efd = LCCore.getEFDfromCD(cd);
 
+        //const dd  = LCCore.getDepthFromTrinity(targetId, send_data, "drilling_depth", allowExtrapolation, options.isForceCalculation); //output:[sec id, efd, rank]
+
         //calc age
         const ageData = LCAge.getAgeFromEFD(efd, method);
         const age = ageData.age;
@@ -4158,7 +4170,7 @@ function createMainWIndow() {
         results.correlation_model_version = paseudoTrinity.index[0] !== null ? LCCore.projects[paseudoTrinity.index[0]].correlation_version : NaN;
         results.event_model_version       = paseudoTrinity.index[0] !== null ? LCCore.projects[paseudoTrinity.index[0]].correlation_version : NaN;
         results.age_model_version         = LCAge.AgeModels[ageIdx] !== undefined ? LCAge.AgeModels[ageIdx].version : NaN;
-        results.description               = "The trinity is paseudo data.";
+        results.description               = "Converted from Composite Depth. The trinity is paseudo data.";
         results.source_type = type;
         results.calc_type = "paseudo-depth";
       } else if (type == "event_free_depth") {
@@ -4237,9 +4249,9 @@ function createMainWIndow() {
 
         //stack
         results.name = name;
-        results.hole = paseudoTrinity[0] !== null ? paseudoTrinity[0] : NaN;
-        results.section = paseudoTrinity[1] !== null ? paseudoTrinity[1] : NaN;
-        results.distance = paseudoTrinity[2] !== null ? paseudoTrinity[2] : NaN;
+        results.hole = paseudoTrinity.hole !== null ? paseudoTrinity.hole : NaN;
+        results.section = paseudoTrinity.section !== null ? paseudoTrinity.section : NaN;
+        results.distance = paseudoTrinity.distance !== null ? paseudoTrinity.distance : NaN;
         results.cd = cd !== null ? cd : NaN;
         results.efd = efd !== null ? efd : NaN;
         results.dd  = dd !== null ? dd : NaN;
@@ -5241,10 +5253,14 @@ function createMainWIndow() {
             label:"Sub-tools",
             submenu:[
               {
-                label: "Snapshot",
-                //accelerator: "CmdOrCtrl+S",
-                click: async () => {
-                  mainWindow.webContents.send("SnapshotMenuClicked");
+                label: "Snapshot(Shift: Full)",
+                click: async (menuItem, browserWindow, event) => {
+
+                  const isShift = event.shiftKey;
+
+                  mainWindow.webContents.send("SnapshotMenuClicked", {
+                    isShift: isShift
+                  });
                 }
               },
               {

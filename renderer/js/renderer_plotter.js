@@ -326,6 +326,23 @@ document.addEventListener("DOMContentLoaded", () => {
                 opt.textContent = p;
                 plotTypeDropdown.appendChild(opt);
             })
+
+            //plot position
+            const plotPositionDropdown = document.createElement("select");
+            plotPositionDropdown.style.width = "70px";
+            plotPositionDropdown.style.marginLeft = "5px";
+            plotPositionDropdown.id = numSeries;
+            plotPositionDropdown.title = "Plot position";
+            plotPositionDropdown.dataset.name = "plotPosition";
+
+            //const plotType = ["line", "scatter","bar"];
+            const plotPosition = ["onSection", "rightside", "leftside"];
+            plotPosition.forEach(p=>{
+                const opt = document.createElement("option");
+                opt.value = p;
+                opt.textContent = p;
+                plotPositionDropdown.appendChild(opt);
+            })
             
             //delete button
             const deleteBtn = document.createElement("button");
@@ -378,6 +395,7 @@ document.addEventListener("DOMContentLoaded", () => {
             seriesDiv.appendChild(amplification);
             seriesDiv.appendChild(plotTypeDropdown);
             seriesDiv.appendChild(plotDirection);
+            seriesDiv.appendChild(plotPositionDropdown);
             seriesDiv.appendChild(axisCheck);
             seriesDiv.appendChild(axisCheckLabel);
             seriesDiv.appendChild(seriesCheck);
@@ -527,6 +545,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 order:0,
                 plotType:"line",
                 resampleWidth:0,
+                position: "onSection",
             };
 
             const visibleCheckbox     = child.querySelector("input[data-name='visible']");
@@ -537,6 +556,7 @@ document.addEventListener("DOMContentLoaded", () => {
             const amplification       = child.querySelector("input[data-name='amplification']");
             const plotTypeDropdown    = child.querySelector("select[data-name='plotType']");
             const noLabel             = child.querySelector("label[data-name='label']");
+            const plotPosition        = child.querySelector("select[data-name='plotPosition']");
             const plotDirection       = child.querySelector("select[data-name='direction']");
             const axisCheckbox        = child.querySelector("input[data-name='axisVisible']");
 
@@ -566,6 +586,7 @@ document.addEventListener("DOMContentLoaded", () => {
             const plotType           = plotTypeDropdown ? plotTypeDropdown.value : "line";
             const plotDirectionValue = plotDirection ? (plotDirection.value==="true") : false;
             const resampleWidth      = resample ? resample.value : null;
+            const plotPositionValue  = plotPosition ? plotPosition.value : "onSection";
             
             //set colour value
             numeratorDropdown.style.color   = colourValue;
@@ -577,6 +598,7 @@ document.addEventListener("DOMContentLoaded", () => {
             amplification.style.color       = colourValue;
             plotDirection.style.color       = colourValue;
             resample.style.color            = colourValue;
+            plotPosition.style.color        = colourValue;
             //plotColour.style.color = colourValue;
 
             result.isDraw        = visibleValue;
@@ -590,6 +612,7 @@ document.addEventListener("DOMContentLoaded", () => {
             result.plotType      = plotType;
             result.isFlip        = plotDirectionValue;
             result.resampleWidth = parseFloat(resampleWidth);
+            result.position      = plotPositionValue;
 
             results.push(result);
         });

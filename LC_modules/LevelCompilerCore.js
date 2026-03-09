@@ -5533,118 +5533,236 @@ class LevelCompilerCore extends EventEmitter{
   }
   getNearestTrinity(targetId, depth, calcType) {
     this.setStatus("completed","start getNearestTrinity");
-    //search in target
-    //this method returns paseudo result because multiple sections matched, but returns most goood sections based on centre of sections.
+
     let output = {index:[null,null,null,null], project:null, hole:null, section: null, distance: null, section_type: false};
     let nearestSectionData = null;
-    let nearestSectionList = [];
-    let tempSectionData = null;
-    let diffDepth = Infinity;
+    let selectedIdx = [null,null,null,null];
 
-    //search target section, if not 
-    if(targetId[0] !== null && targetId[1] !== null && targetId[2] !== null){
-      //if section is selected
-      const targetIdx = this.search_idx_list[targetId.toString()];
-      nearestSectionData = this.getDataByIdx(targetIdx);
-      output.index = targetIdx;
-    } else {
-      //if section is not selected
-      for(let p=0; p<this.projects.length;p++){
-        //if target project
-        if(!this.projects[p]){
-          continue
-        }
-        for(let h=0; h<this.projects[p].holes.length;h++){            
-          //fisrt, search in the selected hole
-          tempSectionData = null;
-          diffDepth = Infinity;
-          for(let s=0; s<this.projects[p].holes[h].sections.length; s++){             
-            const sectionData = this.projects[p].holes[h].sections[s];
-            const midSec = (sectionData.markers[0][calcType] + sectionData.markers[sectionData.markers.length - 1][calcType]) / 2;  
-            if (diffDepth > Math.abs(midSec - depth)) {
-              diffDepth = Math.abs(midSec - depth);
-              tempSectionData = sectionData;
-              output.index = [p, h, s, null];
-            }
-          }
-          nearestSectionList.push([diffDepth, tempSectionData]);
-        }
-      }
+    const hasProject = targetId[0] !== null;
+    const hasHole    = targetId[1] !== null;
+    const hasSection = targetId[2] !== null;
 
-      //get best nearestData
-      for(let s=0; s<nearestSectionList.length; s++){
-        tempSectionData = nearestSectionList[s][1];
-        if(!tempSectionData){continue}
-        const tempUpperDepth = tempSectionData.markers[0][calcType];
-        const tempLowerDepth = tempSectionData.markers[tempSectionData.markers.length - 1][calcType];
-        if(tempSectionData.id[0] == targetId[0] && tempSectionData.id[1] == targetId[1] && targetId[0] !==null && targetId[1] !== null){
-          //target hole
-          if(depth >= tempUpperDepth && depth <= tempLowerDepth){
-            // on the section
-            nearestSectionData = tempSectionData;
-            break;
-          }
-        }
-      }
+    const targetIdx = this.search_idx_list[targetId.toString()];
 
-      //case of out side of section&hole
-      if(nearestSectionData == null){
-        diffDepth = Infinity;
-        for(let s=0; s<nearestSectionList.length; s++){
-          if(nearestSectionList[s][0] < diffDepth){
-            if(!(nearestSectionList[s][1].id[0] == targetId[0] && nearestSectionList[s][1].id[1] == targetId[1])){
-              nearestSectionData = nearestSectionList[s][1];
-              diffDepth = nearestSectionList[s][0];
-            }
-          }
-        }
+    // =========================================================
+    // Fast Path (80% cases): project, hole, section are specified
+    // =========================================================
+    if (hasProject && hasHole && hasSection) {
+      if (targetIdx !== undefined && targetIdx !== null) {
+        nearestSectionData = this.getDataByIdx(targetIdx);
+        selectedIdx = targetIdx;
       }
+    } 
+    // =========================================================
+    // Unified Search Path: targetId is partially or not specified
+    // =========================================================
+    else {
+      // Step 1: Determine search scope (holes to iterate)
+      let targetHoles = [];
       
+      if (hasProject) {
+        if (targetIdx && this.projects[targetIdx[0]]) {
+          const proj = this.projects[targetIdx[0]];
+          if (hasHole) {
+            // Scope: specific hole only
+            if (proj.holes && proj.holes[targetIdx[1]]) {
+              targetHoles.push({ pIdx: targetIdx[0], hIdx: targetIdx[1], holeData: proj.holes[targetIdx[1]] });
+            }
+          } else {
+            // Scope: all holes in the specific project
+            if (proj.holes) {
+              for (let h = 0; h < proj.holes.length; h++) {
+                targetHoles.push({ pIdx: targetIdx[0], hIdx: h, holeData: proj.holes[h] });
+              }
+            }
+          }
+        }
+      } else {
+        // Scope: all holes in all projects
+        for (let p = 0; p < this.projects.length; p++) {
+          if (this.projects[p] && this.projects[p].holes) {
+            for (let h = 0; h < this.projects[p].holes.length; h++) {
+              targetHoles.push({ pIdx: p, hIdx: h, holeData: this.projects[p].holes[h] });
+            }
+          }
+        }
+      }
+
+      // Step 2: Single pass scoring loop
+      let bestScore = Infinity;
+      let minDepthDiff = Infinity;
+
+      for (let i = 0; i < targetHoles.length; i++) {
+        const hInfo = targetHoles[i];
+        const sections = hInfo.holeData.sections;
+        if (!sections) continue;
+
+        for (let s = 0; s < sections.length; s++) {
+          const sectionData = sections[s];
+          if (!sectionData || !sectionData.markers || sectionData.markers.length === 0) continue;
+
+          const topDepth = sectionData.markers[0][calcType];
+          const botDepth = sectionData.markers[sectionData.markers.length - 1][calcType];
+          
+          const isContained = (depth >= topDepth && depth <= botDepth);
+          
+          let isMS = false;
+          const mLen = sectionData.markers.length;
+          if (mLen > 1) {
+            if (depth <= topDepth) {
+              isMS = sectionData.markers[0].isMaster; // 外挿の基準となる上端マーカーのみ判定
+            } else if (depth >= botDepth) {
+              isMS = sectionData.markers[mLen - 1].isMaster; // 外挿の基準となる下端マーカーのみ判定
+            } else {
+              for (let m = 0; m < mLen - 1; m++) {
+                if (sectionData.markers[m][calcType] <= depth && depth <= sectionData.markers[m + 1][calcType]) {
+                  isMS = sectionData.markers[m].isMaster && sectionData.markers[m + 1].isMaster;
+                  break;
+                }
+              }
+            }
+          } else if (mLen === 1) {
+            isMS = sectionData.markers[0].isMaster;
+          }
+          
+          let currentScore;
+          let depthDiff = Infinity;
+
+          // Dynamic Scoring Logic
+          if (hasHole) {
+            // Human Preference (Hole specified): Ignore MS priority
+            if (isContained) {
+              currentScore = 1; // Rank 1: Contained
+            } else {
+              currentScore = 2; // Rank 2: Outside (Extrapolation base)
+              depthDiff = Math.min(Math.abs(topDepth - depth), Math.abs(botDepth - depth));
+            }
+          } else {
+            // AI Preference (Hole not specified): MS priority
+            if (isContained && isMS) {
+              currentScore = 1; // Rank 1: Contained & MS
+            } else if (isContained && !isMS) {
+              currentScore = 2; // Rank 2: Contained & Regular
+            } else if (!isContained && isMS) {
+              currentScore = 3; // Rank 3: Outside & MS (Extrapolation base)
+              depthDiff = Math.min(Math.abs(topDepth - depth), Math.abs(botDepth - depth));
+            } else {
+              currentScore = 4; // Rank 4: Outside & Regular (Extrapolation base)
+              depthDiff = Math.min(Math.abs(topDepth - depth), Math.abs(botDepth - depth));
+            }
+          }
+
+          // Update tentative best candidate
+          if (currentScore < bestScore || (currentScore === bestScore && depthDiff < minDepthDiff)) {
+            bestScore = currentScore;
+            minDepthDiff = depthDiff;
+            nearestSectionData = sectionData;
+            
+            const sIdxStr = sectionData.id ? sectionData.id.toString() : [null, null, null, null];
+            selectedIdx = (sIdxStr && this.search_idx_list[sIdxStr]) ? this.search_idx_list[sIdxStr] : [hInfo.pIdx, hInfo.hIdx, s, null];
+          }
+
+          // Early Exit: if absolute best (Rank 1) is found, stop searching
+          if (bestScore === 1) break;
+        }
+        if (bestScore === 1) break;
+      }
     }
-    
-    //check section data
+
+    // =========================================================
+    // Check section data (Return empty format if literally no data exists)
+    // =========================================================
     if (nearestSectionData == null) {
       output.index = [null,null,null,null];
-      this.setError("","E065: Nearest section data is not exist.")
+      this.setError("","E065: Nearest section data is not exist.");
       return output;
     }
 
-    //if section data is exist
+    // =========================================================
+    // find upper/lower markers
+    // =========================================================
+    const mLen = nearestSectionData.markers.length;
+    let selectedIdxs = [0, 0];
     let upperMarkerData = nearestSectionData.markers[0];
-    let lowerMarkerData = nearestSectionData.markers[nearestSectionData.markers.length - 1];
-    for(let m=0; m<nearestSectionData.markers.length;m++){
-      let marker = nearestSectionData.markers[m];
-      const temp = marker[calcType] - depth;
-      if (temp <= 0 && Math.abs(temp) < Math.abs(upperMarkerData[calcType] - depth)) {
-        upperMarkerData = marker;
-      }
-      if (temp >= 0 && Math.abs(temp) < Math.abs(lowerMarkerData[calcType] - depth)) {
-        lowerMarkerData = marker;
+    let lowerMarkerData = nearestSectionData.markers[0];
+
+    if (mLen > 1) {
+      const topDepth = nearestSectionData.markers[0][calcType];
+      const botDepth = nearestSectionData.markers[mLen - 1][calcType];
+
+      if (depth <= topDepth) {
+        // Extrapolation top
+        selectedIdxs = [0, 0];
+        upperMarkerData = nearestSectionData.markers[0];
+        lowerMarkerData = nearestSectionData.markers[0];
+      } else if (depth >= botDepth) {
+        // Extrapolation bottom
+        selectedIdxs = [mLen - 1, mLen - 1];
+        upperMarkerData = nearestSectionData.markers[mLen - 1];
+        lowerMarkerData = nearestSectionData.markers[mLen - 1];
+      } else {
+        // Interpolation
+        for (let m = 0; m < mLen - 1; m++) {
+          if (nearestSectionData.markers[m][calcType] <= depth && depth <= nearestSectionData.markers[m + 1][calcType]) {
+            selectedIdxs = [m, m + 1];
+            upperMarkerData = nearestSectionData.markers[m];
+            lowerMarkerData = nearestSectionData.markers[m + 1];
+            break; 
+          }
+        }
       }
     }
 
-    //make function
+    // =========================================================
+    // interpolate / extrapolate distance
+    // =========================================================
     const D1 = upperMarkerData.distance;
     const D3 = lowerMarkerData.distance;
     const d1 = upperMarkerData[calcType];
     const d2 = depth;
     const d3 = lowerMarkerData[calcType];
     const d2d1 = d2 - d1;
-    const d3d1 = d3 - d1;    
+    const d3d1 = d3 - d1;
 
-    const interpDistance = this.linearInterp(D1, D3, d2d1, d3d1);
-
-    const idx = this.search_idx_list[nearestSectionData.id.toString()];
-
-    output.project = this.projects[idx[0]].name;
-    output.hole    = this.projects[idx[0]].holes[idx[1]].name;
-    output.section = this.projects[idx[0]].holes[idx[1]].sections[idx[2]].name;
-    output.distance= interpDistance;
-    if(upperMarkerData.isMaster && lowerMarkerData.isMaster){
-      output.section_type = "Paseudo Master Section";
+    let interpDistance = null;
+    if(D1 < D3){
+      interpDistance = this.linearInterp(D1, D3, d2d1, d3d1);
+    }else if(D1===D3){
+      interpDistance = this.linearExtrap(null, D1, null, -d2d1, "linear");
     }else{
+      this.setError("","E065: Nearest upper and lower markers are reversed.");
+      return output;
+    }
+
+    // =========================================================
+    // build output
+    // =========================================================
+    const idx = this.search_idx_list[nearestSectionData.id.toString()];
+    if (idx !== undefined && idx !== null) {
+      selectedIdx = idx;
+    }
+
+    output.index = selectedIdx;
+    
+    // Safety guard to avoid TypeError if selectedIdx is somehow malformed
+    if (selectedIdx[0] !== null && selectedIdx[1] !== null && selectedIdx[2] !== null) {
+      output.project = this.projects[selectedIdx[0]].name;
+      output.hole    = this.projects[selectedIdx[0]].holes[selectedIdx[1]].name;
+      output.section = this.projects[selectedIdx[0]].holes[selectedIdx[1]].sections[selectedIdx[2]].name;
+    }
+    
+    output.distance= interpDistance;
+    output.section_type = "";
+
+    if(upperMarkerData.id && lowerMarkerData.id && upperMarkerData.id[3] == lowerMarkerData.id[3]){
       output.section_type = "Paseudo Parallel Section";
-    };
+    }else{
+      if(upperMarkerData.isMaster && lowerMarkerData.isMaster){
+        output.section_type = "Paseudo Master Section";
+      }else{
+        output.section_type = "Paseudo Parallel Section";
+      };
+    }
 
     this.setStatus("completed","");
     return output;

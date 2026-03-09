@@ -335,6 +335,7 @@ document.addEventListener("DOMContentLoaded", () => {
       }else{          
         alert(result.reason)
         console.log("[Converter]: Failed to export.",result.reason);
+        document.body.style.cursor = "default";
       }
 
       //finish
