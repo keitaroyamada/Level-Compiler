@@ -3571,6 +3571,7 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     }
 
+    await window.LCapi.ExportCorrelationAsCsv();
     
   });
   window.LCapi.receive("ExportCorrelationAsLFMenuClicked", async () => {

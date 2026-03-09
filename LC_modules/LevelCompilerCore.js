@@ -1475,9 +1475,9 @@ class LevelCompilerCore extends EventEmitter{
     this.setStatus("completed","Checked model summary");
   }
   checkModel(...args) {
-    this.setStatus("running","start checkModel");
-    if (this.projects.length == 0) {
-      this.setError("","E018: There is no project data.")
+    this.setStatus("running", "start checkModel");
+    if (!this.projects || this.projects.length === 0) {
+      this.setError("", "E018: There is no project data.");
       console.log("E018: There is no project data.");
       return;
     }
@@ -1485,37 +1485,37 @@ class LevelCompilerCore extends EventEmitter{
     this.updateSearchIdx();
 
     let results = [];
-    
+
     this.projects.forEach((project) => {
       let result = {
-        id:project.id,
-        name:project.name,
-        type:project.model_type,
-        evaluation:false,
+        id: project.id,
+        name: project.name,
+        type: project.model_type,
+        evaluation: false,
         is_connected_master: false,
-        distance_confliction_counts:0,
-        distance_confliction:[],
-        distance_confliction_name:[],
-        
-        cd_error_incompleted_counts:0,
-        cd_error_floating_counts:0,
-        cd_confliction_counts:0,
-        cd_confliction:[],
-        cd_confliction_name:[],
+        distance_confliction_counts: 0,
+        distance_confliction: [],
+        distance_confliction_name: [],
 
-        efd_error_incompleted_counts:0,
-        efd_error_floating_counts:0,
-        efd_confliction_counts:0,
-        efd_confliction:[],
-        efd_confliction_name:[],
+        cd_error_incompleted_counts: 0,
+        cd_error_floating_counts: 0,
+        cd_confliction_counts: 0,
+        cd_confliction: [],
+        cd_confliction_name: [],
 
-        rank_error_counts:0,
-        age_error_counts:0,        
-        age_confliction_counts:0,
-        age_confliction:[],
-        age_confliction_name:[],
+        efd_error_incompleted_counts: 0,
+        efd_error_floating_counts: 0,
+        efd_confliction_counts: 0,
+        efd_confliction: [],
+        efd_confliction_name: [],
 
-        max_rank:-1,  
+        rank_error_counts: 0,
+        age_error_counts: 0,
+        age_confliction_counts: 0,
+        age_confliction: [],
+        age_confliction_name: [],
+
+        max_rank: -1,
         hole_counts: 0,
         section_counts: 0,
         marker_counts: 0,
@@ -1523,209 +1523,144 @@ class LevelCompilerCore extends EventEmitter{
         connection_duo_counts: 0,
       };
 
-      //initialise
-      for(let p=0;p<this.projects.length;p++){
-        result.connection_counts[this.projects[p].name] = 0;
-      }
-      
-      if(project.model_type=="correlation"){
+      // Initialise connection_counts
+      this.projects.forEach((p) => {
+        result.connection_counts[p.name] = 0;
+      });
+
+      if (project.model_type === "correlation") {
         result.is_connected_master = true;
       }
-      //counts
+
       project.holes.forEach((hole) => {
-        //counts holes
         result.hole_counts += 1;
+        
         hole.sections.forEach((section) => {
-          //counts sections
           result.section_counts += 1;
           const epsilon = 1e-3;
           let inDuplicateGroup = false;
+
           section.markers.forEach((marker, index) => {
-            //counts markers
             result.marker_counts += 1;
 
+            // --- 1. Distance Duplicates ---
             if (index > 0) {
               const prevMarker = section.markers[index - 1];
-
               if (Math.abs(marker.distance - prevMarker.distance) < epsilon) {
-                  if (!inDuplicateGroup) {
-                      result.distance_confliction_counts += 1; 
-                      inDuplicateGroup = true;
-                  }
+                if (!inDuplicateGroup) {
+                  // Record the first marker of the duplicate group
                   result.distance_confliction_counts += 1;
-                  result.distance_confliction.push(marker.id);
-                  result.distance_confliction_name.push(hole.name+"-"+section.name+"-"+marker.distance+"cm");
+                  result.distance_confliction.push(prevMarker.id);
+                  result.distance_confliction_name.push(`${hole.name}-${section.name}-${prevMarker.distance}cm`);
+                  inDuplicateGroup = true;
+                }
+                // Record the subsequent markers of the duplicate group
+                result.distance_confliction_counts += 1;
+                result.distance_confliction.push(marker.id);
+                result.distance_confliction_name.push(`${hole.name}-${section.name}-${marker.distance}cm`);
 
-                  console.log("LCCore: Duplicate distances detected at: "+hole.name+"-"+section.name+"-"+marker.distance+"cm")
+                console.log(`LCCore: Duplicate distances detected at: ${hole.name}-${section.name}-${marker.distance}cm`);
               } else {
-                  inDuplicateGroup = false;
+                inDuplicateGroup = false;
               }
             }
 
+            // --- 2. Depth/Age/Rank Errors (Missing Data) ---
+            // Prevent access errors to null or undefined properties
+            const isFloating = marker.depth_source && marker.depth_source[0] === "floating";
 
             if (marker.composite_depth == null) {
-              //counts CD error
-              if(marker.depth_source[0]=="floating"){
-                result.cd_error_floating_counts += 1;
-              }else{
-                result.cd_error_incompleted_counts += 1;
-              }
-            }else{
-              marker.h_connection.forEach(hc=>{
-                const hidx = this.search_idx_list[hc.toString()];
-                if(hidx){
-                  const connected_cd = this.projects[hidx[0]].holes[hidx[1]].sections[hidx[2]].markers[hidx[3]].composite_depth;
-
-                  if(marker.composite_depth !== connected_cd){
-                    //counts CD confliction
-                    result.cd_confliction_counts+=1;
-                    if(marker.composite_depth && connected_cd){
-                      result.cd_confliction.push(marker.composite_depth - connected_cd);
-                      result.cd_confliction_name.push(hole.name+"-"+section.name+"-"+marker.distance+"cm");
-                    }                    
-                  }  
-                }
-                              
-              })
+              isFloating ? result.cd_error_floating_counts++ : result.cd_error_incompleted_counts++;
             }
-
             if (marker.event_free_depth == null) {
-              //counts EFD
-              if(marker.depth_source[0]=="floating"){
-                result.efd_error_floating_counts += 1;
-              }else{
-                result.efd_error_incompleted_counts += 1;
-              }
-            }else{
-              marker.h_connection.forEach(hc=>{
-                const hidx = this.search_idx_list[hc.toString()];
-                if(hidx){
-                  const connected_efd = this.projects[hidx[0]].holes[hidx[1]].sections[hidx[2]].markers[hidx[3]].event_free_depth;
-
-                  if(marker.event_free_depth !== connected_efd){
-                    //counts EFD confliction
-                    result.efd_confliction_counts+=1;
-                    if(marker.event_free_depth && connected_efd){
-                      result.efd_confliction.push(marker.event_free_depth - connected_efd);
-                      result.efd_confliction_name.push(hole.name+"-"+section.name+"-"+marker.distance+"cm");
-                    }
-                    
-                  }  
-                }                              
-              })
+              isFloating ? result.efd_error_floating_counts++ : result.efd_error_incompleted_counts++;
             }
-
             if (marker.age == null) {
-              //counst age error
-              result.age_error_counts += 1;
-            }else{
-              marker.h_connection.forEach(hc=>{
-                const hidx = this.search_idx_list[hc.toString()];
-                if(hidx){
-                  const connected_age = this.projects[hidx[0]].holes[hidx[1]].sections[hidx[2]].markers[hidx[3]].age;
-
-                  if(marker.age !== connected_age){
-                    //counts age confliction
-                    result.age_confliction_counts+=1;
-                    if((marker.age && connected_age)){
-                      result.age_confliction.push(marker.age - connected_age);
-                      result.age_confliction_name.push(hole.name+"-"+section.name+"-"+marker.distance+"cm");
-                    }
-                    
-                  }  
-                }                              
-              })
+              result.age_error_counts++;
             }
 
             if (marker.connection_rank == null) {
-              //counts rank error
-              result.rank_error_counts += 1;
-            } else {
-              //get max rank
-              if (marker.connection_rank > result.max_rank) {
-                result.max_rank = marker.connection_rank;
-              }              
+              result.rank_error_counts++;
+            } else if (marker.connection_rank > result.max_rank) {
+              result.max_rank = marker.connection_rank;
             }
 
-            marker.h_connection.forEach(hc=>{
-              //check connections
-              const cIdx = this.search_idx_list[hc.toString()];
-              if(cIdx){
-                this.projects[cIdx[0]].holes[cIdx[1]].sections[cIdx[2]].markers[cIdx[3]].h_connection.forEach(hc2=>{
-                  if(hc2.toString() == marker.id.toString()){
-                    //if bidirectionary connected
-                    if(hc[0] == project.id[0]){
-                      //counts own project
-                      result.connection_counts[this.projects[cIdx[0]].name] += 1/2;
-                    }else{
-                      //counts other project
-                      result.connection_counts[this.projects[cIdx[0]].name] += 1;
+            // --- 3. Consolidated Connections & Conflictions Check ---
+            // Consolidated four forEach loops into one to improve performance
+            if (marker.h_connection && Array.isArray(marker.h_connection)) {
+              marker.h_connection.forEach((hc) => {
+                const hidx = this.search_idx_list[hc.toString()];
+                if (!hidx) return;
+
+                const connectedProject = this.projects[hidx[0]];
+                const connectedMarker = connectedProject.holes[hidx[1]].sections[hidx[2]].markers[hidx[3]];
+
+                // CD Confliction (Use != null so that 0 is not evaluated as false)
+                if (marker.composite_depth != null && connectedMarker.composite_depth != null) {
+                  if (marker.composite_depth !== connectedMarker.composite_depth) {
+                    result.cd_confliction_counts += 1;
+                    result.cd_confliction.push(marker.composite_depth - connectedMarker.composite_depth);
+                    result.cd_confliction_name.push(`${hole.name}-${section.name}-${marker.distance}cm`);
+                  }
+                }
+
+                // EFD Confliction
+                if (marker.event_free_depth != null && connectedMarker.event_free_depth != null) {
+                  if (marker.event_free_depth !== connectedMarker.event_free_depth) {
+                    result.efd_confliction_counts += 1;
+                    result.efd_confliction.push(marker.event_free_depth - connectedMarker.event_free_depth);
+                    result.efd_confliction_name.push(`${hole.name}-${section.name}-${marker.distance}cm`);
+                  }
+                }
+
+                // Age Confliction
+                if (marker.age != null && connectedMarker.age != null) {
+                  if (marker.age !== connectedMarker.age) {
+                    result.age_confliction_counts += 1;
+                    result.age_confliction.push(marker.age - connectedMarker.age);
+                    result.age_confliction_name.push(`${hole.name}-${section.name}-${marker.distance}cm`);
+                  }
+                }
+
+                // Connection checks (Bidirectional)
+                connectedMarker.h_connection.forEach((hc2) => {
+                  if (hc2.toString() === marker.id.toString()) {
+                    // Safely evaluate while maintaining the logic of hc[0] == project.id[0]
+                    const isOwnProject = Array.isArray(project.id) && hc[0] == project.id[0];
+
+                    if (isOwnProject) {
+                      result.connection_counts[connectedProject.name] += 0.5;
+                    } else {
+                      result.connection_counts[connectedProject.name] += 1;
                     }
 
-                    //check master connection
-                    if(this.projects[cIdx[0]].model_type == "correlation"){
+                    if (connectedProject.model_type === "correlation") {
                       result.is_connected_master = true;
                     }
                   }
-                })
-              }              
-            })
+                });
+              });
+            }
           });
         });
       });
 
-      this.setStatus(
-        "info",
-        "LCCore: [" +
-          project.model_type +
-          "]" +
-          project.name +
-          ": Total interpolation error: CD:" +
-          result.cd_error_incompleted_counts +
-          ", EFD:" +
-          result.efd_error_incompleted_counts +
-          ", Rank:" +
-          result.rank_error_counts +
-          ", Max rank:" +
-          result.max_rank +
-          ", Age:" +
-          result.age_error_counts
-        )
-        if(args[0]==true){
-          console.log(
-              "LCCore: [" +
-              project.model_type +
-              "]" +
-              project.name +
-              ": Total interpolation error: CD:" +
-              result.cd_error_incompleted_counts +
-              ", EFD:" +
-              result.efd_error_incompleted_counts +
-              ", Rank:" +
-              result.rank_error_counts +
-              ", Max rank:" +
-              result.max_rank +
-              ", Age:" +
-              result.age_error_counts
-          );
-    
-        }
+      // --- 4. Final Evaluation & Logging ---
+      result.evaluation = (result.cd_error_incompleted_counts === 0 && result.efd_error_incompleted_counts === 0);
+
+      const logMessage = `LCCore: [${project.model_type}]${project.name}: Total interpolation error: CD:${result.cd_error_incompleted_counts}, EFD:${result.efd_error_incompleted_counts}, Rank:${result.rank_error_counts}, Max rank:${result.max_rank}, Age:${result.age_error_counts}`;
       
-      if (result.cd_error_incompleted_counts == 0 && result.efd_error_incompleted_counts == 0) {
-        result.evaluation = true;
-      } else {
-        result.evaluation = false;
+      this.setStatus("info", logMessage);
+      
+      // Safely check for undefined args[0]
+      if (args.length > 0 && args[0] === true) {
+        console.log(logMessage);
       }
-     
-      //show depth differences
-      //console.log(JSON.stringify(result.cd_confliction))
-      //console.log(JSON.stringify(result.efd_confliction))
-      //console.log(JSON.stringify(result.age_confliction))
+
       results.push(result);
     });
 
-
-    this.setStatus("completed","Checked model.")
+    this.setStatus("completed", "Checked model.");
     return results;
   }
   upgradeToLatestMembers(){
@@ -6172,8 +6107,8 @@ class LevelCompilerCore extends EventEmitter{
     let modelOutput = [];
     let eventListOutput = [
       ["Bore_hole",	"Core_number",	"Event_top",	"Event_bottom",	"ID"],
-      ["This",	"is",	"0",	"100",	""],
-      ["dummy",	"for LF",	"0",	"100",	""],
+      //["This",	"is",	"0",	"100",	""],
+      //["dummy",	"for LF",	"0",	"100",	""],
     ];
     let connectionCounts = 0;
 

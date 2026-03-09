@@ -1,0 +1,7 @@
+Bore_hole,Core_number,Event_top,Event_bottom,ID
+P,02,18.0,22.0,
+Q,01,70.0,73.3,
+R,100,24.7,27.7,
+P,02,46.2,48.6,(Tephra)
+R,100,55.8,58.3,(Tephra)
+R,02,57.3,63.7,

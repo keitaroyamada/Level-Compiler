@@ -1680,7 +1680,7 @@ function createMainWIndow() {
     results.forEach(r=>{
       dist_error += r.distance_confliction_counts;
     })
-    
+
     if(dist_error>0){
       const options = {
         type: "question",
@@ -1707,7 +1707,7 @@ function createMainWIndow() {
       let saveName = "";
       const targetIdx = LCCore.search_idx_list[exportLCCore.projects[i].id.toString()];
 
-      if(LCCore.projects[targetIdx[0].model_type==="correlation"]){
+      if(LCCore.projects[targetIdx[0]].model_type==="correlation"){
         saveName = "[correlation]";
       }else{
         saveName = "[duo]";
@@ -4952,6 +4952,13 @@ function createMainWIndow() {
                 results = LCCore.checkModel();
 
                 const text = results.map((item, i) => {
+                  const cdMean = item.cd_confliction.length ? mean(item.cd_confliction).toFixed(1) : NaN;
+                  const cdMax  = item.cd_confliction.length ? Math.abs(item.cd_confliction.reduce((a, b) => Math.abs(a) > Math.abs(b) ? a : b)).toFixed(1) : NaN;
+                  const cdMin  = item.cd_confliction.length ? Math.abs(item.cd_confliction.reduce((a, b) => Math.abs(a) < Math.abs(b) ? a : b)).toFixed(1) : NaN;
+                  const efdMean = item.efd_confliction.length ? mean(item.efd_confliction).toFixed(1) : NaN;
+                  const efdMax  = item.efd_confliction.length ? Math.abs(item.efd_confliction.reduce((a, b) => Math.abs(a) > Math.abs(b) ? a : b)).toFixed(1) : NaN;
+                  const efdMin  = item.efd_confliction.length ? Math.abs(item.efd_confliction.reduce((a, b) => Math.abs(a) < Math.abs(b) ? a : b)).toFixed(1) : NaN;
+
                   const conn = Object.entries(item.connection_counts)
                     .map(([key, val]) => `  ${"     "+item.name +"->"+key}: ${val}`)
                     .join('\n');
@@ -4968,10 +4975,10 @@ function createMainWIndow() {
                          `  -[CD errors (failed)]: ${item.cd_error_incompleted_counts}\n` +
                          `  -[CD errors (floating)]: ${item.cd_error_floating_counts}\n` +
                          `  -[CD conflictions]: ${item.cd_confliction_counts}\n` +
-                         `  -[CD conflictions (mean[abs])]: ${mean(item.cd_confliction).toFixed(1)} [ ${Math.abs(item.cd_confliction.reduce((a, b) => Math.abs(a) > Math.abs(b) ? a : b)).toFixed(1)} - ${Math.abs(item.cd_confliction.reduce((a, b) => Math.abs(a) < Math.abs(b) ? a : b)).toFixed(1)} ] cm\n` +
+                         `  -[CD conflictions (mean[abs])]: ${Number.isNaN(cdMean) ? '-' : `${cdMean} [ ${cdMax} - ${cdMin} ] cm`}\n` +
                          `  -[EFD errors (failed)]: ${item.efd_error_incompleted_counts}\n` +
                          `  -[EFD errors (floating)]: ${item.efd_error_floating_counts}\n` +
-                         `  -[EFD conflictions (mean[abs])]: ${mean(item.efd_confliction).toFixed(1)}  [ ${Math.abs(item.efd_confliction.reduce((a, b) => Math.abs(a) > Math.abs(b) ? a : b)).toFixed(1)} - ${Math.abs(item.efd_confliction.reduce((a, b) => Math.abs(a) < Math.abs(b) ? a : b)).toFixed(1)} ] cm\n` +
+                         `  -[EFD conflictions (mean[abs])]: ${Number.isNaN(efdMean) ? '-' : `${efdMean} [ ${efdMax} - ${efdMin} ] cm`}\n` +
                          `  -[Age errors]: ${item.age_error_counts}\n` +
                          `  -[Age conflictions]: ${item.age_confliction_counts}\n` +
                          `  -[Max Rank]: ${item.max_rank}\n`+
