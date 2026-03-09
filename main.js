@@ -5734,61 +5734,196 @@ async function getDirectory(window=null, title) {
     return null;
   }
 }
+// Search a file inside a directory or zip (supports nested zip)
+// type: "check" -> return boolean, "get" -> return path info
 async function findFileInDir(in_path, fileName, type) {
-  if (in_path.endsWith(".zip")) {
-    const zipBuffer = fs.readFileSync(in_path);
-    const zip = await JSZip.loadAsync(zipBuffer);
 
-    for (const name in zip.files) {
-      if (path.basename(name) === fileName) {
-        if (type === "check") return true;
-        if (type === "get") return { zipPath: in_path, innerPath: name };
+  // Internal cache stored on the function object to avoid global variables
+  if (!findFileInDir._cache) {
+    findFileInDir._cache = {
+      zipIndex: new Map(), // cache for zip file indexes
+      result: new Map()    // cache for search results
+    };
+  }
+
+  // Unique cache key for the search
+  const cacheKey = `${String(in_path)}::${fileName}`;
+  let found = null;
+
+  // If result already cached, reuse it
+  if (findFileInDir._cache.result.has(cacheKey)) {
+    found = findFileInDir._cache.result.get(cacheKey);
+  } else {
+
+    // ------------------------------------------------------------
+    // Recursive search inside a zip object (supports nested zips)
+    // ------------------------------------------------------------
+    async function searchZip(zipObj, rootZipPath, parentInnerPath) {
+
+      // Unique key representing this zip layer
+      const zipKey = `${rootZipPath}::${parentInnerPath || ""}`;
+      let zipIndex = findFileInDir._cache.zipIndex.get(zipKey);
+
+      // Build index (basename -> full inner path) if not cached
+      if (!zipIndex) {
+        zipIndex = new Map();
+
+        for (const name in zipObj.files) {
+          const entry = zipObj.files[name];
+          if (entry.dir) continue; // ignore directories
+
+          const base = path.basename(name);
+          if (!zipIndex.has(base)) {
+            zipIndex.set(base, name);
+          }
+        }
+
+        findFileInDir._cache.zipIndex.set(zipKey, zipIndex);
+      }
+
+      // Fast lookup using basename index
+      if (zipIndex.has(fileName)) {
+        const innerPath = zipIndex.get(fileName);
+
+        return {
+          zipPath: rootZipPath,
+          innerPath: parentInnerPath
+            ? `${parentInnerPath}::${innerPath}`
+            : innerPath
+        };
+      }
+
+      // Scan for nested zip files
+      for (const name in zipObj.files) {
+        const entry = zipObj.files[name];
+        if (entry.dir) continue;
+
+        // Only process nested zip files
+        if (path.extname(name).toLowerCase() !== ".zip") continue;
+
+        const nestedPath = parentInnerPath
+          ? `${parentInnerPath}::${name}`
+          : name;
+
+        const nestedKey = `${rootZipPath}::${nestedPath}`;
+
+        // Cache nested zip object to avoid repeated decompression
+        let nestedZip = findFileInDir._cache.zipIndex.get(`${nestedKey}::__zipobj__`);
+
+        if (!nestedZip) {
+          const nestedBuffer = await entry.async("nodebuffer");
+          nestedZip = await JSZip.loadAsync(nestedBuffer);
+
+          findFileInDir._cache.zipIndex.set(`${nestedKey}::__zipobj__`, nestedZip);
+        }
+
+        // Recursive search inside nested zip
+        const res = await searchZip(nestedZip, rootZipPath, nestedPath);
+        if (res) return res;
+      }
+
+      return null;
+    }
+
+    // ------------------------------------------------------------
+    // Case 1: input path is a zip file
+    // ------------------------------------------------------------
+    if (typeof in_path === "string" && in_path.endsWith(".zip")) {
+
+      // Cache the root zip object
+      let rootZip = findFileInDir._cache.zipIndex.get(`${in_path}::__rootzip__`);
+
+      if (!rootZip) {
+        const zipBuffer = await fs.promises.readFile(in_path);
+        rootZip = await JSZip.loadAsync(zipBuffer);
+
+        findFileInDir._cache.zipIndex.set(`${in_path}::__rootzip__`, rootZip);
+      }
+
+      // Search inside the zip (including nested zips)
+      found = await searchZip(rootZip, in_path, "");
+
+    } else {
+
+      // ------------------------------------------------------------
+      // Case 2: input path is a directory
+      // ------------------------------------------------------------
+
+      let dir = "";
+
+      // Normalize path input
+      if (typeof in_path === "string") {
+        dir = in_path;
+      } else {
+        const pathData = path.parse(in_path);
+        dir = path.join(pathData.dir, pathData.name);
+      }
+
+      // Read directory entries (Dirent avoids extra stat calls)
+      const entries = await fs.promises.readdir(dir, { withFileTypes: true });
+
+      // First pass: search direct files
+      for (const entry of entries) {
+
+        if (entry.isFile()) {
+
+          // Direct file match
+          if (entry.name === fileName) {
+            found = path.join(dir, entry.name);
+            break;
+          }
+
+          // If a zip file is found, search inside it
+          if (path.extname(entry.name).toLowerCase() === ".zip") {
+
+            const zipPath = path.join(dir, entry.name);
+
+            const res = await findFileInDir(zipPath, fileName, "get");
+
+            if (res) {
+              found = res;
+              break;
+            }
+          }
+        }
+      }
+
+      // Second pass: search subdirectories recursively
+      if (!found) {
+
+        for (const entry of entries) {
+
+          if (!entry.isDirectory()) continue;
+
+          const filePath = path.join(dir, entry.name);
+
+          const res = await findFileInDir(filePath, fileName, "get");
+
+          if (res) {
+            found = res;
+            break;
+          }
+        }
       }
     }
 
-    return type === "check" ? false : null;
+    // Store search result in cache
+    findFileInDir._cache.result.set(cacheKey, found);
   }
 
-  let dir = "";
-
-  if(typeof in_path === "string"){
-    dir = in_path;
-  }else{
-    const pathData = path.parse(in_path);
-    dir = path.join(pathData.dir, pathData.name);
+  // Return according to requested type
+  if (type === "check") {
+    return found !== null;
   }
 
-  const files = fs.readdirSync(dir);
-  for (const file of files) {
-      const filePath = path.join(dir, file);
-      const stat = fs.statSync(filePath);
-
-      if (stat.isDirectory()) {
-        if(type == "get"){
-          const res = await findFileInDir(filePath, fileName, "get");
-          if(res){
-            return res;
-          }
-        }else if(type == "check"){
-          if(await findFileInDir(filePath, fileName, "check") == true){
-            return true;
-          }
-        }
-      } else if (file === fileName) {
-        if(type == "get"){
-          return filePath;
-        }else if(type =="check"){
-          return true;
-        }
-      }
+  if (type === "get") {
+    return found;
   }
 
-  if(type == "check"){
-    return false;
-  } else if(type == "get"){
-    return false;
-  }
+  return false;
 }
+
+
 //--------------------------------------------------------------------------------------------------
 async function putcsvfile(window = null, filePath, data) {
   try {
