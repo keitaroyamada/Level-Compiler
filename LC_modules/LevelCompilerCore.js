@@ -5250,6 +5250,47 @@ class LevelCompilerCore extends EventEmitter{
     this.setStatus("completed","");
     return true;
   }
+  changeProjectType(targetId, to){
+    this.setStatus("running","start changeProjectType");
+    const idx = this.search_idx_list[targetId.toString()];
+    const prj = this.projects[idx[0]];
+    if(prj.model_type==to){
+      this.setErrorAlert("","Model type cannot be changed because the same type is selected.")
+      return "Model type cannot be changed because the same type is selected."
+    }
+
+    if(to==="duo"){
+      //change "correlation" => "duo"
+      prj.model_type = to;
+      this.setUpdateDepth();
+      return true
+    }else if(to==="correlation"){
+      let isMainProjectExist = false;
+      for(let p=0; p<this.projects.length;p++){
+        if(this.projects[p].model_type==="correlation"){
+          isMainProjectExist = true;
+          break;
+        }
+      }
+
+      if(isMainProjectExist){
+        this.setErrorAlert("Model type cannot be change because only one 'correlation' is allowed in a workspace.");
+        return "Model type cannot be change because only one 'correlation' is allowed in a workspace."
+      }else{
+        //change "duo" => "correlation"
+        prj.model_type = to;
+        this.base_project_id = prj.id;
+        this.setUpdateDepth();
+        return true
+      }
+      
+
+    }else{
+      this.setErrorAlert("Unsuspected model type");
+      return "Unsuspected model type"
+    }
+    this.setStatus("completed","");
+  }
   changeName(targetId, value){
     this.setStatus("running","start changeName");
     this.updateSearchIdx();

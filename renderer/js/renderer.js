@@ -1755,7 +1755,7 @@ document.addEventListener("DOMContentLoaded", () => {
           const projectName = LCCore.projects[targetIdx[0]].name
 
           const askData = {
-            title:"Edit marker descriptions: " + projectName,
+            title:"Edit project descriptions: " + projectName,
             label:"",
             value:LCCore.projects[targetIdx[0]].descriptions,
             type:"textarea",
@@ -1795,6 +1795,41 @@ document.addEventListener("DOMContentLoaded", () => {
 
         }else if (result == "duplicate_holes"){
           alert("Duplicate hole names detected. Please rename them to unique names.");
+        }
+      }    
+    }else if(clickResult == "changeProjectType"){
+      console.log(111111111111111111111111111111)
+      if(LCCore){
+        if(objOpts.edit.hittest.project!==null){
+          const ht = objOpts.edit.hittest;
+          const targetId  = [ht.project, null, null, null];
+          const targetIdx = getIdxById(LCCore, targetId); 
+
+          const project = LCCore.projects[targetIdx[0]];
+          const projectName = project.name;
+          let newType="duo";
+          if(project.model_type=="duo"){
+            newType = "correlation";
+          }else{
+            newType = "duo";
+          }
+
+          const askData = {
+            title:"Edit project type: " + projectName,
+            label:"Current model type: " + project.model_type,
+            value:newType,
+            type:"textarea",
+          };
+          const response = await window.LCapi.inputdialog(askData);
+
+          if(response !== null){
+            const result = await window.LCapi.changeProject(targetId, "model_type",response.toString());
+            if(result === true){
+              console.log("[Renderer]: Chnage project type.")
+              await loadModel(false,false);
+              updateView();
+            }
+          }
         }
       }    
     }else if(clickResult == "loadHighResolutionImage"){

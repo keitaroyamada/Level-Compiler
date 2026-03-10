@@ -1214,6 +1214,13 @@ function createMainWIndow() {
                   resolve("mergeProjects"); 
                 } 
               },
+              { 
+                label: 'Change project type', 
+                click: () => {
+                  console.log('MAIN: Change Project Type'); 
+                  resolve("changeProjectType"); 
+                } 
+              },
               { type: 'separator' },
               { 
                 label: 'Delete project', 
@@ -3645,11 +3652,15 @@ function createMainWIndow() {
     
   });
   ipcMain.handle("changeProject", (_e, projectId, type, value) => {
+    console.log(projectId, type, value)
     if(type=="name"){
       const result = LCCore.changeName(projectId, value);
       return result;
     }else if(type=="descriptions"){
       const result = LCCore.changeDescriptions(projectId, value);
+      return result;
+    }else if(type==="model_type"){
+      const result = LCCore.changeProjectType(projectId, value);
       return result;
     }
   });
