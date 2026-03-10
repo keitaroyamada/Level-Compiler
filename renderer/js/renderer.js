@@ -5607,7 +5607,7 @@ document.addEventListener("DOMContentLoaded", () => {
                         sketch.line(
                           (hole_x0 + shift_x) * xMag + pad_x,
                           sketch.mouseY+scroller.scrollTop, //(marker_top + shift_y) * yMag + pad_y,
-                          (hole_x0 + shift_x) * xMag + pad_x + objOpts.marker.width * mw * xMag,// + topBot,
+                          (hole_x0 + shift_x) * xMag + pad_x + objOpts.marker.width * xMag,// + topBot,
                           sketch.mouseY+scroller.scrollTop, //(marker_top + shift_y) * yMag + pad_y
                         )
                         sketch.pop();//load
@@ -5726,6 +5726,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
                 if(objOpts.connection.is_source_visible){
                     //data depth source arrow
+                    sketch.push();
                     sketch.drawingContext.setLineDash([]);
                     sketch.strokeWeight(1);                    
                     sketch.stroke("white");
@@ -5791,7 +5792,8 @@ document.addEventListener("DOMContentLoaded", () => {
                           );
                         }                     
                       }
-                    }                  
+                    }     
+                    sketch.pop();             
                   }
 
                 //add rank marker-------------------------------------------

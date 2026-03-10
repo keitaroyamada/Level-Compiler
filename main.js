@@ -1397,6 +1397,13 @@ function createMainWIndow() {
                   resolve("loadHighResolutionImage");                      
                 } 
               },
+              { 
+                label: 'Load low-resolution image', 
+                click: () => {
+                  console.log('MAIN: Load low-resolution image'); 
+                  resolve("reloadImage");                      
+                } 
+              },
               {
                 label: 'Show floating image', 
                 click: () => {

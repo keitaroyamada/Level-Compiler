@@ -490,7 +490,7 @@ class LevelCompilerCore extends EventEmitter{
 
                 //add duo connection object
                 const model_r = projectData._model_data[marker_r];
-                if (model_r[1] !== "") {
+                if (model_r[1] !== "" && model_r[2] !== "" && model_r[3] !== "") {
                   const duo_connected_hole = lcfnc.zeroPadding(model_r[1]);
                   const duo_connected_sec  = lcfnc.zeroPadding(model_r[2]);
                   const duo_connected_dist = lcfnc.round(parseFloat(model_r[3]), 1);
@@ -5069,8 +5069,8 @@ class LevelCompilerCore extends EventEmitter{
 
     //delete moved hole
     this.projects[holeIdx[0]].holes = this.projects[holeIdx[0]].holes.filter(hole => hole.id[1].toString()!==holeId[1].toString());
-    console.log(this.projects[0].holes[this.projects[0].holes.length-1].sections[0].markers[1].distance)
-    console.log(this.projects[0].holes[this.projects[0].holes.length-1].sections[0].markers[1].h_connection)
+    //console.log(this.projects[0].holes[this.projects[0].holes.length-1].sections[0].markers[1].distance)
+    //console.log(this.projects[0].holes[this.projects[0].holes.length-1].sections[0].markers[1].h_connection)
     
 
     //update model
@@ -6753,8 +6753,9 @@ class LevelCompilerCore extends EventEmitter{
         if(jumpSec===""){
           //not jumped
           //normal or top
-          const upperMaster = modelData[r-1][0].slice(1);
-          const lowerMaster = modelData[r+1][0].slice(1);
+          const upperMaster = modelData[r-1] ? modelData[r-1][0].slice(1) : null;
+          const lowerMaster = modelData[r+1] ? modelData[r+1][0].slice(1) : null;
+          
           if(r>1 && r<modelData.length-1){
             if(holeNames.has(upperMaster)){
               if(holeNames.has(lowerMaster)){
