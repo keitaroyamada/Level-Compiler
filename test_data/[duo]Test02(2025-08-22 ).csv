@@ -1,0 +1,20 @@
+Master hole,Master hole,Master section,Master distance (cm),Master lamina name,Laminaname(A)[general],Distance from core top (cm),Drilling depth (cm),Event,Laminaname(B)[general],Distance from core top (cm),Drilling depth (cm),Event,Laminaname(C)[general],Distance from core top (cm),Drilling depth (cm),Event,Laminaname(D)[general],Distance from core top (cm),Drilling depth (cm),Event
+top/A(0),,,,,A-1-top,0,0,,,,,,,,,,,,,
+A,,,,,,,,,,,,,C-1-top,0,50,,,,,
+A,,,,,,,,,,,,,,,,,D-1-top,0,50,
+A/D,P,01,80.2,P-01-,,73,73,,,,,,,27.333333333333325,77.33333333333333,,,26.333333333333332,76.33333333333333,
+D,,,,,A-1-bottom,100,100,,,,,,,,,,,,,
+D,,,,,,,,,B-1-top,0,100,,,,,,,,,
+D,P,02,18.0,P-02-,,,,,,26,126,deposition-upper()[general],,67,117,deposition-upper()[general],,64,114,deposition-upper()[general]
+D/B,P,02,22.0,P-02-,,,,,,29.333333333333343,129.33333333333334,deposition-lower()[general],,70.66666666666666,120.66666666666666,deposition-lower()[general],,68.33333333333334,118.33333333333334,deposition-lower()[general]
+B,,,,,,,,,,,,,C-1-bottom,100,150,,,,,
+B,,,,,,,,,,,,,,,,,D-1-bottom,100,150,
+B,,,,,A-2-top,0,150,,,,,,,,,,,,,
+B,P,02,46.2,P-02-,,10,160,deposition-upper()[tephra],,58.66666666666666,158.66666666666666,deposition-upper()[tephra],,,,,,,,
+B/A,P,02,48.6,P-02-,,13.666666666666657,163.66666666666666,deposition-lower()[tephra],,62,162,deposition-lower()[tephra],,,,,,,,
+A,,,,,,,,,,,,,,,,,D-2-top,0,180,
+A,P,02,75.8,P-02-,,37.33333333333334,187.33333333333334,,,87,187,,,,,,,10.333333333333343,190.33333333333334,
+A,,,,,,,,,B-1-bottom,100,200,,,,,,,,,
+A/D,P,03,24.4,P-03-,,88.66666666666669,238.66666666666669,,,,,,,,,,,59.333333333333314,239.33333333333331,
+D,,,,,A-2-bottom,100,250,,,,,,,,,,,,,
+D/bottom,,,,,,,,,,,,,,,,,D-2-bottom,100,280,

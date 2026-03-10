@@ -70,7 +70,7 @@ document.addEventListener("DOMContentLoaded", () => {
     };
 
     //=========== public properties =========== 
-    objOpts.information.version = "2.2";
+    objOpts.information.version = "2.3";
     objOpts.developer.mode = "user";//"user";"developer";"root"; 
     objOpts.canvas.use_touchpad_mode = true;
     objOpts.canvas.depth_scale = "composite_depth";
@@ -1300,12 +1300,20 @@ document.addEventListener("DOMContentLoaded", () => {
       }      
     }else if(clickResult=="reloadImage"){
       const curDPCM = JSON.parse(JSON.stringify(objOpts.image.dpcm));
-
-      const targetId = [objOpts.edit.hittest.project, objOpts.edit.hittest.hole,objOpts.edit.hittest.section,null];
+      const targetId = [objOpts.edit.hittest.project, objOpts.edit.hittest.hole,objOpts.edit.hittest.section,null];      
       modelImages.load_target_ids = [targetId];//load target
-      objOpts.image.dpcm = objOpts.image.dpcm;
-      modelImages = await loadCoreImages(modelImages, LCCore, objOpts, ["drilling_depth", "composite_depth","event_free_depth","age"]);
       
+      const reloadDefaultDpcm = true;
+      if(reloadDefaultDpcm){
+        const targetIdx = getIdxById(LCCore, targetId);
+        const holeName = LCCore.projects[targetIdx[0]].holes[targetIdx[1]].name;
+        const sectionName = LCCore.projects[targetIdx[0]].holes[targetIdx[1]].sections[targetIdx[2]].name;
+
+        modelImages.image_resolution[holeName+"-"+sectionName] = objOpts.image.dpcm;
+      }
+     
+      modelImages = await loadCoreImages(modelImages, LCCore, objOpts, ["drilling_depth", "composite_depth","event_free_depth","age"]);
+
       updateView();
       objOpts.image.dpcm = curDPCM;
     }else if(clickResult=="reload"){

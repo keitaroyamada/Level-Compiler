@@ -120,13 +120,13 @@ document.addEventListener("DOMContentLoaded", () => {
             seriesCheckLabel.style.cursor = "pointer";
             seriesCheckLabel.style.fontSize = "16px";
             seriesCheckLabel.style.userSelect = "none";
-            seriesCheckLabel.textContent = "👁";//👁○
+            seriesCheckLabel.textContent = "◉";//👁○
             seriesCheckLabel.style.marginLeft = "8px";
             seriesCheckLabel.title = "Visible (Click to Show/Hide)";
 
             seriesCheck.addEventListener('change', (e) => {
                 if (e.target.checked) {
-                    seriesCheckLabel.textContent = "👁";
+                    seriesCheckLabel.textContent = "◉";
                     seriesCheckLabel.style.textDecoration = "none";
                     seriesCheckLabel.style.opacity = "1";
                     seriesCheckLabel.title = "Visible (Click to Hide)";
