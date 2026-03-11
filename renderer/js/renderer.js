@@ -93,7 +93,7 @@ document.addEventListener("DOMContentLoaded", () => {
     objOpts.canvas.shift_x = 10; //[cm]
     objOpts.canvas.shift_y = 100; //[cm]
     objOpts.canvas.bottom_pad = 100; //[cm]
-    objOpts.canvas.buffer_depth = 0.1; //[rate]
+    objOpts.canvas.buffer_depth = 0.2; //[rate]
     objOpts.canvas.buffer_width = 0.3; //[rate]
     
     objOpts.project.interval = 1;
@@ -4765,12 +4765,12 @@ document.addEventListener("DOMContentLoaded", () => {
         let hole_bottom = -Infinity;
         for (let s = 0; s < LCCore.projects[p].holes[h].sections.length; s++) {
           const section_top_cd = LCCore.projects[p].holes[h].sections[s].markers[0][objOpts.canvas.depth_scale];
-          if(section_top_cd && hole_top > section_top_cd){
+          if(section_top_cd!==null &&section_top_cd!==undefined&& hole_top > section_top_cd){
             hole_top = section_top_cd;
           }
           
           const section_bottom_cd = LCCore.projects[p].holes[h].sections[s].markers.slice(-1)[0][objOpts.canvas.depth_scale];
-          if(section_bottom_cd && hole_bottom<section_bottom_cd){
+          if(section_bottom_cd!==null && section_bottom_cd!==undefined && hole_bottom<section_bottom_cd){
             hole_bottom = section_bottom_cd;
           } 
         }

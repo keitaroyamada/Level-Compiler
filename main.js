@@ -3157,7 +3157,8 @@ function createMainWIndow() {
           "Age lower (calBP)",
           " ",          
           "Connection Rank",
-          "Section type",          
+          "Section type",
+          "Age calc type",          
           //"Calc Type",
           " ",
           "Correlation Model Version",
@@ -3250,6 +3251,7 @@ function createMainWIndow() {
             "",//separator            
             calcedData.correlation_rank,  //connection rank    
             correlationType,//calcedData.is_main_model_connected ? "MAIN " + calcedData.section_type : "DUO " + calcedData.section_type, // MAIN master section/parallel section                    
+            calcedData.age_source.type+"("+calcedData.age_source.upper+"/"+calcedData.age_source.lower+")", //age inter/extrapolation
             //calcedData.calc_type,
             "",
             calcedData.correlation_model_version,
@@ -4025,6 +4027,7 @@ function createMainWIndow() {
         age_mid: null,
         age_upper: null,
         age_lower: null,
+        age_source: null,
         project_id: null,
         hole_id: null,
         section_id: null,
@@ -4140,6 +4143,7 @@ function createMainWIndow() {
         results.age_mid     = age.age.mid   !== null ? age.age.mid   : NaN;
         results.age_upper   = age.age.upper !== null ? age.age.upper : NaN;
         results.age_lower   = age.age.lower !== null ? age.age.lower : NaN;
+        results.age_source  = age.age.source!== null ? age.age.source: NaN;
         results.project_id  = calcedIdx !== null ?  [cd_list[0][0][0], null, null, null] : [null, null, null, null];
         results.hole_id     = calcedIdx !== null ?  [cd_list[0][0][0], cd_list[0][0][1], null, null] : [null, null, null, null];
         results.section_id  = calcedIdx !== null ?  [cd_list[0][0][0], cd_list[0][0][1], cd_list[0][0][2], null] : [null, null, null, null];
@@ -4183,6 +4187,7 @@ function createMainWIndow() {
         results.age_mid = age.mid !== null ? age.mid : NaN;
         results.age_upper = age.upper !== null ? age.upper : NaN;
         results.age_lower = age.lower !== null ? age.lower : NaN;
+        results.age_source  = age.source!== null ? age.source: NaN;
         results.section_type = paseudoTrinity.section_type !== null ? paseudoTrinity.section_type : "";
         results.correlation_rank = 3;
         results.correlation_model_version = paseudoTrinity.index[0] !== null ? LCCore.projects[paseudoTrinity.index[0]].correlation_version : NaN;
@@ -4220,6 +4225,7 @@ function createMainWIndow() {
         results.age_mid = age.mid !== null ? age.mid : NaN;
         results.age_upper = age.upper !== null ? age.upper : NaN;
         results.age_lower = age.lower !== null ? age.lower : NaN;
+        results.age_source  = age.source!== null ? age.source: NaN;
         results.section_type = paseudoTrinity.section_type !== null ? paseudoTrinity.section_type : "";
         results.correlation_rank = 3;
         results.correlation_model_version = paseudoTrinity.index[0] !== null ? LCCore.projects[paseudoTrinity.index[0]].correlation_version : NaN;
@@ -4276,6 +4282,7 @@ function createMainWIndow() {
         results.age_mid = age.mid !== null ? age.mid : NaN;
         results.age_upper = age.upper !== null ? age.upper : NaN;
         results.age_lower = age.lower !== null ? age.lower : NaN;
+        results.age_source  = age.source!== null ? age.source: NaN;
         results.section_type = paseudoTrinity.section_type !== null ? paseudoTrinity.section_type : "";
         results.correlation_rank = 3;
         results.correlation_model_version = paseudoTrinity.index[0] !== null ? LCCore.projects[paseudoTrinity.index[0]].correlation_version : NaN;
@@ -4323,6 +4330,7 @@ function createMainWIndow() {
         results.age_mid = rage.age.mid !== null ? rage.age.mid : NaN;
         results.age_upper = rage.age.upper !== null ? rage.age.upper : NaN;
         results.age_lower = rage.age.lower !== null ? rage.age.lower : NaN;
+        results.age_source  = rage.age.source!== null ? rage.age.source: NaN;
         results.section_type = paseudoTrinity.section_type !== null ? paseudoTrinity.section_type : "";
         results.correlation_rank = 3;
         results.correlation_model_version = paseudoTrinity.index[0] !== null ? LCCore.projects[paseudoTrinity.index[0]].correlation_version : NaN;

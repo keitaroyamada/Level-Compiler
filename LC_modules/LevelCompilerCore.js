@@ -2158,6 +2158,7 @@ class LevelCompilerCore extends EventEmitter{
                 if(isConnected){
                   const age = LCAge.getAgeFromEFD(marker.event_free_depth, "linear"); //{age: { type: null, mid: null, upper: null, lower: null }, age_idx:null};
                   this.projects[p].holes[h].sections[s].markers[m].age = age.age.mid;
+                  this.projects[p].holes[h].sections[s].markers[m].age_source = age.age.source;
                 }else{
                   this.projects[p].holes[h].sections[s].markers[m].age = null;
                 }                

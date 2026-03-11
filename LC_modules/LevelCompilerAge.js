@@ -447,70 +447,10 @@ class LevelCompilerAge {
     ].ages.filter((item) => item.id !== targetAgeDataId);
     this.sortAges();
     this.checkAges();
-  }
-  /*
+  }  
   getAgeFromEFD(efd, method) {
     const targetAgeModelId = this.selected_id;
-    let output = {age: { type: null, mid: null, upper: null, lower: null }, age_idx:null};
-
-    if(method == "linear"){
-      //get access index
-      let targetAgeModelIdx = null;
-      this.AgeModels.forEach((a, n) => {
-        if (targetAgeModelId == a.id) {
-          targetAgeModelIdx = n;
-        }
-      });
-      if (targetAgeModelIdx == null) {
-        return output;
-      }else{
-        output.age_idx = targetAgeModelIdx;
-      }
-
-      if (efd == null) {
-        return output;
-      }
-
-      //get first upper/lower age data
-      let upperData = null;
-      for(let i=0; i<this.AgeModels[targetAgeModelIdx].ages.length;i++){
-        //if above
-        const ageData = this.AgeModels[targetAgeModelIdx].ages[i];
-        if (upperData == null || (ageData.event_free_depth <= efd && upperData.event_free_depth < ageData.event_free_depth)) {
-          if(ageData.enable==true){
-            upperData = ageData;
-          }      
-        }
-      }
-
-      let lowerData = null;
-      for(let i=this.AgeModels[targetAgeModelIdx].ages.length-1; i>=0;i--){
-        //if below
-        const ageData = this.AgeModels[targetAgeModelIdx].ages[i];
-        if (lowerData == null ||(ageData.event_free_depth >= efd && lowerData.event_free_depth > ageData.event_free_depth)) {          
-          if(ageData.enable==true){
-            lowerData = ageData;
-          }
-        }
-      }
-
-      //apply interpolation
-      const interpolatedAge = this.interpolate(
-        upperData,
-        lowerData,
-        "age",
-        efd,
-        method
-      );
-      output.age = interpolatedAge;
-    }
-
-    return output;
-  }
-    */
-  getAgeFromEFD(efd, method) {
-    const targetAgeModelId = this.selected_id;
-    let output = { age: { type: null, mid: null, upper: null, lower: null }, age_idx: null };
+    let output = { age: { type: null, source:null, mid: null, upper: null, lower: null }, age_idx: null };
 
     if (method == "linear") {
       // 1. Identify the target age model index
@@ -613,6 +553,24 @@ class LevelCompilerAge {
       const l_age_u = l_age - parseFloat(lowerAgeData.age_upper_1std);
       const l_age_l = l_age + parseFloat(lowerAgeData.age_lower_1std);
 
+      //get type
+      let mode;
+      let side = null;
+
+      const x1 = (target == "age") ? u_efd : u_age;
+      const x2 = (target == "age") ? l_efd : l_age;
+      const v  = efd;
+
+      const xmin = Math.min(x1, x2);
+      const xmax = Math.max(x1, x2);
+
+      if (v >= xmin && v <= xmax) {
+        mode = "interpolation";
+      } else {
+        mode = "extrapolation";
+        side = (v < xmin) ? "upper" : "lower";
+      }
+
       //calc
       let interp_mid = null;
       let interp_upper = null;
@@ -629,19 +587,12 @@ class LevelCompilerAge {
 
       return {
         type: target,
+        source: {type:mode,upper:upperAgeData.name,lower:lowerAgeData.name},
         mid: interp_mid,
         upper: interp_upper,
         lower: interp_lower,
       };
-    } else if (method == "MC") {
-      console.log("under construction");
-      return {
-        type: target,
-        mid: null,
-        upper: null,
-        lower: null,
-      };
-    }
+    } 
   }
   getEFDFromAge(age, method) {
 
