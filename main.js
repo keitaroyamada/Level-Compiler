@@ -3234,11 +3234,11 @@ function createMainWIndow() {
           const allowPaseudoTrinity = false;
           let rowData = [
             calcedData.name, //data name
-            allowPaseudoTrinity ? calcedData.project : "", //project name
-            allowPaseudoTrinity ? calcedData.hole : "", //hole name
-            allowPaseudoTrinity ? calcedData.section : "", //section name
-            allowPaseudoTrinity ? parseFloat(calcedData.distance).toFixed(options.precision) : "", //distance
-            allowPaseudoTrinity ? parseFloat(calcedData.dd).toFixed(options.precision) : "", //drilling depth
+            options.sourceType==="trinity"||allowPaseudoTrinity ? calcedData.project : "", //project name
+            options.sourceType==="trinity"||allowPaseudoTrinity ? calcedData.hole : "", //hole name
+            options.sourceType==="trinity"||allowPaseudoTrinity ? calcedData.section : "", //section name
+            options.sourceType==="trinity"||allowPaseudoTrinity ? parseFloat(calcedData.distance).toFixed(options.precision) : "", //distance
+            options.sourceType==="trinity"||allowPaseudoTrinity ? parseFloat(calcedData.dd).toFixed(options.precision) : "", //drilling depth
             calcedData.source_type,
             "",
             basis,
@@ -4432,14 +4432,21 @@ function createMainWIndow() {
   function registerAgeFromCsv(fullpath, type="LC"){
     try{
       // loadAgeFromCsv
-      LCAge.loadAgeFromCsv(LCCore, fullpath, type);
+      const res = LCAge.loadAgeFromCsv(LCCore, fullpath, type);
       //apply latest age model to the depth model
+      if(res===true){
+        //register        
+        globalPath.dataPaths.push({type:"csvage",path:fullpath});
+        console.log("MAIN: Registered age model from " + fullpath);
 
-      //register        
-      globalPath.dataPaths.push({type:"csvage",path:fullpath});
-      console.log("MAIN: Registered age model from " + fullpath);
+        return true
+      }else{
+        const result={};
+        result.statusDetails = res;
 
-      return true
+        mainWindow.webContents.send("AlertRenderer", result);
+        console.error("MAIN: ",res);
+      }
       
     }catch(err){
       console.log(err)
@@ -5206,7 +5213,7 @@ function createMainWIndow() {
                 title: "Plotter",
                 parent:mainWindow,
                 //resizable: false,
-                width: 660,//full: 900
+                width: 800,//full: 900
                 height: 600,
                 webPreferences: {preload: path.join(__dirname, "preload", "preload_plotter.js"),},
               });

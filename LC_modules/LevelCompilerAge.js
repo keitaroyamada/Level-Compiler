@@ -45,13 +45,13 @@ class LevelCompilerAge {
     if (LCCore.checkModel()[targetProjectIdx[0]]) {
     } else {
       console.log("LCAge: [ERROR] There is any error in model interpolation.");
-      return;
+      return "There is any error in model interpolation.";
     }
 
     //load age model
     const csv_data = lcfnc.readcsv(age_path);
     if (csv_data == null) {
-      return null;
+      return "There is no age model csv.";
     }
 
     var fileName = age_path.split(/[/\\]/).pop();
@@ -67,7 +67,7 @@ class LevelCompilerAge {
 
         if (!match[1].toLowerCase().includes("age")) {
           console.error("LCAge: Registered file is not age model.");
-          return;
+          return "LCAge: Registered file is not age model.";
         }
       }else{
          if (!match[1].toLowerCase().includes("age") && match[1] !== "") {
@@ -231,9 +231,14 @@ class LevelCompilerAge {
       ageDataSet.ages.push(ageData);
     }
 
+    if(ageDataSet.ages.length<2){
+      return "A model requires at least two ages."
+    }
+
     this.AgeModels.push(ageDataSet);
     this.sortAges();
     //this.checkAges();
+    return true
   }
   getModelData(){
     let model = null;
