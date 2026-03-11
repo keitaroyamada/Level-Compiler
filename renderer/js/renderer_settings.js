@@ -212,7 +212,7 @@ window.addEventListener("DOMContentLoaded", () => {
       );
 
       if (response.response) {
-        window.SettingsApi.sendSettings(null,"renderer")
+        window.SettingsApi.sendSettings({data: null, editable:null, options:null},"renderer")
       }
       
     });

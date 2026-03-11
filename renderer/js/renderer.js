@@ -5029,9 +5029,7 @@ document.addEventListener("DOMContentLoaded", () => {
               continue;
             }
           }
-
-          
-
+      
           //grid
           sketch.drawingContext.setLineDash([]);
           sketch.strokeWeight(objOpts.canvas.grid_width);
@@ -6076,6 +6074,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     }
                   }
 
+                  sketch.push();
                   if (connectionData.isNext == false) {
                     //connected core is not located at the next
                     if (objOpts.connection.is_remote_connections_visible){
@@ -6145,6 +6144,8 @@ document.addEventListener("DOMContentLoaded", () => {
                     }
 
                   }
+
+                  sketch.pop();
                   sketch.drawingContext.globalAlpha = 1;
 
                   //------------------------------------------------------------                
