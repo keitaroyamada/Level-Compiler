@@ -348,6 +348,7 @@ class LevelCompilerAge {
     this.sortAges();
     this.checkAges();
   }
+  
   updateAgeDepth(LCCore){
     //update CD/EFD of age points
     if(this.AgeModels.length==0){
@@ -424,6 +425,7 @@ class LevelCompilerAge {
     this.checkAges();
     //this.checkAges();
   }
+  
   removeAge(targetAgeDataId) {
     const targetAgeModelId = this.selected_id;
     //get access index
@@ -441,6 +443,7 @@ class LevelCompilerAge {
     this.sortAges();
     this.checkAges();
   }
+  /*
   getAgeFromEFD(efd, method) {
     const targetAgeModelId = this.selected_id;
     let output = {age: { type: null, mid: null, upper: null, lower: null }, age_idx:null};
@@ -499,6 +502,63 @@ class LevelCompilerAge {
 
     return output;
   }
+    */
+  getAgeFromEFD(efd, method) {
+    const targetAgeModelId = this.selected_id;
+    let output = { age: { type: null, mid: null, upper: null, lower: null }, age_idx: null };
+
+    if (method == "linear") {
+      // 1. Identify the target age model index
+      let targetAgeModelIdx = null;
+      this.AgeModels.forEach((a, n) => {
+        if (targetAgeModelId == a.id) targetAgeModelIdx = n;
+      });
+
+      if (targetAgeModelIdx == null || efd == null) return output;
+      output.age_idx = targetAgeModelIdx;
+
+      // 2. Prepare valid data: filter enabled points and sort by depth (shallow to deep)
+      // "Upper" data (shallower) will now always come first in the array.
+      const validAges = this.AgeModels[targetAgeModelIdx].ages
+        .filter(a => a.enable === true)
+        .sort((a, b) => a.event_free_depth - b.event_free_depth);
+
+      // Safety check: Linear calculation requires at least two points
+      if (validAges.length < 2) return output;
+
+      let upperData = null; // Shallower point
+      let lowerData = null; // Deeper point
+
+      // 3. Determine the data pair for calculation
+      const firstPoint = validAges[0];
+      const lastPoint = validAges[validAges.length - 1];
+
+      if (efd < firstPoint.event_free_depth) {
+        // Extrapolation (Above/Shallow): Use the first two shallowest points
+        upperData = validAges[0];
+        lowerData = validAges[1];
+      } else if (efd > lastPoint.event_free_depth) {
+        // Extrapolation (Below/Deep): Use the last two deepest points
+        upperData = validAges[validAges.length - 2];
+        lowerData = validAges[validAges.length - 1];
+      } else {
+        // Interpolation (In-range): Find the interval containing the efd
+        for (let i = 0; i < validAges.length - 1; i++) {
+          if (validAges[i].event_free_depth <= efd && efd <= validAges[i + 1].event_free_depth) {
+            upperData = validAges[i];
+            lowerData = validAges[i + 1];
+            break;
+          }
+        }
+      }
+
+      // 4. Execute calculation (ensure upperData is passed as the first argument)
+      output.age = this.interpolate(upperData, lowerData, "age", efd, method);
+    }
+
+    return output;
+  }
+  
   //sub functions
   linearInterp(D1, D3, d2d1, d3d1){
     //D1:   upper marker depth (e.g. CD/EFD) parseFloat(upperMarkerData[calcType]);
