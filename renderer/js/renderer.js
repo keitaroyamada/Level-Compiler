@@ -547,7 +547,7 @@ document.addEventListener("DOMContentLoaded", () => {
   //connection
   document.getElementById("bt_connection").addEventListener("click", async (event) => {
     if(LCCore){
-      if (objOpts.canvas.is_connection) {
+      if (objOpts.canvas.is_connection_visible) {
         objOpts.canvas.is_connection_visible = false;
         document.getElementById("bt_connection").style.backgroundColor = "#f0f0f0";
       } else {

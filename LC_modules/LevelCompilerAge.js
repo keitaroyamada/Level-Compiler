@@ -522,6 +522,7 @@ class LevelCompilerAge {
     }
     return output;
   }
+  
   interpolate(upperAgeData, lowerAgeData, target, efd, method) {
     if (method == "linear") {
       //simply interpolate by linear method
