@@ -4790,6 +4790,9 @@ document.addEventListener("DOMContentLoaded", () => {
     if(holes_bottom == -Infinity){
       holes_bottom = 1000;
     }
+
+    holes_bottom += 200;
+
     objOpts.canvas.shift_y =  -1 * holes_top  + 50;
 
     //scale factor
@@ -4835,6 +4838,8 @@ document.addEventListener("DOMContentLoaded", () => {
     //change scroller size from canvas base(make full size canvas area)
     canvasBase.style.width = canvasBaseWidth.toString() + "px"; //offsetWidth
     canvasBase.style.height = canvasBaseHeight.toString() + "px";
+
+    return {width: canvasBaseWidth, height:canvasBaseHeight}
   }
 
   //m,ain canvas(vector)
@@ -5100,9 +5105,20 @@ document.addEventListener("DOMContentLoaded", () => {
         if(project_w<=0){
           project_w = 100;
         }
-        let project_h = 1000;
-        if(project.composite_depth_bottom !== null &&  project.composite_depth_top !== null){
-          project_h = 2*prj_pady + (project.composite_depth_bottom - project.composite_depth_top) * yMag;
+
+        let project_h = 10000;
+        let project_top = Infinity;
+        let project_bot = -Infinity;
+
+        for (let i = 0, n = project.holes.length; i < n; i++) {
+          const vmin = project.holes[i].sections[0].markers[0][objOpts.canvas.depth_scale];
+          if (vmin < project_top) project_top = vmin;
+          const vmax = project.holes[i].sections[project.holes[i].sections.length-1].markers[project.holes[i].sections[project.holes[i].sections.length-1].markers.length-1][objOpts.canvas.depth_scale];
+          if (vmax > project_bot) project_bot = vmax;
+        }
+
+        if(project_top !== Infinity && project_bot !== -Infinity){
+          project_h = 2*prj_pady + (project_bot - project_top) * yMag;
         }        
                 
         if(project.enable == true){
