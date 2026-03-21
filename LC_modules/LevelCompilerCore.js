@@ -6843,19 +6843,20 @@ class LevelCompilerCore extends EventEmitter{
           name += "-bottom";
         }
           */
-        const regexTop = /\s*(top)$/i;
+        const regexTop = /\s*(top|tp|tpo)\s*$/i;
         if (regexTop.test(name)) {
           name = name.replace(regexTop, "");
-          
-          name = name.trim();
+                    
           name += "-top"; 
+          name = name.trim();
+
         }
-        const regexBottom = /\s*(bottom|bottm|bttom|botom)$/i;
+        const regexBottom = /\s*(bottom|bottm|bttom|botom)\s*$/i;
         if (regexBottom.test(name)) {
           name = name.replace(regexBottom, "");
           
-          name = name.trim();
           name += "-bottom"; 
+          name = name.trim();
         }
 
         toRow.push(name, dist, dd, event);
