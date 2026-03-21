@@ -5111,9 +5111,15 @@ document.addEventListener("DOMContentLoaded", () => {
         let project_bot = -Infinity;
 
         for (let i = 0, n = project.holes.length; i < n; i++) {
+          if (!project.holes[i].sections?.length) continue;
+          if (!project.holes[i].sections[0]?.markers?.length) continue;
+          if (!project.holes[i].sections[project.holes[i].sections.length - 1]?.markers?.length) continue;
+
           const vmin = project.holes[i].sections[0].markers[0][objOpts.canvas.depth_scale];
           if (vmin < project_top) project_top = vmin;
-          const vmax = project.holes[i].sections[project.holes[i].sections.length-1].markers[project.holes[i].sections[project.holes[i].sections.length-1].markers.length-1][objOpts.canvas.depth_scale];
+
+          const vmax = project.holes[i].sections[project.holes[i].sections.length - 1]
+            .markers[project.holes[i].sections[project.holes[i].sections.length - 1].markers.length - 1][objOpts.canvas.depth_scale];
           if (vmax > project_bot) project_bot = vmax;
         }
 
