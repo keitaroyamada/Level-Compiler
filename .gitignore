@@ -1,3 +1,5 @@
 node_modules/
 dist/
 test_data_private/
+tests/temp/
+tests/answers/   
