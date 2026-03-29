@@ -7038,6 +7038,190 @@ class LevelCompilerCore extends EventEmitter{
     return data;
   }
 
+  getMasterPositionList(targetId){
+    const idxs = this.search_idx_list[targetId.toString()];
+    const zeroPoints = this.findZeroPointId();
+
+    const [id_zero_point, startVal, isBaseProject] = zeroPoints[idxs[0]];
+
+    const result = this.graphSearch(id_zero_point, startVal, "composite_depth", "bfs");
+
+    //apply master/master-transfer depth
+    const depthDict  = result.depth;
+    const searchDict = result.info;
+
+    let currentMS = null;
+    let temp = [null, null, null, null, null];
+    let results = [];
+
+    for (let markerIdStr of Object.keys(depthDict)) {
+      const midx = this.search_idx_list[markerIdStr];
+      
+      if (midx) {
+        const currentHoleData    = this.projects[midx[0]].holes[midx[1]];
+        const currentSectionData = this.projects[midx[0]].holes[midx[1]].sections[midx[2]];
+        const currentMarkerData  = this.projects[midx[0]].holes[midx[1]].sections[midx[2]].markers[midx[3]];
+
+        if (currentMarkerData.isMaster) {
+          const currentSec = currentSectionData.id;
+
+          if (currentMS !== currentSec) {
+            if (currentMS !== null) {
+              results.push([...temp]); 
+            }
+
+            currentMS = currentSec;
+
+            temp = [null, null, null, null, null];
+            temp[0] = currentHoleData.name + "-" + currentSectionData.name;
+            temp[1] = currentSectionData.markers[0].distance;
+            temp[2] = currentSectionData.markers[currentSectionData.markers.length - 1].distance;
+            temp[3] = currentMarkerData.distance;
+          } else {
+            temp[4] = currentMarkerData.distance;
+          }
+        }
+      }
+    }
+
+    if (currentMS !== null) {
+      results.push([...temp]);
+    }
+
+    return results
+  }
+
+  exportTestAnswer(outputPath=null, options={}) {
+    const includeDisabled = options.includeDisabled ?? false;
+    const roundDigits = options.roundDigits ?? 3;
+    const includeTrinitySweep = options.includeTrinitySweep ?? true;
+    const trinityStepCm = options.trinityStepCm ?? 1;
+
+    const roundOrNull = (value) => {
+      if (value === null || value === undefined || Number.isNaN(value)) {
+        return null;
+      }
+      return lcfnc.round(Number(value), roundDigits);
+    };
+
+    const markerList = [];
+    const trinitySweepList = [];
+
+    this.projects.forEach((project, p) => {
+      project.holes.forEach((hole, h) => {
+        hole.sections.forEach((section, s) => {
+          section.markers.forEach((marker, m) => {
+            if (!includeDisabled && marker.enable === false) {
+              return;
+            }
+
+            markerList.push({
+              project_order: p,
+              project_name: project.name,
+              project_type: project.model_type,
+              hole_order: h,
+              hole_name: hole.name,
+              section_order: s,
+              section_name: section.name,
+              marker_order: m,
+              marker_name: marker.name,
+              distance_cm: roundOrNull(marker.distance),
+              drilling_depth_cm: roundOrNull(marker.drilling_depth),
+              composite_depth_cm: roundOrNull(marker.composite_depth),
+              event_free_depth_cm: roundOrNull(marker.event_free_depth),
+              age: roundOrNull(marker.age),
+              connection_rank: marker.connection_rank ?? null,
+              unreliability: roundOrNull(marker.unreliability),
+              is_master: marker.isMaster === true,
+              is_zero_point: marker.isZeroPoint === false ? null : roundOrNull(parseFloat(marker.isZeroPoint)),
+              depth_source: Array.isArray(marker.depth_source) ? marker.depth_source[0] : null,
+              horizontal_connection_count: Array.isArray(marker.h_connection) ? marker.h_connection.length : 0,
+              vertical_connection_count: Array.isArray(marker.v_connection) ? marker.v_connection.length : 0,
+            });
+          });
+
+          if (includeTrinitySweep && section.markers.length >= 2) {
+            const sampledDistances = new Set();
+            for (let m = 0; m < section.markers.length - 1; m++) {
+              const upperMarker = section.markers[m];
+              const lowerMarker = section.markers[m + 1];
+
+              if (
+                upperMarker == null ||
+                lowerMarker == null ||
+                upperMarker.distance == null ||
+                lowerMarker.distance == null
+              ) {
+                continue;
+              }
+
+              const start = Number(upperMarker.distance);
+              const end = Number(lowerMarker.distance);
+              if (!Number.isFinite(start) || !Number.isFinite(end) || end < start) {
+                continue;
+              }
+
+              for (let distance = start; distance <= end; distance += trinityStepCm) {
+                sampledDistances.add(roundOrNull(distance));
+              }
+              sampledDistances.add(roundOrNull(start));
+              sampledDistances.add(roundOrNull(end));
+            }
+
+            const orderedDistances = Array.from(sampledDistances)
+              .filter(distance => distance !== null)
+              .sort((a, b) => a - b);
+
+            orderedDistances.forEach((distanceCm) => {
+              const trinity = {
+                name: `${hole.name}-${section.name}-${distanceCm}cm`,
+                hole_name: hole.name,
+                section_name: section.name,
+                distance: distanceCm,
+              };
+              const [cdData] = this.getDepthFromTrinity(project.id, [trinity], "composite_depth");
+              const [efdData] = this.getDepthFromTrinity(project.id, [trinity], "event_free_depth");
+
+              trinitySweepList.push({
+                project_order: p,
+                project_name: project.name,
+                project_type: project.model_type,
+                hole_order: h,
+                hole_name: hole.name,
+                section_order: s,
+                section_name: section.name,
+                distance_cm: roundOrNull(distanceCm),
+                composite_depth_cm: roundOrNull(cdData ? cdData[1] : null),
+                composite_depth_rank: cdData ? (cdData[2] ?? null) : null,
+                composite_depth_source: cdData ? (cdData[3] ?? null) : null,
+                composite_depth_section_type: cdData ? (cdData[4] ?? null) : null,
+                event_free_depth_cm: roundOrNull(efdData ? efdData[1] : null),
+                event_free_depth_rank: efdData ? (efdData[2] ?? null) : null,
+                event_free_depth_source: efdData ? (efdData[3] ?? null) : null,
+                event_free_depth_section_type: efdData ? (efdData[4] ?? null) : null,
+              });
+            });
+          }
+        });
+      });
+    });
+
+    const answer = {
+      version: 1,
+      project_count: this.projects.length,
+      marker_count: markerList.length,
+      trinity_sweep_count: trinitySweepList.length,
+      markers: markerList,
+      trinity_sweep: trinitySweepList,
+    };
+
+    if (outputPath) {
+      const fs = require("fs");
+      fs.writeFileSync(outputPath, JSON.stringify(answer, null, 2), "utf8");
+    }
+
+    return answer;
+  }
   
 }
 

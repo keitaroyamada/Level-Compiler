@@ -5043,6 +5043,17 @@ function createMainWIndow() {
                 putcsvfile(mainWindow, "results.csv", results);                
               }
             }
+          },   
+          {
+            label: "Export MS list",
+            visible: true,
+            click: () => {
+              if(LCCore !== null){
+                const msList = LCCore.getMasterPositionList(LCCore.projects[1].id);
+                console.log(msList)
+                //putcsvfile(mainWindow, "results.csv", msList);  
+              }
+            }
           },          
           { type: "separator" },   
           {
