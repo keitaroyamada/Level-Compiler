@@ -6,7 +6,9 @@
   "main": "main.js",
   "scripts": {
     "start": "electron .",
-    "test": "node -r ./scripts/register-original-fs.js tests/run-all-tests.js",
+    "test": "node scripts/run-project-tests.js",
+    "test:cli": "node -r ./scripts/register-original-fs.js tests/run-all-tests.js",
+    "test:e2e": "playwright test",
     "export:test-answer": "node -r ./scripts/register-original-fs.js scripts/export-test-answer.js",
     "build:win": "electron-builder --win --x64",
     "build:mac": "electron-builder --mac --arm64",
@@ -60,8 +62,10 @@
   },
   "devDependencies": {
     "@emnapi/runtime": "^1.5.0",
+    "@playwright/test": "^1.58.2",
     "electron": "^40.0.0",
     "electron-builder": "^26.5.0",
-    "electronmon": "^2.0.3"
+    "electronmon": "^2.0.3",
+    "playwright": "^1.58.2"
   }
 }

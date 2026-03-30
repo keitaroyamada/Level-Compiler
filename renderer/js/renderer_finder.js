@@ -934,6 +934,18 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
   //-------------------------------------------------------------------------------------------
-  
+  window.__LC_FINDER_E2E__ = {
+    isReady: () => true,
+    getState: () => ({
+      hole: document.getElementById("holeOptions").value,
+      section: document.getElementById("sectionOptions").value,
+      distance: document.getElementById("distanceInput").value,
+      cd: document.getElementById("cdInput").value,
+      efd: document.getElementById("efdInput").value,
+      age: document.getElementById("ageInput").value,
+      holeCount: document.getElementById("holeOptions").options.length,
+      sectionCount: document.getElementById("sectionOptions").options.length,
+    }),
+  };
   //-------------------------------------------------------------------------------------------
 });

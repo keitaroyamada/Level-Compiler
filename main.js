@@ -2584,6 +2584,8 @@ function createMainWIndow() {
       finderWindow.show();
       //finderWindow.webContents.openDevTools();
       //finderWindow.setAlwaysOnTop(true, "floating");
+    });
+    finderWindow.webContents.once("did-finish-load", () => {
       finderWindow.webContents.send("FinderToolClicked", "");
 
       const LCBookmarkSet= getSettings("bookmarks");
@@ -6198,6 +6200,9 @@ function assignObject (obj,data){
   });
 }
 async function checkUpdate(window, from){
+  if (process.env.LC_E2E === "1") {
+    return;
+  }
   //this process does not work in MSI app.
   //check update in the github
   autoUpdater.allowPrerelease = false;
@@ -6434,7 +6439,9 @@ app.whenReady().then(async() => {
 
   //check update
   mainWindow.once("ready-to-show", () => {
-    checkUpdate(mainWindow, "startup");
+    if (process.env.LC_E2E !== "1") {
+      checkUpdate(mainWindow, "startup");
+    }
   });
 
   app.on("activate", (I) => {

@@ -18,8 +18,11 @@ contextBridge.exposeInMainWorld("LCapi", {
 
   //register and load models
   RegisterModelFromCsv: (args) => ipcRenderer.invoke("RegisterModelFromCsv",  webUtils.getPathForFile(args)),
+  RegisterModelFromPath: (args) => ipcRenderer.invoke("RegisterModelFromCsv", args),
   RegisterAgeFromCsv: (args) => ipcRenderer.invoke("RegistertAgeFromCsv", webUtils.getPathForFile(args)),
+  RegisterAgeFromPath: (args) => ipcRenderer.invoke("RegistertAgeFromCsv", args),
   RegisterLCmodel:(args1) => ipcRenderer.invoke("RegisterLCmodel", webUtils.getPathForFile(args1)),
+  RegisterLCmodelFromPath: (args1) => ipcRenderer.invoke("RegisterLCmodel", args1),
   LoadModelFromLCCore: () => ipcRenderer.invoke("LoadModelFromLCCore"),
   LoadAgeFromLCAge: (args) => ipcRenderer.invoke("LoadAgeFromLCAge", args),
   LoadPlotData: (args) => ipcRenderer.invoke("LoadPlotData", args),

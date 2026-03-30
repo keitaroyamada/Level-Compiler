@@ -7350,6 +7350,7 @@ document.addEventListener("DOMContentLoaded", () => {
   } 
   function setAgeList(loadResult){
     if(loadResult !== false){
+      age_model_list = [];
       //fetcf age data from main to renderer
       //initialise dropdown
       const parentElement = document.getElementById("AgeModelSelect");
@@ -7375,6 +7376,62 @@ document.addEventListener("DOMContentLoaded", () => {
 
     }
   }
+  window.__LC_E2E__ = {
+    isReady: () => true,
+    getRendererState: () => ({
+      isLoadedLCModel,
+      projectCount: LCCore?.projects?.length ?? 0,
+      holeCount: LCCore?.projects?.reduce((sum, project) => sum + project.holes.length, 0) ?? 0,
+      ageModelCount: document.getElementById("AgeModelSelect").options.length,
+      holeListCount: document.querySelectorAll("#hole_list input[type='checkbox']").length,
+      yAxisScale: document.getElementById("YAxisSelect").value,
+    }),
+    loadLcModelFromPath: async (inputPath) => {
+      await initialiseCanvas();
+      isLoadedLCModel = true;
+
+      const loaded = await window.LCapi.RegisterLCmodelFromPath(inputPath);
+      if (loaded === false) {
+        isLoadedLCModel = false;
+        return { ok: false, error: "register_failed" };
+      }
+
+      setAgeList(loaded);
+      await loadModel(true, true);
+
+      const selectedAgeModelId = document.getElementById("AgeModelSelect").value;
+      if (selectedAgeModelId) {
+        await loadAge(selectedAgeModelId);
+        await loadPlotData("age");
+        await loadPlotData("data");
+      }
+
+      return {
+        ok: true,
+        ...window.__LC_E2E__.getRendererState(),
+      };
+    },
+    loadAgeModelFromPath: async (inputPath) => {
+      const loadedAge = await window.LCapi.RegisterAgeFromPath(inputPath);
+      if (!loadedAge) {
+        return { ok: false, error: "register_age_failed" };
+      }
+
+      age_model_list = await window.LCapi.MirrorAgeList();
+      setAgeList(age_model_list);
+
+      const selectedAgeModelId = loadedAge.id ?? document.getElementById("AgeModelSelect").value;
+      if (selectedAgeModelId) {
+        document.getElementById("AgeModelSelect").value = selectedAgeModelId;
+      }
+
+      return {
+        ok: true,
+        loadedAge,
+        ...window.__LC_E2E__.getRendererState(),
+      };
+    },
+  };
   async function loadPlotData(type) {
     //LC plot age_collection id is as same as LCAge id 
     const results = await window.LCapi.LoadPlotData(type);
