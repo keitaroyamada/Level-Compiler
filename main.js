@@ -39,6 +39,14 @@ const { UndoManager } = require("./LC_modules/UndoManager.js");
 const { Trinity } = require("./LC_modules/Trinity.js");
 const { Section } = require("./LC_modules/Section.js");
 const { Marker } = require("./LC_modules/Marker.js");
+const {
+  WINDOW_TYPES,
+  clearWindow,
+  getAllWindows,
+  getWindow,
+  hasWindow,
+  setWindow,
+} = require("./main/windows.js");
 const { send, availableMemory, contextIsolated } = require("process");
 const { Worker } = require('worker_threads');
 const { isString } = require("util");
@@ -83,6 +91,16 @@ let settingsWindow = null;
 let imageViewerWindow = null;
 let plotWindow = null;
 let progressBar = null;
+
+// Stage 2 of the main-process refactor introduces a shared window store.
+// Existing local variables remain in place temporarily, and later steps
+// will switch callers over incrementally.
+void WINDOW_TYPES;
+void clearWindow;
+void getAllWindows;
+void getWindow;
+void hasWindow;
+void setWindow;
 
 function createMainWIndow() {
   mainWindow = new BrowserWindow({
