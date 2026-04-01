@@ -513,6 +513,7 @@ document.addEventListener("DOMContentLoaded", () => {
     //call from main process
     dividerEnable = false;
     document.getElementById("bt_divider").style.backgroundColor = "#f0f0f0";
+    recordLcE2EEvent("DividerClosed");
   });
   //============================================================================================
   //target
@@ -4009,6 +4010,25 @@ document.addEventListener("DOMContentLoaded", () => {
     finderEnable = false;
     updateView();
     document.getElementById("bt_finder").style.backgroundColor = "#f0f0f0";
+    recordLcE2EEvent("FinderClosed");
+  });
+  window.LCapi.receive("ConverterClosed", async () => {
+    recordLcE2EEvent("ConverterClosed");
+  });
+  window.LCapi.receive("ImageViewerClosed", async () => {
+    recordLcE2EEvent("ImageViewerClosed");
+  });
+  window.LCapi.receive("LabelerClosed", async () => {
+    recordLcE2EEvent("LabelerClosed");
+  });
+  window.LCapi.receive("PlotterHide", async () => {
+    recordLcE2EEvent("PlotterHide");
+  });
+  window.LCapi.receive("PlotterClosed", async () => {
+    recordLcE2EEvent("PlotterClosed");
+  });
+  window.LCapi.receive("SettingsClosed", async () => {
+    recordLcE2EEvent("SettingsClosed");
   });
   //mouse click (send depth to finder)   1111111111111111111111111
   scroller.addEventListener("click", async function (event) {
@@ -4047,6 +4067,16 @@ document.addEventListener("DOMContentLoaded", () => {
 
   });
   //============================================================================================
+  const lcE2EEventLog = [];
+
+  function recordLcE2EEvent(name, payload = null) {
+    lcE2EEventLog.push({
+      name,
+      payload,
+      timestamp: Date.now(),
+    });
+  }
+
   window.LCapi.receive("rendererLog", async (data) => {
     console.log(data);
   });
@@ -4054,6 +4084,7 @@ document.addEventListener("DOMContentLoaded", () => {
     console.log(data);
   });
   window.LCapi.receive("SettingsMenuClicked", async () => {
+    recordLcE2EEvent("SettingsMenuClicked");
     const settings = makeSendSettingData();
     await window.LCapi.sendSettings(settings, "settings");
   });
@@ -4175,9 +4206,11 @@ document.addEventListener("DOMContentLoaded", () => {
     document.getElementById("bt_divider").click();
   });
   window.LCapi.receive("ReloadMenuClicked", async () => {
+    recordLcE2EEvent("ReloadMenuClicked");
     document.getElementById("bt_reload").click();
   });
   window.LCapi.receive("ZoominMenuClicked", async () => {
+    recordLcE2EEvent("ZoominMenuClicked");
     document.getElementById("bt_zoomin").click();
   });
   window.LCapi.receive("ZoomoutMenuClicked", async () => {
@@ -4190,6 +4223,7 @@ document.addEventListener("DOMContentLoaded", () => {
     document.getElementById("bt_zoomactual").click();
   });
   window.LCapi.receive("SnapshotMenuClicked", async (data) => {
+    recordLcE2EEvent("SnapshotMenuClicked", data);
 
     const isShift = data?.isShift === true;
 
@@ -4202,6 +4236,7 @@ document.addEventListener("DOMContentLoaded", () => {
     document.getElementById("bt_snapshot").click();
   });
   window.LCapi.receive("MeasureMenuClicked", async () => {
+    recordLcE2EEvent("MeasureMenuClicked");
     document.getElementById("bt_measure").click();
   });
   //============================================================================================
@@ -7378,6 +7413,10 @@ document.addEventListener("DOMContentLoaded", () => {
   }
   window.__LC_E2E__ = {
     isReady: () => true,
+    clearEvents: () => {
+      lcE2EEventLog.length = 0;
+    },
+    getEvents: () => lcE2EEventLog.map((entry) => ({ ...entry })),
     getRendererState: () => ({
       isLoadedLCModel,
       projectCount: LCCore?.projects?.length ?? 0,
@@ -7385,6 +7424,7 @@ document.addEventListener("DOMContentLoaded", () => {
       ageModelCount: document.getElementById("AgeModelSelect").options.length,
       holeListCount: document.querySelectorAll("#hole_list input[type='checkbox']").length,
       yAxisScale: document.getElementById("YAxisSelect").value,
+      loadedImageCount: Object.keys(modelImages?.drilling_depth ?? {}).length,
     }),
     loadLcModelFromPath: async (inputPath) => {
       await initialiseCanvas();
@@ -7429,6 +7469,46 @@ document.addEventListener("DOMContentLoaded", () => {
         ok: true,
         loadedAge,
         ...window.__LC_E2E__.getRendererState(),
+      };
+    },
+    loadCoreImagesFromPath: async (inputPath) => {
+      if (!LCCore) {
+        return { ok: false, error: "lcmodel_not_loaded" };
+      }
+
+      const registered = await window.LCapi.RegisterCoreImageFromPath(inputPath, "core_images");
+      if (!registered) {
+        return { ok: false, error: "register_core_images_failed" };
+      }
+
+      modelImages = await loadCoreImages(modelImages, LCCore, objOpts, ["drilling_depth"]);
+      updateView();
+
+      return {
+        ok: true,
+        ...window.__LC_E2E__.getRendererState(),
+      };
+    },
+    openFloatingImageViewerForFirstSection: async () => {
+      if (!LCCore) {
+        return { ok: false, error: "lcmodel_not_loaded" };
+      }
+
+      if (Object.keys(modelImages?.drilling_depth ?? {}).length === 0) {
+        return { ok: false, error: "core_images_not_loaded" };
+      }
+
+      const firstProject = LCCore.projects?.[0];
+      const firstHole = firstProject?.holes?.[0];
+      const firstSection = firstHole?.sections?.[0];
+      if (!firstSection?.id) {
+        return { ok: false, error: "section_not_found" };
+      }
+
+      const opened = await window.LCapi.floatingImageViewer(firstSection.id);
+      return {
+        ok: opened === true,
+        targetId: firstSection.id,
       };
     },
   };

@@ -35,6 +35,18 @@ document.addEventListener("DOMContentLoaded", () => {
     dpcm:150, // load dpcm
     disp_dpcm:100, //display dpcm
   };
+  let viewerReady = true;
+  window.__LC_VIEWER_E2E__ = {
+    isReady() {
+      return viewerReady;
+    },
+    getState() {
+      return {
+        title: document.title,
+        loadedImageCount: Object.keys(modelImages.drilling_depth || {}).length,
+      };
+    },
+  };
   //-------------------------------------------------------------------------------------------
   window.ViewerApi.receive("ImageViewerMenuClicked", async (imBuffer) => {
     document.addEventListener('contextmenu', handleNormalContextmenu);

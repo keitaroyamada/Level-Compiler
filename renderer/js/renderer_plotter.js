@@ -1,4 +1,18 @@
 document.addEventListener("DOMContentLoaded", () => {
+    let plotterReady = true;
+    window.__LC_PLOTTER_E2E__ = {
+        isReady() {
+            return plotterReady;
+        },
+        getState() {
+            return {
+                title: document.title,
+                collectionCount: document.getElementById("c_collection").options.length,
+                plotListCount: document.getElementById("plot_list").children.length,
+            };
+        },
+    };
+
     const scroller = document.getElementById("scroller");
     
     let LCPlot = null;

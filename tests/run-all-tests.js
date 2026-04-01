@@ -96,6 +96,7 @@ const testFiles = [
   "depth-conversion.test.js",
   "age-regression.test.js",
   "test-framework.test.js",
+  "main-windows.test.js",
 ].map((file) => path.join(__dirname, file));
 
 for (const file of testFiles) {

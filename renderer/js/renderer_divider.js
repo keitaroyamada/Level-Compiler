@@ -5,6 +5,7 @@ document.addEventListener("DOMContentLoaded", () => {
   let interpolatedData = null;
   let calcDirection = "act->def";
   let   isDragging    = false;
+  let dividerReady = false;
 
   //-------------------------------------------------------------------------------------------
   //initialise
@@ -14,6 +15,7 @@ document.addEventListener("DOMContentLoaded", () => {
     await updateSectionList();
     await updateMarkerTable();
     updatePlot();
+    dividerReady = true;
     console.log("[Divider]: Divider making");
   });
   //-------------------------------------------------------------------------------------------
@@ -1152,5 +1154,14 @@ document.addEventListener("keydown", (e) => {
     window.DividerApi.toggleDevTools("divider");
   }
 });
+
+  window.__LC_DIVIDER_E2E__ = {
+    isReady: () => dividerReady,
+    getState: () => ({
+      holeCount: document.getElementById("holeOptions").options.length,
+      sectionCount: document.getElementById("sectionOptions").options.length,
+      calcDirection: document.getElementById("directionOptions").value,
+    }),
+  };
    //-------------------------------------------------------------------------------------------
 });

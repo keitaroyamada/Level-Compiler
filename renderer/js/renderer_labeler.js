@@ -1,4 +1,18 @@
 document.addEventListener("DOMContentLoaded", () => {
+  let labelerReady = true;
+  window.__LC_LABELER_E2E__ = {
+    isReady() {
+      return labelerReady;
+    },
+    getState() {
+      return {
+        title: document.title,
+        holeName,
+        sectionName,
+      };
+    },
+  };
+
   //-------------------------------------------------------------------------------------------
   const scroller = document.getElementById("scroller");
   let canvasBase = document.getElementById("canvasBase");

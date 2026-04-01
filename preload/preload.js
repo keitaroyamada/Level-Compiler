@@ -47,13 +47,12 @@ contextBridge.exposeInMainWorld("LCapi", {
   SendDepthToFinder: (args) => ipcRenderer.invoke("SendDepthToFinder", args),
   OpenDivider: () => ipcRenderer.invoke("OpenDivider"),
   CloseDivider: () => ipcRenderer.invoke("CloseDivider"),
-  OpenImporter: () => ipcRenderer.invoke("OpenImporter"),
-  CloseImporter: () => ipcRenderer.invoke("CloseImporter"),
   floatingImageViewer: (args0) => ipcRenderer.invoke("floatingImageViewer",args0),
   
 
   //image
   RegisterCoreImage: (args1,args2) =>  ipcRenderer.invoke("RegisterCoreImage", webUtils.getPathForFile(args1), args2),
+  RegisterCoreImageFromPath: (args1,args2) =>  ipcRenderer.invoke("RegisterCoreImage", args1, args2),
   LoadCoreImage: (args1, args2) =>  ipcRenderer.invoke("LoadCoreImage", args1, args2),
   GetResources: () => ipcRenderer.sendSync("GetResources"),
 

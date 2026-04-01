@@ -1,9 +1,11 @@
+window.AboutApi.receive("Version", async (data) => {
+  const versionElement = document.getElementById("app_version");
+  if (versionElement) {
+    versionElement.textContent = "Version: " + data;
+  }
+});
+
 document.addEventListener("DOMContentLoaded", () => {
-
-  window.AboutApi.receive("Version", async (data) => {
-    document.getElementById('app_version').textContent = "Version: "+data;
-  });
-
   document.getElementById('link').addEventListener('click', (event) => {
     event.preventDefault();
     

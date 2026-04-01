@@ -9,12 +9,12 @@ const WINDOW_TYPES = Object.freeze({
   FINDER: "finder",
   DIVIDER: "divider",
   CONVERTER: "converter",
-  IMPORTER: "importer",
   LABELER: "labeler",
   SETTINGS: "settings",
   IMAGE_VIEWER: "image_viewer",
   PLOTTER: "plotter",
   PROGRESS: "progress",
+  ABOUT: "about",
 });
 
 const IPC_CHANNEL_RULES = Object.freeze({

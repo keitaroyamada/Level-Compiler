@@ -7,6 +7,7 @@ document.addEventListener("DOMContentLoaded", () => {
   let called_from = "";
   let headerLines = 1;
   let dataId = null;
+  let converterReady = false;
   //-------------------------------------------------------------------------------------------
   window.ConverterApi.receive("ConverterMenuClicked", async (data) => {
     output_type = data.output_type;
@@ -51,6 +52,8 @@ document.addEventListener("DOMContentLoaded", () => {
     if(source_path !== null){
       await loadCsv(source_path )
     }
+
+    converterReady = true;
   });
   //-------------------------------------------------------------------------------------------
   //load data
@@ -551,4 +554,12 @@ document.addEventListener("DOMContentLoaded", () => {
       ext: filename.substring(lastDotIndex)    
     };
   }
+
+  window.__LC_CONVERTER_E2E__ = {
+    isReady: () => converterReady,
+    getState: () => ({
+      outputType: output_type,
+      calledFrom: called_from,
+    }),
+  };
 });

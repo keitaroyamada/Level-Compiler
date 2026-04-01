@@ -42,6 +42,7 @@ const { Marker } = require("./LC_modules/Marker.js");
 const {
   WINDOW_TYPES,
   clearWindow,
+  createWindow,
   getAllWindows,
   getWindow,
   hasWindow,
@@ -85,7 +86,6 @@ let mainWindow = null;
 let finderWindow = null;
 let dividerWindow = null;
 let converterWindow = null;
-let importerWindow = null;
 let labelerWindow = null;
 let settingsWindow = null;
 let imageViewerWindow = null;
@@ -96,30 +96,318 @@ let progressBar = null;
 // Existing local variables remain in place temporarily, and later steps
 // will switch callers over incrementally.
 void WINDOW_TYPES;
-void clearWindow;
 void getAllWindows;
-void getWindow;
-void hasWindow;
-void setWindow;
+function syncLegacyWindowRef(type, windowRef) {
+  switch (type) {
+    case WINDOW_TYPES.MAIN:
+      mainWindow = windowRef;
+      break;
+    case WINDOW_TYPES.FINDER:
+      finderWindow = windowRef;
+      break;
+    case WINDOW_TYPES.DIVIDER:
+      dividerWindow = windowRef;
+      break;
+    case WINDOW_TYPES.CONVERTER:
+      converterWindow = windowRef;
+      break;
+    case WINDOW_TYPES.LABELER:
+      labelerWindow = windowRef;
+      break;
+    case WINDOW_TYPES.SETTINGS:
+      settingsWindow = windowRef;
+      break;
+    case WINDOW_TYPES.IMAGE_VIEWER:
+      imageViewerWindow = windowRef;
+      break;
+    case WINDOW_TYPES.PLOTTER:
+      plotWindow = windowRef;
+      break;
+    default:
+      break;
+  }
+}
+
+function getManagedWindow(type) {
+  return getWindow(type);
+}
+
+function setManagedWindow(type, windowRef) {
+  const storedWindow = setWindow(type, windowRef);
+  syncLegacyWindowRef(type, storedWindow);
+  return storedWindow;
+}
+
+function clearManagedWindow(type) {
+  syncLegacyWindowRef(type, null);
+  clearWindow(type);
+}
+
+function hasManagedWindow(type) {
+  return hasWindow(type);
+}
+
+function sendToManagedWindow(type, channel, payload = null) {
+  const currentWindow = getManagedWindow(type);
+  if (!currentWindow || currentWindow.isDestroyed()) {
+    return false;
+  }
+
+  const { webContents } = currentWindow;
+  if (!webContents || webContents.isDestroyed()) {
+    return false;
+  }
+
+  webContents.send(channel, payload);
+  return true;
+}
+
+function getMainWindow() {
+  return getManagedWindow(WINDOW_TYPES.MAIN);
+}
+
+function setMainWindow(windowRef) {
+  return setManagedWindow(WINDOW_TYPES.MAIN, windowRef);
+}
+
+function clearMainWindow() {
+  clearManagedWindow(WINDOW_TYPES.MAIN);
+}
+
+function hasMainWindow() {
+  return hasManagedWindow(WINDOW_TYPES.MAIN);
+}
+
+function getFinderWindow() {
+  return getManagedWindow(WINDOW_TYPES.FINDER);
+}
+
+function setFinderWindow(windowRef) {
+  return setManagedWindow(WINDOW_TYPES.FINDER, windowRef);
+}
+
+function clearFinderWindow() {
+  clearManagedWindow(WINDOW_TYPES.FINDER);
+}
+
+function hasFinderWindow() {
+  return hasManagedWindow(WINDOW_TYPES.FINDER);
+}
+
+function getDividerWindow() {
+  return getManagedWindow(WINDOW_TYPES.DIVIDER);
+}
+
+function setDividerWindow(windowRef) {
+  return setManagedWindow(WINDOW_TYPES.DIVIDER, windowRef);
+}
+
+function clearDividerWindow() {
+  clearManagedWindow(WINDOW_TYPES.DIVIDER);
+}
+
+function hasDividerWindow() {
+  return hasManagedWindow(WINDOW_TYPES.DIVIDER);
+}
+
+function getConverterWindow() {
+  return getManagedWindow(WINDOW_TYPES.CONVERTER);
+}
+
+function setConverterWindow(windowRef) {
+  return setManagedWindow(WINDOW_TYPES.CONVERTER, windowRef);
+}
+
+function clearConverterWindow() {
+  clearManagedWindow(WINDOW_TYPES.CONVERTER);
+}
+
+function hasConverterWindow() {
+  return hasManagedWindow(WINDOW_TYPES.CONVERTER);
+}
+
+function getLabelerWindow() {
+  return getManagedWindow(WINDOW_TYPES.LABELER);
+}
+
+function setLabelerWindow(windowRef) {
+  return setManagedWindow(WINDOW_TYPES.LABELER, windowRef);
+}
+
+function clearLabelerWindow() {
+  clearManagedWindow(WINDOW_TYPES.LABELER);
+}
+
+function hasLabelerWindow() {
+  return hasManagedWindow(WINDOW_TYPES.LABELER);
+}
+
+function getSettingsWindow() {
+  return getManagedWindow(WINDOW_TYPES.SETTINGS);
+}
+
+function setSettingsWindow(windowRef) {
+  return setManagedWindow(WINDOW_TYPES.SETTINGS, windowRef);
+}
+
+function clearSettingsWindow() {
+  clearManagedWindow(WINDOW_TYPES.SETTINGS);
+}
+
+function hasSettingsWindow() {
+  return hasManagedWindow(WINDOW_TYPES.SETTINGS);
+}
+
+function getImageViewerWindow() {
+  return getManagedWindow(WINDOW_TYPES.IMAGE_VIEWER);
+}
+
+function setImageViewerWindow(windowRef) {
+  return setManagedWindow(WINDOW_TYPES.IMAGE_VIEWER, windowRef);
+}
+
+function clearImageViewerWindow() {
+  clearManagedWindow(WINDOW_TYPES.IMAGE_VIEWER);
+}
+
+function hasImageViewerWindow() {
+  return hasManagedWindow(WINDOW_TYPES.IMAGE_VIEWER);
+}
+
+function getPlotterWindow() {
+  return getManagedWindow(WINDOW_TYPES.PLOTTER);
+}
+
+function setPlotterWindow(windowRef) {
+  return setManagedWindow(WINDOW_TYPES.PLOTTER, windowRef);
+}
+
+function clearPlotterWindow() {
+  clearManagedWindow(WINDOW_TYPES.PLOTTER);
+}
+
+function hasPlotterWindow() {
+  return hasManagedWindow(WINDOW_TYPES.PLOTTER);
+}
+
+function closeConverterWindow() {
+  if (!hasConverterWindow()) {
+    return false;
+  }
+
+  const currentConverterWindow = getConverterWindow();
+  currentConverterWindow.removeAllListeners("close");
+  currentConverterWindow.close();
+  clearConverterWindow();
+  return true;
+}
+
+function openSettingsWindow({
+  browserWindowOptions = {},
+  onExisting = null,
+  onReadyToShow = null,
+} = {}) {
+  if (hasSettingsWindow()) {
+    const settingsWindow = getSettingsWindow();
+    settingsWindow.focus();
+    if (typeof onExisting === "function") {
+      onExisting(settingsWindow);
+    }
+    return settingsWindow;
+  }
+
+  const settingsWindow = setSettingsWindow(createWindow(WINDOW_TYPES.SETTINGS, {
+    browserWindowOptions,
+  }));
+
+  settingsWindow.on("closed", () => {
+    clearSettingsWindow();
+    sendToMainWindow("SettingsClosed", "");
+  });
+  settingsWindow.once("ready-to-show", () => {
+    settingsWindow.show();
+    settingsWindow.setAlwaysOnTop(true, "floating");
+    if (typeof onReadyToShow === "function") {
+      onReadyToShow(settingsWindow);
+    }
+  });
+
+  return settingsWindow;
+}
+
+function openConverterWindow({
+  browserWindowOptions = {},
+  onExisting = null,
+  onReadyToShow = null,
+  onDidFinishLoad = null,
+} = {}) {
+  if (hasConverterWindow()) {
+    const converterWindow = getConverterWindow();
+    converterWindow.focus();
+    if (typeof onExisting === "function") {
+      onExisting(converterWindow);
+    }
+    return converterWindow;
+  }
+
+  const converterWindow = setConverterWindow(createWindow(WINDOW_TYPES.CONVERTER, {
+    browserWindowOptions,
+  }));
+
+  converterWindow.on("closed", () => {
+    clearConverterWindow();
+    sendToMainWindow("ConverterClosed", "");
+  });
+  converterWindow.once("ready-to-show", () => {
+    converterWindow.show();
+    if (typeof onReadyToShow === "function") {
+      onReadyToShow(converterWindow);
+    }
+  });
+  converterWindow.webContents.once("did-finish-load", () => {
+    if (typeof onDidFinishLoad === "function") {
+      onDidFinishLoad(converterWindow);
+    }
+  });
+
+  return converterWindow;
+}
+
+function sendToMainWindow(channel, payload = null) {
+  return sendToManagedWindow(WINDOW_TYPES.MAIN, channel, payload);
+}
+
+function sendToFinderWindow(channel, payload = null) {
+  return sendToManagedWindow(WINDOW_TYPES.FINDER, channel, payload);
+}
+
+function sendToConverterWindow(channel, payload = null) {
+  return sendToManagedWindow(WINDOW_TYPES.CONVERTER, channel, payload);
+}
+
+function sendToSettingsWindow(channel, payload = null) {
+  return sendToManagedWindow(WINDOW_TYPES.SETTINGS, channel, payload);
+}
+
+function sendToImageViewerWindow(channel, payload = null) {
+  return sendToManagedWindow(WINDOW_TYPES.IMAGE_VIEWER, channel, payload);
+}
+
+function sendToLabelerWindow(channel, payload = null) {
+  return sendToManagedWindow(WINDOW_TYPES.LABELER, channel, payload);
+}
+
+function sendToPlotterWindow(channel, payload = null) {
+  return sendToManagedWindow(WINDOW_TYPES.PLOTTER, channel, payload);
+}
 
 function createMainWIndow() {
-  mainWindow = new BrowserWindow({
-    title: "Level Compiler",
-    width: isDev ? 2000 : 1000,
-    height: 800,
-    webPreferences: {
-      //nodeIntegration: false, //Do not change for security reason
-      //contextIsolation: true, //Do not change for security reason
-      preload: path.join(__dirname, "preload", "preload.js"),
-    },
-    icon: "./icon/levelcompiler.png",
-  });
+  const mainWindow = setMainWindow(createWindow(WINDOW_TYPES.MAIN, { isDev }));
 
   //open devtools if in dev env
   if (isDev) {
     mainWindow.webContents.openDevTools();
   }
-  mainWindow.loadFile(path.join(__dirname, "./renderer/index.html"));
   mainWindow.on('close', async(event) => {
     const historyList = history.getHistory();
     const lastAction = historyList[historyList.length-1];
@@ -142,33 +430,31 @@ function createMainWIndow() {
       }
     }
 
-    if (finderWindow && !finderWindow.isDestroyed()) {
-      finderWindow.close();
+    if (hasFinderWindow()) {
+      getFinderWindow().close();
     }
-    if (dividerWindow && !dividerWindow.isDestroyed()) {
-      dividerWindow.close();
+    if (hasDividerWindow()) {
+      getDividerWindow().close();
     }
-    if (converterWindow && !converterWindow.isDestroyed()) {
-      converterWindow.close();
+    if (hasConverterWindow()) {
+      getConverterWindow().close();
     }
-    if (importerWindow && !importerWindow.isDestroyed()) {
-      importerWindow.close();
+    if (hasLabelerWindow()) {
+      getLabelerWindow().close();
     }
-    if (labelerWindow && !labelerWindow.isDestroyed()) {
-      labelerWindow.close();
+    if (hasImageViewerWindow()) {
+      getImageViewerWindow().close();
     }
-    if (imageViewerWindow && !imageViewerWindow.isDestroyed()) {
-      imageViewerWindow.close();
+    if (hasSettingsWindow()) {
+      getSettingsWindow().close();
     }
-    if (settingsWindow && !settingsWindow.isDestroyed()) {
-      settingsWindow.close();
-    }
-    if (plotWindow && !plotWindow.isDestroyed()) {
-      plotWindow.close();
+    if (hasPlotterWindow()) {
+      getPlotterWindow().close();
     }
 
-    if(mainWindow && !mainWindow.isDestroyed()){
-      mainWindow.destroy();
+    if (hasMainWindow()) {
+      getMainWindow().destroy();
+      clearMainWindow();
     }
   });
 
@@ -204,14 +490,14 @@ function createMainWIndow() {
     LCPlot = initialiseLCPlotData();
     
     //for mainwindow
-    mainWindow.webContents.send("initialiseLCPlotData");
+    getMainWindow().webContents.send("initialiseLCPlotData");
     console.log("MAIN: Renderer LCPlot is initialised.");
 
     //for plotter
     const zipped = await zipData(LCPlot);
 
-    if(zipped &&plotWindow){
-      plotWindow.webContents.send("importedData", zipped);      
+    if (zipped && hasPlotterWindow()) {
+      sendToPlotterWindow("importedData", zipped);      
       
       console.log("MAIN: Plotter LCPlot is initialised.");
     }
@@ -323,7 +609,7 @@ function createMainWIndow() {
         hasError: false,    
         errorDetails: null, 
       }
-      mainWindow.webContents.send("AlertRenderer", err);
+      getMainWindow().webContents.send("AlertRenderer", err);
     }
 
     //send data
@@ -331,7 +617,7 @@ function createMainWIndow() {
       const zipped = await zipData(LCCore.exportSerialisedModel());
       if(LCPlot.data_collections.length>0){
         //initialise view
-        plotWindow.webContents.send("initialiseSendData");
+        sendToPlotterWindow("initialiseSendData");
       }
       console.log("MAIN: Load age model into LCCore. id: " +  LCAge.selected_id + " name:" +  model_name);
       return zipped;
@@ -428,12 +714,12 @@ function createMainWIndow() {
     return result;
   });
   ipcMain.handle("FileChoseDialog", async (_e, title, ext) => {
-    const result = await getfile(mainWindow, title, ext);
+    const result = await getfile(getMainWindow(), title, ext);
     
     return result;
   });
   ipcMain.handle("FolderChoseDialog", async (_e, title) => {
-    const result = await getDirectory(mainWindow, title);
+    const result = await getDirectory(getMainWindow(), title);
     return result;
   });
 
@@ -483,7 +769,7 @@ function createMainWIndow() {
   });
   async function loadCoreImages(loadOptions, type){
     const isShowMemory = false;
-    progressBar   = progressDialog(mainWindow, "Load modeled section images", "Now converting...", false);    
+    progressBar   = progressDialog(getMainWindow(), "Load modeled section images", "Now converting...", false);    
     //await new Promise(r => progressBar.on('ready', r));
     await new Promise(r => progressBar.once('ready', r));
 
@@ -924,36 +1210,33 @@ function createMainWIndow() {
       //const metadata = await sharp(buf).metadata();
       const metadata = await sharp(sectionImage["drilling_depth"][Object.keys(sectionImage["drilling_depth"])[0]]).metadata();
 
-      if (imageViewerWindow) {
-        imageViewerWindow.focus();
+      if (hasImageViewerWindow()) {
+        getImageViewerWindow().focus();
         return;
       }
 
       //create finder window
-      imageViewerWindow = new BrowserWindow({
-        title: "imageViewer",
-        parent: mainWindow,
-        frame: false,
-        width: 300,//metadata.width,
-        height: 800,
-        webPreferences: {preload: path.join(__dirname, "preload", "preload_image_viewer.js"),},
-      });
+      const imageViewerWindow = setImageViewerWindow(createWindow(WINDOW_TYPES.IMAGE_VIEWER, {
+        browserWindowOptions: {
+          parent: getMainWindow(),
+          width: 300,
+          height: 800,
+        },
+      }));
       
       //converterWindow.setAlwaysOnTop(true, "normal");
       imageViewerWindow.on("closed", () => {
-        imageViewerWindow = null;
-        mainWindow.webContents.send("ImageViewerClosed", "");
+        clearImageViewerWindow();
+        sendToMainWindow("ImageViewerClosed", "");
       });
-      imageViewerWindow.setMenu(null);
-
-      imageViewerWindow.loadFile(path.join(__dirname, "./renderer/image_viewer.html"));
-
       imageViewerWindow.once("ready-to-show", () => {
         imageViewerWindow.show();
         //imageViewerWindow.setAlwaysOnTop(true, "floating");
         //imageViewerWindow.webContents.openDevTools();
         //converterWindow.setAlwaysOnTop(true, "normal");
-        imageViewerWindow.webContents.send("ImageViewerMenuClicked", sectionImage);
+      });
+      imageViewerWindow.webContents.once("did-finish-load", () => {
+        sendToImageViewerWindow("ImageViewerMenuClicked", sectionImage);
       });
 
       return true;
@@ -1023,9 +1306,9 @@ function createMainWIndow() {
   });
   ipcMain.handle("progressbar", async (_e, tit, txt, indeterminate, window="mainWindow") => {
     progressBar = null;
-    let targetWindow = mainWindow;
+    let targetWindow = getMainWindow();
     if(window == "converterWindow"){
-      targetWindow = converterWindow;
+      targetWindow = getConverterWindow();
     }
     progressBar = progressDialog(targetWindow, tit, txt, indeterminate);
     //await new Promise(resolve => setTimeout(resolve, 100));
@@ -1064,13 +1347,13 @@ function createMainWIndow() {
 
     let targetWindow = null;
     if(opts.parent == "main"){
-      targetWindow = mainWindow;
+      targetWindow = getMainWindow();
     }else if(opts.parent == "settings"){
-      targetWindow = settingsWindow;
+      targetWindow = getSettingsWindow();
     }else if(opts.parent == "labeler"){
-      targetWindow = labelerWindow;
+      targetWindow = getLabelerWindow();
     }else if(opts.parent == "finder"){
-      targetWindow = finderWindow;
+      targetWindow = getFinderWindow();
     }
 
     const response = dialog.showMessageBox(targetWindow, options);
@@ -1682,8 +1965,8 @@ function createMainWIndow() {
           {
             label:"Close",
             click: () => {
-              if (imageViewerWindow && !imageViewerWindow.isDestroyed()) {
-                imageViewerWindow.close();
+              if (hasImageViewerWindow()) {
+                getImageViewerWindow().close();
               }                  
             } 
           }
@@ -1722,7 +2005,7 @@ function createMainWIndow() {
         message: "Duplicate marker positions were found (N="+dist_error+") in the correlation model. This may result in incorrect data or processing errors.Do you want to continue exporting anyway?",
       };
 
-      const { response } = await dialog.showMessageBox(mainWindow, options);
+      const { response } = await dialog.showMessageBox(getMainWindow(), options);
 
       if(response===0){
         return null
@@ -1746,7 +2029,7 @@ function createMainWIndow() {
       }
       saveName += exportLCCore.projects[idx[0]].name+"("+version+").csv"; 
       
-      await putcsvfile(mainWindow, saveName, outputArray);
+      await putcsvfile(getMainWindow(), saveName, outputArray);
       console.log("MAIN: Export ", saveName);
     }
     history.saveState(LCCore.exportSerialisedModel(), "export csvmodel");
@@ -1777,7 +2060,7 @@ function createMainWIndow() {
         message: "Duplicate marker positions were found (N="+dist_error+"). This may result in incorrect data or processing errors.Do you want to continue exporting anyway?",
       };
 
-      const { response } = await dialog.showMessageBox(mainWindow, options);
+      const { response } = await dialog.showMessageBox(getMainWindow(), options);
 
       if(response===0){
         return
@@ -1797,8 +2080,8 @@ function createMainWIndow() {
       const saveModelName = exportLCCore.projects[idx[0]].name+" Correlation model ("+version+").csv"; 
       const saveEventName = exportLCCore.projects[idx[0]].name+" List of Event Layers ("+version+").csv"; 
 
-      putcsvfile(mainWindow, saveModelName, outputArray.model);
-      putcsvfile(mainWindow, saveEventName, outputArray.event);
+      putcsvfile(getMainWindow(), saveModelName, outputArray.model);
+      putcsvfile(getMainWindow(), saveEventName, outputArray.event);
       console.log("MAIN: Export ", saveModelName, saveEventName);
     }
     history.saveState(LCCore.exportSerialisedModel(), "export csvmodel");
@@ -1941,7 +2224,7 @@ function createMainWIndow() {
 
    
       try{
-        const result = await dialog.showOpenDialog(labelerWindow, {
+        const result = await dialog.showOpenDialog(getLabelerWindow(), {
           title: "Please select a folder to save",
           defaultPath: app.getPath("desktop"),
           buttonLabel: "Save",
@@ -2020,99 +2303,39 @@ function createMainWIndow() {
     LCCore.changeBaseProject(newId);
   });
   ipcMain.handle("PlotterGetData", (_e, data) => {
-    if (converterWindow) {
-      converterWindow.focus();
-      return;
-    }
-
-    //create finder window
-    converterWindow = new BrowserWindow({
-      parent: plotWindow ? plotWindow : mainWindow, 
-      title: "Converter",
-      width: 750,
-      height: 800,
-      webPreferences: {preload: path.join(__dirname, "preload", "preload_converter.js"),},
+    openConverterWindow({
+      browserWindowOptions: {
+        parent: hasPlotterWindow() ? getPlotterWindow() : getMainWindow(),
+        width: 750,
+        height: 800,
+      },
+      onDidFinishLoad: () => {
+        sendToConverterWindow("ConverterMenuClicked", data);
+      },
     });
-    
-    //converterWindow.setAlwaysOnTop(true, "normal");
-    converterWindow.on("closed", () => {
-      converterWindow = null;
-      mainWindow.webContents.send("ConverterClosed", "");
-    });
-    converterWindow.setMenu(null);
-
-    converterWindow.loadFile(path.join(__dirname, "./renderer/converter.html"));
-
-    converterWindow.once("ready-to-show", () => {
-      converterWindow.show();
-      //converterWindow.setAlwaysOnTop(true, "floating");
-      //converterWindow.webContents.openDevTools();
-      //converterWindow.setAlwaysOnTop(true, "normal");
-      converterWindow.webContents.send("ConverterMenuClicked", data);
-    });   
   });
   ipcMain.handle("ConverterClose", (_e, data) => {
-    if(converterWindow){
+    if(hasConverterWindow()){
       console.log("Converter Close called.")
-      converterWindow.removeAllListeners("close");
-      converterWindow.close();
-      converterWindow = null;
+      getConverterWindow().removeAllListeners("close");
+      getConverterWindow().close();
+      clearConverterWindow();
     }    
   });
   ipcMain.handle("PlotterClose", (_e, data) => {
     isPlotterClose = true;
-    plotWindow.removeAllListeners("close");
-    plotWindow.close();
-    plotWindow = null;
-    mainWindow.webContents.send("PlotterClosed", "");
+    getPlotterWindow().removeAllListeners("close");
+    getPlotterWindow().close();
+    clearPlotterWindow();
+    sendToMainWindow("PlotterClosed", "");
   });
   ipcMain.on("windowCloseButton", (_e) => {
     isPlotterClose = false;
-    plotWindow.removeAllListeners("close");
-    plotWindow.close();
-    plotWindow = null;
-    mainWindow.webContents.send("PlotterClosed", "");
+    getPlotterWindow().removeAllListeners("close");
+    getPlotterWindow().close();
+    clearPlotterWindow();
+    sendToMainWindow("PlotterClosed", "");
     isPlotterClose = false;
-  });
-  ipcMain.handle("OpenImporter", async (_e) => {
-    if (importerWindow) {
-      importerWindow.focus();
-      importerWindow.webContents.send("ImporterToolClicked", "");
-      return;
-    }
-
-    //create finder window
-    importerWindow = new BrowserWindow({
-      title: "Finder",
-      parent: mainWindow,
-      width: 700,
-      height: 700,
-      webPreferences: {
-        preload: path.join(__dirname, "preload", "preload_converter.js"),
-      },
-    });
-
-    importerWindow.on("closed", () => {
-      importerWindow = null;
-      mainWindow.webContents.send("ImporterClosed", "");
-    });
-
-    importerWindow.setMenu(null);
-    importerWindow.loadFile(path.join(__dirname, "./renderer/importer.html"));
-
-    importerWindow.once("ready-to-show", () => {
-      importerWindow.show();
-      //importerWindow.webContents.openDevTools();
-      //importerWindow.setAlwaysOnTop(true, "floating");
-      importerWindow.webContents.send("ImporterToolClicked", "");
-    });
-  });
-  ipcMain.handle("CloseImporter", async (_e) => {
-    if (importerWindow) {
-      importerWindow.close();
-      importerWindow = null;
-      return;
-    }
   });
   ipcMain.handle("LoadPlotData", async (_e, type) => {
     //calc latest age and depth
@@ -2479,14 +2702,14 @@ function createMainWIndow() {
     _e.returnValue = resultList;    
   });
   ipcMain.handle("OpenDivider", async (_e) => {
-    if (dividerWindow) {
-      dividerWindow.focus();
+    if (hasDividerWindow()) {
+      getDividerWindow().focus();
 
-      if (dividerWindow.webContents.getURL()) {
-        dividerWindow.webContents.send("DividerToolClicked", "");
+      if (getDividerWindow().webContents.getURL()) {
+        getDividerWindow().webContents.send("DividerToolClicked", "");
       } else {
-        dividerWindow.webContents.once("did-finish-load", () => {
-          dividerWindow.webContents.send("DividerToolClicked", "");
+        getDividerWindow().webContents.once("did-finish-load", () => {
+          getDividerWindow().webContents.send("DividerToolClicked", "");
         });
       }
 
@@ -2494,28 +2717,17 @@ function createMainWIndow() {
     }
 
     //initial construction
-    dividerWindow = new BrowserWindow({
-      title: "Divider",
-      parent: mainWindow,
-      width: 1300,
-      height: 800,
-      webPreferences: {
-        preload: path.join(__dirname, "preload", "preload_divider.js"),
+    const dividerWindow = setDividerWindow(createWindow(WINDOW_TYPES.DIVIDER, {
+      browserWindowOptions: {
+        parent: getMainWindow(),
       },
-    });
+    }));
 
     dividerWindow.on("closed", () => {
-      
-      if(mainWindow && !mainWindow.isDestroyed){
-        mainWindow.webContents.send("DividerClosed", "");
-        dividerWindow = null;
-      }
+      sendToMainWindow("DividerClosed", "");
+      clearDividerWindow();
       
     });
-
-    dividerWindow.setMenu(null);
-
-    dividerWindow.loadFile(path.join(__dirname, "./renderer/divider.html"));
 
     dividerWindow.webContents.once("did-finish-load", () => {
       dividerWindow.show();
@@ -2524,51 +2736,41 @@ function createMainWIndow() {
   });
 
   ipcMain.handle("CloseDivider", async (_e) => {
-    if (dividerWindow) {
-      dividerWindow.close();
-      dividerWindow = null;
+    if (hasDividerWindow()) {
+      getDividerWindow().close();
+      clearDividerWindow();
       return;
     }
   });
   ipcMain.handle("dividerReflow", async (_e) => {
-    if (dividerWindow) {
-      dividerWindow.blur();
-      setTimeout(() => dividerWindow.focus(), 1); 
+    if (hasDividerWindow()) {
+      getDividerWindow().blur();
+      setTimeout(() => getDividerWindow().focus(), 1); 
       return true;
     }
     return false
   });
   ipcMain.on("dividerExport", async (_e, data) => {
-    putcsvfile(dividerWindow, null, data);    
+    putcsvfile(getDividerWindow(), null, data);    
     console.log("MAIN: Exported Divided data.");
   });
   ipcMain.handle("OpenFinder", async (_e) => {
-    if (finderWindow && !finderWindow.isDestroyed()) {
-      finderWindow.focus();
-      finderWindow.webContents.send("FinderToolClicked", "");
+    if (hasFinderWindow()) {
+      getFinderWindow().focus();
+      sendToFinderWindow("FinderToolClicked", "");
       return;
     }
 
     //create finder window
-    finderWindow = new BrowserWindow({
-      title: "Finder",
-      parent:mainWindow,
-      width: 230,
-      height: 580,
-      webPreferences: {
-        preload: path.join(__dirname, "preload", "preload_finder.js"),
+    const finderWindow = setFinderWindow(createWindow(WINDOW_TYPES.FINDER, {
+      browserWindowOptions: {
+        parent: getMainWindow(),
       },
-    });
+    }));
 
     finderWindow.on("closed", () => {
-      finderWindow = null;
-      const { webContents } = mainWindow;
-      if (webContents && !webContents.isDestroyed()) {
-        try {
-          webContents.send("FinderClosed", "");
-        } catch (e) {
-        }
-      }
+      clearFinderWindow();
+      sendToMainWindow("FinderClosed", "");
     });
 
 
@@ -2581,8 +2783,8 @@ function createMainWIndow() {
             type: "checkbox",
             checked: false,
             click: (menuItem) => {
-              if (finderWindow && !finderWindow.isDestroyed()) {
-                finderWindow.webContents.send("updateModeChanged", menuItem.checked);
+              if (hasFinderWindow()) {
+                sendToFinderWindow("updateModeChanged", menuItem.checked);
               }
             }
           },
@@ -2594,17 +2796,13 @@ function createMainWIndow() {
       customMenu.popup({ window: finderWindow, x: params.x, y: params.y });
     });
   
-    finderWindow.setMenu(null);
-
-    finderWindow.loadFile(path.join(__dirname, "./renderer/finder.html"));
-
     finderWindow.once("ready-to-show", () => {
       finderWindow.show();
       //finderWindow.webContents.openDevTools();
       //finderWindow.setAlwaysOnTop(true, "floating");
     });
     finderWindow.webContents.once("did-finish-load", () => {
-      finderWindow.webContents.send("FinderToolClicked", "");
+      sendToFinderWindow("FinderToolClicked", "");
 
       const LCBookmarkSet= getSettings("bookmarks");
       let LCBookmarkData = null;
@@ -2612,13 +2810,13 @@ function createMainWIndow() {
         LCBookmarkData = LCBookmarkSet[LCCore.name];
       }
       
-      finderWindow.webContents.send("Bookmarks", LCBookmarkData);
+      sendToFinderWindow("Bookmarks", LCBookmarkData);
     });
   });
   ipcMain.handle("CloseFinder", async (_e) => {
-    if (finderWindow && !finderWindow.isDestroyed()) {
-      finderWindow.close();
-      finderWindow = null;
+    if (hasFinderWindow()) {
+      getFinderWindow().close();
+      clearFinderWindow();
       return;
     }
   });
@@ -2632,16 +2830,16 @@ function createMainWIndow() {
 
     let targetWindow = null;
     if(opts.parent == "main"){
-      targetWindow = mainWindow;
+      targetWindow = getMainWindow();
     }else if(opts.parent == "divider"){
-      targetWindow = dividerWindow;
+      targetWindow = getDividerWindow();
     }
 
     const result = await dialog.showMessageBox(targetWindow, options);
     return result.response === 0;
   });
   ipcMain.handle("SendDepthToFinder", async (_e, data) => {
-    finderWindow.webContents.send("SendDepthFromMain", data);
+    return sendToFinderWindow("SendDepthFromMain", data);
   });
   ipcMain.on("request-mainprocess-info", (event) => {
     const info = "";
@@ -2649,58 +2847,52 @@ function createMainWIndow() {
   });
   ipcMain.on("toggle-devtools", async(_e, data) => {
     if(data == "divider"){
-      if (dividerWindow.webContents.isDevToolsOpened()) {
-        dividerWindow.webContents.closeDevTools();
+      if (getDividerWindow().webContents.isDevToolsOpened()) {
+        getDividerWindow().webContents.closeDevTools();
       } else {
-        dividerWindow.webContents.openDevTools();
+        getDividerWindow().webContents.openDevTools();
       }
     } else if(data == "finder"){
-      if (finderWindow.webContents.isDevToolsOpened()) {
-        finderWindow.webContents.closeDevTools();
+      if (getFinderWindow().webContents.isDevToolsOpened()) {
+        getFinderWindow().webContents.closeDevTools();
       } else {
-        finderWindow.webContents.openDevTools();
+        getFinderWindow().webContents.openDevTools();
       }
     } else if(data == "main"){
-      if (mainWindow.webContents.isDevToolsOpened()) {
-        mainWindow.webContents.closeDevTools();
+      if (getMainWindow().webContents.isDevToolsOpened()) {
+        getMainWindow().webContents.closeDevTools();
       } else {
-        mainWindow.webContents.openDevTools();
+        getMainWindow().webContents.openDevTools();
       }
     } else if(data == "converter"){
-      if (converterWindow.webContents.isDevToolsOpened()) {
-        converterWindow.webContents.closeDevTools();
+      if (getConverterWindow().webContents.isDevToolsOpened()) {
+        getConverterWindow().webContents.closeDevTools();
       } else {
-        converterWindow.webContents.openDevTools();
+        getConverterWindow().webContents.openDevTools();
       }
     } else if(data == "labeler"){
-      if (labelerWindow.webContents.isDevToolsOpened()) {
-        labelerWindow.webContents.closeDevTools();
+      if (getLabelerWindow().webContents.isDevToolsOpened()) {
+        getLabelerWindow().webContents.closeDevTools();
       } else {
-        labelerWindow.webContents.openDevTools();
+        getLabelerWindow().webContents.openDevTools();
       }
     }else if(data == "viewer"){
-      if (imageViewerWindow.webContents.isDevToolsOpened()) {
-        imageViewerWindow.webContents.closeDevTools();
+      if (getImageViewerWindow().webContents.isDevToolsOpened()) {
+        getImageViewerWindow().webContents.closeDevTools();
       } else {
-        imageViewerWindow.webContents.openDevTools();
-      }
-    }else if(data == "importer"){
-      if (importerWindow.webContents.isDevToolsOpened()) {
-        importerWindow.webContents.closeDevTools();
-      } else {
-        importerWindow.webContents.openDevTools();
+        getImageViewerWindow().webContents.openDevTools();
       }
     }else if(data == "plotter"){
-      if (plotWindow.webContents.isDevToolsOpened()) {
-        plotWindow.webContents.closeDevTools();
+      if (getPlotterWindow().webContents.isDevToolsOpened()) {
+        getPlotterWindow().webContents.closeDevTools();
       } else {
-        plotWindow.webContents.openDevTools();
+        getPlotterWindow().webContents.openDevTools();
       }
     }else if(data == "settings"){
-      if (settingsWindow.webContents.isDevToolsOpened()) {
-        settingsWindow.webContents.closeDevTools();
+      if (getSettingsWindow().webContents.isDevToolsOpened()) {
+        getSettingsWindow().webContents.closeDevTools();
       } else {
-        settingsWindow.webContents.openDevTools();
+        getSettingsWindow().webContents.openDevTools();
       }
     }
     
@@ -2745,7 +2937,7 @@ function createMainWIndow() {
           },"core_images");
 
           if(coreImages!==null){
-            mainWindow.webContents.send("LoadCoreImagesMenuClicked", coreImages);
+            getMainWindow().webContents.send("LoadCoreImagesMenuClicked", coreImages);
           }
         }
 
@@ -2810,7 +3002,7 @@ function createMainWIndow() {
           },"core_images");
 
           if(coreImages!==null){
-            mainWindow.webContents.send("LoadCoreImagesMenuClicked", coreImages);
+            getMainWindow().webContents.send("LoadCoreImagesMenuClicked", coreImages);
           }
         }
 
@@ -2984,7 +3176,7 @@ function createMainWIndow() {
   ipcMain.handle("cvtLoadCsv", async (_e, title, ext, pathData) => {
     try{
       //progress bar
-      progressBar   = progressDialog(converterWindow, "Depth Converter", "Now checking...", true);
+      progressBar   = progressDialog(getConverterWindow(), "Depth Converter", "Now checking...", true);
 
       await new Promise((resolve) => {
         progressBar.on("ready", resolve);
@@ -2994,7 +3186,7 @@ function createMainWIndow() {
       //for converter
       let result = null;
       if(pathData==null){
-        result = await getfile(mainWindow, title, ext);
+        result = await getfile(getMainWindow(), title, ext);
       }else{
         result = pathData;
       }
@@ -3152,7 +3344,7 @@ function createMainWIndow() {
 
       //
       if(options.outType == "export"){
-        progressBar = progressDialog(converterWindow, "Depth Converter", "Now exporting...", true);
+        progressBar = progressDialog(getConverterWindow(), "Depth Converter", "Now exporting...", true);
         await new Promise((resolve) => {
           progressBar.on("ready", resolve);
         });
@@ -3197,12 +3389,10 @@ function createMainWIndow() {
         //main
         if (globalTempData.data === null || calcedDataList === null) {
           globalTempData = null;
-          if(converterWindow){
+          if (hasConverterWindow()) {
             console.log("Converter Close called.")
-            converterWindow.removeAllListeners("close");
-            converterWindow.close();
-            converterWindow = null;
-          } 
+            closeConverterWindow();
+          }
           return {ok:false, reason: "There is no valid data for convertion."}
         }
 
@@ -3291,7 +3481,7 @@ function createMainWIndow() {
         }
         
         //export
-        const res = await putcsvfile(converterWindow, null, convertedData);
+        const res = await putcsvfile(getConverterWindow(), null, convertedData);
         if(res.ok){
           console.log("[MAIN]: Converted data is exported successfully.");
         }else{          
@@ -3303,12 +3493,10 @@ function createMainWIndow() {
           progressBar = null;
         }
         globalTempData = null;
-        if(converterWindow){
+        if (hasConverterWindow()) {
           console.log("Converter Close called.")
-          converterWindow.removeAllListeners("close");
-          converterWindow.close();
-          converterWindow = null;
-        } 
+          closeConverterWindow();
+        }
         return res
       }else if(options.outType == "import"){
         if (options.sourceType == "age"){
@@ -3319,19 +3507,17 @@ function createMainWIndow() {
           }          
         }
         
-        progressBar = progressDialog(converterWindow, "Depth Converter", "Now importing...", true);
+        progressBar = progressDialog(getConverterWindow(), "Depth Converter", "Now importing...", true);
         await new Promise((resolve) => {
           progressBar.on("ready", resolve);
         });
         //main convertion
         if (globalTempData.data === null || calcedDataList === null) {
           globalTempData = null;
-          if(converterWindow){
+          if (hasConverterWindow()) {
             console.log("Converter Close called.")
-            converterWindow.removeAllListeners("close");
-            converterWindow.close();
-            converterWindow = null;
-          } 
+            closeConverterWindow();
+          }
           return {ok:false, reason: "There is no valid data for convertion."}
         }
 
@@ -3400,12 +3586,12 @@ function createMainWIndow() {
 
           //send => plotter
           try {
-            plotWindow.webContents.send("importedData", zipped);
-            mainWindow.webContents.send("importedData", true); // -> call loadplotdata(PlotterGetData)
+            sendToPlotterWindow("importedData", zipped);
+            getMainWindow().webContents.send("importedData", true); // -> call loadplotdata(PlotterGetData)
             console.log("MAIN: Plot Data is imported into Plotter & renderer.");
           } catch (err) {
             console.error("MAIN: Failed to zip:", err);
-            dialog.showMessageBox(mainWindow, {
+            dialog.showMessageBox(getMainWindow(), {
               type: "info",
               title: "Failed to load",
               message: "Failed to load data",
@@ -3413,23 +3599,19 @@ function createMainWIndow() {
             });
 
             globalTempData = null;
-            if(converterWindow){
+            if (hasConverterWindow()) {
               console.log("Converter Close called.")
-              converterWindow.removeAllListeners("close");
-              converterWindow.close();
-              converterWindow = null;
-            } 
+              closeConverterWindow();
+            }
             return {ok: false, reason: err}
           }
 
         }else if(options.callFrom == "converter"){    
           globalTempData = null; 
-          if(converterWindow){
+          if (hasConverterWindow()) {
             console.log("Converter Close called.")
-            converterWindow.removeAllListeners("close");
-            converterWindow.close();
-            converterWindow = null;
-          } 
+            closeConverterWindow();
+          }
           return {ok: false, reason: "There is no actions."}     
         }
         
@@ -3439,12 +3621,10 @@ function createMainWIndow() {
           //progressBar = null;
         }
         globalTempData = null;
-        if(converterWindow){
+        if (hasConverterWindow()) {
           console.log("Converter Close called.")
-          converterWindow.removeAllListeners("close");
-          converterWindow.close();
-          converterWindow = null;
-        } 
+          closeConverterWindow();
+        }
         return {ok: true}        
       } else {
         console.log("[MAIN]: Unkown convertion type detected.")
@@ -3454,12 +3634,10 @@ function createMainWIndow() {
           progressBar = null;
         }
         globalTempData = null;
-        if(converterWindow){
+        if (hasConverterWindow()) {
           console.log("Converter Close called.")
-          converterWindow.removeAllListeners("close");
-          converterWindow.close();
-          converterWindow = null;
-        } 
+          closeConverterWindow();
+        }
         return {ok: false, reason:"Unkown convertion type detected"} 
       } 
     }
@@ -3501,15 +3679,15 @@ function createMainWIndow() {
     return [projectList, holeList, sectionList];
   });
   ipcMain.handle("changeFix", async (_e, isFix) => {
-    if (!finderWindow || finderWindow.isDestroyed()) {
+    if (!hasFinderWindow()) {
       return;
     }
     if (isFix) {
-      finderWindow.setParentWindow(mainWindow);
-      finderWindow.setAlwaysOnTop(true, "floating");
+      getFinderWindow().setParentWindow(getMainWindow());
+      getFinderWindow().setAlwaysOnTop(true, "floating");
     } else {
-      finderWindow.setParentWindow(null);
-      finderWindow.setAlwaysOnTop(false);
+      getFinderWindow().setParentWindow(null);
+      getFinderWindow().setAlwaysOnTop(false);
       
     }
   });
@@ -3522,17 +3700,17 @@ function createMainWIndow() {
     return [dist_upper, dist_lower];
   });
   ipcMain.handle("MoveToHorizon", async (_e, data) => {
-    mainWindow.webContents.send("MoveToHorizonFromFinder", data);
+    getMainWindow().webContents.send("MoveToHorizonFromFinder", data);
   });
   ipcMain.handle("terminalLog", async (_e, data) => {
     console.log(data);
   });
   ipcMain.handle("rendererLog", async (_e, data) => {
-    mainWindow.webContents.send("rendererLog", data);
+    getMainWindow().webContents.send("rendererLog", data);
   });
   ipcMain.handle("sendPlotOptions", (_e,data, to) => {
     if(to=="renderer"){
-      mainWindow.webContents.send("PlotDataOptions", data);
+      getMainWindow().webContents.send("PlotDataOptions", data);
     }    
   });
   ipcMain.handle("depthConverter", async (_e, dataList, options) => {
@@ -3569,45 +3747,26 @@ function createMainWIndow() {
   });
   ipcMain.handle("sendSettings", (_e,sendData, to) => {
     if(to=="settings"){
-      if(settingsWindow==null){
-        //case of call properties
-        if (settingsWindow) {
-          settingsWindow.focus();
-          return;
-        }
-    
-        //create finder window
-        settingsWindow = new BrowserWindow({
-          title: "Settings",
-          width: 700,
-          height: 700,
-          webPreferences: {preload: path.join(__dirname, "preload", "preload_settings.js"),},
-          parent: mainWindow,
-          model: true,
-        });
-        
-        //converterWindow.setAlwaysOnTop(true, "normal");
-        settingsWindow.on("closed", () => {
-          settingsWindow = null;
-          mainWindow.webContents.send("SettingsClosed", "");
-        });
-        settingsWindow.setMenu(null);
-    
-        settingsWindow.loadFile(path.join(__dirname, "./renderer/settings.html"));
-    
-        settingsWindow.once("ready-to-show", () => {
-          settingsWindow.show();
-         // converterWindow.setAlwaysOnTop(true, "normal");
-         //settingsWindow.webContents.openDevTools();
-          settingsWindow.setAlwaysOnTop(true, "floating");
-          settingsWindow.webContents.send("SettingsData", sendData);
+      if(!hasSettingsWindow()){
+        openSettingsWindow({
+          browserWindowOptions: {
+            parent: getMainWindow(),
+            model: true,
+          },
+          onReadyToShow: () => {
+            sendToSettingsWindow("SettingsData", sendData);
+          },
         });
       }else{
-        settingsWindow.webContents.send("SettingsData", sendData);
+        openSettingsWindow({
+          onExisting: () => {
+            sendToSettingsWindow("SettingsData", sendData);
+          },
+        });
       }
 
     }else if(to=="renderer"){
-      mainWindow.webContents.send("SettingsData", sendData.data);
+      getMainWindow().webContents.send("SettingsData", sendData.data);
       if(sendData){
         setSettings("settingsRenderer", sendData.data);
       }      
@@ -3624,7 +3783,7 @@ function createMainWIndow() {
     setSettings("bookmarks", LCBookmarkSet);
   });
   ipcMain.handle("requestCurrentPosition", (_e) => {
-    mainWindow.webContents.send("FinderRequestCurrentPosition");    
+    getMainWindow().webContents.send("FinderRequestCurrentPosition");    
   });
 
   ipcMain.handle("openExtarnalLink", (_e,url) => {
@@ -3665,7 +3824,7 @@ function createMainWIndow() {
       message: "Do you aslo want to delete the connections between projects?",
     };
 
-    const { response } = await dialog.showMessageBox(mainWindow, options);
+    const { response } = await dialog.showMessageBox(getMainWindow(), options);
 
     const result = LCCore.deleteProject(projectId, response);
 
@@ -3989,7 +4148,7 @@ function createMainWIndow() {
     let distance_duplicate = 0;
 
     if (options.callFrom === "converter" || options.callFrom === "plotter") {
-      callWindow = converterWindow;
+      callWindow = getConverterWindow();
       showProgress = true;
       const cm = LCCore.checkModel();
       cm.forEach(r=>{
@@ -4011,7 +4170,7 @@ function createMainWIndow() {
         }
       }
     } else {
-      callWindow = mainWindow;
+      callWindow = getMainWindow();
     }
     
     let resultList = [];
@@ -4412,13 +4571,13 @@ function createMainWIndow() {
     //alert error
     newLCCore.on('error_alert', (err) => {
       console.error('LCCore => '+ err.statusDetails);
-      mainWindow.webContents.send("AlertRenderer", err);
+      getMainWindow().webContents.send("AlertRenderer", err);
     });
 
     //fatal error
     newLCCore.on('error_fatal', (err) => {
       console.error('LCCore => '+ err.statusDetails);
-      mainWindow.webContents.send("AlertRenderer", err);
+      getMainWindow().webContents.send("AlertRenderer", err);
       throw new Error('LCCore fatal error: ' + err.statusDetails); 
     });
 
@@ -4472,7 +4631,7 @@ function createMainWIndow() {
         const result={};
         result.statusDetails = res;
 
-        mainWindow.webContents.send("AlertRenderer", result);
+        getMainWindow().webContents.send("AlertRenderer", result);
         console.error("MAIN: ",res);
       }
       
@@ -4484,7 +4643,7 @@ function createMainWIndow() {
     globalPath.dataPaths.push({type:"lcmodel",path:fullpath});
 
     //import data
-    const inData = await loadmodelfile(mainWindow, fullpath);
+    const inData = await loadmodelfile(getMainWindow(), fullpath);
 
     //register
     if(inData!==null){
@@ -4530,7 +4689,7 @@ function createMainWIndow() {
     } 
   }
   //--------------------------------------------------------------------------------------------------
-  mainWindow.webContents.once("did-finish-load", () => {    
+  getMainWindow().webContents.once("did-finish-load", () => {    
     const rendererSettings = getSettings("settingsRenderer");
       
     const tempMainSettings = getSettings("settingsMain");
@@ -4547,7 +4706,7 @@ function createMainWIndow() {
     }
     
     if (rendererSettings) {
-      mainWindow.webContents.send("SettingsData", rendererSettings);
+      getMainWindow().webContents.send("SettingsData", rendererSettings);
     }
   });
   function buildMainMenu(){
@@ -4566,41 +4725,15 @@ function createMainWIndow() {
                 { type: "separator" },
                 { label: "Preferences",
                   click: () => {
-                    if (settingsWindow) {
-                      settingsWindow.focus();
-                      return;
-                    }
-                
-                    //create finder window
-                    settingsWindow = new BrowserWindow({
-                      title: "Settings",
-                      width: 700,
-                      height: 700,
-                      webPreferences: {preload: path.join(__dirname, "preload", "preload_settings.js"),},
-                    });
-                    
-                    //converterWindow.setAlwaysOnTop(true, "normal");
-                    settingsWindow.on("closed", () => {
-                      settingsWindow = null;
-                      if (mainWindow && !mainWindow.isDestroyed()){
-                        mainWindow.webContents.send("SettingsClosed", "");
-                      }
-                    });
-                    settingsWindow.setMenu(null);
-                
-                    settingsWindow.loadFile(path.join(__dirname, "./renderer/settings.html"));
-                
-                    settingsWindow.once("ready-to-show", () => {
-                      settingsWindow.show();
-                      settingsWindow.setAlwaysOnTop(true, "floating");
-                    //settingsWindow.webContents.openDevTools();
-                      //converterWindow.setAlwaysOnTop(true, "normal");
-                      const data = {
-                        output_type:"export",
-                        called_from:"main",
-                        path:null,
-                      }; 
-                      mainWindow.webContents.send("SettingsMenuClicked", data);
+                    openSettingsWindow({
+                      onReadyToShow: () => {
+                        const data = {
+                          output_type:"export",
+                          called_from:"main",
+                          path:null,
+                        };
+                        sendToMainWindow("SettingsMenuClicked", data);
+                      },
                     });
                   },
                 },
@@ -4622,20 +4755,20 @@ function createMainWIndow() {
                 accelerator: "CmdOrCtrl+M",
                 //accelerator: "CmdOrCtrl+S",
                 click: async () => {
-                  const fullpath = await getfile(mainWindow, "Please chose Correlation model file", [{name: "LCmodel file", extensions: ["lcmodel"]}]);
+                  const fullpath = await getfile(getMainWindow(), "Please chose Correlation model file", [{name: "LCmodel file", extensions: ["lcmodel"]}]);
                   await registerLCModel(fullpath);
-                  mainWindow.webContents.send("UpdateViewFromMain");                },
+                  getMainWindow().webContents.send("UpdateViewFromMain");                },
               },
               {
                 label: "Load Correlation Model from csv",              
                 click: async() => {
-                  const fullpath = await getfile(mainWindow, "Please chose Correlation model CSV file", [{name: "CSV file", extensions: ["csv"]}]);
+                  const fullpath = await getfile(getMainWindow(), "Please chose Correlation model CSV file", [{name: "CSV file", extensions: ["csv"]}]);
                   if(fullpath){
                     registerModelFromCsv(fullpath);
                     //calc
                     LCCore.calcCompositeDepth();
                     LCCore.calcEventFreeDepth();
-                    mainWindow.webContents.send("UpdateViewFromMain");
+                    getMainWindow().webContents.send("UpdateViewFromMain");
                   }
                 },
               },
@@ -4643,19 +4776,19 @@ function createMainWIndow() {
               {
                 label: "Load Age model",
                 click: async() => {
-                  const fullpath = await getfile(mainWindow, "Please chose Age model CSV file", [{name: "CSV file", extensions: ["csv"]}]);
+                  const fullpath = await getfile(getMainWindow(), "Please chose Age model CSV file", [{name: "CSV file", extensions: ["csv"]}]);
                   if(fullpath){
                     console.log(fullpath)
                     //register
                     registerAgeFromCsv(fullpath);
-                    mainWindow.webContents.send("UpdateViewFromMain");
+                    getMainWindow().webContents.send("UpdateViewFromMain");
                   }
                 },
               },
               {
                 label: "Load Core Images",
                 click: async() => {
-                  const imageDir = await getDirectory(mainWindow, "Please select image root directory.")
+                  const imageDir = await getDirectory(getMainWindow(), "Please select image root directory.")
                   if(imageDir!==false){
                     //register path
                     globalPath.dataPaths.push({type:"core_images", path:imageDir});
@@ -4675,7 +4808,7 @@ function createMainWIndow() {
                       dpcm:40,
                     },"core_images");
 
-                    mainWindow.webContents.send("LoadCoreImagesMenuClicked", coreImages);
+                    getMainWindow().webContents.send("LoadCoreImagesMenuClicked", coreImages);
                     //mainWindow.webContents.send("UpdateViewFromMain"); 
                   }
                 },
@@ -4691,7 +4824,7 @@ function createMainWIndow() {
                     }
                   }
 
-                  mainWindow.webContents.send("ReloadMenuClicked", null);
+                  getMainWindow().webContents.send("ReloadMenuClicked", null);
                 }
               },      
             ],
@@ -4702,14 +4835,14 @@ function createMainWIndow() {
               {
                 label: "Import Correlation Model for Level Finder",
                 click: async() => {
-                  const fullpath = await getfile(mainWindow, "Please Chose Correlation Model (fro LF)", [{name: "CSV file", extensions: ["csv"]}]);
+                  const fullpath = await getfile(getMainWindow(), "Please Chose Correlation Model (fro LF)", [{name: "CSV file", extensions: ["csv"]}]);
                   if(fullpath){
                     console.log("MAIN: Import correlation model for Level Finder from", fullpath)
                     registerModelFromCsv(fullpath, "forLF");
                     //calc
                     LCCore.calcCompositeDepth();
                     LCCore.calcEventFreeDepth();
-                    mainWindow.webContents.send("UpdateViewFromMain");
+                    getMainWindow().webContents.send("UpdateViewFromMain");
                     
                     //mainWindow.webContents.send("ImportCorrelationModelForLFMenuClicked");
                   }
@@ -4718,11 +4851,11 @@ function createMainWIndow() {
               {
                 label: "Import Event List for Level Finder",
                 click: async() => {
-                  const fullpath = await getfile(mainWindow, "Please Chose Event List (for LF))", [{name: "CSV file", extensions: ["csv"]}]);
+                  const fullpath = await getfile(getMainWindow(), "Please Chose Event List (for LF))", [{name: "CSV file", extensions: ["csv"]}]);
                   if(fullpath){
                     console.log("MAIN: Import event list for Level Finder from", fullpath)
                     LCCore.loadEventListFromCsv(fullpath);
-                    mainWindow.webContents.send("UpdateViewFromMain");                    
+                    getMainWindow().webContents.send("UpdateViewFromMain");                    
                     //mainWindow.webContents.send("ImportEventListForLFMenuClicked");
                   }
                 },
@@ -4730,12 +4863,12 @@ function createMainWIndow() {
               {
                 label: "Import Age Model for Level Finder",
                 click: async() => {
-                  const fullpath = await getfile(mainWindow, "Please chose Age model CSV file", [{name: "CSV file", extensions: ["csv"]}]);
+                  const fullpath = await getfile(getMainWindow(), "Please chose Age model CSV file", [{name: "CSV file", extensions: ["csv"]}]);
                   if(fullpath){
                     console.log(fullpath)
                     //register
                     registerAgeFromCsv(fullpath, "LF");
-                    mainWindow.webContents.send("UpdateViewFromMain");
+                    getMainWindow().webContents.send("UpdateViewFromMain");
                   }
                 },
               },
@@ -4764,7 +4897,7 @@ function createMainWIndow() {
   
                     if(globalPath.saveModelPath == null){
                       //save as new file
-                      const result = await putmodelfile(mainWindow, outData, null);
+                      const result = await putmodelfile(getMainWindow(), outData, null);
                       if(result){
                         globalPath.saveModelPath = result;
                         LCCore.updateVersionInfo();
@@ -4772,7 +4905,7 @@ function createMainWIndow() {
                       }                      
                     }else{
                       //save orverwrite
-                      const result = await putmodelfile(mainWindow, outData, globalPath.saveModelPath);
+                      const result = await putmodelfile(getMainWindow(), outData, globalPath.saveModelPath);
                       if(result){
                         globalPath.saveModelPath = result;
                         LCCore.updateVersionInfo();
@@ -4800,10 +4933,10 @@ function createMainWIndow() {
   
                     if(globalPath.saveModelPath == null){
                       //save as new file
-                      globalPath.saveModelPath = await putmodelfile(mainWindow, outData, null);
+                      globalPath.saveModelPath = await putmodelfile(getMainWindow(), outData, null);
                     }else{
                       //save orverwrite
-                      globalPath.saveModelPath = await putmodelfile(mainWindow, outData, globalPath.saveModelPath);
+                      globalPath.saveModelPath = await putmodelfile(getMainWindow(), outData, globalPath.saveModelPath);
                     }
                     history.saveState(LCCore.exportSerialisedModel(), "export lcmodel");
                   }                
@@ -4825,7 +4958,7 @@ function createMainWIndow() {
                     const outData = {LCCore:outLCCore, LCAge:LCAge, LCPlotAge:out_LCPlot};
   
                     //save as new file
-                    globalPath.saveModelPath = await putmodelfile(mainWindow, outData, null);
+                    globalPath.saveModelPath = await putmodelfile(getMainWindow(), outData, null);
                     history.saveState(LCCore.exportSerialisedModel(), "export lcmodel");
                     
                   }                
@@ -4840,13 +4973,13 @@ function createMainWIndow() {
               {
                 label: "Export csv model for Level Compiler",
                 click: () => {
-                  mainWindow.webContents.send("ExportCorrelationAsLCMenuClicked");
+                  getMainWindow().webContents.send("ExportCorrelationAsLCMenuClicked");
                 },
               },
               {
                 label: "Export csv model for Level Finder",
                 click: () => {
-                  mainWindow.webContents.send("ExportCorrelationAsLFMenuClicked");
+                  getMainWindow().webContents.send("ExportCorrelationAsLFMenuClicked");
                 },
               },
             ],
@@ -4865,7 +4998,7 @@ function createMainWIndow() {
                       message: "Are you sure you want to exit?",
                     };
   
-                    const response = dialog.showMessageBoxSync(mainWindow, options);
+                    const response = dialog.showMessageBoxSync(getMainWindow(), options);
   
                     if (response === 1) {
                       app.quit(); 
@@ -4885,48 +5018,22 @@ function createMainWIndow() {
                   label: "Edit mode",
                   accelerator: "CmdOrCtrl+E",
                   click: () =>{
-                    mainWindow.webContents.send("EditCorrelation");
+                      getMainWindow().webContents.send("EditCorrelation");
                   },
                 },
                 { type: "separator" },
                 {
                   label: "Preferences",
                   click: () => {
-                    if (settingsWindow) {
-                      settingsWindow.focus();
-                      return;
-                    }
-                
-                    //create finder window
-                    settingsWindow = new BrowserWindow({
-                      title: "Settings",
-                      width: 700,
-                      height: 700,
-                      webPreferences: {preload: path.join(__dirname, "preload", "preload_settings.js"),},
-                    });
-                    
-                    //converterWindow.setAlwaysOnTop(true, "normal");
-                    settingsWindow.on("closed", () => {
-                      settingsWindow = null;
-                      if (mainWindow && !mainWindow.isDestroyed()){
-                        mainWindow.webContents.send("SettingsClosed", "");
-                      }
-                    });
-                    settingsWindow.setMenu(null);
-                
-                    settingsWindow.loadFile(path.join(__dirname, "./renderer/settings.html"));
-                
-                    settingsWindow.once("ready-to-show", () => {
-                      settingsWindow.show();
-                      settingsWindow.setAlwaysOnTop(true, "floating");
-                    //settingsWindow.webContents.openDevTools();
-                      //converterWindow.setAlwaysOnTop(true, "normal");
-                      const data = {
-                        output_type:"export",
-                        called_from:"main",
-                        path:null,
-                      }; 
-                      mainWindow.webContents.send("SettingsMenuClicked", data);
+                    openSettingsWindow({
+                      onReadyToShow: () => {
+                        const data = {
+                          output_type:"export",
+                          called_from:"main",
+                          path:null,
+                        };
+                        sendToMainWindow("SettingsMenuClicked", data);
+                      },
                     });
                   },
                 },
@@ -4942,7 +5049,7 @@ function createMainWIndow() {
                   label: "Edit mode",
                   accelerator: "CmdOrCtrl+E",
                   click: () =>{
-                    mainWindow.webContents.send("EditCorrelation");
+                    getMainWindow().webContents.send("EditCorrelation");
                   },
                 },
               ]
@@ -4988,7 +5095,7 @@ function createMainWIndow() {
                
               if(text !== null){
                 dialog.showMessageBox(
-                  mainWindow,
+                  getMainWindow(),
                   {
                   type: 'info',
                   title: 'Model versions',
@@ -5040,15 +5147,15 @@ function createMainWIndow() {
                 }).join('\n');
 
                 dialog.showMessageBox(
-                  mainWindow,
+                  getMainWindow(),
                   {
                   type: 'info',
                   title: 'Model statistics',
                   detail:text,
                   buttons: ['OK']
                 });
-                mainWindow.webContents.send("rendererLog", "Check results:");
-                mainWindow.webContents.send("rendererLog", results);
+                getMainWindow().webContents.send("rendererLog", "Check results:");
+                getMainWindow().webContents.send("rendererLog", results);
               }
             }
           },
@@ -5059,8 +5166,8 @@ function createMainWIndow() {
               if(LCCore !== null && LCCore.projects.length>0){
                 const results = LCCore.leaveOneOut("in");
                 
-                mainWindow.webContents.send("rendererLog", results);
-                putcsvfile(mainWindow, "results.csv", results);                
+                getMainWindow().webContents.send("rendererLog", results);
+                putcsvfile(getMainWindow(), "results.csv", results);                
               }
             }
           },   
@@ -5083,28 +5190,28 @@ function createMainWIndow() {
                 label: "Zoomin",
                 //accelerator: "CmdOrCtrl+S",
                 click: async () => {
-                  mainWindow.webContents.send("ZoominMenuClicked");
+                  getMainWindow().webContents.send("ZoominMenuClicked");
                 }
               },
               {
                 label: "Zoom default",
                 //accelerator: "CmdOrCtrl+S",
                 click: async () => {
-                  mainWindow.webContents.send("ZoomdefaultMenuClicked");
+                  getMainWindow().webContents.send("ZoomdefaultMenuClicked");
                 }
               },
               {
                 label: "Zoomout",
                 //accelerator: "CmdOrCtrl+S",
                 click: async () => {
-                  mainWindow.webContents.send("ZoomoutMenuClicked");
+                  getMainWindow().webContents.send("ZoomoutMenuClicked");
                 }
               },
               {
                 label: "Zoom actual scale",
                 //accelerator: "CmdOrCtrl+S",
                 click: async () => {
-                  mainWindow.webContents.send("ZoomactualMenuClicked");
+                  getMainWindow().webContents.send("ZoomactualMenuClicked");
                 }
               },
             ]
@@ -5114,7 +5221,7 @@ function createMainWIndow() {
             label: "Unload all models",
             accelerator: "CmdOrCtrl+W",
             click: () => {
-              mainWindow.webContents.send("UnLoadModelsMenuClicked");
+              getMainWindow().webContents.send("UnLoadModelsMenuClicked");
             },
           }
         ],
@@ -5131,43 +5238,18 @@ function createMainWIndow() {
                   return
                 }
               }
-              if (converterWindow) {
-                converterWindow.focus();
-                return;
-              }
-          
-              //create finder window
-              converterWindow = new BrowserWindow({
-                title: "Converter",
-                width: 700,
-                height: 700,
-                webPreferences: {preload: path.join(__dirname, "preload", "preload_converter.js"),},
-              });
-              
-              //converterWindow.setAlwaysOnTop(true, "normal");
-              converterWindow.on("closed", () => {
-                converterWindow = null;
-                if (mainWindow && !mainWindow.isDestroyed()){
-                  mainWindow.webContents.send("ConverterClosed", "");
-                }
-              });
-
-              converterWindow.setMenu(null);
-          
-              converterWindow.loadFile(path.join(__dirname, "./renderer/converter.html"));
-          
-              converterWindow.once("ready-to-show", () => {                
-                //converterWindow.setAlwaysOnTop(true, "floating");
-                converterWindow.show();
-                converterWindow.focus();
-                //converterWindow.webContents.openDevTools();
-                //converterWindow.setAlwaysOnTop(true, "normal");
-                const data = {
-                  output_type:"export",
-                  called_from:"main",
-                  path:null,
-                }; 
-                converterWindow.webContents.send("ConverterMenuClicked", data);
+              openConverterWindow({
+                onReadyToShow: (converterWindow) => {
+                  converterWindow.focus();
+                },
+                onDidFinishLoad: () => {
+                  const data = {
+                    output_type:"export",
+                    called_from:"main",
+                    path:null,
+                  };
+                  sendToConverterWindow("ConverterMenuClicked", data);
+                },
               });
             },
           },
@@ -5185,15 +5267,15 @@ function createMainWIndow() {
                 return;
               }
 
-              mainWindow.webContents.send("DividerMenuClicked", null);
+              getMainWindow().webContents.send("DividerMenuClicked", null);
             }
           },
           {
             label: "Labeler",
             accelerator: "CmdOrCtrl+L",
             click: () => {
-              if (labelerWindow) {
-                labelerWindow.focus();
+              if (hasLabelerWindow()) {
+                getLabelerWindow().focus();
                 return;
               }
           
@@ -5202,31 +5284,20 @@ function createMainWIndow() {
               tempCore.addHole(tempCore.projects[0].id,"temp");
   
               //create finder window
-              labelerWindow = new BrowserWindow({
-                title: "labeler",
-                width: 800,
-                height: 800,
-                webPreferences: {preload: path.join(__dirname, "preload", "preload_labeler.js"),},
-              });
+              const labelerWindow = setLabelerWindow(createWindow(WINDOW_TYPES.LABELER));
               
               //converterWindow.setAlwaysOnTop(true, "normal");
               labelerWindow.on("closed", () => {
-                labelerWindow = null;
+                clearLabelerWindow();
                 tempCore = null;
-                if (mainWindow && !mainWindow.isDestroyed()){
-                  mainWindow.webContents.send("LabelerClosed", "");
-                }
+                sendToMainWindow("LabelerClosed", "");
               });
-              labelerWindow.setMenu(null);
-          
-              labelerWindow.loadFile(path.join(__dirname, "./renderer/labeler.html"));
-          
               labelerWindow.once("ready-to-show", () => {
                 labelerWindow.show();
                 //labelerWindow.setAlwaysOnTop(true, "normal");
                 //labelerWindow.webContents.openDevTools();
                 //converterWindow.setAlwaysOnTop(true, "normal");
-                labelerWindow.webContents.send("LabelerMenuClicked");
+                sendToLabelerWindow("LabelerMenuClicked");
               });
             },
           },
@@ -5239,23 +5310,20 @@ function createMainWIndow() {
                   return
                 }
               }
-              if (plotWindow) {
-                plotWindow.show();
-                plotWindow.focus();
+              if (hasPlotterWindow()) {
+                getPlotterWindow().show();
+                getPlotterWindow().focus();
                 return;
               }
           
               isPlotterClose = false;
 
               //create finder window
-              plotWindow = new BrowserWindow({
-                title: "Plotter",
-                parent:mainWindow,
-                //resizable: false,
-                width: 800,//full: 900
-                height: 600,
-                webPreferences: {preload: path.join(__dirname, "preload", "preload_plotter.js"),},
-              });
+              const plotWindow = setPlotterWindow(createWindow(WINDOW_TYPES.PLOTTER, {
+                browserWindowOptions: {
+                  parent: getMainWindow(),
+                },
+              }));
               
               plotWindow.on("close", (e) => {
                 if(isPlotterClose){
@@ -5266,24 +5334,18 @@ function createMainWIndow() {
                 
                 plotWindow.hide();
                 //plotWindow = null;
-                if(mainWindow && !mainWindow.isDestroyed()){
-                  mainWindow.webContents.send("PlotterHide", ""); 
-                }
+                sendToMainWindow("PlotterHide", ""); 
               });
               plotWindow.on("closed", () => {
-                plotWindow = null; 
-                if (mainWindow && !mainWindow.isDestroyed()){
-                  if(mainWindow.webContents){
-                    mainWindow.webContents.send("LabelerClosed", "");
-                  }                  
-                }
+                clearPlotterWindow(); 
+                sendToMainWindow("LabelerClosed", "");
               });
 
               const customMenu = Menu.buildFromTemplate([
                   {
                     label: "Release loaded data",
                     click: () => {
-                      plotWindow.webContents.send("PlotterCleared", "");  
+                      sendToPlotterWindow("PlotterCleared", "");  
                     },
                   }
                   /*,
@@ -5315,7 +5377,7 @@ function createMainWIndow() {
                 plotWindow.show();
                 //plotWindow.setAlwaysOnTop(true, "floating");
                 //plotWindow.webContents.openDevTools();
-                plotWindow.webContents.send("PlotterMenuClicked", isData);
+                sendToPlotterWindow("PlotterMenuClicked", isData);
               });
             },
           },
@@ -5329,7 +5391,7 @@ function createMainWIndow() {
 
                   const isShift = event.shiftKey;
 
-                  mainWindow.webContents.send("SnapshotMenuClicked", {
+                  getMainWindow().webContents.send("SnapshotMenuClicked", {
                     isShift: isShift
                   });
                 }
@@ -5338,7 +5400,7 @@ function createMainWIndow() {
                 label: "Measure",
                 //accelerator: "CmdOrCtrl+S",
                 click: async () => {
-                  mainWindow.webContents.send("MeasureMenuClicked");
+                  getMainWindow().webContents.send("MeasureMenuClicked");
                 }
               }
             ]
@@ -5347,10 +5409,10 @@ function createMainWIndow() {
           {
             label: "Developer tool",
             click: () => {
-              if (mainWindow.webContents.isDevToolsOpened()) {
-                mainWindow.webContents.closeDevTools();
+              if (getMainWindow().webContents.isDevToolsOpened()) {
+                getMainWindow().webContents.closeDevTools();
               } else {
-                mainWindow.webContents.openDevTools();
+                getMainWindow().webContents.openDevTools();
               }
               //mainWindow.webContents.openDevTools();
             },
@@ -5364,7 +5426,7 @@ function createMainWIndow() {
               label: "Help",
               submenu: [
                 { label: "About", click: createAboutWindow },
-                { label: "Check update", click: async()=>{await checkUpdate(mainWindow, "button")}},
+                { label: "Check update", click: async()=>{await checkUpdate(getMainWindow(), "button")}},
                 { 
                   id: "autoUpdateDownload",
                   label: "Auto update download",
@@ -5383,7 +5445,7 @@ function createMainWIndow() {
             {
               label: "Help",
               submenu: [
-                { label: "Check update", click: async()=>{await checkUpdate(mainWindow, "button")}},
+                { label: "Check update", click: async()=>{await checkUpdate(getMainWindow(), "button")}},
                 { 
                   id: "autoUpdateDownload",
                   label: "Auto update download",
@@ -5579,7 +5641,7 @@ async function zipData(data) {
       console.timeEnd("encode");
     } catch (serializeError) {
       console.error("[zipData] msgpack encoding failed:", serializeError);
-      mainWindow.webContents.send("AlertRenderer", serializeError);
+      getMainWindow().webContents.send("AlertRenderer", serializeError);
       reject(serializeError);
       return;
     }
@@ -5602,7 +5664,7 @@ async function zipData(data) {
     //zlib.gzip(buf, (err, buffer) => {
       if (err) {
         console.error("[zipData] Gzip compression failed:", err);
-        mainWindow.webContents.send("AlertRenderer", err);
+        getMainWindow().webContents.send("AlertRenderer", err);
         reject(err);
       } else {
         console.timeEnd("zipped");
@@ -6167,47 +6229,33 @@ function isZipFile(filepath) {
   );
 }
 
-//--------------------------------------------------------------------------------------------------
-//create sub window
-function createNewWindow(title, htmlPath, preloadPath) {
-  const newWindow = new BrowserWindow({
-    title: title,
-    width: 630,
-    height: 800,
-    webPreferences: {
-      preload: path.join(__dirname, preloadPath),
-    },
-  });
-  newWindow.loadFile(path.join(__dirname, htmlPath));
-  return newWindow;
-}
-//--------------------------------------------------------------------------------------------------
 function mean(arr, useAbs = false) {
   return arr.reduce((a, b) => a + (useAbs ? Math.abs(b) : b), 0) / arr.length;
 }
 //--------------------------------------------------------------------------------------------------
 //create about window
 function createAboutWindow() {
-  // make window
-  const aboutWindow = new BrowserWindow({
-    title: "About Level Compiler",
-    parent: mainWindow,
-    width: 500,
-    height: 300,
-    webPreferences: {preload: path.join(__dirname, "preload", "preload_about.js"),},
+  const aboutWindow = createWindow(WINDOW_TYPES.ABOUT, {
+    browserWindowOptions: {
+      parent: getMainWindow(),
+    },
   });
-  aboutWindow.setMenu(null);
-  aboutWindow.loadFile(path.join(__dirname, "./renderer/about.html"));
-
-  
+  const sendVersion = () => {
+    aboutWindow.webContents.send("Version", app.getVersion());
+  };
 
   aboutWindow.once("ready-to-show", () => {
     aboutWindow.show();
     //aboutWindow.setAlwaysOnTop(true, "floating");
     //aboutWindow.webContents.openDevTools();
     //converterWindow.setAlwaysOnTop(true, "normal");
-    aboutWindow.webContents.send("Version", app.getVersion());
   });
+
+  if (aboutWindow.webContents.isLoadingMainFrame()) {
+    aboutWindow.webContents.once("did-finish-load", sendVersion);
+  } else {
+    sendVersion();
+  }
 }
 function assignObject (obj,data){
   //assign without event listener
@@ -6313,7 +6361,7 @@ async function checkUpdate(window, from){
 
 
   autoUpdater.on("error", (err) => {
-    mainWindow.webContents.send("rendererLog", err);
+    getMainWindow().webContents.send("rendererLog", err);
     if (from === "button") {
       dialog.showMessageBox(window, {
         type: "error",
@@ -6456,9 +6504,9 @@ app.whenReady().then(async() => {
   createMainWIndow();
 
   //check update
-  mainWindow.once("ready-to-show", () => {
+  getMainWindow().once("ready-to-show", () => {
     if (process.env.LC_E2E !== "1") {
-      checkUpdate(mainWindow, "startup");
+      checkUpdate(getMainWindow(), "startup");
     }
   });
 

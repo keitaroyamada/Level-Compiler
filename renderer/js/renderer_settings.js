@@ -1,4 +1,17 @@
 window.addEventListener("DOMContentLoaded", () => {
+    let settingsReady = true;
+    window.__LC_SETTINGS_E2E__ = {
+      isReady() {
+        return settingsReady;
+      },
+      getState() {
+        return {
+          title: document.title,
+          itemCount: document.querySelectorAll(".settings-item").length,
+        };
+      },
+    };
+
     let settings = {};
     let isEditable = false;
 
