@@ -29,10 +29,10 @@ contextBridge.exposeInMainWorld("DividerApi", {
   MoveToHorizon: (payload) => ipcRenderer.invoke("MoveToHorizon", payload),
   terminalLog: (args1) => ipcRenderer.invoke("terminalLog", args1),
   rendererLog: (args1) => ipcRenderer.invoke("rendererLog", args1),
-  toggleDevTools: (args1) => ipcRenderer.send('toggle-devtools',args1),
+  toggleDevTools: (target) => ipcRenderer.send("toggle-devtools", { target }),
   writeCsv: (args1) => ipcRenderer.send('dividerExport',args1),
 
-  inputdialog: (args1) => ipcRenderer.invoke("inputdialog", args1),
+  inputdialog: (payload) => ipcRenderer.invoke("inputdialog", payload),
 
   dividerConverter: (payload) => ipcRenderer.invoke("dividerConverter", payload),
 

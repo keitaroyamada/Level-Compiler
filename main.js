@@ -1484,7 +1484,8 @@ function createMainWIndow() {
     const response = dialog.showMessageBox(targetWindow, options);
     return response;
   });
-  ipcMain.handle("inputdialog", async (_e, data,) => {
+  ipcMain.handle("inputdialog", async (_e, payload) => {
+    const data = payload ?? {};
     //type:text, password, email, number, url, date, time, color, range
     try {
       const result = await prompt({
@@ -2433,7 +2434,8 @@ function createMainWIndow() {
   ipcMain.handle("LabelerLoadModel", (_e) => {
     return tempCore.exportSerialisedModel();
   });
-  ipcMain.handle("ChangeDepthScale", async (_e, newId) => {
+  ipcMain.handle("ChangeDepthScale", async (_e, payload) => {
+    const { newId } = payload;
     LCCore.changeBaseProject(newId);
   });
   ipcMain.handle("PlotterGetData", (_e, payload) => {
@@ -2462,18 +2464,16 @@ function createMainWIndow() {
       return false;
     }
 
-    setImmediate(() => {
-      if (!hasPlotterWindow()) {
-        return;
-      }
+    const plotterWindow = getPlotterWindow();
+    if (!plotterWindow) {
+      return false;
+    }
 
-      const plotterWindow = getPlotterWindow();
-      isPlotterClose = true;
+    isPlotterClose = true;
+    if (typeof plotterWindow.removeAllListeners === "function") {
       plotterWindow.removeAllListeners("close");
-      plotterWindow.close();
-      clearPlotterWindow();
-      sendToMainWindow("PlotterClosed", "");
-    });
+    }
+    plotterWindow.close();
 
     return true;
   });
@@ -2483,12 +2483,15 @@ function createMainWIndow() {
     }
 
     const plotterWindow = getPlotterWindow();
-    isPlotterClose = false;
-    plotterWindow.removeAllListeners("close");
+    if (!plotterWindow) {
+      return;
+    }
+
+    isPlotterClose = true;
+    if (typeof plotterWindow.removeAllListeners === "function") {
+      plotterWindow.removeAllListeners("close");
+    }
     plotterWindow.close();
-    clearPlotterWindow();
-    sendToMainWindow("PlotterClosed", "");
-    isPlotterClose = false;
   });
   ipcMain.handle("LoadPlotData", async (_e, payload) => {
     const { type } = payload;
@@ -2998,50 +3001,51 @@ function createMainWIndow() {
     const info = "";
     event.sender.send("mainprocess-info", info);
   });
-  ipcMain.on("toggle-devtools", async(_e, data) => {
-    if(data == "divider"){
+  ipcMain.on("toggle-devtools", async(_e, payload) => {
+    const { target } = payload;
+    if(target == "divider"){
       if (getDividerWindow().webContents.isDevToolsOpened()) {
         getDividerWindow().webContents.closeDevTools();
       } else {
         getDividerWindow().webContents.openDevTools();
       }
-    } else if(data == "finder"){
+    } else if(target == "finder"){
       if (getFinderWindow().webContents.isDevToolsOpened()) {
         getFinderWindow().webContents.closeDevTools();
       } else {
         getFinderWindow().webContents.openDevTools();
       }
-    } else if(data == "main"){
+    } else if(target == "main"){
       if (getMainWindow().webContents.isDevToolsOpened()) {
         getMainWindow().webContents.closeDevTools();
       } else {
         getMainWindow().webContents.openDevTools();
       }
-    } else if(data == "converter"){
+    } else if(target == "converter"){
       if (getConverterWindow().webContents.isDevToolsOpened()) {
         getConverterWindow().webContents.closeDevTools();
       } else {
         getConverterWindow().webContents.openDevTools();
       }
-    } else if(data == "labeler"){
+    } else if(target == "labeler"){
       if (getLabelerWindow().webContents.isDevToolsOpened()) {
         getLabelerWindow().webContents.closeDevTools();
       } else {
         getLabelerWindow().webContents.openDevTools();
       }
-    }else if(data == "viewer"){
+    }else if(target == "viewer"){
       if (getImageViewerWindow().webContents.isDevToolsOpened()) {
         getImageViewerWindow().webContents.closeDevTools();
       } else {
         getImageViewerWindow().webContents.openDevTools();
       }
-    }else if(data == "plotter"){
+    }else if(target == "plotter"){
       if (getPlotterWindow().webContents.isDevToolsOpened()) {
         getPlotterWindow().webContents.closeDevTools();
       } else {
         getPlotterWindow().webContents.openDevTools();
       }
-    }else if(data == "settings"){
+    }else if(target == "settings"){
       if (getSettingsWindow().webContents.isDevToolsOpened()) {
         getSettingsWindow().webContents.closeDevTools();
       } else {
@@ -3899,11 +3903,10 @@ function createMainWIndow() {
       return resultList[0];
     }
   });  
-  ipcMain.handle("changeEditMode", (_e,mode) => {
-    
+  ipcMain.handle("changeEditMode", (_e, payload) => {
+    const { mode } = payload;
     isEditMode = mode;
     menuRebuild();
-    
   });
   ipcMain.handle("sendSettings", (_e, payload) => {
     const { sendData, to } = payload;

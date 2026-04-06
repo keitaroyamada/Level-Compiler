@@ -28,9 +28,9 @@ contextBridge.exposeInMainWorld("FinderApi", {
   terminalLog: (args1) => ipcRenderer.invoke("terminalLog", args1),
   rendererLog: (args1) => ipcRenderer.invoke("rendererLog", args1),
   GetResources: () => ipcRenderer.sendSync("GetResources"),
-  toggleDevTools: (args1) => ipcRenderer.send('toggle-devtools',args1),
+  toggleDevTools: (target) => ipcRenderer.send("toggle-devtools", { target }),
 
-  inputdialog: (args1) => ipcRenderer.invoke("inputdialog", args1),
+  inputdialog: (payload) => ipcRenderer.invoke("inputdialog", payload),
   askdialog: (payload) => ipcRenderer.invoke(IPC_CHANNELS.ASK_DIALOG, normaliseDialogPayload(payload)),
   saveBookmarks: (payload) => ipcRenderer.invoke("saveBookmarks", payload),
 

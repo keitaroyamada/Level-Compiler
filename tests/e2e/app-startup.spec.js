@@ -105,9 +105,7 @@ async function launchApp() {
   await firstWindow.waitForLoadState("domcontentloaded");
   await firstWindow.waitForFunction(() => Boolean(window.__LC_E2E__ && window.__LC_E2E__.isReady()));
   await electronApp.evaluate(() => {
-    const fs = require("fs");
     global.__LC_E2E_MAIN_PROCESS_ERRORS__ = [];
-    const errorLogPath = process.env.LC_E2E_MAIN_PROCESS_ERROR_LOG;
 
     if (global.__LC_E2E_MAIN_PROCESS_ERROR_MONITOR_INSTALLED__) {
       return;
@@ -125,10 +123,6 @@ async function launchApp() {
         type,
         message,
       });
-
-      if (errorLogPath) {
-        fs.appendFileSync(errorLogPath, `${JSON.stringify({ type, message })}\n`, "utf8");
-      }
     };
 
     process.on("uncaughtException", (error) => {
@@ -158,6 +152,13 @@ function readMainProcessErrorsFromLog(errorLogPath) {
 }
 
 async function assertNoMainProcessErrors(electronApp, errorLogPath) {
+  if (electronApp) {
+    await electronApp.evaluate(async () => {
+      await new Promise((resolve) => setImmediate(resolve));
+      await new Promise((resolve) => setImmediate(resolve));
+    });
+  }
+
   const liveErrors = electronApp
     ? await electronApp.evaluate(() => global.__LC_E2E_MAIN_PROCESS_ERRORS__ || [])
     : [];
@@ -213,6 +214,29 @@ async function clickMenuItemByLabel(electronApp, targetLabel) {
   }, targetLabel);
 
   expect(clicked).toBe(true);
+}
+
+async function getMenuItemVisibility(electronApp, targetLabel) {
+  return electronApp.evaluate(({ Menu }, label) => {
+    function findMenuItem(items) {
+      for (const item of items) {
+        if (item.label === label) {
+          return item;
+        }
+        if (item.submenu) {
+          const nested = findMenuItem(item.submenu.items);
+          if (nested) {
+            return nested;
+          }
+        }
+      }
+      return null;
+    }
+
+    const menu = Menu.getApplicationMenu();
+    const item = menu ? findMenuItem(menu.items) : null;
+    return item ? item.visible !== false : null;
+  }, targetLabel);
 }
 
 async function closeWindowByTitle(electronApp, expectedTitle) {
@@ -306,6 +330,18 @@ test("file and folder chooser payloads return mocked paths", async () => {
     } catch (_error) {
       // Ignore reset failures while shutting down.
     }
+    await closeElectronApp(electronApp, firstWindow, runtimeIssueMonitor);
+  }
+});
+
+test("changeEditMode payload enables the Save menu visibility", async () => {
+  const { electronApp, firstWindow, runtimeIssueMonitor } = await launchApp();
+  try {
+    expect(await getMenuItemVisibility(electronApp, "Save")).toBe(false);
+
+    await firstWindow.evaluate(() => window.LCapi.changeEditMode({ mode: true }));
+    await expect.poll(() => getMenuItemVisibility(electronApp, "Save")).toBe(true);
+  } finally {
     await closeElectronApp(electronApp, firstWindow, runtimeIssueMonitor);
   }
 });

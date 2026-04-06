@@ -23,9 +23,9 @@ contextBridge.exposeInMainWorld("PlotterApi", {
   rendererLog: (args1) => ipcRenderer.invoke("rendererLog", args1),
 
   askdialog: (payload) => ipcRenderer.invoke(IPC_CHANNELS.ASK_DIALOG, normaliseDialogPayload(payload)),
-  inputdialog: (args1) => ipcRenderer.invoke("inputdialog", args1),
+  inputdialog: (payload) => ipcRenderer.invoke("inputdialog", payload),
 
-  toggleDevTools: (args1) => ipcRenderer.send('toggle-devtools',args1),
+  toggleDevTools: (target) => ipcRenderer.send("toggle-devtools", { target }),
 
   getPlotData: (payload) => ipcRenderer.invoke("PlotterGetData", payload),
   initialisePlotDataCollection: () => ipcRenderer.invoke("initialisePlotDataCollection"),

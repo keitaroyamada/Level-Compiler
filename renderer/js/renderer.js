@@ -1148,12 +1148,12 @@ document.addEventListener("DOMContentLoaded", () => {
       objOpts.edit.marker_from = null;
       objOpts.edit.marker_to = null;
       document.body.style.cursor = "default";
-      await window.LCapi.changeEditMode(objOpts.edit.editable);
+      await window.LCapi.changeEditMode({ mode: objOpts.edit.editable });
       document.removeEventListener('contextmenu', handleEditContextmenu);
       document.addEventListener('contextmenu', handleNormalContextmenu);
     }else{
       objOpts.edit.editable = true;
-      await window.LCapi.changeEditMode(objOpts.edit.editable);
+      await window.LCapi.changeEditMode({ mode: objOpts.edit.editable });
       objOpts.edit.contextmenu_enable = true;
       document.body.style.cursor = "crosshair"; 
       if(objOpts.edit.contextmenu_enable){

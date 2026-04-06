@@ -72,9 +72,9 @@ contextBridge.exposeInMainWorld("LabelerApi", {
   deleteMarker: (payload) => ipcRenderer.invoke("LabelerDeleteMarker", payload),
 
   askdialog: (payload) => ipcRenderer.invoke(IPC_CHANNELS.ASK_DIALOG, normaliseDialogPayload(payload)),
-  inputdialog: (args1) => ipcRenderer.invoke("inputdialog", args1),
+  inputdialog: (payload) => ipcRenderer.invoke("inputdialog", payload),
   GetResources: () => ipcRenderer.sendSync("GetResources"),
-  toggleDevTools: (args1) => ipcRenderer.send('toggle-devtools',args1),
+  toggleDevTools: (target) => ipcRenderer.send("toggle-devtools", { target }),
   saveLabelerData: (args1) => ipcRenderer.invoke("LabelerSaveData", args1),
 
   sendUndo: (payload) => ipcRenderer.invoke('sendUndo', payload),
