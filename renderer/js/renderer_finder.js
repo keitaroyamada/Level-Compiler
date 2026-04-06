@@ -241,11 +241,11 @@ document.addEventListener("DOMContentLoaded", () => {
     const sectionName = sectionList[document.getElementById("holeOptions").value][document.getElementById("sectionOptions").value][2];
     const sectionId = sectionList[document.getElementById("holeOptions").value][document.getElementById("sectionOptions").value];
 
-    const secLimit = await window.FinderApi.getSectionLimit(
-      [sectionId[1][0], null, null, null],
+    const secLimit = await window.FinderApi.getSectionLimit({
+      projectId: [sectionId[1][0], null, null, null],
       holeName,
-      sectionName
-    );
+      sectionName,
+    });
 
     if(!limit){
       document.getElementById("distanceInput").max = Infinity;
@@ -335,7 +335,10 @@ document.addEventListener("DOMContentLoaded", () => {
           allowOutside: alterType=="extrapolation" ? true : false,          
         };
 
-        calcedData = await window.FinderApi.depthConverter([["", ["", holeName, sectionName, distance], targetId]], options);
+        calcedData = await window.FinderApi.depthConverter({
+          dataList: [["", ["", holeName, sectionName, distance], targetId]],
+          options,
+        });
         await window.FinderApi.rendererLog(calcedData);
         //apply
         document.getElementById("ddInput").value        = Math.round(calcedData.dd * 10) / 10;
@@ -367,7 +370,10 @@ document.addEventListener("DOMContentLoaded", () => {
           
         }
 
-        calcedData = await window.FinderApi.depthConverter([["", cd, targetId]], options);
+        calcedData = await window.FinderApi.depthConverter({
+          dataList: [["", cd, targetId]],
+          options,
+        });
         console.log(calcedData)
         //await window.FinderApi.rendererLog(calcedData); 
         if(calcedData.hole == holeName){
@@ -414,7 +420,11 @@ document.addEventListener("DOMContentLoaded", () => {
             holeName    = holeList[document.getElementById("holeOptions").value][2];
             sectionId   = sectionList[document.getElementById("holeOptions").value][document.getElementById("sectionOptions").value][1];
             sectionName = sectionList[document.getElementById("holeOptions").value][document.getElementById("sectionOptions").value][2];
-            const secLimit = await window.FinderApi.getSectionLimit([sectionId[0], null, null, null],holeName,sectionName);
+            const secLimit = await window.FinderApi.getSectionLimit({
+              projectId: [sectionId[0], null, null, null],
+              holeName,
+              sectionName,
+            });
             const topDistance    = secLimit[0];
 
             //calc
@@ -424,7 +434,10 @@ document.addEventListener("DOMContentLoaded", () => {
               polationType: "linear",  
               allowOutside: false
             };
-            calcedData = await window.FinderApi.depthConverter([["", ["", holeName, sectionName, topDistance], targetId]], options);
+            calcedData = await window.FinderApi.depthConverter({
+              dataList: [["", ["", holeName, sectionName, topDistance], targetId]],
+              options,
+            });
             await window.FinderApi.rendererLog(calcedData);
             //apply
             document.getElementById("distanceInput").value  = isNaN(calcedData.distance) ? "" : Math.round(calcedData.distance * 10) / 10;
@@ -439,7 +452,11 @@ document.addEventListener("DOMContentLoaded", () => {
             holeName    = holeList[document.getElementById("holeOptions").value][2];
             sectionId   = sectionList[document.getElementById("holeOptions").value][document.getElementById("sectionOptions").value][1];
             sectionName = sectionList[document.getElementById("holeOptions").value][document.getElementById("sectionOptions").value][2];
-            const secLimit = await window.FinderApi.getSectionLimit([sectionId[0], null, null, null],holeName,sectionName);
+            const secLimit = await window.FinderApi.getSectionLimit({
+              projectId: [sectionId[0], null, null, null],
+              holeName,
+              sectionName,
+            });
             const topDistance    = secLimit[1];
 
             //calc
@@ -449,7 +466,10 @@ document.addEventListener("DOMContentLoaded", () => {
               polationType: "linear",  
               allowOutside: false
             };
-            calcedData = await window.FinderApi.depthConverter([["", ["", holeName, sectionName, topDistance], targetId]], options);
+            calcedData = await window.FinderApi.depthConverter({
+              dataList: [["", ["", holeName, sectionName, topDistance], targetId]],
+              options,
+            });
             await window.FinderApi.rendererLog(calcedData);
             //apply
             document.getElementById("ddInput").value        = Math.round(calcedData.dd * 10) / 10;
@@ -463,7 +483,11 @@ document.addEventListener("DOMContentLoaded", () => {
             holeName    = holeList[document.getElementById("holeOptions").value][2];
             sectionId   = sectionList[document.getElementById("holeOptions").value][document.getElementById("sectionOptions").value][1];
             sectionName = sectionList[document.getElementById("holeOptions").value][document.getElementById("sectionOptions").value][2];
-            const secLimit = await window.FinderApi.getSectionLimit([sectionId[0], null, null, null],holeName,sectionName);
+            const secLimit = await window.FinderApi.getSectionLimit({
+              projectId: [sectionId[0], null, null, null],
+              holeName,
+              sectionName,
+            });
             const topDistance    = (secLimit[0] + secLimit[1]) / 2;
 
             //calc
@@ -473,7 +497,10 @@ document.addEventListener("DOMContentLoaded", () => {
               polationType: "linear",  
               allowOutside: false
             };
-            calcedData = await window.FinderApi.depthConverter([["", ["", holeName, sectionName, topDistance], targetId]], options);
+            calcedData = await window.FinderApi.depthConverter({
+              dataList: [["", ["", holeName, sectionName, topDistance], targetId]],
+              options,
+            });
             await window.FinderApi.rendererLog(calcedData);
             //apply
             document.getElementById("ddInput").value        = Math.round(calcedData.dd * 10) / 10;
@@ -508,7 +535,10 @@ document.addEventListener("DOMContentLoaded", () => {
         targetId = [sectionId[0],sectionId[1],null,null];//extrapolate nearest section
       }
       
-      calcedData = await window.FinderApi.depthConverter([["finder_from_cd", cd, targetId]], options);
+      calcedData = await window.FinderApi.depthConverter({
+        dataList: [["finder_from_cd", cd, targetId]],
+        options,
+      });
       //window.FinderApi.rendererLog(calcedData);
 
       //apply//calc(data[2]);
@@ -558,7 +588,10 @@ document.addEventListener("DOMContentLoaded", () => {
         //targetId = sectionId;//extraplate same section
         targetId = [sectionId[0],sectionId[1],null,null];//extrapolate nearest section
       }
-      calcedData = await window.FinderApi.depthConverter([["finder_from_efd", efd, targetId]], options);
+      calcedData = await window.FinderApi.depthConverter({
+        dataList: [["finder_from_efd", efd, targetId]],
+        options,
+      });
       //await window.FinderApi.rendererLog(calcedData);
 
       //apply
@@ -607,7 +640,10 @@ document.addEventListener("DOMContentLoaded", () => {
         //targetId = sectionId;//extraplate same section
         targetId = [sectionId[0],sectionId[1],null,null];//extrapolate nearest section
       }
-      calcedData = await window.FinderApi.depthConverter([["", age, targetId]], options);
+      calcedData = await window.FinderApi.depthConverter({
+        dataList: [["", age, targetId]],
+        options,
+      });
       await window.FinderApi.rendererLog(calcedData);
 
       //apply
@@ -671,7 +707,7 @@ document.addEventListener("DOMContentLoaded", () => {
         age: calcedData.age_mid,
       };
 
-      await window.FinderApi.MoveToHorizon(send_data);
+      await window.FinderApi.MoveToHorizon({ data: send_data });
     }
 
     //update
@@ -703,7 +739,7 @@ document.addEventListener("DOMContentLoaded", () => {
       //document.getElementById("fix").style.backgroundColor = "lightgray";
       document.getElementById("fix").querySelector("img").src = resourceData.finder["fixed"];
     }
-    window.FinderApi.changeFix(isFix);
+    window.FinderApi.changeFix({ isFix });
   });
   //-------------------------------------------------------------------------------------------
   document.getElementById("link").addEventListener("click", async (event) => {
@@ -734,7 +770,7 @@ document.addEventListener("DOMContentLoaded", () => {
         event_free_depth: Math.round(document.getElementById("efdInput").value * 10) / 10,
         age: Math.round(document.getElementById("ageInput").value * 10) / 10,
       };
-      await window.FinderApi.MoveToHorizon(send_data);
+      await window.FinderApi.MoveToHorizon({ data: send_data });
         
     }
   });
@@ -765,7 +801,10 @@ document.addEventListener("DOMContentLoaded", () => {
           allowOutside: false
         };
 
-        const calcedData = await window.FinderApi.depthConverter([["finder_from_dd", data.y, [data.project, data.hole,data.section,null]]], options);
+        const calcedData = await window.FinderApi.depthConverter({
+          dataList: [["finder_from_dd", data.y, [data.project, data.hole,data.section,null]]],
+          options,
+        });
 
         document.getElementById("holeOptions").value = data.holeIdx;
         updateSectionList();
@@ -834,7 +873,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }
 
         //save
-        await window.FinderApi.saveBookmarks(bookmarks);
+        await window.FinderApi.saveBookmarks({ bookmarks });
       }
     
   });
@@ -846,9 +885,11 @@ document.addEventListener("DOMContentLoaded", () => {
     }
     const response = await window.FinderApi.askdialog(
       {
-        title:"Delete bookmark",
-        message:"Are you sure you want to delete this bookmark?",
-        parent:"finder"
+        opts: {
+          title:"Delete bookmark",
+          message:"Are you sure you want to delete this bookmark?",
+          parent:"finder"
+        }
       }
     );
 
@@ -873,7 +914,7 @@ document.addEventListener("DOMContentLoaded", () => {
       }
 
       //save
-      await window.FinderApi.saveBookmarks(bookmarks);
+      await window.FinderApi.saveBookmarks({ bookmarks });
     }
   });
   document.getElementById("bookmarksOptions").addEventListener("change", async (event) => {
@@ -946,6 +987,23 @@ document.addEventListener("DOMContentLoaded", () => {
       holeCount: document.getElementById("holeOptions").options.length,
       sectionCount: document.getElementById("sectionOptions").options.length,
     }),
+    getCurrentSectionLimit: async () => {
+      const holeIndex = document.getElementById("holeOptions").value;
+      const sectionIndex = document.getElementById("sectionOptions").value;
+      const holeName = holeList[holeIndex][2];
+      const sectionName = sectionList[holeIndex][sectionIndex][2];
+      const sectionId = sectionList[holeIndex][sectionIndex][1];
+      const sectionLimit = await window.FinderApi.getSectionLimit({
+        projectId: [sectionId[0], null, null, null],
+        holeName,
+        sectionName,
+      });
+      return {
+        holeName,
+        sectionName,
+        sectionLimit,
+      };
+    },
   };
   //-------------------------------------------------------------------------------------------
 });

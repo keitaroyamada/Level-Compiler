@@ -331,7 +331,9 @@ document.addEventListener("DOMContentLoaded", () => {
       }
 
       //convert
-      const result = await window.ConverterApi.cvtConverter(await zip(sendData));
+      const result = await window.ConverterApi.cvtConverter({
+        options: await zip(sendData),
+      });
       
       if(result.ok){
         console.log("[Converter]: Converted data is exported successfully.");
@@ -401,16 +403,16 @@ document.addEventListener("DOMContentLoaded", () => {
     //const result = await window.ConverterApi.progressbar("Depth converter", "Now loading...", true, "converterWindow");
 
     let numRows = 0;
-    const zippedResults = await window.ConverterApi.cvtLoadCsv(
-      "Please select the conversion target data",
-      [
+    const zippedResults = await window.ConverterApi.cvtLoadCsv({
+      title: "Please select the conversion target data",
+      ext: [
         {
           name: "CSV file",
           extensions: ["csv"],
         },
       ],
-      path
-    );
+      pathData: path,
+    });
       const unzippedResults = await unzip(zippedResults);
 
       source_data = unzippedResults.data;
@@ -561,5 +563,74 @@ document.addEventListener("DOMContentLoaded", () => {
       outputType: output_type,
       calledFrom: called_from,
     }),
+    loadCsvFromPath: async (inputPath) => {
+      await loadCsv(inputPath);
+      const chooserCount = document.querySelectorAll("[id^='depth_chooser']").length;
+      return {
+        path: loadedpath,
+        counts: source_data == null ? 0 : source_data.length,
+        previewRows: Array.isArray(source_data) ? source_data.length : 0,
+        chooserCount,
+      };
+    },
+    runConverterPayload: async () => {
+      for (let i = 0; i < 20; i++) {
+        if (document.getElementById("depth_chooser0") != null) {
+          break;
+        }
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      }
+
+      const sourceType = document.getElementById("cvt_source_type").value;
+      const sendData = {
+        id: dataId,
+        sourceType,
+        polationType: "linear",
+        returnType: "min",
+        headerLines,
+        outType: "import",
+        allowOutside: true,
+        isForceCalculation: true,
+        callFrom: "converter",
+        isZip: true,
+        precision: 1,
+      };
+      const chooser0 = document.getElementById("depth_chooser0");
+      if (chooser0 == null) {
+        return { ok: false, reason: "source chooser is not ready." };
+      }
+
+      if (sourceType === "age") {
+        sendData.nameIdx = parseInt(chooser0.value);
+        sendData.ageIdx = parseInt(document.getElementById("depth_chooser1").value);
+        sendData.dataStartFrom = Math.max(...[sendData.nameIdx, sendData.ageIdx]);
+      } else if (sourceType === "trinity") {
+        sendData.nameIdx = parseInt(chooser0.value);
+        sendData.holeIdx = parseInt(document.getElementById("depth_chooser1").value);
+        sendData.sectionIdx = parseInt(document.getElementById("depth_chooser2").value);
+        sendData.distanceIdx = parseInt(document.getElementById("depth_chooser3").value);
+        sendData.dataStartFrom = Math.max(
+          ...[sendData.nameIdx, sendData.holeIdx, sendData.sectionIdx, sendData.distanceIdx]
+        );
+      } else if (sourceType === "composite_depth") {
+        sendData.nameIdx = parseInt(chooser0.value);
+        sendData.cdIdx = parseInt(document.getElementById("depth_chooser1").value);
+        sendData.dataStartFrom = Math.max(...[sendData.nameIdx, sendData.cdIdx]);
+      } else if (sourceType === "event_free_depth") {
+        sendData.nameIdx = parseInt(chooser0.value);
+        sendData.efdIdx = parseInt(document.getElementById("depth_chooser1").value);
+        sendData.dataStartFrom = Math.max(...[sendData.nameIdx, sendData.efdIdx]);
+      } else if (sourceType === "drilling_depth") {
+        sendData.nameIdx = parseInt(chooser0.value);
+        sendData.ddIdx = parseInt(document.getElementById("depth_chooser1").value);
+        sendData.dataStartFrom = Math.max(...[sendData.nameIdx, sendData.ddIdx]);
+      } else {
+        return { ok: false, reason: `unsupported_source_type:${sourceType}` };
+      }
+
+      return window.ConverterApi.cvtConverter({
+        options: await zip(sendData),
+      });
+    },
   };
 });

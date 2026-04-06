@@ -14,6 +14,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   //model source path
   let age_model_list = []; //for reload
+  let lcE2ELastPlotPayload = null;
 
   //p5(vector) canvas
   let vectorObjects = null; //p5 instance data
@@ -380,7 +381,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
 
       if(N>0){
-        await window.LCapi.progressbar("Load models", "Now chacking...", true);
+        await window.LCapi.progressbar({ title: "Load models", text: "Now chacking...", indeterminate: true });
       }
 
       for(let i=0;i<order.length;i++){
@@ -388,55 +389,27 @@ document.addEventListener("DOMContentLoaded", () => {
         if(droppedData.type == "lcmodel"){
           numModel--;
           console.log("[Renderer]: LCmodel load from drop..");
-          //await initialiseCorrelationModel();
-          //await initialiseAgeModel();
-          await initialiseCanvas();
-          //await initialisePlot();
-          //modelImages = initialiseImages();
-          //await initialisePaths();
-
-          //load into LCCore (load process is in receive("RegisteredLCModel")
-          await registerLCModel(droppedData.path);
-          //load registered model from main to renderer with making up hole list view
-          if(numModel===0){
-            //if load all model
-            await loadModel(true, true);
-            //updateView();
-            const selected_age_model_id = document.getElementById("AgeModelSelect").value; 
-            await loadAge(selected_age_model_id);//load age data included LCCore
-
-            await loadPlotData("age");
-            await loadPlotData("data")
-          }
+          await importLcModelSource(droppedData.path, {
+            resetCanvas: true,
+            syncRendererState: numModel === 0,
+          });
           
         }else if(droppedData.type == "csv"){
           if(droppedData.name.includes("[correlation]") || droppedData.name.includes("[duo]") ){
             numModel--;
             //case model file
             console.log("[Renderer]: Correlation model file load from drop.");
-            //register correlation model
             console.log(droppedData.path)
-            await registerModel(droppedData.path);
-
-            if(numModel===0){
-              //if load all model
-              await loadModel(true, true);
-            }
+            await importCorrelationModelSource(droppedData.path, {
+              syncRendererState: numModel === 0,
+            });
           } else if(droppedData.name.includes("[age]")){
 
             //case age file
             console.log("[Renderer]: Age model file load from drop.");
-            //register age model
-            await registerAge(droppedData.path);
-
-            if(age_model_list.length >0){
-              document.getElementById("AgeModelSelect").value = age_model_list[age_model_list.length-1].id;
-              await loadAge(age_model_list[age_model_list.length-1].id);
-
-              await loadPlotData("age");//age plot
-              await loadPlotData("data")
-            }
-            updateView();
+            await importAgeModelSource(droppedData.path, {
+              syncRendererState: true,
+            });
           }
         }else if(droppedData.type == "lcsection"){
           const result = await window.LCapi.addSectionFromLcsection(droppedData.path);
@@ -454,22 +427,25 @@ document.addEventListener("DOMContentLoaded", () => {
           //case core image
           const response = await window.LCapi.askdialog(
             {
-              title: "Load core images",
-              message: "Do you want to load the core images?",
-              parent: "main"
+              opts: {
+                title: "Load core images",
+                message: "Do you want to load the core images?",
+                parent: "main"
+              }
             }
           );
 
           if (response.response) {
             await window.LCapi.clearProgressbar()
             console.log("[Renderer]: Directory load from drop..");
-            //register dir path
-            await window.LCapi.RegisterCoreImage(droppedData.path, "core_images");
-
-            //load images
-            modelImages = await loadCoreImages(modelImages, LCCore, objOpts, ["drilling_depth","composite_depth","event_free_depth","age"]);
-            document.getElementById("bt_core_photo").click();
-            console.log(modelImages)
+            const imported = await importCoreImagesSource(droppedData.path, {
+              depthScales: ["drilling_depth","composite_depth","event_free_depth","age"],
+              togglePhoto: true,
+            });
+            if (!imported.ok) {
+              await window.LCapi.clearProgressbar()
+              return
+            }
           }
 
         }      
@@ -500,11 +476,11 @@ document.addEventListener("DOMContentLoaded", () => {
       if (!dividerEnable) {
         dividerEnable = true;
         document.getElementById("bt_divider").style.backgroundColor = "#ccc";
-        await LCapi.OpenDivider("OpenDivider", async () => {});
+        await LCapi.OpenDivider();
       } else {
         dividerEnable = false;
         document.getElementById("bt_divider").style.backgroundColor = "#f0f0f0";
-        await LCapi.CloseDivider("CloseDvider", async () => {});
+        await LCapi.CloseDivider();
       }
     }
   });
@@ -766,9 +742,11 @@ document.addEventListener("DOMContentLoaded", () => {
   window.LCapi.receive("UnLoadModelsMenuClicked", async () => {
     const response = await window.LCapi.Confirm(
       {
-        title:"Confirm",
-        message:"Are you sure you want to clear the loaded models?",
-        parent: "main"
+        opts: {
+          title:"Confirm",
+          message:"Are you sure you want to clear the loaded models?",
+          parent: "main"
+        }
       }
     );
     if (response) {
@@ -893,10 +871,11 @@ document.addEventListener("DOMContentLoaded", () => {
   //============================================================================================
   window.LCapi.receive("PlotDataOptions", async (data) => {
      console.log("[Renderer]: Plot options are received.", data)
+     lcE2ELastPlotPayload = data;
 
      try{
       
-      if(LCPlotData.draw_collections){
+      if(LCPlotData?.draw_collections){
         LCPlotData.draw_collections = [];
       }      
 
@@ -918,7 +897,7 @@ document.addEventListener("DOMContentLoaded", () => {
       const invalidSet = new Set(objOpts.plot.invalid_values);
 
       //calc plotvaluse
-      if(objOpts.plotter.selected_options !== null && LCPlotData.data_collections.length>0){
+      if(objOpts.plotter.selected_options !== null && (LCPlotData?.data_collections?.length ?? 0) > 0){
         // clac each datasets
         const selectedList = objOpts.plotter.selected_options;
         for(let t=0; t< selectedList.length; t++){
@@ -1128,7 +1107,11 @@ document.addEventListener("DOMContentLoaded", () => {
           console.log("[Renderer]: Plot data is loaded.")
         }
       }else{
-        console.log("[Renderer]: There is no plot data or information: ", objOpts.plotter.selected_options, LCPlotData.data_collections)
+        console.log(
+          "[Renderer]: There is no plot data or information: ",
+          objOpts.plotter.selected_options,
+          LCPlotData?.data_collections ?? null
+        )
       }
            
       updateView();
@@ -1189,12 +1172,12 @@ document.addEventListener("DOMContentLoaded", () => {
     if(objOpts.edit.hittest==null) return
     if(objOpts.edit.hittest.hole!==null){
       if(objOpts.edit.hittest.section!==null){
-        clickResult = await window.LCapi.showContextMenu("sectionContextMenu");
+        clickResult = await window.LCapi.showContextMenu({ type: "sectionContextMenu" });
       }else{
-        clickResult = await window.LCapi.showContextMenu("holeContextMenu");
+        clickResult = await window.LCapi.showContextMenu({ type: "holeContextMenu" });
       }
     }else{
-      clickResult = await window.LCapi.showContextMenu("normalContextMenu");  
+      clickResult = await window.LCapi.showContextMenu({ type: "normalContextMenu" });  
     }
 
     if(clickResult==null){
@@ -1295,7 +1278,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
             console.log("[Renderer]: Send section properties: ", sectionProperties)
 
-            await window.LCapi.sendSettings(sectionProperties, "settings");
+            await window.LCapi.sendSettings({
+              sendData: sectionProperties,
+              to: "settings",
+            });
           }
         }
       }      
@@ -1335,7 +1321,7 @@ document.addEventListener("DOMContentLoaded", () => {
   async function handleEditContextmenu(event) {
     event.preventDefault();
 
-    const clickResult = await window.LCapi.showContextMenu("editContextMenu");
+    const clickResult = await window.LCapi.showContextMenu({ type: "editContextMenu" });
     if(clickResult==null) return
 
     if(clickResult == "connectMarkers"){
@@ -1485,7 +1471,11 @@ document.addEventListener("DOMContentLoaded", () => {
           };
           const response = await window.LCapi.inputdialog(askData);
           if(response !== null){
-            const result = await window.LCapi.changeMarker(targetId, "descriptions",response);
+            const result = await window.LCapi.changeMarker({
+              markerId: targetId,
+              type: "descriptions",
+              value: response,
+            });
             if(result == true){
               console.log("[Renderer]: Chnage marker descriptions.")
               await loadModel(false, false);
@@ -1565,7 +1555,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
             console.log("[Renderer]: Send section properties: ", sectionProperties)
 
-            await window.LCapi.sendSettings(sectionProperties, "settings");
+            await window.LCapi.sendSettings({
+              sendData: sectionProperties,
+              to: "settings",
+            });
           }
         }
       }   
@@ -1600,7 +1593,11 @@ document.addEventListener("DOMContentLoaded", () => {
           };
           const response = await window.LCapi.inputdialog(askData);
           if(response !== null){
-            const result = await window.LCapi.changeSection(targetId, "descriptions",response);
+            const result = await window.LCapi.changeSection({
+              sectionId: targetId,
+              type: "descriptions",
+              value: response,
+            });
             if(result == true){
               console.log("[Renderer]: Chnage section descriptions.")
               await loadModel(false,false);
@@ -1662,7 +1659,11 @@ document.addEventListener("DOMContentLoaded", () => {
           };
           const response = await window.LCapi.inputdialog(askData);
           if(response !== null){
-            const result = await window.LCapi.changeHole(targetId, "descriptions",response);
+            const result = await window.LCapi.changeHole({
+              holeId: targetId,
+              type: "descriptions",
+              value: response,
+            });
             if(result == true){
               console.log("[Renderer]: Chnage hole descriptions.")
               await loadModel(false,false);
@@ -1763,7 +1764,11 @@ document.addEventListener("DOMContentLoaded", () => {
           };
           const response = await window.LCapi.inputdialog(askData);
           if(response !== null){
-            const result = await window.LCapi.changeProject(targetId, "descriptions",response);
+            const result = await window.LCapi.changeProject({
+              projectId: targetId,
+              type: "descriptions",
+              value: response,
+            });
             if(result == true){
               console.log("[Renderer]: Chnage project descriptions.")
               await loadModel(false,false);
@@ -1774,9 +1779,11 @@ document.addEventListener("DOMContentLoaded", () => {
     }else if(clickResult == "mergeProjects"){
       const response = await window.LCapi.askdialog(
         {
-          title:"Merge all projects",
-          message:"Are you sure you want to merge all the projects?",
-          parent: "main"
+          opts: {
+            title:"Merge all projects",
+            message:"Are you sure you want to merge all the projects?",
+            parent: "main"
+          }
         }        
       );
       if (response.response) {
@@ -1824,7 +1831,11 @@ document.addEventListener("DOMContentLoaded", () => {
           const response = await window.LCapi.inputdialog(askData);
 
           if(response !== null){
-            const result = await window.LCapi.changeProject(targetId, "model_type",response.toString());
+            const result = await window.LCapi.changeProject({
+              projectId: targetId,
+              type: "model_type",
+              value: response.toString(),
+            });
             if(result === true){
               console.log("[Renderer]: Chnage project type.")
               await loadModel(false,false);
@@ -1871,7 +1882,7 @@ document.addEventListener("DOMContentLoaded", () => {
       const targetId = [objOpts.edit.hittest.project, objOpts.edit.hittest.hole,objOpts.edit.hittest.section,null];
       if(Object.keys(modelImages["drilling_depth"]).length>0){
         console.log("Renderer: openfloating image viewer");
-        await window.LCapi.floatingImageViewer(targetId);
+        await window.LCapi.floatingImageViewer({ targetId });
       }
     }else if(clickResult.includes("holeMoveTo")){
       const minHoleOrder = Math.min(...LCCore.projects.flatMap(p => p.holes.map(h => h.order)));
@@ -1921,7 +1932,11 @@ document.addEventListener("DOMContentLoaded", () => {
       if(targetIds.length == 2){
         console.log("renderer: Change order "+ targetIds[0] +"<->"+targetIds[1]);        
 
-        const result = await window.LCapi.changeHole(targetIds[0], "order", targetIds[1]);
+        const result = await window.LCapi.changeHole({
+          holeId: targetIds[0],
+          type: "order",
+          value: targetIds[1],
+        });
         if(result == true){
           await undo("save", "Change Hole Order");//undo
           console.log("[Renderer]: Chnage hole order.")
@@ -1960,7 +1975,10 @@ document.addEventListener("DOMContentLoaded", () => {
         };
         const response = await window.LCapi.inputdialog(askData);
         if(response !== null){
-          const result = await window.LCapi.changeWorkspace("name",response);
+          const result = await window.LCapi.changeWorkspace({
+            type: "name",
+            value: response,
+          });
           if(result == true){
             console.log("[Renderer]: Chnage workspace name.")
             await loadModel(false,false);
@@ -1979,7 +1997,10 @@ document.addEventListener("DOMContentLoaded", () => {
         };
         const response = await window.LCapi.inputdialog(askData);
         if(response !== null){
-          const result = await window.LCapi.changeWorkspace("descriptions",response);
+          const result = await window.LCapi.changeWorkspace({
+            type: "descriptions",
+            value: response,
+          });
           if(result == true){
             console.log("[Renderer]: Chnage workspace descriptions.")
             await loadModel(false,false);
@@ -2083,9 +2104,11 @@ document.addEventListener("DOMContentLoaded", () => {
       if(objOpts.edit.mode == "connect_marker"){
         const response = await window.LCapi.askdialog(
           {
-            title:"Connect markers",
-            message:"Do you want to CONNECT between selected markers?",
-            parent: "main"
+            opts: {
+              title:"Connect markers",
+              message:"Do you want to CONNECT between selected markers?",
+              parent: "main"
+            }
           }
         );
         if (response.response) {
@@ -2095,7 +2118,11 @@ document.addEventListener("DOMContentLoaded", () => {
           
           console.log("[Editor]: Connected markers between " + fromId +" and " + toId);
           
-          const result = await window.LCapi.connectMarkers(fromId, toId, "horizontal");
+          const result = await window.LCapi.connectMarkers({
+            fromId,
+            toId,
+            direction: "horizontal",
+          });
                     
           if(result==true){
             await undo("save","Connect Markers");//undo
@@ -2127,9 +2154,11 @@ document.addEventListener("DOMContentLoaded", () => {
       } else if(objOpts.edit.mode == "connect_section"){
         const response = await window.LCapi.askdialog(
           {
-            title:"Connect markers",
-            message:"Do you want to CONNECT between selected sections?",
-            parent: "main"
+            opts: {
+              title:"Connect markers",
+              message:"Do you want to CONNECT between selected sections?",
+              parent: "main"
+            }
           }
         );
         if (response.response) {
@@ -2141,7 +2170,11 @@ document.addEventListener("DOMContentLoaded", () => {
           let result = null;
           if(fromId[0] == toId[0] && fromId[1] == toId[1] && fromId[2] !== toId[2]){
             //case connect vertival
-            result = await window.LCapi.connectMarkers(fromId, toId, "vertical");
+            result = await window.LCapi.connectMarkers({
+              fromId,
+              toId,
+              direction: "vertical",
+            });
           }
           console.log(result)
           
@@ -2163,9 +2196,11 @@ document.addEventListener("DOMContentLoaded", () => {
       } else if(objOpts.edit.mode == "disconnect_section"){
         const response = await window.LCapi.askdialog(
           {
-            title:"Connect markers",
-            message:"Do you want to DISCONNECT between selected sections?",
-            parent: "main"
+            opts: {
+              title:"Connect markers",
+              message:"Do you want to DISCONNECT between selected sections?",
+              parent: "main"
+            }
           }
         );
         if (response.response) {
@@ -2176,7 +2211,11 @@ document.addEventListener("DOMContentLoaded", () => {
           
           if(fromId[0] == toId[0] && fromId[1] == toId[1] && fromId[2] !== toId[2]){
             //case connect vertival
-            result = await window.LCapi.disconnectMarkers(fromId, toId, "vertical");
+            result = await window.LCapi.disconnectMarkers({
+              fromId,
+              toId,
+              direction: "vertical",
+            });
           }
           if(result == true){
             await undo("save","Disconnect Sections");//undo
@@ -2293,9 +2332,11 @@ document.addEventListener("DOMContentLoaded", () => {
           if(objOpts.edit.marker_from.markerName.includes("-top") || objOpts.edit.marker_from.markerName.includes("-bottom")){
             response = await window.LCapi.askdialog(
               {
-                title:"Reserved Name Change Warning",
-                message:"You are attempting to change a name that is reserved by system rules. Do you want to proceed with this change?",
-                parent: "main"
+                opts: {
+                  title:"Reserved Name Change Warning",
+                  message:"You are attempting to change a name that is reserved by system rules. Do you want to proceed with this change?",
+                  parent: "main"
+                }
               }
             );
 
@@ -2344,7 +2385,11 @@ document.addEventListener("DOMContentLoaded", () => {
         if (response !== null) {
           const targetId = [ht.project, ht.hole, ht.section, ht.nearest_marker];
           
-          const result = await window.LCapi.changeMarker(targetId, target, response);
+          const result = await window.LCapi.changeMarker({
+            markerId: targetId,
+            type: target,
+            value: response,
+          });
           if(result == true){
             await undo("save","Change Marker "+target.charAt(0).toUpperCase() + target.slice(1));//undo
             await loadModel(false,false);
@@ -2393,7 +2438,10 @@ document.addEventListener("DOMContentLoaded", () => {
         }
         
         //apply        
-        const result = await window.LCapi.SetMaster(targetId, "enable");
+        const result = await window.LCapi.SetMaster({
+          markerId: targetId,
+          type: "enable",
+        });
         if(result==true){
           await undo("save","Set Master");//undo
           await loadModel(false, false);
@@ -2419,7 +2467,10 @@ document.addEventListener("DOMContentLoaded", () => {
         const targetId = [ht.project, ht.hole, ht.section, ht.nearest_marker];
         console.log(targetId)
         
-        const result = await window.LCapi.SetMaster(targetId, "disable");
+        const result = await window.LCapi.SetMaster({
+          markerId: targetId,
+          type: "disable",
+        });
         if(result==true){
           await undo("save","Unset Master");//undo
           await loadModel(false,false);
@@ -2451,9 +2502,11 @@ document.addEventListener("DOMContentLoaded", () => {
         if(isExistZeroPoint == true){
           response = await window.LCapi.askdialog(
             {
-              title:"Set Zero Point",
-              message: "The Zero point has alrady been defined. Do you want to replace this?",
-              parent: "main"
+              opts: {
+                title:"Set Zero Point",
+                message: "The Zero point has alrady been defined. Do you want to replace this?",
+                parent: "main"
+              }
             }
           );
         }
@@ -2473,7 +2526,10 @@ document.addEventListener("DOMContentLoaded", () => {
           const targetId = [ht.project, ht.hole, ht.section, ht.nearest_marker];
           //console.log(targetId,response)
           
-          const result = await window.LCapi.SetZeroPoint(targetId, response);
+          const result = await window.LCapi.SetZeroPoint({
+            markerId: targetId,
+            value: response,
+          });
           if(result==true){
             await undo("save","Set Zero Point");//undo
             await loadModel(false,false);
@@ -2490,9 +2546,11 @@ document.addEventListener("DOMContentLoaded", () => {
       }else if (objOpts.edit.mode == "disconnect_marker"){
           const response = await window.LCapi.askdialog(
             {
-              title:"Disconnect markers",
-              message:"Do you want to DISCONNECT connections in this marker?",
-              parent: "main"
+              opts: {
+                title:"Disconnect markers",
+                message:"Do you want to DISCONNECT connections in this marker?",
+                parent: "main"
+              }
             }
           );
           if (response.response) {
@@ -2502,7 +2560,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
             console.log("[Editor]: Disconnected connections in " + fromId);
             
-            const result = await window.LCapi.disconnectAllConnections(fromId, "horizontal");
+            const result = await window.LCapi.disconnectAllConnections({
+              fromId,
+              direction: "horizontal",
+            });
             if(result.success > 0 && result.failure == 0){
               console.log("[Renderer]: Disconnected markers");
             }else if(result.success > 0 && result.failure > 0){
@@ -2603,9 +2664,11 @@ document.addEventListener("DOMContentLoaded", () => {
       if(objOpts.edit.mode == "delete_marker"){
         const response = await window.LCapi.askdialog(
           {
-            title:"Delete markers",
-            message:"Do you want to DELETE the selected marker?",
-            parent: "main"
+            opts: {
+              title:"Delete markers",
+              message:"Do you want to DELETE the selected marker?",
+              parent: "main"
+            }
           }
         );
         if (response.response) {
@@ -2613,7 +2676,9 @@ document.addEventListener("DOMContentLoaded", () => {
           
           console.log("[Editor]: Delete marker: " + fromId);
           
-          const result = await window.LCapi.deleteMarker(fromId);
+          const result = await window.LCapi.deleteMarker({
+            markerId: fromId,
+          });
           if(result==true){
             await undo("save","Delete Marker");//undo
             await loadModel(false,false);
@@ -2667,9 +2732,11 @@ document.addEventListener("DOMContentLoaded", () => {
       isProcessing = true;
       const response = await window.LCapi.askdialog(
         {
-          title:"Add new markers",
-          message:"Do you want to ADD a new marker?",
-          parent: "main"
+          opts: {
+            title:"Add new markers",
+            message:"Do you want to ADD a new marker?",
+            parent: "main"
+          }
         }
       );
       if (response.response) {
@@ -2679,7 +2746,12 @@ document.addEventListener("DOMContentLoaded", () => {
         const sectionId = [objOpts.edit.marker_from.project, objOpts.edit.marker_from.hole, objOpts.edit.marker_from.section, null];
         console.log("[Editor]: Add marker between " + upperId +" and "+lowerId);
         
-        const result = await window.LCapi.addMarker(sectionId, objOpts.edit.marker_from.y, objOpts.canvas.depth_scale, ht.relative_x);
+        const result = await window.LCapi.addMarker({
+          sectionId,
+          depth: objOpts.edit.marker_from.y,
+          depthScale: objOpts.canvas.depth_scale,
+          relativeX: ht.relative_x,
+        });
         if(result == true){
           await undo("save","Add Marker");//undo
           await loadModel(false,false);
@@ -2803,10 +2875,20 @@ document.addEventListener("DOMContentLoaded", () => {
           let result = null;
           if(["deposition","d","markup","m"].includes(response1.toLowerCase())){
             if(["general","tephra","disturbed","void","g","t","d","v"].includes(response2.toLowerCase())){
-              result = await window.LCapi.AddEvent(upperId, lowerId, response1, response2);
+              result = await window.LCapi.AddEvent({
+                upperId,
+                lowerId,
+                depositionType: response1,
+                value: response2,
+              });
             }
           }else  if(["erosion","e"].includes(response1.toLowerCase())){
-            result = await window.LCapi.AddEvent(upperId, [], response1, response2);
+            result = await window.LCapi.AddEvent({
+              upperId,
+              lowerId: [],
+              depositionType: response1,
+              value: response2,
+            });
           }
 
           if(result == true){
@@ -2834,9 +2916,11 @@ document.addEventListener("DOMContentLoaded", () => {
     }else if(objOpts.edit.mode == "delete_event"){
       const response = await window.LCapi.askdialog(
         {
-          title:"Delete event", 
-          message:"Are you sure you want to REMOVE all events?",
-          parent: "main"
+          opts: {
+            title:"Delete event", 
+            message:"Are you sure you want to REMOVE all events?",
+            parent: "main"
+          }
         }
       );
       if(response.response){
@@ -2845,7 +2929,11 @@ document.addEventListener("DOMContentLoaded", () => {
         
         console.log("[Renderer]: Deleting event between ",upperId,lowerId);
 
-        result = await window.LCapi.DeleteEvent(upperId, lowerId,[]);
+        result = await window.LCapi.DeleteEvent({
+          upperId,
+          lowerId,
+          type: [],
+        });
         if(result == true){
           await undo("save","Delete Event");//undo
           await loadModel(false,false);
@@ -2932,7 +3020,11 @@ document.addEventListener("DOMContentLoaded", () => {
       if (response !== null) {
         const targetId = [ht.project, ht.hole, ht.section, null];
         
-        const result = await window.LCapi.changeSection(targetId, target, response);
+        const result = await window.LCapi.changeSection({
+          sectionId: targetId,
+          type: target,
+          value: response,
+        });
         if(result=="used"){
           console.log(`[Renderer]: "${response}" is already in use. Please enter a unique name.`);
           alert(`"${response}" is already in use. Please enter a unique name.`);
@@ -2966,15 +3058,19 @@ document.addEventListener("DOMContentLoaded", () => {
       isProcessing = true;
       const response = await window.LCapi.askdialog(
         {
-          title:"Delete section",
-          message:"Do you want to delete the section?",
-          parent: "main"
+          opts: {
+            title:"Delete section",
+            message:"Do you want to delete the section?",
+            parent: "main"
+          }
         }
       );
       if (response.response) {
         const targetId = [ht.project, ht.hole, ht.section, null];
         
-        const result = await window.LCapi.deleteSection(targetId);
+        const result = await window.LCapi.deleteSection({
+          sectionId: targetId,
+        });
         if(result){
           await undo("save","Delete Section");//undo
           await loadModel(false,false);
@@ -3058,7 +3154,10 @@ document.addEventListener("DOMContentLoaded", () => {
         if(inData.distance_top<inData.distance_bottom && inData.dd_top<inData.dd_bottom){
           const targetId = [ht.project, ht.hole, null, null];
                   
-          const result = await window.LCapi.addSection(targetId, inData);
+          const result = await window.LCapi.addSection({
+            sectionId: targetId,
+            data: inData,
+          });
           if(result==true){
             await undo("save","Add Section");//undo
             await loadModel(false,false);
@@ -3168,9 +3267,11 @@ document.addEventListener("DOMContentLoaded", () => {
       if(objOpts.edit.mode == "connect_section"){
         const response = await window.LCapi.askdialog(
           {
-            title:"Connect sections",
-            message:"Do you want to CONNECT between selected sections?",
-            parent: "main"
+            opts: {
+              title:"Connect sections",
+              message:"Do you want to CONNECT between selected sections?",
+              parent: "main"
+            }
           }
         );
         if (response.response) {
@@ -3178,7 +3279,11 @@ document.addEventListener("DOMContentLoaded", () => {
           
           if(fromId[0] == toId[0] && fromId[1] == toId[1] && fromId[2] !== toId[2]){
             //case connect vertival
-            if(await window.LCapi.connectMarkers(fromId, toId, "vertical")){
+            if(await window.LCapi.connectMarkers({
+              fromId,
+              toId,
+              direction: "vertical",
+            })){
               await undo("save","Connect Sections");//undo
               await loadModel(false,false);
               const changedData = await getUpdatedSectionIds("depth");
@@ -3199,9 +3304,11 @@ document.addEventListener("DOMContentLoaded", () => {
       } else if(objOpts.edit.mode == "disconnect_section"){
         const response = await window.LCapi.askdialog(
           {
-            title:"Connect sections",
-            message:"Do you want to DISCONNECT between selected sections?",
-            parent: "main"
+            opts: {
+              title:"Connect sections",
+              message:"Do you want to DISCONNECT between selected sections?",
+              parent: "main"
+            }
           }
         );
         if (response.response) {
@@ -3209,7 +3316,11 @@ document.addEventListener("DOMContentLoaded", () => {
           
           if(fromId[0] == toId[0] && fromId[1] == toId[1] && fromId[2] !== toId[2]){
             //case connect vertival
-            if(await window.LCapi.disconnectMarkers(fromId, toId, "vertical")){
+            if(await window.LCapi.disconnectMarkers({
+              fromId,
+              toId,
+              direction: "vertical",
+            })){
               await undo("save","Disconnect Markers");//undo
               await loadModel(false,false);
               const changedData = await getUpdatedSectionIds("depth");
@@ -3294,7 +3405,11 @@ document.addEventListener("DOMContentLoaded", () => {
         const targetId = [ht.project, ht.hole, null, null];
         console.log(targetId)
         
-        const result = await window.LCapi.changeHole(targetId, target, response);
+        const result = await window.LCapi.changeHole({
+          holeId: targetId,
+          type: target,
+          value: response,
+        });
         if(result=="used"){
           console.log(`[Renderer]: "${response}" is already in use. Please enter a unique name.`);
           alert(`"${response}" is already in use. Please enter a unique name.`);
@@ -3326,15 +3441,19 @@ document.addEventListener("DOMContentLoaded", () => {
     if(objOpts.edit.mode == "delete_hole"){
       const response = await window.LCapi.askdialog(
         {
-          title:"Delete hole",
-          message:"Do you want to delete the hole?",
-          parent: "main"
+          opts: {
+            title:"Delete hole",
+            message:"Do you want to delete the hole?",
+            parent: "main"
+          }
         }
       );
       if (response.response) {
         const targetId = [ht.project, ht.hole, null, null];
         
-        const result = await window.LCapi.deleteHole(targetId);
+        const result = await window.LCapi.deleteHole({
+          holeId: targetId,
+        });
         if(result == true){
           await undo("save","Delete Hole");//undo
           console.log("[Renderer]: Delete hole.")
@@ -3375,7 +3494,10 @@ document.addEventListener("DOMContentLoaded", () => {
       if (response !== null) {
         const targetId = [ht.project, null, null, null];
         
-        const result = await window.LCapi.addHole(targetId, response);
+        const result = await window.LCapi.addHole({
+          projectId: targetId,
+          name: response,
+        });
         if(result == true){
           await undo("save", "Add Hole");//undo
           console.log("[Renderer]: Add hole.")
@@ -3460,7 +3582,10 @@ document.addEventListener("DOMContentLoaded", () => {
         };
         const response2 = await window.LCapi.inputdialog(askData);
 
-        const result = await window.LCapi.addProject(response, response2);
+        const result = await window.LCapi.addProject({
+          type: response,
+          name: response2,
+        });
         if(result == true){
           await undo("save","Add Project");//undo
           console.log("[Renderer]: Add project.")
@@ -3506,15 +3631,19 @@ document.addEventListener("DOMContentLoaded", () => {
     if(objOpts.edit.mode == "delete_project"){
       const response = await window.LCapi.askdialog(
         {
-          title:"Delete project",
-          message:"Are you sure to delete this project?",
-          parent: "main"
+          opts: {
+            title:"Delete project",
+            message:"Are you sure to delete this project?",
+            parent: "main"
+          }
         }
       );
       if (response.response) {
         const targetId = [ht.project, null, null, null];
         
-        const result = await window.LCapi.deleteProject(targetId);
+        const result = await window.LCapi.deleteProject({
+          projectId: targetId,
+        });
         if(result == true){
           await undo("save","Delete Project");//undo
           console.log("[Renderer]: Delete project.")
@@ -3536,7 +3665,11 @@ document.addEventListener("DOMContentLoaded", () => {
       const response = await window.LCapi.inputdialog(askData);
       if(response !== null){
         const targetId = [ht.project, null, null, null];
-        const result = await window.LCapi.changeProject(targetId, "name",response);
+        const result = await window.LCapi.changeProject({
+          projectId: targetId,
+          type: "name",
+          value: response,
+        });
         if(result == true){
           console.log("[Renderer]: Chnage project name.")
           await loadModel(false,false);
@@ -3552,9 +3685,11 @@ document.addEventListener("DOMContentLoaded", () => {
     }else if(objOpts.edit.mode == "move_hole_to_project"){
       const response = await window.LCapi.askdialog(
         {
-          title:"Move hole to project",
-          message:"Are you sure to move the hole to this selected project?",
-          parent: "main"
+          opts: {
+            title:"Move hole to project",
+            message:"Are you sure to move the hole to this selected project?",
+            parent: "main"
+          }
         }
       );
 
@@ -3564,7 +3699,10 @@ document.addEventListener("DOMContentLoaded", () => {
         const toProjectId = [ht.project, null, null, null];
         const holeId      = [holeHt.project, holeHt.hole, null, null];
         
-        const result = await window.LCapi.moveHoleToProject(holeId, toProjectId);
+        const result = await window.LCapi.moveHoleToProject({
+          holeId,
+          projectId: toProjectId,
+        });
 
         if(result == true){
           await undo("save","Move Hole");//undo
@@ -3603,10 +3741,12 @@ document.addEventListener("DOMContentLoaded", () => {
     if(projectData.model_type == "duo"){
       const response = await window.LCapi.askdialog(
         {
-          title:"Export model",
-          message:"Connections to the main model will not be exported because the main model is not loaded.\n"+      
-                  "Are you sure you want to export?",
-          parent: "main"
+          opts: {
+            title:"Export model",
+            message:"Connections to the main model will not be exported because the main model is not loaded.\n"+      
+                    "Are you sure you want to export?",
+            parent: "main"
+          }
         }        
       );
 
@@ -3621,15 +3761,17 @@ document.addEventListener("DOMContentLoaded", () => {
   window.LCapi.receive("ExportCorrelationAsLFMenuClicked", async () => {
     const response = await window.LCapi.askdialog(
       {
-        title:"Export model",
-        message:
-          "Please note that the following expression cannot be used in LF format.\n"+      
-          "+ If erosion event included, it cannot be converted.\n"+
-          "+ If CD is not defined, the marker will be ignored.: \n"+
-          "+ If markup event included, it will be ignored.\n"+
-          "+ With 5 or more holes in a project, output is produced but cannot be loaded in Level Finder.\n"+
-          "Are you sure you want to export?",
-        parent: "main"
+        opts: {
+          title:"Export model",
+          message:
+            "Please note that the following expression cannot be used in LF format.\n"+      
+            "+ If erosion event included, it cannot be converted.\n"+
+            "+ If CD is not defined, the marker will be ignored.: \n"+
+            "+ If markup event included, it will be ignored.\n"+
+            "+ With 5 or more holes in a project, output is produced but cannot be loaded in Level Finder.\n"+
+            "Are you sure you want to export?",
+          parent: "main"
+        }
       }
       
       
@@ -3687,7 +3829,10 @@ document.addEventListener("DOMContentLoaded", () => {
             backup_hole_enable[hole.id.toString()] = setVal;
             //update model
             if(objOpts.edit.editable){
-              await window.LCapi.changeEnable(hole.id, setVal);
+              await window.LCapi.changeEnable({
+                targetId: hole.id,
+                isEnable: setVal,
+              });
             }
             
             console.log("[Renderer]: Hole "+hole.name +" is "+setType+".");
@@ -3712,7 +3857,10 @@ document.addEventListener("DOMContentLoaded", () => {
             //backup
             //update model
             if(objOpts.edit.editable){
-              await window.LCapi.changeEnable(LCCore.projects[target_idx[0]].id, false);
+              await window.LCapi.changeEnable({
+                targetId: LCCore.projects[target_idx[0]].id,
+                isEnable: false,
+              });
             }
 
             backup_hole_enable[LCCore.projects[target_idx[0]].id.toString()] = false;
@@ -3722,7 +3870,10 @@ document.addEventListener("DOMContentLoaded", () => {
             //backup
             //update model
             if(objOpts.edit.editable){
-              await window.LCapi.changeEnable(LCCore.projects[target_idx[0]].id, true);
+              await window.LCapi.changeEnable({
+                targetId: LCCore.projects[target_idx[0]].id,
+                isEnable: true,
+              });
             }            
 
             backup_hole_enable[LCCore.projects[target_idx[0]].id.toString()] = true;
@@ -3978,13 +4129,13 @@ document.addEventListener("DOMContentLoaded", () => {
       if (!finderEnable) {
         finderEnable = true;
         document.getElementById("bt_finder").style.backgroundColor = "#ccc";
-        await LCapi.OpenFinder("OpenFinder", async () => {});
+        await LCapi.OpenFinder();
         objOpts.interface.finder_data = null;
 
       } else {
         finderEnable = false;
         document.getElementById("bt_finder").style.backgroundColor = "#f0f0f0";
-        await LCapi.CloseFinder("CloseFinder", async () => {});
+        await LCapi.CloseFinder();
         updateView();
       }
     }
@@ -4001,7 +4152,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const centerY = (rect.height / 2);//IF ADD 76PIX, CENTRED
 
     const ht = getClickedItemIdx(centerX, centerY, LCCore, objOpts);   
-    await window.LCapi.SendDepthToFinder(ht);
+    await window.LCapi.SendDepthToFinder({ data: ht });
 
   });
   window.LCapi.receive("FinderClosed", async () => {
@@ -4041,7 +4192,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     //send to finder
     if (finderEnable) {
-      await window.LCapi.SendDepthToFinder(ht);
+      await window.LCapi.SendDepthToFinder({ data: ht });
       console.log("[Renderer]: Send the clicked depth to Finder", ht.y, objOpts.canvas.depth_scale);
     }
 
@@ -4086,11 +4237,17 @@ document.addEventListener("DOMContentLoaded", () => {
   window.LCapi.receive("SettingsMenuClicked", async () => {
     recordLcE2EEvent("SettingsMenuClicked");
     const settings = makeSendSettingData();
-    await window.LCapi.sendSettings(settings, "settings");
+    await window.LCapi.sendSettings({
+      sendData: settings,
+      to: "settings",
+    });
   });
   window.LCapi.receive("getSettingsFromRenderer", async () => {
     const settings = makeSendSettingData();
-    await window.LCapi.sendSettings(settings, "main");
+    await window.LCapi.sendSettings({
+      sendData: settings,
+      to: "main",
+    });
   });
 
   function makeSendSettingData(){
@@ -4144,7 +4301,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
       //back to settings menu
       const settings = makeSendSettingData();
-      await window.LCapi.sendSettings(settings, "settings");
+      await window.LCapi.sendSettings({
+        sendData: settings,
+        to: "settings",
+      });
     }else{
       //call saved settings
       let isOldFormat = false;
@@ -4165,7 +4325,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
         const settings = makeSendSettingData()
 
-        await window.LCapi.sendSettings(settings, "save");
+        await window.LCapi.sendSettings({
+          sendData: settings,
+          to: "save",
+        });
               
         console.log("[Renderer]: Legacy-format settings detected. Replacing with the current version.", settings)
 
@@ -6981,8 +7144,14 @@ document.addEventListener("DOMContentLoaded", () => {
       polationType: "linear",  
       allowOutside: false
     };
-    const upperData = await window.LCapi.depthConverter([["", y0, upperTargetId]], options);
-    const lowerData = await window.LCapi.depthConverter([["", y1, upperTargetId]], options);
+    const upperData = await window.LCapi.depthConverter({
+      dataList: [["", y0, upperTargetId]],
+      options,
+    });
+    const lowerData = await window.LCapi.depthConverter({
+      dataList: [["", y1, upperTargetId]],
+      options,
+    });
 
     //calc stat
     const meanAge = (lowerData.age_mid + upperData.age_mid) / 2;
@@ -7102,9 +7271,11 @@ document.addEventListener("DOMContentLoaded", () => {
       if (sketch.key === 'n' && sketch.keyIsDown(sketch.CONTROL)) { 
         const response = await window.LCapi.Confirm(
           {
-            title:"Confirm",
-            message:"Are you sure you want to delete the written data?",
-            parent: "main"
+            opts: {
+              title:"Confirm",
+              message:"Are you sure you want to delete the written data?",
+              parent: "main"
+            }
           }
         );
 
@@ -7133,15 +7304,35 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     //mount model into LCCore
-    const results = await window.LCapi.RegisterModelFromCsv(in_path);
+    const results =
+      typeof in_path === "string"
+        ? await window.LCapi.RegisterModelFromPath(in_path)
+        : await window.LCapi.RegisterModelFromCsv(in_path);
 
     if (results == null) {
       console.log("[Renderer]: Failed to resister correlation model.")
       return null;
     }else{
-      console.log("[Renderer]: Correlation Model has been resistered into the LCCore: " + in_path.name +".");
+      const displayName = typeof in_path === "string" ? in_path : in_path.name;
+      console.log("[Renderer]: Correlation Model has been resistered into the LCCore: " + displayName +".");
     }
     return true;
+  }
+  async function importCorrelationModelSource(in_path, options = {}) {
+    const {
+      syncRendererState = true,
+    } = options;
+
+    const registered = await registerModel(in_path);
+    if (!registered) {
+      return { ok: false, error: "register_failed" };
+    }
+
+    if (syncRendererState) {
+      await loadModel(true, true);
+    }
+
+    return { ok: true };
   }
   async function registerModelFromLCCore() {
   
@@ -7310,7 +7501,10 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     //load age model
-    const results = await window.LCapi.RegisterAgeFromCsv(in_path);
+    const results =
+      typeof in_path === "string"
+        ? await window.LCapi.RegisterAgeFromPath(in_path)
+        : await window.LCapi.RegisterAgeFromCsv(in_path);
     //console.log(results);
 
     if (results) {
@@ -7326,10 +7520,60 @@ document.addEventListener("DOMContentLoaded", () => {
       console.log("[Renderer]: Age Model has been registered into the LCAge: "+results.name);
       //console.log(results);
     }
+    return results ?? null;
+  }
+  function getLatestAgeModelId(preferredId = null) {
+    if (preferredId != null) {
+      return preferredId;
+    }
+
+    const selectedAgeModelId = document.getElementById("AgeModelSelect").value;
+    if (selectedAgeModelId) {
+      return selectedAgeModelId;
+    }
+
+    return age_model_list.length > 0 ? age_model_list[age_model_list.length-1].id : null;
+  }
+  async function syncAgeSelection(ageId) {
+    const selectedAgeModelId = getLatestAgeModelId(ageId);
+    if (!selectedAgeModelId) {
+      return null;
+    }
+
+    document.getElementById("AgeModelSelect").value = selectedAgeModelId;
+    await loadAge(selectedAgeModelId);
+    await loadPlotData("age");
+    await loadPlotData("data");
+
+    return selectedAgeModelId;
+  }
+  async function importAgeModelSource(in_path, options = {}) {
+    const {
+      syncRendererState = false,
+    } = options;
+
+    if (!LCCore) {
+      return { ok: false, error: "lcmodel_not_loaded" };
+    }
+
+    const loadedAge = await registerAge(in_path);
+    if (!loadedAge) {
+      return { ok: false, error: "register_age_failed" };
+    }
+
+    if (syncRendererState) {
+      await syncAgeSelection(loadedAge.id);
+      updateView();
+    }
+
+    return {
+      ok: true,
+      loadedAge,
+    };
   }
   async function loadAge(age_id) {
     //load age model
-    const results = await unzip( await window.LCapi.LoadAgeFromLCAge(age_id));
+    const results = await unzip( await window.LCapi.LoadAgeFromLCAge({ ageId: age_id }));
     
     if (results) {
       LCCore = results;
@@ -7379,10 +7623,81 @@ document.addEventListener("DOMContentLoaded", () => {
   }
   async function registerLCModel(in_path){
     //register main
-    const loadResult = await window.LCapi.RegisterLCmodel(in_path);
+    const loadResult =
+      typeof in_path === "string"
+        ? await window.LCapi.RegisterLCmodelFromPath(in_path)
+        : await window.LCapi.RegisterLCmodel(in_path);
+
+    if (loadResult === false) {
+      return false;
+    }
 
     setAgeList(loadResult);
+    return loadResult;
   } 
+  async function importLcModelSource(in_path, options = {}) {
+    const {
+      resetCanvas = false,
+      syncRendererState = true,
+    } = options;
+
+    if (resetCanvas) {
+      await initialiseCanvas();
+    }
+
+    const loadResult = await registerLCModel(in_path);
+    if (loadResult === false) {
+      isLoadedLCModel = false;
+      return { ok: false, error: "register_failed" };
+    }
+
+    if (syncRendererState) {
+      await loadModel(true, true);
+      isLoadedLCModel = true;
+      await syncAgeSelection();
+    }
+
+    return {
+      ok: true,
+      loadResult,
+    };
+  }
+  async function importCoreImagesSource(in_path, options = {}) {
+    const {
+      depthScales = ["drilling_depth"],
+      togglePhoto = false,
+    } = options;
+
+    if (!LCCore) {
+      return { ok: false, error: "lcmodel_not_loaded" };
+    }
+
+    const resolvedPath =
+      typeof in_path === "string"
+        ? { fullpath: in_path }
+        : await window.LCapi.getFilePath(in_path);
+    const dirPath = resolvedPath?.fullpath ?? null;
+    if (!dirPath) {
+      console.log("[Renderer]: Failed to resolve dropped image path.");
+      return { ok: false, error: "path_resolution_failed" };
+    }
+
+    const registered = await window.LCapi.RegisterCoreImageFromPath({
+      dirHandle: dirPath,
+      type: "core_images",
+    });
+    if (!registered) {
+      return { ok: false, error: "register_core_images_failed" };
+    }
+
+    modelImages = await loadCoreImages(modelImages, LCCore, objOpts, depthScales);
+    if (togglePhoto && !objOpts.canvas.is_core_photo_visible) {
+      document.getElementById("bt_core_photo").click();
+    }
+    updateView();
+
+    return { ok: true };
+  }
   function setAgeList(loadResult){
     if(loadResult !== false){
       age_model_list = [];
@@ -7425,25 +7740,182 @@ document.addEventListener("DOMContentLoaded", () => {
       holeListCount: document.querySelectorAll("#hole_list input[type='checkbox']").length,
       yAxisScale: document.getElementById("YAxisSelect").value,
       loadedImageCount: Object.keys(modelImages?.drilling_depth ?? {}).length,
+      canvasBackgroundColour: objOpts.canvas.background_colour,
+      lastPlotPayload: lcE2ELastPlotPayload,
     }),
-    loadLcModelFromPath: async (inputPath) => {
-      await initialiseCanvas();
-      isLoadedLCModel = true;
-
-      const loaded = await window.LCapi.RegisterLCmodelFromPath(inputPath);
-      if (loaded === false) {
-        isLoadedLCModel = false;
-        return { ok: false, error: "register_failed" };
+    getFirstSectionReference: () => {
+      const firstProject = LCCore?.projects?.[0];
+      const firstHole = firstProject?.holes?.[0];
+      const firstSection = firstHole?.sections?.[0];
+      if (!firstSection || !firstHole || firstSection.markers.length < 2) {
+        return null;
       }
 
-      setAgeList(loaded);
-      await loadModel(true, true);
+      const topMarker = firstSection.markers[0];
+      const bottomMarker = firstSection.markers[firstSection.markers.length - 1];
+      return {
+        holeName: firstHole.name,
+        sectionName: firstSection.name,
+        sectionId: firstSection.id,
+        midpoint: (Number(topMarker.distance) + Number(bottomMarker.distance)) / 2,
+      };
+    },
+    deleteFirstSection: async () => {
+      const firstProject = LCCore?.projects?.[0];
+      const firstHole = firstProject?.holes?.[0];
+      const firstSection = firstHole?.sections?.[0];
+      if (!firstProject || !firstHole || !firstSection) {
+        return { ok: false, error: "section_not_found" };
+      }
 
-      const selectedAgeModelId = document.getElementById("AgeModelSelect").value;
-      if (selectedAgeModelId) {
-        await loadAge(selectedAgeModelId);
-        await loadPlotData("age");
-        await loadPlotData("data");
+      const beforeSectionCount = firstHole.sections.length;
+      const result = await window.LCapi.deleteSection({
+        sectionId: firstSection.id,
+      });
+      if (result === true) {
+        await loadModel(false, false);
+      }
+      const nextProject = LCCore?.projects?.[0];
+      const nextHole = nextProject?.holes?.[0];
+      const afterSectionCount = nextHole?.sections?.length ?? 0;
+
+      return {
+        ok: result === true,
+        result,
+        beforeSectionCount,
+        afterSectionCount,
+      };
+    },
+    depthConvert: async (payload) => window.LCapi.depthConverter(payload),
+    addEventToFirstAvailablePair: async () => {
+      if (!LCCore) {
+        return { ok: false, error: "lcmodel_not_loaded" };
+      }
+
+      for (const project of LCCore.projects) {
+        for (const hole of project.holes) {
+          for (const section of hole.sections) {
+            for (let i = 0; i < section.markers.length - 1; i += 1) {
+              const upperMarker = section.markers[i];
+              const lowerMarker = section.markers[i + 1];
+              if ((upperMarker.event?.length ?? 0) > 0) {
+                continue;
+              }
+
+              const upperId = upperMarker.id;
+              const lowerId = lowerMarker.id;
+              const beforeCount = upperMarker.event?.length ?? 0;
+              const result = await window.LCapi.AddEvent({
+                upperId,
+                lowerId,
+                depositionType: "deposition",
+                value: "general",
+              });
+              if (result === true) {
+                await loadModel(false, false);
+              }
+              const nextIdx = getIdxById(LCCore, upperId);
+              const nextMarker =
+                LCCore.projects[nextIdx[0]].holes[nextIdx[1]].sections[nextIdx[2]].markers[nextIdx[3]];
+              const afterCount = nextMarker.event?.length ?? 0;
+
+              return {
+                ok: result === true,
+                result,
+                upperId,
+                lowerId,
+                beforeCount,
+                afterCount,
+              };
+            }
+          }
+        }
+      }
+
+      return { ok: false, error: "event_target_not_found" };
+    },
+    deleteEventBetween: async (upperId, lowerId) => {
+      const targetIdx = getIdxById(LCCore, upperId);
+      if (!targetIdx || targetIdx[0] == null) {
+        return { ok: false, error: "event_target_not_found" };
+      }
+
+      const upperMarker =
+        LCCore.projects[targetIdx[0]].holes[targetIdx[1]].sections[targetIdx[2]].markers[targetIdx[3]];
+      const beforeCount = upperMarker.event?.length ?? 0;
+      const result = await window.LCapi.DeleteEvent({
+        upperId,
+        lowerId,
+        type: [],
+      });
+      if (result === true) {
+        await loadModel(false, false);
+      }
+      const nextIdx = getIdxById(LCCore, upperId);
+      const nextMarker =
+        LCCore.projects[nextIdx[0]].holes[nextIdx[1]].sections[nextIdx[2]].markers[nextIdx[3]];
+      const afterCount = nextMarker.event?.length ?? 0;
+
+      return {
+        ok: result === true,
+        result,
+        beforeCount,
+        afterCount,
+      };
+    },
+    saveStateAndGetChangedSectionsAfterEvent: async () => {
+      const saved = await window.LCapi.sendSaveState({
+        type: "main",
+        name: "e2e-state-snapshot",
+      });
+      if (saved !== true) {
+        return { ok: false, error: "save_state_failed", saved };
+      }
+
+      const added = await window.__LC_E2E__.addEventToFirstAvailablePair();
+      if (!added.ok) {
+        return { ok: false, error: "add_event_failed", added };
+      }
+
+      const changed = await getUpdatedSectionIds("depth");
+
+      return {
+        ok: true,
+        added,
+        changed,
+      };
+    },
+    allowCloseWithoutSaving: async () => {
+      return window.LCapi.e2eSetCloseDialogResponse(1);
+    },
+    keepWindowOpenOnUnsavedClose: async () => {
+      return window.LCapi.e2eSetCloseDialogResponse(0);
+    },
+    pushDialogResponse: async (response) => {
+      return window.LCapi.e2ePushDialogResponse(response);
+    },
+    getAndClearDialogLog: async () => {
+      return window.LCapi.e2eGetAndClearDialogLog();
+    },
+    setOpenDialogResponse: async (payload) => {
+      return window.LCapi.e2eSetOpenDialogResponse(payload);
+    },
+    getOpenDialogResponse: async () => {
+      return window.LCapi.e2eGetOpenDialogResponse();
+    },
+    chooseFile: async (title, ext) => {
+      return window.LCapi.FileChoseDialog({ title, ext });
+    },
+    chooseFolder: async (title) => {
+      return window.LCapi.FolderChoseDialog({ title });
+    },
+    loadLcModelFromPath: async (inputPath) => {
+      const imported = await importLcModelSource(inputPath, {
+        resetCanvas: true,
+        syncRendererState: true,
+      });
+      if (!imported.ok) {
+        return imported;
       }
 
       return {
@@ -7451,42 +7923,107 @@ document.addEventListener("DOMContentLoaded", () => {
         ...window.__LC_E2E__.getRendererState(),
       };
     },
-    loadAgeModelFromPath: async (inputPath) => {
-      const loadedAge = await window.LCapi.RegisterAgeFromPath(inputPath);
-      if (!loadedAge) {
-        return { ok: false, error: "register_age_failed" };
+    dropLcModelFromPath: async (inputPath) => {
+      const imported = await importLcModelSource(inputPath, {
+        resetCanvas: true,
+        syncRendererState: true,
+      });
+      if (!imported.ok) {
+        return imported;
       }
 
-      age_model_list = await window.LCapi.MirrorAgeList();
-      setAgeList(age_model_list);
+      return {
+        ok: true,
+        ...window.__LC_E2E__.getRendererState(),
+      };
+    },
+    dropAgeModelFromPath: async (inputPath) => {
+      const imported = await importAgeModelSource(inputPath, {
+        syncRendererState: true,
+      });
+      if (!imported.ok) {
+        return imported;
+      }
 
-      const selectedAgeModelId = loadedAge.id ?? document.getElementById("AgeModelSelect").value;
+      return {
+        ok: true,
+        loadedAge: imported.loadedAge,
+        ...window.__LC_E2E__.getRendererState(),
+      };
+    },
+    loadAgeModelFromPath: async (inputPath) => {
+      const imported = await importAgeModelSource(inputPath, {
+        syncRendererState: false,
+      });
+      if (!imported.ok) {
+        return imported;
+      }
+
+      const selectedAgeModelId = getLatestAgeModelId(imported.loadedAge.id);
       if (selectedAgeModelId) {
         document.getElementById("AgeModelSelect").value = selectedAgeModelId;
       }
 
       return {
         ok: true,
-        loadedAge,
+        loadedAge: imported.loadedAge,
         ...window.__LC_E2E__.getRendererState(),
       };
     },
-    loadCoreImagesFromPath: async (inputPath) => {
-      if (!LCCore) {
-        return { ok: false, error: "lcmodel_not_loaded" };
+    dropCoreImagesFromPath: async (inputPath) => {
+      const imported = await importCoreImagesSource(inputPath, {
+        depthScales: ["drilling_depth", "composite_depth", "event_free_depth", "age"],
+      });
+      if (!imported.ok) {
+        return imported;
       }
-
-      const registered = await window.LCapi.RegisterCoreImageFromPath(inputPath, "core_images");
-      if (!registered) {
-        return { ok: false, error: "register_core_images_failed" };
-      }
-
-      modelImages = await loadCoreImages(modelImages, LCCore, objOpts, ["drilling_depth"]);
-      updateView();
 
       return {
         ok: true,
         ...window.__LC_E2E__.getRendererState(),
+      };
+    },
+    loadCoreImagesFromPath: async (inputPath) => {
+      const imported = await importCoreImagesSource(inputPath, {
+        depthScales: ["drilling_depth"],
+      });
+      if (!imported.ok) {
+        return imported;
+      }
+
+      return {
+        ok: true,
+        ...window.__LC_E2E__.getRendererState(),
+      };
+    },
+    loadCoreImageBuffersForFirstSection: async () => {
+      if (!LCCore) {
+        return { ok: false, error: "lcmodel_not_loaded" };
+      }
+
+      const firstSection = LCCore.projects?.[0]?.holes?.[0]?.sections?.[0];
+      if (!firstSection?.id) {
+        return { ok: false, error: "section_not_found" };
+      }
+
+      const imageBuffers = await window.LCapi.LoadCoreImage({
+        loadOptions: {
+          targetIds: [firstSection.id],
+          operations: [],
+          dpcm: objOpts.image.dpcm,
+        },
+        type: "core_images",
+      });
+      const datasets = Object.keys(imageBuffers ?? {});
+      const totalBufferCount = datasets.reduce(
+        (count, dataset) => count + Object.keys(imageBuffers?.[dataset] ?? {}).length,
+        0
+      );
+
+      return {
+        ok: datasets.length > 0,
+        datasetCount: datasets.length,
+        totalBufferCount,
       };
     },
     openFloatingImageViewerForFirstSection: async () => {
@@ -7505,7 +8042,7 @@ document.addEventListener("DOMContentLoaded", () => {
         return { ok: false, error: "section_not_found" };
       }
 
-      const opened = await window.LCapi.floatingImageViewer(firstSection.id);
+      const opened = await window.LCapi.floatingImageViewer({ targetId: firstSection.id });
       return {
         ok: opened === true,
         targetId: firstSection.id,
@@ -7514,7 +8051,7 @@ document.addEventListener("DOMContentLoaded", () => {
   };
   async function loadPlotData(type) {
     //LC plot age_collection id is as same as LCAge id 
-    const results = await window.LCapi.LoadPlotData(type);
+    const results = await window.LCapi.LoadPlotData({ type });
     if (results!==null) {
       //load
       const dataType = results.type;
@@ -8403,7 +8940,10 @@ async function getFooterInfo(LCCore, hittest, objOpts) {
       allowOutside: false
     };
 
-    const calcedData = await window.LCapi.depthConverter([["", hittest.y, targetId]], options);
+    const calcedData = await window.LCapi.depthConverter({
+      dataList: [["", hittest.y, targetId]],
+      options,
+    });
     age = calcedData !== null ? calcedData.age_mid.toFixed(objOpts.age.age_precision) + " calBP)" : "---)";
   }
 
@@ -8643,15 +9183,21 @@ async function undo(type, name="unnamed"){
   return new Promise(async(resolve, reject)=>{
     let result;
     if(type == "undo"){
-      result = await window.LCapi.sendUndo("main");
+      result = await window.LCapi.sendUndo({ type: "main" });
       console.log("[Renderer]: received undo data: ",result);
     }else if(type == "redo"){
-      result = await window.LCapi.sendRedo("main");
+      result = await window.LCapi.sendRedo({ type: "main" });
       console.log("[Renderer]: received redo data: ",result);
     }else if(type == "save"){
-      result = await window.LCapi.sendSaveState("main", name);
+      result = await window.LCapi.sendSaveState({
+        type: "main",
+        name,
+      });
     }else if(type == "getChangedSectionIds"){
-      result = await window.LCapi.getChangedSectionIds("main", 1);
+      result = await window.LCapi.getChangedSectionIds({
+        type: "main",
+        numPrevious: 1,
+      });
     }
 
      resolve(result);
@@ -8668,7 +9214,7 @@ async function updateImageRegistration(modelImages, LCCore){
           //check folder im
           //console.log(modelImages.image_dir, h.name+"-"+s.name+".jpg")
           if(Object.keys(modelImages.drilling_depth).length > 0){
-            const isImExist = await window.LCapi.CheckImagesInDir(h.name+"-"+s.name+".jpg");
+            const isImExist = await window.LCapi.CheckImagesInDir({ fileName: h.name+"-"+s.name+".jpg" });
             //console.log(h.name+"-"+s.name,  isImExist)
 
             // /im_in_dir
@@ -8723,7 +9269,7 @@ async function loadCoreImages(modelImages, LCCore, objOpts, operations) {
       //check
       if (LCCore == null) {
         console.log("[Renderer]: There is no LCCore.");
-        await window.LCapi.updateProgressbar(1, 1);
+        await window.LCapi.updateProgressbar({ current: 1, total: 1 });
         resolve(results);
         return;
       }
@@ -8732,7 +9278,7 @@ async function loadCoreImages(modelImages, LCCore, objOpts, operations) {
         if(!operations.includes("drilling_depth")){
           if (Object.keys(modelImages.drilling_depth).length == 0) {
             console.log("[Renderer]: There is no original image.");
-            await window.LCapi.updateProgressbar(1, 1);
+            await window.LCapi.updateProgressbar({ current: 1, total: 1 });
             resolve(results);
             return;
           }
@@ -8770,7 +9316,7 @@ async function loadCoreImages(modelImages, LCCore, objOpts, operations) {
       
       if(N==0){
         console.log("[Renderer]: There is no update image.")
-        await window.LCapi.updateProgressbar(1, 1);
+        await window.LCapi.updateProgressbar({ current: 1, total: 1 });
         resolve(results);
         return;
       }
@@ -8785,7 +9331,10 @@ async function loadCoreImages(modelImages, LCCore, objOpts, operations) {
       //main Progress   
       try{
         //load image
-        const imageBuffers = await window.LCapi.LoadCoreImage(loadOptions, "core_images");
+        const imageBuffers = await window.LCapi.LoadCoreImage({
+          loadOptions,
+          type: "core_images",
+        });
         //const imageBuffers = await new Promise(async(resolve, reject)=>{
         //  const imBufferDict = await window.LCapi.LoadCoreImage(loadOptions,"core_images");
         //  resolve(imBufferDict)
@@ -8825,7 +9374,7 @@ async function assignCoreImages(coreImages, imageBuffers) {
     await new Promise((resolve, reject) => {
       new p5(async (p) => {
         try {
-          await window.LCapi.progressbar("Assigning images", "Now assigning...",true);
+          await window.LCapi.progressbar({ title: "Assigning images", text: "Now assigning...", indeterminate: true });
           //await window.LCapi.updateProgressbar(0, N, "");
           let n = 0;
           if(imageBuffers==null){

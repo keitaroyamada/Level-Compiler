@@ -1,5 +1,19 @@
 // preload.js
 const { contextBridge, ipcRenderer, webUtils } = require("electron");
+const IPC_CHANNELS = {
+  ASK_DIALOG: "askdialog",
+};
+
+function normaliseDialogPayload(input) {
+  const opts = input?.opts ?? input ?? {};
+  return {
+    opts: {
+      title: opts.title ?? "",
+      message: opts.message ?? "",
+      parent: opts.parent ?? "main",
+    },
+  };
+}
 
 contextBridge.exposeInMainWorld("PlotterApi", {
   //rederer <-> main
@@ -8,14 +22,14 @@ contextBridge.exposeInMainWorld("PlotterApi", {
   terminalLog: (args1) => ipcRenderer.invoke("terminalLog", args1),
   rendererLog: (args1) => ipcRenderer.invoke("rendererLog", args1),
 
-  askdialog: (args1, args2) => ipcRenderer.invoke("askdialog", args1, args2),
+  askdialog: (payload) => ipcRenderer.invoke(IPC_CHANNELS.ASK_DIALOG, normaliseDialogPayload(payload)),
   inputdialog: (args1) => ipcRenderer.invoke("inputdialog", args1),
 
   toggleDevTools: (args1) => ipcRenderer.send('toggle-devtools',args1),
 
-  getPlotData: (args1) => ipcRenderer.invoke("PlotterGetData", args1),
+  getPlotData: (payload) => ipcRenderer.invoke("PlotterGetData", payload),
   initialisePlotDataCollection: () => ipcRenderer.invoke("initialisePlotDataCollection"),
-  sendPlotOptions:(args1,args2) => ipcRenderer.invoke("sendPlotOptions",args1,args2),
+  sendPlotOptions: (payload) => ipcRenderer.invoke("sendPlotOptions", payload),
   clearProgressbar:() => ipcRenderer.invoke("clearProgressbar"),
   PlotterClose:() => ipcRenderer.invoke("PlotterClose"),
   ConverterClose:() => ipcRenderer.invoke("ConverterClose"),

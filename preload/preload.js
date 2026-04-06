@@ -1,12 +1,86 @@
 // preload.js
 const { contextBridge, ipcRenderer, webUtils } = require("electron");
 
+const IPC_CHANNELS = {
+  ASK_DIALOG: "askdialog",
+  CONFIRM: "Confirm",
+  REGISTER_MODEL_FROM_CSV: "RegisterModelFromCsv",
+  REGISTER_AGE_FROM_CSV: "RegistertAgeFromCsv",
+  REGISTER_LC_MODEL: "RegisterLCmodel",
+  REGISTER_CORE_IMAGE: "RegisterCoreImage",
+};
+
+function resolveFileInputPath(input) {
+  return webUtils.getPathForFile(input);
+}
+
+function normaliseDialogPayload(input) {
+  const opts = input?.opts ?? input ?? {};
+  return {
+    opts: {
+      title: opts.title ?? "",
+      message: opts.message ?? "",
+      parent: opts.parent ?? "main",
+    },
+  };
+}
+
+function resolvePathInput(input) {
+  if (typeof input === "string") {
+    return input;
+  }
+
+  if (input == null) {
+    return null;
+  }
+
+  return resolveFileInputPath(input);
+}
+
+function createModelRegistrationPayload(input) {
+  const modelPath = resolvePathInput(input);
+  return modelPath ? { modelPath } : null;
+}
+
+function createAgeRegistrationPayload(input) {
+  const agePath = resolvePathInput(input);
+  return agePath ? { agePath } : null;
+}
+
+function createLcModelRegistrationPayload(input) {
+  const modelPath = resolvePathInput(input);
+  return modelPath ? { modelPath } : null;
+}
+
+function createCoreImageRegistrationPayload(input) {
+  if (!input) {
+    return null;
+  }
+
+  const dirHandle = resolvePathInput(input.dirHandle);
+  if (!dirHandle || !input.type) {
+    return null;
+  }
+
+  return {
+    dirHandle,
+    type: input.type,
+  };
+}
+
+function invokeWithPayload(channel, payload) {
+  if (payload == null) {
+    return Promise.resolve(null);
+  }
+  return ipcRenderer.invoke(channel, payload);
+}
+
 contextBridge.exposeInMainWorld("LCapi", {
 
   getFilePath: (args) => ipcRenderer.invoke("getFilePath", webUtils.getPathForFile(args)),
-  CheckImagesInDir: (args2) => ipcRenderer.invoke("CheckImagesInDir", args2),
-  FileChoseDialog: (args1, args2) => ipcRenderer.invoke("FileChoseDialog", args1, args2),
-  FolderChoseDialog: (args1) => ipcRenderer.invoke("FolderChoseDialog", args1),
+  CheckImagesInDir: (payload) => ipcRenderer.invoke("CheckImagesInDir", payload),
+  FileChoseDialog: (payload) => ipcRenderer.invoke("FileChoseDialog", payload),
+  FolderChoseDialog: (payload) => ipcRenderer.invoke("FolderChoseDialog", payload),
 
 
   //initialise
@@ -17,15 +91,33 @@ contextBridge.exposeInMainWorld("LCapi", {
   InitialisePaths: () => ipcRenderer.invoke("InitialisePaths"),
 
   //register and load models
-  RegisterModelFromCsv: (args) => ipcRenderer.invoke("RegisterModelFromCsv",  webUtils.getPathForFile(args)),
-  RegisterModelFromPath: (args) => ipcRenderer.invoke("RegisterModelFromCsv", args),
-  RegisterAgeFromCsv: (args) => ipcRenderer.invoke("RegistertAgeFromCsv", webUtils.getPathForFile(args)),
-  RegisterAgeFromPath: (args) => ipcRenderer.invoke("RegistertAgeFromCsv", args),
-  RegisterLCmodel:(args1) => ipcRenderer.invoke("RegisterLCmodel", webUtils.getPathForFile(args1)),
-  RegisterLCmodelFromPath: (args1) => ipcRenderer.invoke("RegisterLCmodel", args1),
+  RegisterModelFromCsv: (fileHandle) => invokeWithPayload(
+    IPC_CHANNELS.REGISTER_MODEL_FROM_CSV,
+    createModelRegistrationPayload(fileHandle)
+  ),
+  RegisterModelFromPath: (modelPath) => invokeWithPayload(
+    IPC_CHANNELS.REGISTER_MODEL_FROM_CSV,
+    createModelRegistrationPayload(modelPath)
+  ),
+  RegisterAgeFromCsv: (fileHandle) => invokeWithPayload(
+    IPC_CHANNELS.REGISTER_AGE_FROM_CSV,
+    createAgeRegistrationPayload(fileHandle)
+  ),
+  RegisterAgeFromPath: (agePath) => invokeWithPayload(
+    IPC_CHANNELS.REGISTER_AGE_FROM_CSV,
+    createAgeRegistrationPayload(agePath)
+  ),
+  RegisterLCmodel:(fileHandle) => invokeWithPayload(
+    IPC_CHANNELS.REGISTER_LC_MODEL,
+    createLcModelRegistrationPayload(fileHandle)
+  ),
+  RegisterLCmodelFromPath: (modelPath) => invokeWithPayload(
+    IPC_CHANNELS.REGISTER_LC_MODEL,
+    createLcModelRegistrationPayload(modelPath)
+  ),
   LoadModelFromLCCore: () => ipcRenderer.invoke("LoadModelFromLCCore"),
-  LoadAgeFromLCAge: (args) => ipcRenderer.invoke("LoadAgeFromLCAge", args),
-  LoadPlotData: (args) => ipcRenderer.invoke("LoadPlotData", args),
+  LoadAgeFromLCAge: (payload) => ipcRenderer.invoke("LoadAgeFromLCAge", payload),
+  LoadPlotData: (payload) => ipcRenderer.invoke("LoadPlotData", payload),
   MirrorAgeList: () => ipcRenderer.invoke("MirrorAgeList"),
   Reregister: () => ipcRenderer.invoke("Reregister"),
 
@@ -37,69 +129,86 @@ contextBridge.exposeInMainWorld("LCapi", {
   //calcs
   CalcCompositeDepth: () => ipcRenderer.invoke("CalcCompositeDepth"),
   CalcEventFreeDepth: () => ipcRenderer.invoke("CalcEventFreeDepth"),
-  GetAgeFromEFD: (args0, args1) => ipcRenderer.invoke("GetAgeFromEFD", args0, args1),
-  GetAgeFromCD: (args0, args1) => ipcRenderer.invoke("GetAgeFromCD", args0, args1),
+  GetAgeFromEFD: (payload) => ipcRenderer.invoke("GetAgeFromEFD", payload),
+  GetAgeFromCD: (payload) => ipcRenderer.invoke("GetAgeFromCD", payload),
 
   //tools
   OpenFinder: () => ipcRenderer.invoke("OpenFinder"),
   CloseFinder: () => ipcRenderer.invoke("CloseFinder"),
-  depthConverter: (args0, args1) =>  ipcRenderer.invoke("depthConverter", args0, args1),
-  SendDepthToFinder: (args) => ipcRenderer.invoke("SendDepthToFinder", args),
+  depthConverter: (payload) =>  ipcRenderer.invoke("depthConverter", payload),
+  SendDepthToFinder: (payload) => ipcRenderer.invoke("SendDepthToFinder", payload),
   OpenDivider: () => ipcRenderer.invoke("OpenDivider"),
   CloseDivider: () => ipcRenderer.invoke("CloseDivider"),
-  floatingImageViewer: (args0) => ipcRenderer.invoke("floatingImageViewer",args0),
+  floatingImageViewer: (payload) => ipcRenderer.invoke("floatingImageViewer", payload),
   
 
   //image
-  RegisterCoreImage: (args1,args2) =>  ipcRenderer.invoke("RegisterCoreImage", webUtils.getPathForFile(args1), args2),
-  RegisterCoreImageFromPath: (args1,args2) =>  ipcRenderer.invoke("RegisterCoreImage", args1, args2),
-  LoadCoreImage: (args1, args2) =>  ipcRenderer.invoke("LoadCoreImage", args1, args2),
+  RegisterCoreImage: (payload) => invokeWithPayload(
+    IPC_CHANNELS.REGISTER_CORE_IMAGE,
+    createCoreImageRegistrationPayload(payload)
+  ),
+  RegisterCoreImageFromPath: (payload) => invokeWithPayload(
+    IPC_CHANNELS.REGISTER_CORE_IMAGE,
+    createCoreImageRegistrationPayload(payload)
+  ),
+  LoadCoreImage: (payload) => ipcRenderer.invoke("LoadCoreImage", payload),
   GetResources: () => ipcRenderer.sendSync("GetResources"),
 
 
   //others
-  Confirm: (args1, args2) => ipcRenderer.invoke("Confirm", args1, args2),
-  progressbar: (args1, args2, args3) => ipcRenderer.invoke("progressbar", args1, args2, args3),
-  updateProgressbar: (args1, args2) => ipcRenderer.invoke("updateProgressbar", args1, args2),
+  Confirm: (payload) => ipcRenderer.invoke(
+    IPC_CHANNELS.CONFIRM,
+    normaliseDialogPayload(payload)
+  ),
+  progressbar: (payload) => ipcRenderer.invoke("progressbar", payload),
+  updateProgressbar: (payload) => ipcRenderer.invoke("updateProgressbar", payload),
   clearProgressbar: () => ipcRenderer.invoke("clearProgressbar"),
-  askdialog: (args1, args2) => ipcRenderer.invoke("askdialog", args1, args2),
+  askdialog: (payload) => ipcRenderer.invoke(
+    IPC_CHANNELS.ASK_DIALOG,
+    normaliseDialogPayload(payload)
+  ),
   inputdialog: (args1) => ipcRenderer.invoke("inputdialog", args1),
   toggleDevTools: (args1) => ipcRenderer.send('toggle-devtools',args1),
-  showContextMenu: (args1) => ipcRenderer.invoke("showContextMenu", args1),
-  connectMarkers: (args1,args2,args3) => ipcRenderer.invoke("connectMarkers", args1,args2,args3),
-  disconnectMarkers: (args1,args2,args3) => ipcRenderer.invoke("disconnectMarkers", args1,args2,args3),
-  disconnectAllConnections: (args1,args2) => ipcRenderer.invoke("disconnectAllConnections", args1,args2),
-  deleteMarker: (args1) => ipcRenderer.invoke("deleteMarker", args1),
-  addMarker: (args1,args2,args3,args4) => ipcRenderer.invoke("addMarker", args1,args2,args3,args4),
-  changeMarker: (args1,args2,args3) => ipcRenderer.invoke("changeMarker", args1,args2,args3),
-  changeSection: (args1,args2,args3) => ipcRenderer.invoke("changeSection", args1,args2,args3),
-  deleteSection: (args1,args2) => ipcRenderer.invoke("deleteSection", args1,args2),
-  addSection: (args1,args2) => ipcRenderer.invoke("addSection", args1,args2),
-  changeHole: (args1,args2,args3) => ipcRenderer.invoke("changeHole", args1,args2,args3),
-  deleteHole: (args1) => ipcRenderer.invoke("deleteHole", args1),
-  addHole: (args1,args2) => ipcRenderer.invoke("addHole", args1,args2),
-  moveHoleToProject: (args1,args2) => ipcRenderer.invoke("moveHoleToProject", args1,args2),  
-  addProject: (args1,args2) => ipcRenderer.invoke("addProject", args1,args2),
-  deleteProject: (args1) => ipcRenderer.invoke("deleteProject", args1),
-  changeProject: (args1,args2,args3) => ipcRenderer.invoke("changeProject", args1,args2,args3),
-  changeWorkspace: (args1,args2) => ipcRenderer.invoke("changeWorkspace", args1,args2),
+  showContextMenu: (payload) => ipcRenderer.invoke("showContextMenu", payload),
+  connectMarkers: (payload) => ipcRenderer.invoke("connectMarkers", payload),
+  disconnectMarkers: (payload) => ipcRenderer.invoke("disconnectMarkers", payload),
+  disconnectAllConnections: (payload) => ipcRenderer.invoke("disconnectAllConnections", payload),
+  deleteMarker: (payload) => ipcRenderer.invoke("deleteMarker", payload),
+  addMarker: (payload) => ipcRenderer.invoke("addMarker", payload),
+  changeMarker: (payload) => ipcRenderer.invoke("changeMarker", payload),
+  changeSection: (payload) => ipcRenderer.invoke("changeSection", payload),
+  deleteSection: (payload) => ipcRenderer.invoke("deleteSection", payload),
+  addSection: (payload) => ipcRenderer.invoke("addSection", payload),
+  changeHole: (payload) => ipcRenderer.invoke("changeHole", payload),
+  deleteHole: (payload) => ipcRenderer.invoke("deleteHole", payload),
+  addHole: (payload) => ipcRenderer.invoke("addHole", payload),
+  moveHoleToProject: (payload) => ipcRenderer.invoke("moveHoleToProject", payload),
+  addProject: (payload) => ipcRenderer.invoke("addProject", payload),
+  deleteProject: (payload) => ipcRenderer.invoke("deleteProject", payload),
+  changeProject: (payload) => ipcRenderer.invoke("changeProject", payload),
+  changeWorkspace: (payload) => ipcRenderer.invoke("changeWorkspace", payload),
   mergeProjects: () => ipcRenderer.invoke("mergeProjects"),
   RegisterAgeFromLCAge: () => ipcRenderer.invoke('RegisterAgeFromLCAge'),
-  SetZeroPoint: (args1,args2) => ipcRenderer.invoke("SetZeroPoint", args1,args2),
-  SetMaster: (args1,args2) => ipcRenderer.invoke("SetMaster", args1,args2),
-  AddEvent: (args1,args2,args3,args4) => ipcRenderer.invoke("AddEvent", args1,args2,args3,args4),
-  DeleteEvent: (args1,args2,args3) => ipcRenderer.invoke("DeleteEvent", args1,args2,args3),
+  SetZeroPoint: (payload) => ipcRenderer.invoke("SetZeroPoint", payload),
+  SetMaster: (payload) => ipcRenderer.invoke("SetMaster", payload),
+  AddEvent: (payload) => ipcRenderer.invoke("AddEvent", payload),
+  DeleteEvent: (payload) => ipcRenderer.invoke("DeleteEvent", payload),
   addSectionFromLcsection:(args1) => ipcRenderer.invoke("addSectionFromLcsection", webUtils.getPathForFile(args1)),
   changeEditMode:(args1) => ipcRenderer.invoke("changeEditMode",args1),
-  sendSettings:(args1,args2) => ipcRenderer.invoke("sendSettings",args1,args2),
+  sendSettings:(payload) => ipcRenderer.invoke("sendSettings", payload),
   getDisplayInfo:() => ipcRenderer.invoke("getDisplayInfo"),
-  changeEnable:(args1,args2) => ipcRenderer.invoke("changeEnable",args1,args2),
+  changeEnable:(payload) => ipcRenderer.invoke("changeEnable", payload),
+  e2eSetCloseDialogResponse: (response) => ipcRenderer.invoke("e2eSetCloseDialogResponse", response),
+  e2ePushDialogResponse: (response) => ipcRenderer.invoke("e2ePushDialogResponse", response),
+  e2eGetAndClearDialogLog: () => ipcRenderer.invoke("e2eGetAndClearDialogLog"),
+  e2eSetOpenDialogResponse: (payload) => ipcRenderer.invoke("e2eSetOpenDialogResponse", payload),
+  e2eGetOpenDialogResponse: () => ipcRenderer.invoke("e2eGetOpenDialogResponse"),
 
 
-  sendUndo: (args1) => ipcRenderer.invoke('sendUndo',args1),
-  sendRedo: (args1) => ipcRenderer.invoke('sendRedo',args1),
-  sendSaveState: (args1, args2) => ipcRenderer.invoke('sendSaveState',args1, args2),  
-  getChangedSectionIds: (args1,args2) => ipcRenderer.invoke('getChangedSectionIds',args1,args2),
+  sendUndo: (payload) => ipcRenderer.invoke('sendUndo', payload),
+  sendRedo: (payload) => ipcRenderer.invoke('sendRedo', payload),
+  sendSaveState: (payload) => ipcRenderer.invoke("sendSaveState", payload),  
+  getChangedSectionIds: (payload) => ipcRenderer.invoke("getChangedSectionIds", payload),
   
   //main -> renderer
   receive: (channel, func) => {

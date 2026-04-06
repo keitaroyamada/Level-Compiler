@@ -11,6 +11,9 @@ document.addEventListener("DOMContentLoaded", () => {
                 plotListCount: document.getElementById("plot_list").children.length,
             };
         },
+        sendPlotPayload(payload) {
+            return window.PlotterApi.sendPlotOptions(payload);
+        },
     };
 
     const scroller = document.getElementById("scroller");
@@ -40,7 +43,10 @@ document.addEventListener("DOMContentLoaded", () => {
             //
             await initialiseLCPlotDataCollection();
         }        
-    })    
+    })
+    window.onbeforeunload = () => {
+        window.PlotterApi.windowCloseButton();
+    };
     //-------------------------------------------------------------------------------------------
     document.addEventListener("mousemove", async function (event) {     
         const rect = document.getElementById("p5Canvas").getBoundingClientRect(); // Canvas position and size   
@@ -73,7 +79,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 called_from:"plotter",
                 path:dataList[d].fullpath,
             };
-            await window.PlotterApi.getPlotData(sendData);//plotter -> main -> converter -> main(LCPlot)
+            await window.PlotterApi.getPlotData({ data: sendData });//plotter -> main -> converter -> main(LCPlot)
         }
         console.log("[Plotter]: All csvs are registered into LCPlot.")
     });
@@ -634,7 +640,7 @@ document.addEventListener("DOMContentLoaded", () => {
         } 
 
     })   
-    window.PlotterApi.receive("initiariseSendData", async () => {
+    window.PlotterApi.receive("initialiseSendData", async () => {
         if(LCPlot !== null ){ 
             //remove all sended data
             const parentElement = document.getElementById("plot_list");
@@ -1093,7 +1099,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
     function sendToRenderer(type){
         let selectedList = getSelectedData();
-        window.PlotterApi.sendPlotOptions({data:selectedList, emitType:type}, "renderer");
+        window.PlotterApi.sendPlotOptions({ sendData: { data:selectedList, emitType:type }, to: "renderer" });
     }
     async function unzip(result) {
         if (result == null) {

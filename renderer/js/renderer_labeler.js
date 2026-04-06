@@ -11,6 +11,81 @@ document.addEventListener("DOMContentLoaded", () => {
         sectionName,
       };
     },
+    saveState(name = "e2e-labeler-save") {
+      return window.LabelerApi.sendSaveState({ type: "labeler", name });
+    },
+    async checkFixtureFiles(dirHandle, modelFileName, imageFileName) {
+      const modelExists = await window.LabelerApi.isExistFile({
+        dirHandle,
+        fileName: modelFileName,
+      });
+      const imageExists = await window.LabelerApi.isExistFile({
+        dirHandle,
+        fileName: imageFileName,
+      });
+      const loadedModel = await window.LabelerApi.LoadSectionModel({
+        dirHandle,
+        fileName: modelFileName,
+      });
+      return {
+        modelExists,
+        imageExists,
+        loadedModel,
+      };
+    },
+    async exerciseMarkerPayloadFlow() {
+      const sectionResult = await addSectionData("E2E-HOLE", "E2E-SECTION");
+      if (!sectionResult) {
+        return { ok: false, step: "addSectionData" };
+      }
+
+      const beforeCount = tempCore.projects[0].holes[0].sections[0].markers.length;
+      const added = await addMarkerData("E2E-MARKER", 50, 0.5);
+      if (!added) {
+        return { ok: false, step: "addMarkerData" };
+      }
+
+      const createdMarker =
+        tempCore.projects[0].holes[0].sections[0].markers.find((marker) => marker.name === "E2E-MARKER") ?? null;
+      if (!createdMarker) {
+        return { ok: false, step: "findAddedMarker" };
+      }
+
+      const renamed = await window.LabelerApi.changeMarker({
+        markerId: createdMarker.id,
+        type: "name",
+        value: "E2E-MARKER-RENAMED",
+      });
+      if (!renamed) {
+        return { ok: false, step: "changeMarker" };
+      }
+      tempCore = renamed;
+
+      const renamedMarker =
+        tempCore.projects[0].holes[0].sections[0].markers.find(
+          (marker) => marker.id.toString() === createdMarker.id.toString()
+        ) ?? null;
+      if (!renamedMarker || renamedMarker.name !== "E2E-MARKER-RENAMED") {
+        return { ok: false, step: "verifyRenamedMarker" };
+      }
+
+      const deleted = await window.LabelerApi.deleteMarker({ markerId: createdMarker.id });
+      if (!deleted) {
+        return { ok: false, step: "deleteMarker" };
+      }
+      tempCore = deleted;
+
+      const afterCount = tempCore.projects[0].holes[0].sections[0].markers.length;
+      return {
+        ok: true,
+        beforeCount,
+        afterCount,
+        markerRemoved:
+          tempCore.projects[0].holes[0].sections[0].markers.some(
+            (marker) => marker.id.toString() === createdMarker.id.toString()
+          ) === false,
+      };
+    },
   };
 
   //-------------------------------------------------------------------------------------------
@@ -80,9 +155,11 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const response = await window.LabelerApi.askdialog(
       {
-        title:"Initialise Canvas",
-        message:"Do you want to Remove all data?",
-        parent:"labeler"
+        opts: {
+          title:"Initialise Canvas",
+          message:"Do you want to Remove all data?",
+          parent:"labeler"
+        }
       }
     );
     if (response.response) {
@@ -208,10 +285,16 @@ document.addEventListener("DOMContentLoaded", () => {
 
       //check
       if(!isModelExist){
-        isModelExist = await window.LabelerApi.isExistFile(dirPath, fileName+".lcsection");
+        isModelExist = await window.LabelerApi.isExistFile({
+          dirHandle: dirPath,
+          fileName: fileName+".lcsection",
+        });
       }
       if(!isImExist){
-        isImExist = await window.LabelerApi.isExistFile(dirPath, fileName+".jpg");
+        isImExist = await window.LabelerApi.isExistFile({
+          dirHandle: dirPath,
+          fileName: fileName+".jpg",
+        });
       }
        
     }
@@ -227,10 +310,16 @@ document.addEventListener("DOMContentLoaded", () => {
 
       //check
       if(!isModelExist){
-        isModelExist = await window.LabelerApi.isExistFile(dirPath, fileName+".lcsection");
+        isModelExist = await window.LabelerApi.isExistFile({
+          dirHandle: dirPath,
+          fileName: fileName+".lcsection",
+        });
       }
       if(!isImExist){
-        isImExist = await window.LabelerApi.isExistFile(dirPath, fileName+".jpg");
+        isImExist = await window.LabelerApi.isExistFile({
+          dirHandle: dirPath,
+          fileName: fileName+".jpg",
+        });
       }
     }
 
@@ -249,7 +338,10 @@ document.addEventListener("DOMContentLoaded", () => {
         console.log("Load annotation data: \n",tempCore);
 
         //load image
-        const res2 = await window.LabelerApi.RegisterCoreImage(dirPath, "labeler");
+        const res2 = await window.LabelerApi.RegisterCoreImage({
+          dirHandle: dirPath,
+          type: "labeler",
+        });
         if(res2==true){
           //load images
           modelImages = await loadCoreImages(modelImages, tempCore, objOpts, ["drilling_depth"]);
@@ -277,7 +369,10 @@ document.addEventListener("DOMContentLoaded", () => {
         console.log("Load annotation data: \n",tempCore);
 
         //load image
-        const res = await window.LabelerApi.RegisterCoreImage(dirPath, "labeler");
+        const res = await window.LabelerApi.RegisterCoreImage({
+          dirHandle: dirPath,
+          type: "labeler",
+        });
         if(res==true){
           //load images
           modelImages = await loadCoreImages(modelImages, tempCore, objOpts, ["drilling_depth"]);
@@ -733,14 +828,20 @@ document.addEventListener("DOMContentLoaded", () => {
           if(objOpts.mode == "change_marker_dd" && (ht.nearest_marker_name.includes("-top") || ht.nearest_marker_name.includes("-bottom"))){
             const askData2 = await window.LabelerApi.askdialog(
               {
-                title:"Batch change marker drilling depth",
-                message:"Do you want to update the all marker's drilling depth?",
-                parent:"labeler"
+                opts: {
+                  title:"Batch change marker drilling depth",
+                  message:"Do you want to update the all marker's drilling depth?",
+                  parent:"labeler"
+                }
               }
             );
             if (askData2.response) {
               //first, update top/bottom
-              const tb = await window.LabelerApi.changeMarker(targetId, target, response);
+              const tb = await window.LabelerApi.changeMarker({
+                markerId: targetId,
+                type: target,
+                value: response,
+              });
               if(tb){
                 tempCore = tb;
                 await undo("save", "Replace Top/Bottom Drilling depth");//undo
@@ -761,7 +862,7 @@ document.addEventListener("DOMContentLoaded", () => {
               //delete
               for(let i=0; i<deleteIds.length; i++){
                 const mData = markers[deleteIds[i].toString()];
-                const res1 = await window.LabelerApi.deleteMarker(deleteIds[i]);
+                const res1 = await window.LabelerApi.deleteMarker({ markerId: deleteIds[i] });
                 if(res1){
                   console.log(mData.name+" is deleted.");
                   tempCore = res1;                                    
@@ -790,7 +891,11 @@ document.addEventListener("DOMContentLoaded", () => {
 
             }else{
               //
-              const result3 = await window.LabelerApi.changeMarker(targetId, target, response);
+              const result3 = await window.LabelerApi.changeMarker({
+                markerId: targetId,
+                type: target,
+                value: response,
+              });
               if(result3){
                 await undo("save", "Change Marker Drilling Depth");//undo
                 tempCore = result3;
@@ -800,7 +905,11 @@ document.addEventListener("DOMContentLoaded", () => {
               }
             }
           }else{
-            const result3 = await window.LabelerApi.changeMarker(targetId, target, response);
+            const result3 = await window.LabelerApi.changeMarker({
+              markerId: targetId,
+              type: target,
+              value: response,
+            });
             if(result3){
               await undo("save", "Change Marker Drilling Depth");//undo
               tempCore = result3;
@@ -833,9 +942,11 @@ document.addEventListener("DOMContentLoaded", () => {
       if(objOpts.mode == "delete_marker"){
         const response = await window.LabelerApi.askdialog(
           {
-            title:"Delete markers",
-            message:"Do you want to DELETE the selected marker?",
-            parent:"labeler"
+            opts: {
+              title:"Delete markers",
+              message:"Do you want to DELETE the selected marker?",
+              parent:"labeler"
+            }
           }
         );
         if (response.response) {
@@ -843,7 +954,7 @@ document.addEventListener("DOMContentLoaded", () => {
           
           console.log("[Editor]: Delete marker: " + fromId);
 
-          const result = await window.LabelerApi.deleteMarker(fromId);
+          const result = await window.LabelerApi.deleteMarker({ markerId: fromId });
           if(result){
             tempCore = result;
             await undo("save", "Delete Marker");//undo
@@ -1063,10 +1174,13 @@ document.addEventListener("DOMContentLoaded", () => {
             //load image
             const imageBuffers = await new Promise(async(resolve, reject)=>{
               const imBufferDict = await window.LabelerApi.LoadCoreImage({
-                targetIds:modelImages.load_target_ids,
-                operations:operations,
-                dpcm:objOpts.dpcm,
-              },"labeler");
+                loadOptions: {
+                  targetIds:modelImages.load_target_ids,
+                  operations:operations,
+                  dpcm:objOpts.dpcm,
+                },
+                type: "labeler",
+              });
               resolve(imBufferDict)
             }) 
             results = await assignCoreImages(results, imageBuffers, objOpts);
@@ -1152,7 +1266,10 @@ document.addEventListener("DOMContentLoaded", () => {
     return new Promise(async (resolve, reject) => {
       //initialise
       let results;
-      const res = await window.LabelerApi.LoadSectionModel(pathData, modelName);//load original size
+      const res = await window.LabelerApi.LoadSectionModel({
+        dirHandle: pathData,
+        fileName: modelName,
+      });//load original size
       if(res!==false){
         results = res;
       }
@@ -1219,7 +1336,7 @@ document.addEventListener("DOMContentLoaded", () => {
   }
   async function addSectionData(holeName, sectionName){
     return new Promise(async (resolve, reject) => {
-      const res = await window.LabelerApi.addSectionData(holeName, sectionName);
+      const res = await window.LabelerApi.addSectionData({ holeName, sectionName });
       if(res){
         tempCore = res;
       }
@@ -1229,7 +1346,7 @@ document.addEventListener("DOMContentLoaded", () => {
   }
   async function addMarkerData(name, distance, relative_x){
     return new Promise(async (resolve, reject) => {
-      tempCore = await window.LabelerApi.addMarkerData(name, distance, relative_x);
+      tempCore = await window.LabelerApi.addMarkerData({ name, depth: distance, relativeX: relative_x });
       resolve(tempCore)
     });
   }
@@ -1325,13 +1442,16 @@ document.addEventListener("DOMContentLoaded", () => {
     return new Promise(async(resolve, reject)=>{
       let result;
       if(type == "undo"){
-        result = await window.LabelerApi.sendUndo("labeler");
+        result = await window.LabelerApi.sendUndo({ type: "labeler" });
         console.log("[Labeler]: Recieved undo data: "+result);
       }else if(type == "redo"){
-        result = await window.LabelerApi.sendRedo("labeler");
+        result = await window.LabelerApi.sendRedo({ type: "labeler" });
         console.log("[Labeler]: Recieved redo data: "+result);
       }else if(type == "save"){
-        result = await window.LabelerApi.sendSaveState("labeler", name);
+        result = await window.LabelerApi.sendSaveState({
+          type: "labeler",
+          name,
+        });
         console.log("[Labeler]: Recieved save data: ",result);
       }      
        resolve(result);
