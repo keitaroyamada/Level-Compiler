@@ -1,18 +1,32 @@
 // preload.js
 const { contextBridge, ipcRenderer } = require("electron");
+const IPC_CHANNELS = {
+  CONFIRM: "Confirm",
+};
+
+function normaliseDialogPayload(input) {
+  const opts = input?.opts ?? input ?? {};
+  return {
+    opts: {
+      title: opts.title ?? "",
+      message: opts.message ?? "",
+      parent: opts.parent ?? "main",
+    },
+  };
+}
 
 contextBridge.exposeInMainWorld("DividerApi", {
   //rederer <-> main
   //renderer name: (main name)
   dividerGetCoreList: () => ipcRenderer.invoke("finderGetCoreList"),
 
-  changeFix: (args) => ipcRenderer.invoke("changeFix", args),
+  changeFix: (payload) => ipcRenderer.invoke("changeFix", payload),
 
-  depthConverter: (args1, args2) => ipcRenderer.invoke("depthConverter", args1, args2),
+  depthConverter: (payload) => ipcRenderer.invoke("depthConverter", payload),
 
-  getSectionLimit: (args1, args2) => ipcRenderer.invoke("getSectionLimit", args1, args2),
+  getSectionLimit: (payload) => ipcRenderer.invoke("getSectionLimit", payload),
 
-  MoveToHorizon: (args1) => ipcRenderer.invoke("MoveToHorizon", args1),
+  MoveToHorizon: (payload) => ipcRenderer.invoke("MoveToHorizon", payload),
   terminalLog: (args1) => ipcRenderer.invoke("terminalLog", args1),
   rendererLog: (args1) => ipcRenderer.invoke("rendererLog", args1),
   toggleDevTools: (args1) => ipcRenderer.send('toggle-devtools',args1),
@@ -20,11 +34,11 @@ contextBridge.exposeInMainWorld("DividerApi", {
 
   inputdialog: (args1) => ipcRenderer.invoke("inputdialog", args1),
 
-  dividerConverter: (args1,args2, args3) => ipcRenderer.sendSync("dividerConverter", args1,args2, args3),
+  dividerConverter: (payload) => ipcRenderer.invoke("dividerConverter", payload),
 
   dividerReflow: () => ipcRenderer.invoke("dividerReflow", ),
 
-   Confirm: (args1, args2) => ipcRenderer.invoke("Confirm", args1, args2),
+   Confirm: (payload) => ipcRenderer.invoke(IPC_CHANNELS.CONFIRM, normaliseDialogPayload(payload)),
 
   //main -> renderer
   receive: (channel, func) => {

@@ -256,14 +256,20 @@ document.addEventListener("DOMContentLoaded", () => {
         polationType: "linear",  
         allowOutside: true
       };
-      const resultUpper = await window.DividerApi.depthConverter([["NoUse", ["NoUse", holeName, sectionName, start], sectionId]], options);
+      const resultUpper = await window.DividerApi.depthConverter({
+        dataList: [["NoUse", ["NoUse", holeName, sectionName, start], sectionId]],
+        options,
+      });
       posUpper = resultUpper.efd;
       options = {
         sourceType: "event_free_depth",
         polationType: "linear",  
         allowOutside: true
       };
-      const resultLower = await window.DividerApi.depthConverter([["NoUse", posUpper+interval, sectionId]], options);
+      const resultLower = await window.DividerApi.depthConverter({
+        dataList: [["NoUse", posUpper+interval, sectionId]],
+        options,
+      });
       distUpper = resultUpper.distance;
       distLower = resultLower.distance;
     }else if(type == "Age"){
@@ -272,14 +278,20 @@ document.addEventListener("DOMContentLoaded", () => {
         polationType: "linear",  
         allowOutside: true
       };
-      const result = await window.DividerApi.depthConverter([["NoUse", ["NoUse", holeName, sectionName, start], sectionId]], options);
+      const result = await window.DividerApi.depthConverter({
+        dataList: [["NoUse", ["NoUse", holeName, sectionName, start], sectionId]],
+        options,
+      });
       posUpper = result.age_mid;
       options = {
         sourceType: "age",
         polationType: "linear",  
         allowOutside: true
       };
-      const resultLower = await window.DividerApi.depthConverter([["NoUse", posUpper+interval, sectionId]], options);
+      const resultLower = await window.DividerApi.depthConverter({
+        dataList: [["NoUse", posUpper+interval, sectionId]],
+        options,
+      });
       distUpper = resultUpper.distance;
       distLower = resultLower.distance;
     }
@@ -326,7 +338,10 @@ document.addEventListener("DOMContentLoaded", () => {
           polationType: "linear",  
           allowOutside: true
         };
-        const resultLower = await window.DividerApi.depthConverter([["NoUse", posUpper, sectionId]], options);
+        const resultLower = await window.DividerApi.depthConverter({
+          dataList: [["NoUse", posUpper, sectionId]],
+          options,
+        });
         
         distUpper = distLower;
         distLower = resultLower.distance;
@@ -337,7 +352,10 @@ document.addEventListener("DOMContentLoaded", () => {
           polationType: "linear",  
           allowOutside: true
         };
-        const resultLower = await window.DividerApi.depthConverter([["NoUse", posUpper, sectionId]], options);
+        const resultLower = await window.DividerApi.depthConverter({
+          dataList: [["NoUse", posUpper, sectionId]],
+          options,
+        });
         
         distUpper = distLower;
         distLower = resultLower.distance;
@@ -547,9 +565,11 @@ document.addEventListener("DOMContentLoaded", () => {
     if (rows.length > 1) {
       const userResponse = await window.DividerApi.Confirm(
         {
-          title:"Confirm",
-          message:"Do you want to update the definition table?",
-          parent: "divider"
+          opts: {
+            title:"Confirm",
+            message:"Do you want to update the definition table?",
+            parent: "divider"
+          }
         }
       );
       
@@ -994,7 +1014,7 @@ document.getElementById("definition_lower").addEventListener("click", () => {
   }
 });
   //-------------------------------------------------------------------------------------------
-document.getElementById("calcButton").addEventListener("click", () => {
+document.getElementById("calcButton").addEventListener("click", async () => {
   //get data
   const [targetData, targetIdx] = getTableData("target_table");
   //const filteredTargetData = targetData.filter(row => row[0]===true);
@@ -1018,7 +1038,11 @@ document.getElementById("calcButton").addEventListener("click", () => {
   const secId  = sectionList[holeIdx][sectionIdx][1];
 
   //calc main
-  let resultList = window.DividerApi.dividerConverter([holeId, secId, depthData], targetData, calcDirection);
+  let resultList = await window.DividerApi.dividerConverter({
+    depthData: [holeId, secId, depthData],
+    targetData,
+    direction: calcDirection,
+  });
   console.log("[divider]: calced results", resultList);
 
   if(resultList==null){
@@ -1162,6 +1186,51 @@ document.addEventListener("keydown", (e) => {
       sectionCount: document.getElementById("sectionOptions").options.length,
       calcDirection: document.getElementById("directionOptions").value,
     }),
+    runDividerConverter: async () => {
+      const depthBody = document.getElementById("depth_body");
+      while (depthBody.rows.length > 0) {
+        depthBody.deleteRow(0);
+      }
+      await updateMarkerTable();
+      const targetBody = document.getElementById("target_body");
+      while (targetBody.rows.length > 0) {
+        targetBody.deleteRow(0);
+      }
+      document.getElementById("add_target").click();
+
+      const depthRows = Array.from(document.querySelectorAll("#depth_table tbody tr"));
+      if (depthRows.length === 0) {
+        return { ok: false, error: "divider_depth_rows_not_ready" };
+      }
+
+      const firstDepth = Number(depthRows[0].cells[2].innerText);
+      const targetRow = targetBody.rows[0];
+      targetRow.cells[1].innerText = "E2E sample";
+      targetRow.cells[2].innerText = String(firstDepth);
+      targetRow.cells[3].innerText = String(firstDepth + 1);
+
+      const [targetData] = getTableData("target_table");
+      const [depthData] = getTableData("depth_table");
+      if (targetData.length === 0 || depthData.length === 0) {
+        return { ok: false, error: "divider_tables_not_ready" };
+      }
+
+      const holeIdx = document.getElementById("holeOptions").value;
+      const sectionIdx = document.getElementById("sectionOptions").value;
+      const holeId = holeList[holeIdx][1];
+      const secId = sectionList[holeIdx][sectionIdx][1];
+      const direction = document.getElementById("directionOptions").value;
+      const resultList = await window.DividerApi.dividerConverter({
+        depthData: [holeId, secId, depthData],
+        targetData,
+        direction,
+      });
+
+      return {
+        ok: Array.isArray(resultList),
+        resultCount: Array.isArray(resultList) ? resultList.length : 0,
+      };
+    },
   };
    //-------------------------------------------------------------------------------------------
 });

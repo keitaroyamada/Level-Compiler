@@ -80,6 +80,43 @@ let globalPath = {
 let mainSettings = {isAutoUpdateDownload: true};
 let globalTempData = null;
 let sendBuffer = null;
+let e2eCloseDialogResponse = null;
+let e2eDialogResponses = [];
+let e2eDialogLog = [];
+let e2eOpenDialogResponse = {
+  file: null,
+  folder: null,
+};
+let isMainWindowClosing = false;
+
+function resetTransientAppState() {
+  globalTempData = null;
+  sendBuffer = null;
+  tempCore = null;
+  viewerCore = null;
+  labelerHistory = null;
+}
+
+function recordE2EDialog(options) {
+  if (process.env.LC_E2E !== "1") {
+    return;
+  }
+  e2eDialogLog.push({
+    title: options?.title ?? null,
+    message: options?.message ?? null,
+    buttons: Array.isArray(options?.buttons) ? [...options.buttons] : [],
+  });
+}
+
+async function showMessageBoxWithE2E(window, options) {
+  recordE2EDialog(options);
+
+  if (process.env.LC_E2E === "1" && e2eDialogResponses.length > 0) {
+    return { response: e2eDialogResponses.shift() };
+  }
+
+  return dialog.showMessageBox(window, options);
+}
 
 //windows
 let mainWindow = null;
@@ -302,6 +339,42 @@ function closeConverterWindow() {
   return true;
 }
 
+function closePlotterWindow() {
+  if (!hasPlotterWindow()) {
+    return false;
+  }
+
+  const currentPlotterWindow = getPlotterWindow();
+  currentPlotterWindow.removeAllListeners("close");
+  currentPlotterWindow.close();
+  clearPlotterWindow();
+  return true;
+}
+
+function closeDividerWindow() {
+  if (!hasDividerWindow()) {
+    return false;
+  }
+
+  const currentDividerWindow = getDividerWindow();
+  currentDividerWindow.removeAllListeners("close");
+  currentDividerWindow.close();
+  clearDividerWindow();
+  return true;
+}
+
+function closeFinderWindow() {
+  if (!hasFinderWindow()) {
+    return false;
+  }
+
+  const currentFinderWindow = getFinderWindow();
+  currentFinderWindow.removeAllListeners("close");
+  currentFinderWindow.close();
+  clearFinderWindow();
+  return true;
+}
+
 function openSettingsWindow({
   browserWindowOptions = {},
   onExisting = null,
@@ -401,6 +474,30 @@ function sendToPlotterWindow(channel, payload = null) {
   return sendToManagedWindow(WINDOW_TYPES.PLOTTER, channel, payload);
 }
 
+function closeChildWindows() {
+  if (hasFinderWindow()) {
+    getFinderWindow().close();
+  }
+  if (hasDividerWindow()) {
+    getDividerWindow().close();
+  }
+  if (hasConverterWindow()) {
+    getConverterWindow().close();
+  }
+  if (hasLabelerWindow()) {
+    getLabelerWindow().close();
+  }
+  if (hasImageViewerWindow()) {
+    getImageViewerWindow().close();
+  }
+  if (hasSettingsWindow()) {
+    getSettingsWindow().close();
+  }
+  if (hasPlotterWindow()) {
+    getPlotterWindow().close();
+  }
+}
+
 function createMainWIndow() {
   const mainWindow = setMainWindow(createWindow(WINDOW_TYPES.MAIN, { isDev }));
 
@@ -408,54 +505,51 @@ function createMainWIndow() {
   if (isDev) {
     mainWindow.webContents.openDevTools();
   }
-  mainWindow.on('close', async(event) => {
+  mainWindow.on('close', (event) => {
+    if (isMainWindowClosing) {
+      closeChildWindows();
+      return;
+    }
+
     const historyList = history.getHistory();
     const lastAction = historyList[historyList.length-1];
 
     if(historyList.length>0 && !lastAction.name.includes("export lcmodel")){
       event.preventDefault();
+      void (async () => {
+        const options = {
+          type: "question",
+          buttons: ["No", "Yes"],
+          defaultId: 0,
+          title: "Unsaved Changes",
+          message: "Unsaved changes to the model. Do you really want to exit?",
+        };
+        recordE2EDialog(options);
+        const response =
+          process.env.LC_E2E === "1" && e2eCloseDialogResponse !== null
+            ? { response: e2eCloseDialogResponse }
+            : await showMessageBoxWithE2E(null, options);
+        e2eCloseDialogResponse = null;
+        console.log(response)
+        if(response.response === 0){
+          return;
+        }
 
-      const options = {
-        type: "question",
-        buttons: ["No", "Yes"],
-        defaultId: 0,
-        title: "Unsaved Changes",
-        message: "Unsaved changes to the model. Do you really want to exit?",
-      };
-
-      const response = await dialog.showMessageBox(null, options);
-      console.log(response)
-      if(response.response === 0){
-        return
-      }
-    }
-
-    if (hasFinderWindow()) {
-      getFinderWindow().close();
-    }
-    if (hasDividerWindow()) {
-      getDividerWindow().close();
-    }
-    if (hasConverterWindow()) {
-      getConverterWindow().close();
-    }
-    if (hasLabelerWindow()) {
-      getLabelerWindow().close();
-    }
-    if (hasImageViewerWindow()) {
-      getImageViewerWindow().close();
-    }
-    if (hasSettingsWindow()) {
-      getSettingsWindow().close();
-    }
-    if (hasPlotterWindow()) {
-      getPlotterWindow().close();
+        isMainWindowClosing = true;
+        closeChildWindows();
+        if (hasMainWindow()) {
+          getMainWindow().close();
+        }
+      })();
+      return;
     }
 
-    if (hasMainWindow()) {
-      getMainWindow().destroy();
-      clearMainWindow();
-    }
+    isMainWindowClosing = true;
+    closeChildWindows();
+  });
+  mainWindow.on("closed", () => {
+    clearMainWindow();
+    isMainWindowClosing = false;
   });
 
   //initialise
@@ -472,6 +566,8 @@ function createMainWIndow() {
   ipcMain.handle("InitialiseCorrelationModel", async (_e) => {
     //initialise
     LCCore = initialiseLCCore();
+    history.setInitialState(LCCore.exportSerialisedModel());
+    resetTransientAppState();
     const zipped = await zipData(LCCore.exportSerialisedModel());
 
     console.log("MAIN: Project correlation data is initialised.");
@@ -481,6 +577,7 @@ function createMainWIndow() {
     //initialise
     LCAge = new LevelCompilerAge();
     LCCore.calcMarkerAges(LCAge);
+    resetTransientAppState();
     console.log("MAIN: Project age data is initialised.");
     return;
   });
@@ -508,12 +605,14 @@ function createMainWIndow() {
   ipcMain.handle("InitialisePaths", async (_e) => {
     //import modeln
     initialiseGlobalPath();
+    resetTransientAppState();
     console.log("MAIN: Paths are initialised.");
     return;
   });
   //============================================================================================
   //register and load model data
-  ipcMain.handle("RegisterModelFromCsv", async (_e, model_path) => {
+  ipcMain.handle("RegisterModelFromCsv", async (_e, payload) => {
+    const { modelPath: model_path } = payload;
     //get file path
     let results = path.parse(model_path);
     const fullpath = path.join(results.dir, results.base);
@@ -521,7 +620,8 @@ function createMainWIndow() {
     const result = registerModelFromCsv(fullpath);
     return result
   });
-  ipcMain.handle("RegistertAgeFromCsv", async (_e, age_path) => {
+  ipcMain.handle("RegistertAgeFromCsv", async (_e, payload) => {
+    const { agePath: age_path } = payload;
     try {
       //get file path
       let results = path.parse(age_path);
@@ -547,7 +647,8 @@ function createMainWIndow() {
       return null;
     }
   });
-  ipcMain.handle("RegisterLCmodel", async (_e, model_path) => {
+  ipcMain.handle("RegisterLCmodel", async (_e, payload) => {
+    const { modelPath: model_path } = payload;
     try {
       //get file path
       let results = path.parse(model_path);
@@ -573,7 +674,8 @@ function createMainWIndow() {
       return null;
     }
   });
-  ipcMain.handle("LoadAgeFromLCAge", async (_e, age_id) => {
+  ipcMain.handle("LoadAgeFromLCAge", async (_e, payload) => {
+    const { ageId: age_id } = payload;
     //apply latest age model to the depth model
     let model_name = null;
 
@@ -699,7 +801,8 @@ function createMainWIndow() {
     results.imagepath = path.join(results.dir, results.name+".jpg");//force to rename for labeler
     return results;
   });
-  ipcMain.handle("CheckImagesInDir", async (_e, name) => {
+  ipcMain.handle("CheckImagesInDir", async (_e, payload) => {
+    const { fileName: name } = payload;
     let targetList = globalPath.dataPaths.filter(item=>item.type=="core_images");
     //mainWindow.webContents.send("rendererLog", targetList);
 
@@ -713,19 +816,20 @@ function createMainWIndow() {
     }
     return result;
   });
-  ipcMain.handle("FileChoseDialog", async (_e, title, ext) => {
-    const result = await getfile(getMainWindow(), title, ext);
+  ipcMain.handle("FileChoseDialog", async (_e, payload) => {
+    const result = await getfile(getMainWindow(), payload.title, payload.ext);
     
     return result;
   });
-  ipcMain.handle("FolderChoseDialog", async (_e, title) => {
-    const result = await getDirectory(getMainWindow(), title);
+  ipcMain.handle("FolderChoseDialog", async (_e, payload) => {
+    const result = await getDirectory(getMainWindow(), payload.title);
     return result;
   });
 
  //============================================================================================
  //image process
-  ipcMain.handle('RegisterCoreImage', (_e, dir_handle, type) => {
+  ipcMain.handle('RegisterCoreImage', (_e, payload) => {
+    const { dirHandle: dir_handle, type } = payload;
     try{
       //get file path
       const pathData = path.parse(dir_handle);
@@ -762,7 +866,8 @@ function createMainWIndow() {
       return false
     } 
   });
-  ipcMain.handle("LoadCoreImage", async (_e, loadOptions, type) => {
+  ipcMain.handle("LoadCoreImage", async (_e, payload) => {
+    const { loadOptions, type } = payload;
     //type: "core_images", "labeler"    
     const coreImages = await loadCoreImages(loadOptions, type);
     return coreImages;
@@ -1172,7 +1277,8 @@ function createMainWIndow() {
     
     _e.returnValue = {plot:plot_icons, tool:tool_icons, finder:finder_icons, labeler:labeler_icons};
   });
-  ipcMain.handle("isExistFile",(_e, dirHandle, fileName)=>{
+  ipcMain.handle("isExistFile",(_e, payload)=>{
+    const { dirHandle, fileName } = payload;
     try{
       //get file path
       const pathData = path.parse(dirHandle);
@@ -1196,7 +1302,8 @@ function createMainWIndow() {
       return false
     } 
   });
-  ipcMain.handle("floatingImageViewer", async (_e, targetId) => {
+  ipcMain.handle("floatingImageViewer", async (_e, payload) => {
+    const { targetId } = payload;
     try{
       const loadOptions = {
         targetIds: [targetId], 
@@ -1304,13 +1411,14 @@ function createMainWIndow() {
       return "fail_to_add"
     }
   });
-  ipcMain.handle("progressbar", async (_e, tit, txt, indeterminate, window="mainWindow") => {
+  ipcMain.handle("progressbar", async (_e, progressbarPayload) => {
+    const { title, text, indeterminate, targetWindow: requestedWindow = "mainWindow" } = progressbarPayload;
     progressBar = null;
     let targetWindow = getMainWindow();
-    if(window == "converterWindow"){
+    if(requestedWindow == "converterWindow"){
       targetWindow = getConverterWindow();
     }
-    progressBar = progressDialog(targetWindow, tit, txt, indeterminate);
+    progressBar = progressDialog(targetWindow, title, text, indeterminate);
     //await new Promise(resolve => setTimeout(resolve, 100));
     if (progressBar && typeof progressBar.once === 'function') {
       await new Promise(resolve => progressBar.once('ready', resolve));
@@ -1325,8 +1433,8 @@ function createMainWIndow() {
       return true
     }    
   });
-  ipcMain.handle("updateProgressbar", async (_e, n, N) => {
-    progressBar = await updateProgress(progressBar, n, N);
+  ipcMain.handle("updateProgressbar", async (_e, progressPayload) => {
+    progressBar = await updateProgress(progressBar, progressPayload.current, progressPayload.total);
     return true
   });
   ipcMain.handle("clearProgressbar", async (_e) => {
@@ -1336,7 +1444,8 @@ function createMainWIndow() {
       return true
     }         
   });
-  ipcMain.handle("askdialog", (_e, opts, txt) => {
+  ipcMain.handle("askdialog", (_e, dialogPayload) => {
+    const { opts } = dialogPayload;
     const options = {
       type: "question",
       buttons: ["No", "Yes"],
@@ -1383,7 +1492,8 @@ function createMainWIndow() {
         return null;
     }
   });
-  ipcMain.handle('showContextMenu', (event, type) => {
+  ipcMain.handle('showContextMenu', (event, payload) => {
+    const { type } = payload;
     return new Promise((resolve) => {
       let template;
       if(type == "editContextMenu"){
@@ -2108,7 +2218,8 @@ function createMainWIndow() {
 
     return results;
   });
-  ipcMain.handle("LabelerAddSectionData", async (_e, holeName, sectionName) => {
+  ipcMain.handle("LabelerAddSectionData", async (_e, payload) => {
+    const { holeName, sectionName } = payload;
     //create new section
     //change temp hole name
     //const result = LCCore.addSectionModel(targetHoleIds[0], sectionData);
@@ -2132,9 +2243,10 @@ function createMainWIndow() {
 
     return tempCore.exportSerialisedModel();
   });
-  ipcMain.handle("LabelerAddMarkerData", async (_e, name, depth, relative_x) => {
+  ipcMain.handle("LabelerAddMarkerData", async (_e, payload) => {
+    const { name, depth, relativeX } = payload;
     //add marker
-    const result = tempCore.addMarker(tempCore.projects[0].holes[0].sections[0].id, depth, "distance", relative_x);
+    const result = tempCore.addMarker(tempCore.projects[0].holes[0].sections[0].id, depth, "distance", relativeX);
     
     if(result==true){
       const nearMarkers = tempCore.getMarkerIdsByDistance(tempCore.projects[0].holes[0].sections[0].id, depth);
@@ -2162,7 +2274,8 @@ function createMainWIndow() {
       return false;
     }    
   });
-  ipcMain.handle("LabelerChangeMarker", (_e, markerId, type, value) => {
+  ipcMain.handle("LabelerChangeMarker", (_e, payload) => {
+    const { markerId, type, value } = payload;
     //
     const idx = tempCore.search_idx_list[markerId.toString()];
     
@@ -2194,7 +2307,11 @@ function createMainWIndow() {
       }
     }
   });
-  ipcMain.handle("LabelerDeleteMarker", (_e, markerId) => {
+  ipcMain.handle("LabelerDeleteMarker", (_e, payload) => {
+    const markerId =
+      payload && typeof payload === "object" && Array.isArray(payload) === false
+        ? payload.markerId
+        : payload;
     //console.log(markerId)
     const result = tempCore.deleteMarker(markerId);
     if(result == true){
@@ -2245,7 +2362,8 @@ function createMainWIndow() {
       
 
   });
-  ipcMain.handle("LabelerLoadSectionModel", (_e, dirHandle, fileName) => {
+  ipcMain.handle("LabelerLoadSectionModel", (_e, payload) => {
+    const { dirHandle, fileName } = payload;
     //register lcsection model
     try{
       //get file path
@@ -2302,7 +2420,8 @@ function createMainWIndow() {
   ipcMain.handle("ChangeDepthScale", async (_e, newId) => {
     LCCore.changeBaseProject(newId);
   });
-  ipcMain.handle("PlotterGetData", (_e, data) => {
+  ipcMain.handle("PlotterGetData", (_e, payload) => {
+    const { data } = payload;
     openConverterWindow({
       browserWindowOptions: {
         parent: hasPlotterWindow() ? getPlotterWindow() : getMainWindow(),
@@ -2324,20 +2443,17 @@ function createMainWIndow() {
   });
   ipcMain.handle("PlotterClose", (_e, data) => {
     isPlotterClose = true;
-    getPlotterWindow().removeAllListeners("close");
-    getPlotterWindow().close();
-    clearPlotterWindow();
+    closePlotterWindow();
     sendToMainWindow("PlotterClosed", "");
   });
   ipcMain.on("windowCloseButton", (_e) => {
     isPlotterClose = false;
-    getPlotterWindow().removeAllListeners("close");
-    getPlotterWindow().close();
-    clearPlotterWindow();
+    closePlotterWindow();
     sendToMainWindow("PlotterClosed", "");
     isPlotterClose = false;
   });
-  ipcMain.handle("LoadPlotData", async (_e, type) => {
+  ipcMain.handle("LoadPlotData", async (_e, payload) => {
+    const { type } = payload;
     //calc latest age and depth
     //LC plot age_collection id is as same as LCAge id
 
@@ -2402,7 +2518,8 @@ function createMainWIndow() {
     //LCCore.getModelSummary();
     return zipped;
   });
-  ipcMain.handle("GetAgeFromEFD", async (_e, efd, method) => {
+  ipcMain.handle("GetAgeFromEFD", async (_e, payload) => {
+    const { efd, method } = payload;
     //calc age
     const age = LCAge.getAgeFromEFD(efd, method);
     if (age == null) {
@@ -2411,7 +2528,8 @@ function createMainWIndow() {
       return age.mid;
     }
   });
-  ipcMain.handle("GetAgeFromCD", async (_e, cd, method) => {
+  ipcMain.handle("GetAgeFromCD", async (_e, payload) => {
+    const { cd, method } = payload;
     //calc efd
     if (LCCore.base_project_id == null) {
       return NaN;
@@ -2430,7 +2548,8 @@ function createMainWIndow() {
       return age.age.mid;
     }
   });
-  ipcMain.on("dividerConverter", async (_e, depthData, targetData, direction) => {
+  ipcMain.handle("dividerConverter", async (_e, payload) => {
+    const { depthData, targetData, direction } = payload;
     //calc 
     console.log("MAIN: Calc divider ["+direction+"]")
     //depthData: [holeId, secId, depthData], targetData
@@ -2699,7 +2818,7 @@ function createMainWIndow() {
       resultList.push(result);
     }
 
-    _e.returnValue = resultList;    
+    return resultList;
   });
   ipcMain.handle("OpenDivider", async (_e) => {
     if (hasDividerWindow()) {
@@ -2736,11 +2855,8 @@ function createMainWIndow() {
   });
 
   ipcMain.handle("CloseDivider", async (_e) => {
-    if (hasDividerWindow()) {
-      getDividerWindow().close();
-      clearDividerWindow();
-      return;
-    }
+    closeDividerWindow();
+    return;
   });
   ipcMain.handle("dividerReflow", async (_e) => {
     if (hasDividerWindow()) {
@@ -2814,13 +2930,11 @@ function createMainWIndow() {
     });
   });
   ipcMain.handle("CloseFinder", async (_e) => {
-    if (hasFinderWindow()) {
-      getFinderWindow().close();
-      clearFinderWindow();
-      return;
-    }
+    closeFinderWindow();
+    return;
   });
-  ipcMain.handle("Confirm", async (event, opts, message) => {
+  ipcMain.handle("Confirm", async (event, confirmPayload) => {
+    const { opts } = confirmPayload;
     const options = {
       type: "question",
       buttons: ["Yes", "No"],
@@ -2838,7 +2952,8 @@ function createMainWIndow() {
     const result = await dialog.showMessageBox(targetWindow, options);
     return result.response === 0;
   });
-  ipcMain.handle("SendDepthToFinder", async (_e, data) => {
+  ipcMain.handle("SendDepthToFinder", async (_e, payload) => {
+    const { data } = payload;
     return sendToFinderWindow("SendDepthFromMain", data);
   });
   ipcMain.on("request-mainprocess-info", (event) => {
@@ -2897,7 +3012,8 @@ function createMainWIndow() {
     }
     
   });
-  ipcMain.handle("sendUndo", async (_e, type) => { 
+  ipcMain.handle("sendUndo", async (_e, payload) => {
+    const { type } = payload;
     if(type=="main"){
       const result = history.undo();   
       if(result !== null){
@@ -2963,7 +3079,8 @@ function createMainWIndow() {
     }
     
   });
-  ipcMain.handle("sendRedo", async (_e, type) => {
+  ipcMain.handle("sendRedo", async (_e, payload) => {
+    const { type } = payload;
     if(type=="main"){
       const result = history.redo();      
       if(result !== null){
@@ -3024,7 +3141,8 @@ function createMainWIndow() {
       }
     }
   });
-  ipcMain.handle("sendSaveState", async (_e, type, name="unnamed") => {
+  ipcMain.handle("sendSaveState", async (_e, payload) => {
+    const { type, name = "unnamed" } = payload;
     if(type=="main"){
       history.saveState(LCCore.exportSerialisedModel(), name);
       console.log("MAIN: State saved. Num of history is " + history.undoStack.length);    
@@ -3035,7 +3153,8 @@ function createMainWIndow() {
       return true;
     }
   });
-  ipcMain.handle("getChangedSectionIds", async (_e, type, numPrevious) => {
+  ipcMain.handle("getChangedSectionIds", async (_e, payload) => {
+    const { type, numPrevious } = payload;
     if(type=="main"){
       const result = history.getDelta(numPrevious);
       const ids = getChangedSectionIds(history.lastState, result);
@@ -3173,7 +3292,8 @@ function createMainWIndow() {
     data.push([LCCore.projects[idx].id, LCCore.projects[idx].name]);
     return data;
   });
-  ipcMain.handle("cvtLoadCsv", async (_e, title, ext, pathData) => {
+  ipcMain.handle("cvtLoadCsv", async (_e, payload) => {
+    const { title, ext, pathData } = payload;
     try{
       //progress bar
       progressBar   = progressDialog(getConverterWindow(), "Depth Converter", "Now checking...", true);
@@ -3241,7 +3361,8 @@ function createMainWIndow() {
       console.error(error)
     }
   });
-  ipcMain.handle("cvtConverter", async (_e, options) => {
+  ipcMain.handle("cvtConverter", async (_e, payload) => {
+    let { options } = payload;
     options = await unzipData(options);
     if(!globalTempData){
 
@@ -3607,12 +3728,8 @@ function createMainWIndow() {
           }
 
         }else if(options.callFrom == "converter"){    
-          globalTempData = null; 
-          if (hasConverterWindow()) {
-            console.log("Converter Close called.")
-            closeConverterWindow();
-          }
-          return {ok: false, reason: "There is no actions."}     
+          globalTempData = null;
+          return {ok: false, reason: "There is no actions."}
         }
         
         //finish
@@ -3678,7 +3795,8 @@ function createMainWIndow() {
 
     return [projectList, holeList, sectionList];
   });
-  ipcMain.handle("changeFix", async (_e, isFix) => {
+  ipcMain.handle("changeFix", async (_e, payload) => {
+    const { isFix } = payload;
     if (!hasFinderWindow()) {
       return;
     }
@@ -3691,7 +3809,8 @@ function createMainWIndow() {
       
     }
   });
-  ipcMain.handle("getSectionLimit", async (_e, projectId, holeName, sectionName) => {
+  ipcMain.handle("getSectionLimit", async (_e, payload) => {
+    const { projectId, holeName, sectionName } = payload;
     const idx = LCCore.getIdxFromTrinity(projectId, [holeName, sectionName, ""]);
 
     const sectionData = LCCore.projects[idx[0]].holes[idx[1]].sections[idx[2]];
@@ -3699,7 +3818,8 @@ function createMainWIndow() {
     const dist_lower = sectionData.markers[sectionData.markers.length - 1].distance;
     return [dist_upper, dist_lower];
   });
-  ipcMain.handle("MoveToHorizon", async (_e, data) => {
+  ipcMain.handle("MoveToHorizon", async (_e, payload) => {
+    const { data } = payload;
     getMainWindow().webContents.send("MoveToHorizonFromFinder", data);
   });
   ipcMain.handle("terminalLog", async (_e, data) => {
@@ -3708,12 +3828,14 @@ function createMainWIndow() {
   ipcMain.handle("rendererLog", async (_e, data) => {
     getMainWindow().webContents.send("rendererLog", data);
   });
-  ipcMain.handle("sendPlotOptions", (_e,data, to) => {
+  ipcMain.handle("sendPlotOptions", (_e, payload) => {
+    const { sendData, to } = payload;
     if(to=="renderer"){
-      getMainWindow().webContents.send("PlotDataOptions", data);
+      getMainWindow().webContents.send("PlotDataOptions", sendData);
     }    
   });
-  ipcMain.handle("depthConverter", async (_e, dataList, options) => {
+  ipcMain.handle("depthConverter", async (_e, payload) => {
+    const { dataList, options } = payload;
     
     //convert
     const resultList = await depthConverter(dataList, options);
@@ -3745,7 +3867,8 @@ function createMainWIndow() {
     menuRebuild();
     
   });
-  ipcMain.handle("sendSettings", (_e,sendData, to) => {
+  ipcMain.handle("sendSettings", (_e, payload) => {
+    const { sendData, to } = payload;
     if(to=="settings"){
       if(!hasSettingsWindow()){
         openSettingsWindow({
@@ -3774,7 +3897,8 @@ function createMainWIndow() {
       setSettings("settingsRenderer", sendData.data)
     }    
   });
-  ipcMain.handle("saveBookmarks", (_e, data) => {
+  ipcMain.handle("saveBookmarks", (_e, payload) => {
+    const { bookmarks: data } = payload;
     let LCBookmarkSet= getSettings("bookmarks");
     if(LCBookmarkSet==null){
       LCBookmarkSet = {};
@@ -3785,15 +3909,63 @@ function createMainWIndow() {
   ipcMain.handle("requestCurrentPosition", (_e) => {
     getMainWindow().webContents.send("FinderRequestCurrentPosition");    
   });
+  ipcMain.handle("e2eSetCloseDialogResponse", (_e, response) => {
+    if (process.env.LC_E2E !== "1") {
+      return false;
+    }
+    e2eCloseDialogResponse = response;
+    return true;
+  });
+  ipcMain.handle("e2ePushDialogResponse", (_e, response) => {
+    if (process.env.LC_E2E !== "1") {
+      return false;
+    }
+    e2eDialogResponses.push(response);
+    return true;
+  });
+  ipcMain.handle("e2eGetAndClearDialogLog", () => {
+    if (process.env.LC_E2E !== "1") {
+      return [];
+    }
+    const log = [...e2eDialogLog];
+    e2eDialogLog = [];
+    return log;
+  });
+  ipcMain.handle("e2eSetOpenDialogResponse", (_e, payload) => {
+    if (process.env.LC_E2E !== "1") {
+      return false;
+    }
+    if (!payload || typeof payload !== "object") {
+      e2eOpenDialogResponse = { file: null, folder: null };
+      return true;
+    }
+    e2eOpenDialogResponse = {
+      file: Object.prototype.hasOwnProperty.call(payload, "file")
+        ? payload.file
+        : e2eOpenDialogResponse.file,
+      folder: Object.prototype.hasOwnProperty.call(payload, "folder")
+        ? payload.folder
+        : e2eOpenDialogResponse.folder,
+    };
+    return true;
+  });
+  ipcMain.handle("e2eGetOpenDialogResponse", () => {
+    if (process.env.LC_E2E !== "1") {
+      return null;
+    }
+    return { ...e2eOpenDialogResponse };
+  });
 
-  ipcMain.handle("openExtarnalLink", (_e,url) => {
+  ipcMain.handle("openExtarnalLink", (_e, payload) => {
+    const { url } = payload;
     if(url){
       shell.openExternal(url);
     }
   });
   //--------------------------------------------------------------------------------------------------
   //-----workspace-----
-  ipcMain.handle("changeWorkspace", (_e, type, value) => {
+  ipcMain.handle("changeWorkspace", (_e, payload) => {
+    const { type, value } = payload;
     if(type=="name"){
       LCCore.name = value;
       return true;
@@ -3803,7 +3975,8 @@ function createMainWIndow() {
     }
   });
   //-----project-----
-  ipcMain.handle("addProject", async(_e, type, name) => {
+  ipcMain.handle("addProject", async(_e, payload) => {
+    const { type, name } = payload;
     
     const result = LCCore.addProject(type, name);
 
@@ -3815,7 +3988,8 @@ function createMainWIndow() {
       return result
     }
   });
-  ipcMain.handle("deleteProject", async(_e, projectId) => {
+  ipcMain.handle("deleteProject", async(_e, payload) => {
+    const { projectId } = payload;
     const options = {
       type: "question",
       buttons: ["No", "Yes"],
@@ -3839,7 +4013,8 @@ function createMainWIndow() {
     }
     
   });
-  ipcMain.handle("changeProject", (_e, projectId, type, value) => {
+  ipcMain.handle("changeProject", (_e, payload) => {
+    const { projectId, type, value } = payload;
     console.log(projectId, type, value)
     if(type=="name"){
       const result = LCCore.changeName(projectId, value);
@@ -3866,7 +4041,8 @@ function createMainWIndow() {
     }
   }); 
   //-----hole-----
-  ipcMain.handle("addHole", async(_e, projectId, name) => {
+  ipcMain.handle("addHole", async(_e, payload) => {
+    const { projectId, name } = payload;
     
     const result = LCCore.addHole(projectId, name);
 
@@ -3878,7 +4054,8 @@ function createMainWIndow() {
       return result
     }
   });
-  ipcMain.handle("deleteHole", async(_e, holeId) => {
+  ipcMain.handle("deleteHole", async(_e, payload) => {
+    const { holeId } = payload;
     
     const result = LCCore.deleteHole(holeId);
 
@@ -3894,7 +4071,8 @@ function createMainWIndow() {
 
     
   });
-  ipcMain.handle("changeHole", (_e, holeId, type, value) => {
+  ipcMain.handle("changeHole", (_e, payload) => {
+    const { holeId, type, value } = payload;
     
     if(type=="name"){
       const result = LCCore.changeName(holeId, value);
@@ -3907,7 +4085,8 @@ function createMainWIndow() {
       return result;
     }
   });
-  ipcMain.handle("moveHoleToProject", async(_e, holeId, projectId) => {
+  ipcMain.handle("moveHoleToProject", async(_e, payload) => {
+    const { holeId, projectId } = payload;
     
     const result = LCCore.moveHoleToProject(holeId, projectId);
 
@@ -3922,7 +4101,8 @@ function createMainWIndow() {
     }
   });
   //-----section-----
-  ipcMain.handle("addSection", (_e, sectionId, data) => {
+  ipcMain.handle("addSection", (_e, payload) => {
+    const { sectionId, data } = payload;
     //    
     const result = LCCore.addSection(sectionId,data);//LCCore.deleteSection(sectionId);
     if(result == true){
@@ -3934,7 +4114,8 @@ function createMainWIndow() {
     }
     
   });
-  ipcMain.handle("deleteSection", (_e, sectionId) => {
+  ipcMain.handle("deleteSection", (_e, payload) => {
+    const { sectionId } = payload;
     //    
     const result = LCCore.deleteSection(sectionId);//LCCore.deleteSection(sectionId);
     if(result == true){
@@ -3948,7 +4129,8 @@ function createMainWIndow() {
     }
     
   });
-  ipcMain.handle("changeSection", (_e, sectionId, type, value) => {    
+  ipcMain.handle("changeSection", (_e, payload) => {    
+    const { sectionId, type, value } = payload;
     if(type=="name"){
       const result = LCCore.changeName(sectionId, value);
       return result;
@@ -3958,7 +4140,8 @@ function createMainWIndow() {
     }
   });
   //-----marker-----
-  ipcMain.handle("addMarker", (_e, sectionId, depth, depthScale,relativeX) => {
+  ipcMain.handle("addMarker", (_e, payload) => {
+    const { sectionId, depth, depthScale, relativeX } = payload;
     //add
     const result = LCCore.addMarker(sectionId, depth, depthScale, relativeX);
     if(result==true){
@@ -3970,8 +4153,9 @@ function createMainWIndow() {
       return result
     }   
   });
-  ipcMain.handle("deleteMarker", (_e, targetId) => {
-    const result = LCCore.deleteMarker(targetId);
+  ipcMain.handle("deleteMarker", (_e, payload) => {
+    const { markerId } = payload;
+    const result = LCCore.deleteMarker(markerId);
     if(result==true){
       LCCore.calcCompositeDepth();
       LCCore.calcEventFreeDepth();
@@ -3981,7 +4165,8 @@ function createMainWIndow() {
       return false
     }    
   });
-  ipcMain.handle("changeMarker", (_e, markerId, type, value) => {    
+  ipcMain.handle("changeMarker", (_e, payload) => {    
+    const { markerId, type, value } = payload;
     if(type == "distance"){
       //value:distance
       const result = LCCore.changeDistance(markerId, value);
@@ -4002,7 +4187,8 @@ function createMainWIndow() {
     }
   });
   //-----event-----
-  ipcMain.handle("AddEvent", async(_e, upperId, lowerId, depositionType, value) => {
+  ipcMain.handle("AddEvent", async(_e, payload) => {
+    const { upperId, lowerId, depositionType, value } = payload;
     let result = LCCore.addEvent(upperId, lowerId, depositionType, value);
 
     if (result == true) {
@@ -4015,9 +4201,10 @@ function createMainWIndow() {
       return result
     }
   });
-  ipcMain.handle("DeleteEvent", async(_e, upperId, lowerId, type) => {
+  ipcMain.handle("DeleteEvent", async(_e, payload) => {
+    const { upperId, lowerId, type } = payload;
     
-    const result = LCCore.deleteEvent(upperId, lowerId, []);
+    const result = LCCore.deleteEvent(upperId, lowerId, type);
 
     if (result == true) {
       LCCore.calcCompositeDepth();
@@ -4030,7 +4217,8 @@ function createMainWIndow() {
     }
   });
   //-----action----- 
-  ipcMain.handle("connectMarkers", (_e, fromId, toId, direction) => {
+  ipcMain.handle("connectMarkers", (_e, payload) => {
+    const { fromId, toId, direction } = payload;
     const res = LCCore.connectMarkers(fromId, toId, direction);
 
     if(res == true){
@@ -4041,7 +4229,8 @@ function createMainWIndow() {
       return false
     }    
   });
-  ipcMain.handle("disconnectMarkers", (_e, fromId, toId, direction) => {
+  ipcMain.handle("disconnectMarkers", (_e, payload) => {
+    const { fromId, toId, direction } = payload;
     const res = LCCore.disconnectMarkers(fromId, toId, direction);
     if(res==true){
       LCCore.calcCompositeDepth();
@@ -4051,7 +4240,8 @@ function createMainWIndow() {
       return false
     }    
   });
-  ipcMain.handle("disconnectAllConnections", (_e, fromId, direction) => {
+  ipcMain.handle("disconnectAllConnections", (_e, payload) => {
+    const { fromId, direction } = payload;
     const fromIdx = LCCore.search_idx_list[fromId.toString()];
     
     let connections = [];
@@ -4084,7 +4274,8 @@ function createMainWIndow() {
     }
     return results
   });
-  ipcMain.handle("SetZeroPoint", async(_e, markerId, value) => {
+  ipcMain.handle("SetZeroPoint", async(_e, payload) => {
+    const { markerId, value } = payload;
     
     const result = LCCore.setZeroPoint(markerId, value);
     
@@ -4098,7 +4289,8 @@ function createMainWIndow() {
       return result
     }
   });
-  ipcMain.handle("SetMaster", async(_e, markerId, type) => {
+  ipcMain.handle("SetMaster", async(_e, payload) => {
+    const { markerId, type } = payload;
     
     const result = LCCore.setMaster(markerId, type);
 
@@ -4112,7 +4304,8 @@ function createMainWIndow() {
       return result
     }
   });  
-  ipcMain.handle("changeEnable", async(_e, targetId, isEnable) => {
+  ipcMain.handle("changeEnable", async(_e, payload) => {
+    const { targetId, isEnable } = payload;
     const result = LCCore.changeEnable(targetId, isEnable);
 
     if (result == true) {
@@ -4163,7 +4356,7 @@ function createMainWIndow() {
           message: "Duplicate marker positions were found (N="+distance_duplicate+"). This may result in incorrect data or processing errors.Do you want to continue exporting anyway?",
         };
 
-        const { response } = await dialog.showMessageBox(callWindow, options);
+        const { response } = await showMessageBoxWithE2E(callWindow, options);
 
         if(response===0){
           return null;
@@ -5610,6 +5803,10 @@ async function getfile(window=null, title, ext) {
     properties: ["openFile"],
   };
 
+  if (process.env.LC_E2E === "1" && e2eOpenDialogResponse.file !== null) {
+    return e2eOpenDialogResponse.file;
+  }
+
   try {
     const result = await dialog.showOpenDialog(window, options);
     if (!result.canceled) {
@@ -5848,6 +6045,10 @@ async function getDirectory(window=null, title) {
     title: title,
     properties: ["openDirectory"], 
   };
+
+  if (process.env.LC_E2E === "1" && e2eOpenDialogResponse.folder !== null) {
+    return e2eOpenDialogResponse.folder;
+  }
 
   try {
     const result = await dialog.showOpenDialog(window, options);

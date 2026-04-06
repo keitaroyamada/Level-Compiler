@@ -1,5 +1,50 @@
 // preload.js
 const { contextBridge, ipcRenderer, webUtils } = require("electron");
+const IPC_CHANNELS = {
+  ASK_DIALOG: "askdialog",
+  REGISTER_CORE_IMAGE: "RegisterCoreImage",
+};
+
+function resolveFileInputPath(input) {
+  return webUtils.getPathForFile(input);
+}
+
+function normaliseDialogPayload(input) {
+  const opts = input?.opts ?? input ?? {};
+  return {
+    opts: {
+      title: opts.title ?? "",
+      message: opts.message ?? "",
+      parent: opts.parent ?? "main",
+    },
+  };
+}
+
+function createCoreImageRegistrationPayload(input) {
+  if (!input) {
+    return null;
+  }
+
+  const dirHandle =
+    typeof input.dirHandle === "string"
+      ? input.dirHandle
+      : resolveFileInputPath(input.dirHandle);
+  if (!dirHandle || !input.type) {
+    return null;
+  }
+
+  return {
+    dirHandle,
+    type: input.type,
+  };
+}
+
+function invokeWithPayload(channel, payload) {
+  if (payload == null) {
+    return Promise.resolve(null);
+  }
+  return ipcRenderer.invoke(channel, payload);
+}
 
 contextBridge.exposeInMainWorld("ViewerApi", {
   //rederer <-> main
@@ -11,20 +56,23 @@ contextBridge.exposeInMainWorld("ViewerApi", {
   terminalLog: (args1) => ipcRenderer.invoke("terminalLog", args1),
   rendererLog: (args1) => ipcRenderer.invoke("rendererLog", args1),
 
-  RegisterCoreImage: (args1,args2) =>  ipcRenderer.invoke("RegisterCoreImage", webUtils.getPathForFile(args1),args2),
-  LoadCoreImage: (args1,args2) =>  ipcRenderer.invoke("LoadCoreImage", args1,args2),
-  CheckImagesInDir: (args2) => ipcRenderer.invoke("CheckImagesInDir", args2),
-  isExistFile: (args1, args2) => ipcRenderer.invoke("isExistFile", webUtils.getPathForFile(args1), args2),
-  LoadSectionModel: (args1, args2) => ipcRenderer.invoke("LabelerLoadSectionModel", webUtils.getPathForFile(args1), args2),
+  RegisterCoreImage: (payload) => invokeWithPayload(
+    IPC_CHANNELS.REGISTER_CORE_IMAGE,
+    createCoreImageRegistrationPayload(payload)
+  ),
+  LoadCoreImage: (payload) => ipcRenderer.invoke("LoadCoreImage", payload),
+  CheckImagesInDir: (payload) => ipcRenderer.invoke("CheckImagesInDir", payload),
+  isExistFile: (payload) => ipcRenderer.invoke("isExistFile", payload),
+  LoadSectionModel: (payload) => ipcRenderer.invoke("LabelerLoadSectionModel", payload),
 
-  askdialog: (args1, args2) => ipcRenderer.invoke("askdialog", args1, args2),
+  askdialog: (payload) => ipcRenderer.invoke(IPC_CHANNELS.ASK_DIALOG, normaliseDialogPayload(payload)),
   inputdialog: (args1) => ipcRenderer.invoke("inputdialog", args1),
   GetResources: () => ipcRenderer.sendSync("GetResources"),
   toggleDevTools: (args1) => ipcRenderer.send('toggle-devtools',args1),
   saveLabelerData: (args1) => ipcRenderer.invoke("LabelerSaveData", args1),
 
 
-  showContextMenu: (args1) => ipcRenderer.invoke("showContextMenu", args1),
+  showContextMenu: (payload) => ipcRenderer.invoke("showContextMenu", payload),
   
   //main -> renderer
   receive: (channel, func) => {

@@ -247,7 +247,7 @@ document.addEventListener("DOMContentLoaded", () => {
   //-------------------------------------------------------------------------------------------
   async function handleNormalContextmenu(event) {
     event.preventDefault();
-    let clickResult  = await window.ViewerApi.showContextMenu("imageViewerContextMenu");
+    let clickResult  = await window.ViewerApi.showContextMenu({ type: "imageViewerContextMenu" });
   }
   function wait(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));

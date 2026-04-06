@@ -1,4 +1,22 @@
 window.addEventListener("DOMContentLoaded", () => {
+    function mergeSettingsPatch(target, source) {
+      for (const [key, value] of Object.entries(source)) {
+        if (
+          value !== null &&
+          typeof value === "object" &&
+          Array.isArray(value) === false &&
+          target[key] !== null &&
+          typeof target[key] === "object" &&
+          Array.isArray(target[key]) === false
+        ) {
+          mergeSettingsPatch(target[key], value);
+        } else {
+          target[key] = value;
+        }
+      }
+      return target;
+    }
+
     let settingsReady = true;
     window.__LC_SETTINGS_E2E__ = {
       isReady() {
@@ -8,6 +26,17 @@ window.addEventListener("DOMContentLoaded", () => {
         return {
           title: document.title,
           itemCount: document.querySelectorAll(".settings-item").length,
+        };
+      },
+      applySettingsPatch(patch) {
+        settings = mergeSettingsPatch(structuredClone(settings), patch);
+        window.SettingsApi.sendSettings({
+          sendData: { data: settings, editable: null, options: null },
+          to: "renderer",
+        });
+        return {
+          ok: true,
+          ...window.__LC_SETTINGS_E2E__.getState(),
         };
       },
     };
@@ -55,7 +84,10 @@ window.addEventListener("DOMContentLoaded", () => {
                 currentElement = currentElement.parentElement;
               }
               console.log("Updated: ", parentNames);
-              window.SettingsApi.sendSettings({data: settings, editable:null, options:null}, "renderer");
+              window.SettingsApi.sendSettings({
+                sendData: {data: settings, editable:null, options:null},
+                to: "renderer",
+              });
             });
             wrapper.appendChild(label);
             wrapper.appendChild(input);
@@ -218,14 +250,19 @@ window.addEventListener("DOMContentLoaded", () => {
     document.getElementById("default").addEventListener("click", async (event) => {
       const response = await window.SettingsApi.askdialog(
         {
-          title:"Initialise settings",
-          message:"All settings will be reset. Do you want to restore them to their default values?",
-          parent: "settings"
+          opts: {
+            title:"Initialise settings",
+            message:"All settings will be reset. Do you want to restore them to their default values?",
+            parent: "settings"
+          }
         }        
       );
 
       if (response.response) {
-        window.SettingsApi.sendSettings({data: null, editable:null, options:null},"renderer")
+        window.SettingsApi.sendSettings({
+          sendData: {data: null, editable:null, options:null},
+          to: "renderer",
+        })
       }
       
     });
