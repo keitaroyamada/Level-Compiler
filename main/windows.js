@@ -33,7 +33,7 @@ const windowDefinitions = Object.freeze({
   },
   [WINDOW_TYPES.FINDER]: {
     browserWindowOptions: () => ({
-      title: "Finder",
+      title: "LC Finder",
       width: 230,
       height: 580,
       webPreferences: {
@@ -45,7 +45,7 @@ const windowDefinitions = Object.freeze({
   },
   [WINDOW_TYPES.DIVIDER]: {
     browserWindowOptions: () => ({
-      title: "Divider",
+      title: "LC Divider",
       width: 1300,
       height: 800,
       webPreferences: {
@@ -57,7 +57,7 @@ const windowDefinitions = Object.freeze({
   },
   [WINDOW_TYPES.CONVERTER]: {
     browserWindowOptions: () => ({
-      title: "Converter",
+      title: "LC Converter",
       width: 700,
       height: 700,
       webPreferences: {
@@ -69,7 +69,7 @@ const windowDefinitions = Object.freeze({
   },
   [WINDOW_TYPES.LABELER]: {
     browserWindowOptions: () => ({
-      title: "labeler",
+      title: "LC Labeler",
       width: 800,
       height: 800,
       webPreferences: {
@@ -81,7 +81,7 @@ const windowDefinitions = Object.freeze({
   },
   [WINDOW_TYPES.SETTINGS]: {
     browserWindowOptions: () => ({
-      title: "Settings",
+      title: "LC Settings",
       width: 700,
       height: 700,
       webPreferences: {
@@ -93,7 +93,7 @@ const windowDefinitions = Object.freeze({
   },
   [WINDOW_TYPES.IMAGE_VIEWER]: {
     browserWindowOptions: () => ({
-      title: "imageViewer",
+      title: "LC Viewer",
       frame: false,
       width: 300,
       height: 800,
@@ -106,7 +106,7 @@ const windowDefinitions = Object.freeze({
   },
   [WINDOW_TYPES.PLOTTER]: {
     browserWindowOptions: () => ({
-      title: "Plotter",
+      title: "LC Plotter",
       width: 800,
       height: 600,
       webPreferences: {
@@ -118,7 +118,7 @@ const windowDefinitions = Object.freeze({
   },
   [WINDOW_TYPES.ABOUT]: {
     browserWindowOptions: () => ({
-      title: "About Level Compiler",
+      title: "LC About",
       width: 500,
       height: 300,
       webPreferences: {

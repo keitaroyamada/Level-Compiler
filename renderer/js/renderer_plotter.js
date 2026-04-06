@@ -41,9 +41,6 @@ document.addEventListener("DOMContentLoaded", () => {
             await initialiseLCPlotDataCollection();
         }        
     })    
-    window.onbeforeunload = () => {
-        window.PlotterAPI.send('windowCloseButton');
-    };
     //-------------------------------------------------------------------------------------------
     document.addEventListener("mousemove", async function (event) {     
         const rect = document.getElementById("p5Canvas").getBoundingClientRect(); // Canvas position and size   
@@ -369,31 +366,10 @@ document.addEventListener("DOMContentLoaded", () => {
                 const grandChild = seriesDiv.querySelector("input[type='checkbox']");
                 if (grandChild) {
                     grandChild.checked = false;
-                    parentElement.dispatchEvent(new Event('change'));
+                    parentElement.dispatchEvent(new Event('change', { bubbles: true }));
                 }
                 seriesDiv.remove();
                 updateView();
-            });
-            
-
-            deleteBtn.addEventListener("click", () => {
-                /*
-                const parentElement = document.getElementById("plot_list");
-                const grandChild = seriesDiv.querySelector("input[type='checkbox']");
-                if (grandChild) {
-                    grandChild.checked = false;
-                    parentElement.dispatchEvent(new Event('change'));
-                }
-                */
-
-                seriesDiv.remove();
-                const parentElement = document.getElementById("plot_list");
-                parentElement.dispatchEvent(new Event('change', { bubbles: true }));
-
-                updateView();
-
-                
-                
             });
 
 

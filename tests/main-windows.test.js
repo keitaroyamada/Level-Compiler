@@ -81,7 +81,7 @@ registerTest("createWindow applies managed defaults for helper windows", () => {
     throw new Error("Expected createWindow to construct the supplied BrowserWindow class.");
   }
 
-  if (windowRef.options.title !== "Finder") {
+  if (windowRef.options.title !== "LC Finder") {
     throw new Error("Expected finder window title to come from the window definition.");
   }
 

@@ -290,6 +290,22 @@ function hasPlotterWindow() {
   return hasManagedWindow(WINDOW_TYPES.PLOTTER);
 }
 
+function getAboutWindow() {
+  return getManagedWindow(WINDOW_TYPES.ABOUT);
+}
+
+function setAboutWindow(windowRef) {
+  return setManagedWindow(WINDOW_TYPES.ABOUT, windowRef);
+}
+
+function clearAboutWindow() {
+  clearManagedWindow(WINDOW_TYPES.ABOUT);
+}
+
+function hasAboutWindow() {
+  return hasManagedWindow(WINDOW_TYPES.ABOUT);
+}
+
 function closeConverterWindow() {
   if (!hasConverterWindow()) {
     return false;
@@ -2323,16 +2339,34 @@ function createMainWIndow() {
     }    
   });
   ipcMain.handle("PlotterClose", (_e, data) => {
-    isPlotterClose = true;
-    getPlotterWindow().removeAllListeners("close");
-    getPlotterWindow().close();
-    clearPlotterWindow();
-    sendToMainWindow("PlotterClosed", "");
+    if (!hasPlotterWindow()) {
+      return false;
+    }
+
+    setImmediate(() => {
+      if (!hasPlotterWindow()) {
+        return;
+      }
+
+      const plotterWindow = getPlotterWindow();
+      isPlotterClose = true;
+      plotterWindow.removeAllListeners("close");
+      plotterWindow.close();
+      clearPlotterWindow();
+      sendToMainWindow("PlotterClosed", "");
+    });
+
+    return true;
   });
   ipcMain.on("windowCloseButton", (_e) => {
+    if (!hasPlotterWindow()) {
+      return;
+    }
+
+    const plotterWindow = getPlotterWindow();
     isPlotterClose = false;
-    getPlotterWindow().removeAllListeners("close");
-    getPlotterWindow().close();
+    plotterWindow.removeAllListeners("close");
+    plotterWindow.close();
     clearPlotterWindow();
     sendToMainWindow("PlotterClosed", "");
     isPlotterClose = false;
@@ -5338,7 +5372,7 @@ function createMainWIndow() {
               });
               plotWindow.on("closed", () => {
                 clearPlotterWindow(); 
-                sendToMainWindow("LabelerClosed", "");
+                sendToMainWindow("PlotterClosed", "");
               });
 
               const customMenu = Menu.buildFromTemplate([
@@ -5365,8 +5399,6 @@ function createMainWIndow() {
                 customMenu.popup({ window: plotWindow, x: params.x, y: params.y });
               });
           
-              plotWindow.loadFile(path.join(__dirname, "./renderer/plotter.html"));
-
               let isData = false;
               if(LCPlot.data_collections.length>0){
                 //plot data exost
@@ -6235,14 +6267,24 @@ function mean(arr, useAbs = false) {
 //--------------------------------------------------------------------------------------------------
 //create about window
 function createAboutWindow() {
-  const aboutWindow = createWindow(WINDOW_TYPES.ABOUT, {
+  if (hasAboutWindow()) {
+    const aboutWindow = getAboutWindow();
+    aboutWindow.focus();
+    return aboutWindow;
+  }
+
+  const aboutWindow = setAboutWindow(createWindow(WINDOW_TYPES.ABOUT, {
     browserWindowOptions: {
       parent: getMainWindow(),
     },
-  });
+  }));
   const sendVersion = () => {
     aboutWindow.webContents.send("Version", app.getVersion());
   };
+
+  aboutWindow.on("closed", () => {
+    clearAboutWindow();
+  });
 
   aboutWindow.once("ready-to-show", () => {
     aboutWindow.show();
@@ -6256,6 +6298,8 @@ function createAboutWindow() {
   } else {
     sendVersion();
   }
+
+  return aboutWindow;
 }
 function assignObject (obj,data){
   //assign without event listener

@@ -25,8 +25,63 @@ async function launchApp() {
   const firstWindow = await electronApp.firstWindow();
   await firstWindow.waitForLoadState("domcontentloaded");
   await firstWindow.waitForFunction(() => Boolean(window.__LC_E2E__ && window.__LC_E2E__.isReady()));
+  await electronApp.evaluate(() => {
+    global.__LC_E2E_MAIN_PROCESS_ERRORS__ = [];
+
+    if (global.__LC_E2E_MAIN_PROCESS_ERROR_MONITOR_INSTALLED__) {
+      return;
+    }
+
+    const recordError = (type, error) => {
+      const message =
+        error && typeof error.stack === "string"
+          ? error.stack
+          : error && typeof error.message === "string"
+            ? error.message
+            : String(error);
+
+      global.__LC_E2E_MAIN_PROCESS_ERRORS__.push({
+        type,
+        message,
+      });
+    };
+
+    process.on("uncaughtException", (error) => {
+      recordError("uncaughtException", error);
+    });
+
+    process.on("unhandledRejection", (error) => {
+      recordError("unhandledRejection", error);
+    });
+
+    global.__LC_E2E_MAIN_PROCESS_ERROR_MONITOR_INSTALLED__ = true;
+  });
 
   return { electronApp, firstWindow };
+}
+
+async function assertNoMainProcessErrors(electronApp) {
+  const errors = await electronApp.evaluate(() => global.__LC_E2E_MAIN_PROCESS_ERRORS__ || []);
+  expect(
+    errors,
+    `Unexpected main-process errors:\n${errors.map((error) => `[${error.type}] ${error.message}`).join("\n\n")}`
+  ).toEqual([]);
+}
+
+async function closeApp(electronApp) {
+  let capturedError = null;
+
+  try {
+    await assertNoMainProcessErrors(electronApp);
+  } catch (error) {
+    capturedError = error;
+  }
+
+  await electronApp.close();
+
+  if (capturedError) {
+    throw capturedError;
+  }
 }
 
 async function findWindowByTitle(electronApp, expectedTitle, timeoutMs = 30000) {
@@ -91,7 +146,7 @@ test("app starts and renderer test hook is available", async () => {
     expect(state.projectCount).toBe(0);
     expect(state.holeCount).toBe(0);
   } finally {
-    await electronApp.close();
+    await closeApp(electronApp);
   }
 });
 
@@ -109,7 +164,7 @@ test("app loads lcmodel fixture into renderer", async () => {
     expect(result.holeCount).toBeGreaterThan(0);
     expect(result.holeListCount).toBeGreaterThanOrEqual(result.holeCount);
   } finally {
-    await electronApp.close();
+    await closeApp(electronApp);
   }
 });
 
@@ -135,7 +190,7 @@ test("app loads age csv fixture into renderer after lcmodel", async () => {
     );
     expect(selectedAgeModelId).toBe(String(result.loadedAge.id));
   } finally {
-    await electronApp.close();
+    await closeApp(electronApp);
   }
 });
 
@@ -155,7 +210,7 @@ test("app loads core images into the renderer after lcmodel", async () => {
     expect(result.ok).toBe(true);
     expect(result.loadedImageCount).toBeGreaterThan(0);
   } finally {
-    await electronApp.close();
+    await closeApp(electronApp);
   }
 });
 
@@ -197,7 +252,7 @@ test("image viewer opens after core images load and notifies on close", async ()
     const events = await firstWindow.evaluate(() => window.__LC_E2E__.getEvents());
     expect(events.some((entry) => entry.name === "ImageViewerClosed")).toBe(true);
   } finally {
-    await electronApp.close();
+    await closeApp(electronApp);
   }
 });
 
@@ -274,7 +329,7 @@ test("finder coordinate search computes CD, EFD, and age consistently after load
     expect(Number(finderState.efd)).toBeCloseTo(toOneDecimal(expected.efd), 1);
     expect(Number(finderState.age)).toBeCloseTo(toOneDecimal(expected.age), 1);
   } finally {
-    await electronApp.close();
+    await closeApp(electronApp);
   }
 });
 
@@ -304,7 +359,7 @@ test("finder close notifies the main renderer", async () => {
     const events = await firstWindow.evaluate(() => window.__LC_E2E__.getEvents());
     expect(events.some((entry) => entry.name === "FinderClosed")).toBe(true);
   } finally {
-    await electronApp.close();
+    await closeApp(electronApp);
   }
 });
 
@@ -337,7 +392,7 @@ test("converter window opens from the menu and notifies on close", async () => {
     const events = await firstWindow.evaluate(() => window.__LC_E2E__.getEvents());
     expect(events.some((entry) => entry.name === "ConverterClosed")).toBe(true);
   } finally {
-    await electronApp.close();
+    await closeApp(electronApp);
   }
 });
 
@@ -355,7 +410,7 @@ test("menu click forwards a main-window event to the renderer", async () => {
     const events = await firstWindow.evaluate(() => window.__LC_E2E__.getEvents());
     expect(events.some((entry) => entry.name === "ZoominMenuClicked")).toBe(true);
   } finally {
-    await electronApp.close();
+    await closeApp(electronApp);
   }
 });
 
@@ -382,7 +437,7 @@ test("divider window opens and receives initial data from the main process", asy
     expect(Number(state.sectionCount)).toBeGreaterThan(0);
     expect(state.calcDirection).toBe("actual2definition");
   } finally {
-    await electronApp.close();
+    await closeApp(electronApp);
   }
 });
 
@@ -412,7 +467,7 @@ test("divider close notifies the main renderer", async () => {
     const events = await firstWindow.evaluate(() => window.__LC_E2E__.getEvents());
     expect(events.some((entry) => entry.name === "DividerClosed")).toBe(true);
   } finally {
-    await electronApp.close();
+    await closeApp(electronApp);
   }
 });
 
@@ -440,7 +495,7 @@ test("settings window opens from the menu and notifies on close", async () => {
     const events = await firstWindow.evaluate(() => window.__LC_E2E__.getEvents());
     expect(events.some((entry) => entry.name === "SettingsClosed")).toBe(true);
   } finally {
-    await electronApp.close();
+    await closeApp(electronApp);
   }
 });
 
@@ -462,7 +517,7 @@ test("about window opens from the menu and shows the current app version", async
 
     await closeWindowByTitle(electronApp, "LC About");
   } finally {
-    await electronApp.close();
+    await closeApp(electronApp);
   }
 });
 
@@ -488,7 +543,7 @@ test("labeler window opens from the menu and notifies on close", async () => {
     const events = await firstWindow.evaluate(() => window.__LC_E2E__.getEvents());
     expect(events.some((entry) => entry.name === "LabelerClosed")).toBe(true);
   } finally {
-    await electronApp.close();
+    await closeApp(electronApp);
   }
 });
 
@@ -509,7 +564,15 @@ test("plotter window opens from the menu and notifies on explicit close", async 
       () => Boolean(window.__LC_PLOTTER_E2E__ && window.__LC_PLOTTER_E2E__.isReady())
     );
 
-    await plotterWindow.evaluate(() => window.PlotterApi.PlotterClose());
+    await Promise.all([
+      plotterWindow.waitForEvent("close"),
+      plotterWindow.evaluate(() => window.PlotterApi.PlotterClose()).catch((error) => {
+        if (String(error).includes("Target page, context or browser has been closed")) {
+          return null;
+        }
+        throw error;
+      }),
+    ]);
 
     await firstWindow.waitForFunction(() =>
       window.__LC_E2E__.getEvents().some((entry) => entry.name === "PlotterClosed")
@@ -518,6 +581,6 @@ test("plotter window opens from the menu and notifies on explicit close", async 
     const events = await firstWindow.evaluate(() => window.__LC_E2E__.getEvents());
     expect(events.some((entry) => entry.name === "PlotterClosed")).toBe(true);
   } finally {
-    await electronApp.close();
+    await closeApp(electronApp);
   }
 });
