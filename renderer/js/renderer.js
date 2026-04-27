@@ -15,6 +15,8 @@ document.addEventListener("DOMContentLoaded", () => {
   //model source path
   let age_model_list = []; //for reload
   let lcE2ELastPlotPayload = null;
+  let lcE2EPlotApplyCount = 0;
+  let reportedInvalidEventConnections = new Set();
 
   //p5(vector) canvas
   let vectorObjects = null; //p5 instance data
@@ -673,6 +675,7 @@ document.addEventListener("DOMContentLoaded", () => {
       await loadAge(selected_age_model_id);
       await loadPlotData("age");
       await loadPlotData("data")
+      applyPlotOptionsToPlotData();
 
       //update photo
       if(Object.keys(modelImages.drilling_depth).length>0){
@@ -810,6 +813,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     await loadPlotData("age");
     await loadPlotData("data")
+    applyPlotOptionsToPlotData();
 
     //update photo
     if(Object.keys(modelImages.drilling_depth).length>0){
@@ -855,6 +859,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     await loadPlotData("age");
     await loadPlotData("data")
+    applyPlotOptionsToPlotData();
 
     updateView();    
     await window.LCapi.clearProgressbar();
@@ -869,251 +874,212 @@ document.addEventListener("DOMContentLoaded", () => {
     //data.errorDetails
   });
   //============================================================================================
+  function applyPlotOptionsToPlotData() {
+    lcE2EPlotApplyCount += 1;
+    if(LCPlotData?.draw_collections){
+      LCPlotData.draw_collections = [];
+    }
+
+    const invalidSet = new Set(objOpts.plot.invalid_values);
+
+    if(objOpts.plotter.selected_options !== null && (LCPlotData?.data_collections?.length ?? 0) > 0){
+      const selectedList = objOpts.plotter.selected_options;
+      for(let t=0; t< selectedList.length; t++){
+        const target = selectedList[t];
+
+        let colIdx = null;
+        LCPlotData.data_collections.forEach((c, i)=>{
+          if(c.id == target.collectionId){
+              colIdx = i;
+          }
+        })
+
+        if(colIdx==null){
+          continue
+        }
+
+        let nIdx = null;
+        let dIdx = null;
+        const numInfoData = 12;
+
+        if(LCPlotData.data_collections[colIdx].rows.length > 0){
+          if(target.numeratorId>0){
+            nIdx = target.numeratorId   + numInfoData;
+          }
+          if(target.denominatorId>0){
+            dIdx = target.denominatorId + numInfoData;
+          }
+        }
+
+        if(nIdx==null && dIdx==null){
+          continue
+        }
+
+        const numeratorDataSeries   = [];
+        if(nIdx!==null){
+          const numeratorDataset0 = drawPointDataset();
+          numeratorDataset0.zoom_level = 0;
+          let val_min = Infinity;
+          let val_max = - Infinity;
+
+          LCPlotData.data_collections[colIdx].rows.forEach((row,ridx)=>{
+            const drawPoint  = drawPointData(row, LCCore);
+
+            if(!Number.isFinite(drawPoint.drilling_depth)){
+              return
+            }
+
+            drawPoint.idx = ridx;
+            drawPoint.id  = row[0] ? row[0] : "";
+
+            drawPoint.type   = "data";
+            drawPoint.header = LCPlotData.data_collections[colIdx].header[nIdx] ? LCPlotData.data_collections[colIdx].header[nIdx] : "";
+            drawPoint.unit   = LCPlotData.data_collections[colIdx].units[nIdx]  ? LCPlotData.data_collections[colIdx].units[nIdx]  : "";
+
+            const isValid = row[nIdx] !== null && !invalidSet.has(String(row[nIdx]).toLowerCase()) && Number.isFinite(Number(row[nIdx]));
+            drawPoint.val = isValid ? Number(row[nIdx]) : NaN;
+
+            numeratorDataset0.data.push(drawPoint);
+            if(drawPoint.val < val_min){
+              val_min = drawPoint.val;
+            }
+            if(drawPoint.val > val_max){
+              val_max = drawPoint.val;
+            }
+          })
+
+          if(Number.isFinite(val_min)){
+            numeratorDataset0.min = val_min;
+          }
+          if(Number.isFinite(val_max)){
+            numeratorDataset0.max = val_max;
+          }
+
+          numeratorDataSeries.push(numeratorDataset0);
+        }
+
+        const denominatorDataSeries = [];
+        if(dIdx!==null){
+          const denominatorDataset0     = drawPointDataset();
+          denominatorDataset0.zoom_level = 0;
+          let val_min = Infinity;
+          let val_max = - Infinity;
+
+          LCPlotData.data_collections[colIdx].rows.forEach((row,ridx)=>{
+            const drawPoint  = drawPointData(row, LCCore);
+            if(!Number.isFinite(drawPoint.composite_depth)){
+              return
+            }
+
+            drawPoint.idx = ridx;
+            drawPoint.id  = row[0] ? row[0] : "";
+
+            drawPoint.type   = "data";
+            drawPoint.header = LCPlotData.data_collections[colIdx].header[dIdx] ? LCPlotData.data_collections[colIdx].header[dIdx] : "";
+            drawPoint.unit   = LCPlotData.data_collections[colIdx].units[dIdx]  ? LCPlotData.data_collections[colIdx].units[dIdx]  : "";
+
+            const isValid = row[dIdx] !== null && !invalidSet.has(String(row[dIdx]).toLowerCase()) && Number.isFinite(Number(row[dIdx]));
+            drawPoint.val = isValid ? Number(row[dIdx]) : NaN;
+
+            denominatorDataset0.data.push(drawPoint);
+
+            if(drawPoint.val < val_min){
+              val_min = drawPoint.val;
+            }
+            if(drawPoint.val > val_max){
+              val_max = drawPoint.val;
+            }
+          })
+
+          if(Number.isFinite(val_min)){
+            denominatorDataset0.min = val_min;
+          }
+          if(Number.isFinite(val_max)){
+            denominatorDataset0.max = val_max;
+          }
+
+          denominatorDataSeries.push(denominatorDataset0);
+        }
+
+        const dividedDataSeries = dividePlotData(numeratorDataSeries, denominatorDataSeries);
+
+        const bin_width = target.resampleWidth;
+        if(bin_width>0){
+          let resampledDataset;
+          if(objOpts.plot.resample_method=="moving"){
+            resampledDataset = movingAvPointData(dividedDataSeries, [bin_width], objOpts);
+          }else{
+            resampledDataset = resamplePointData(dividedDataSeries, [bin_width], objOpts);
+          }
+
+          const sortedDataset = sortDataSetRowsByModelOrder(resampledDataset, LCCore);
+          sortedDataset.min = dividedDataSeries[0].min;
+          sortedDataset.max = dividedDataSeries[0].max;
+
+          dividedDataSeries[0] = sortedDataset;
+          dividedDataSeries[0].is_resampled = true;
+        }
+
+        dividedDataSeries.forEach(dividedData => {
+          if (dividedData.data.length > 0) {
+            if (dividedData.data[0].source == "trinity") {
+              const sortDepthMapByValue = list =>
+                list
+                  .map((value, index) => ({ index, value }))
+                  .sort((a, b) => {
+                    const d = a.value.value - b.value.value;
+                    return d !== 0 ? d : a.index - b.index;
+                  })
+                  .map(d => d.value);
+
+              dividedData.depth_map.drilling_depth =
+                sortDepthMapByValue(dividedData.depth_map.drilling_depth);
+
+              dividedData.depth_map.composite_depth =
+                sortDepthMapByValue(dividedData.depth_map.composite_depth);
+
+              dividedData.depth_map.event_free_depth =
+                sortDepthMapByValue(dividedData.depth_map.event_free_depth);
+
+              dividedData.depth_map.age =
+                sortDepthMapByValue(dividedData.depth_map.age);
+            }
+          }
+        });
+
+        LCPlotData.draw_collections.push(dividedDataSeries);
+      }
+
+      if(["root","developer"].includes(objOpts.developer.mode)){
+        console.log("[Renderer]: Plot data: ",LCPlotData)
+      }else{
+        console.log("[Renderer]: Plot data is loaded.")
+      }
+    }else{
+      console.log(
+        "[Renderer]: There is no plot data or information: ",
+        objOpts.plotter.selected_options,
+        LCPlotData?.data_collections ?? null
+      )
+    }
+  }
   window.LCapi.receive("PlotDataOptions", async (data) => {
      console.log("[Renderer]: Plot options are received.", data)
      lcE2ELastPlotPayload = data;
 
      try{
-      
-      if(LCPlotData?.draw_collections){
-        LCPlotData.draw_collections = [];
-      }      
-
-      //get plotter options
       objOpts.plotter.selected_options = data.data;
       objOpts.plot.is_plot_visible = true;
       document.getElementById("bt_chart").style.backgroundColor = "#ccc";
 
-      //emit type: new: start plot, add: add new data, updateDataset: update data values, updateSetting: update only setting
       if(objOpts.plotter.selected_options.emitType=="updateSetting"){
-        //If only settings are changed, skip data recalculation as it is unnecessary        
         if(["root","developer"].includes(objOpts.developer.mode)){
           console.log("[Renderer]: Plotter update only settings")
         }
         return
       }
 
-      //initiarise
-      const invalidSet = new Set(objOpts.plot.invalid_values);
-
-      //calc plotvaluse
-      if(objOpts.plotter.selected_options !== null && (LCPlotData?.data_collections?.length ?? 0) > 0){
-        // clac each datasets
-        const selectedList = objOpts.plotter.selected_options;
-        for(let t=0; t< selectedList.length; t++){
-          //each Plot list in plotter
-          const target = selectedList[t];       
-          
-          //main
-          //get idx
-          let colIdx = null;
-          LCPlotData.data_collections.forEach((c, i)=>{
-            if(c.id == target.collectionId){
-                colIdx = i;
-            }
-          })
-
-          if(colIdx==null){
-            continue
-          }
-
-          //get data
-          let nIdx = null;
-          let dIdx = null;
-          const numInfoData = 12;
-
-          if(LCPlotData.data_collections[colIdx].rows.length > 0){
-            //if row data exist
-            
-            if(target.numeratorId>0){
-              nIdx = target.numeratorId   + numInfoData;
-            }
-            if(target.denominatorId>0){
-              dIdx = target.denominatorId + numInfoData;
-            }
-          }
-
-          if(nIdx==null && dIdx==null){
-            continue
-          }
-
-          //calc bin size
-          let th = [0.010, 0.025, 0.050, 0.075, 0.10, 0.25, 0.50, 0.75, 1.0, 2.5, 5.0, 7.5, 10]; //cm          
-          //console.time("[Renderer]: Making multi-level data: ")
-          //-------numerator----------------------------------------------------------------------------------------------------   
-          //the data row is sorted by the original depth source
-          const numeratorDataSeries   = [];          
-          if(nIdx!==null){         
-            const numeratorDataset0 = drawPointDataset();     
-            numeratorDataset0.zoom_level = 0;     
-            let val_min = Infinity;
-            let val_max = - Infinity;
-
-            LCPlotData.data_collections[colIdx].rows.forEach((row,ridx)=>{     
-              const drawPoint  = drawPointData(row, LCCore);
-              
-              if(!Number.isFinite(drawPoint.composite_depth)){
-                return
-              } 
-
-              drawPoint.idx = ridx;
-              drawPoint.id  = row[0] ? row[0] : "";
-
-              drawPoint.type   = "data";
-              drawPoint.header = LCPlotData.data_collections[colIdx].header[nIdx] ? LCPlotData.data_collections[colIdx].header[nIdx] : "";
-              drawPoint.unit   = LCPlotData.data_collections[colIdx].units[nIdx]  ? LCPlotData.data_collections[colIdx].units[nIdx]  : "";
-
-              // Sanitize input: assign 'raw' only if it is a valid, finite number; otherwise fallback to NaN.              
-              const isValid = row[nIdx] !== null && !invalidSet.has(String(row[nIdx]).toLowerCase()) && Number.isFinite(Number(row[nIdx]));
-              drawPoint.val = isValid ? Number(row[nIdx]) : NaN;
-
-              numeratorDataset0.data.push(drawPoint);     
-              if(drawPoint.val < val_min){
-                val_min = drawPoint.val;
-              }
-              if(drawPoint.val > val_max){
-                val_max = drawPoint.val;
-              }       
-            })
-            
-            //set values
-            if(Number.isFinite(val_min)){
-              numeratorDataset0.min = val_min;
-            }
-            if(Number.isFinite(val_max)){
-              numeratorDataset0.max = val_max;
-            }
-
-            //sunbmit
-            numeratorDataSeries.push(numeratorDataset0);//original data
-          }
-          //-------denominator------------------------------------------------------------------------------------------
-          //the data row is sorted by the original depth source
-          const denominatorDataSeries = [];
-          if(dIdx!==null){            
-            const denominatorDataset0     = drawPointDataset();     
-            denominatorDataset0.zoom_level = 0;     
-            let val_min = Infinity;
-            let val_max = - Infinity;
-
-            LCPlotData.data_collections[colIdx].rows.forEach((row,ridx)=>{     
-              const drawPoint  = drawPointData(row, LCCore);
-              if(!Number.isFinite(drawPoint.composite_depth)){
-                return
-              }
-              
-              drawPoint.idx = ridx;
-              drawPoint.id  = row[0] ? row[0] : "";
-
-              drawPoint.type   = "data";
-              drawPoint.header = LCPlotData.data_collections[colIdx].header[dIdx] ? LCPlotData.data_collections[colIdx].header[dIdx] : "";
-              drawPoint.unit   = LCPlotData.data_collections[colIdx].units[dIdx]  ? LCPlotData.data_collections[colIdx].units[dIdx]  : "";
-              
-              // Sanitize input: assign 'raw' only if it is a valid, finite number; otherwise fallback to NaN.              
-              const isValid = row[dIdx] !== null && !invalidSet.has(String(row[dIdx]).toLowerCase()) && Number.isFinite(Number(row[dIdx]));
-              drawPoint.val = isValid ? Number(row[dIdx]) : NaN;
-              
-              denominatorDataset0.data.push(drawPoint);     
-
-              if(drawPoint.val < val_min){
-                val_min = drawPoint.val;
-              }
-              if(drawPoint.val > val_max){
-                val_max = drawPoint.val;
-              }       
-            })
-            
-            //set values
-            if(Number.isFinite(val_min)){
-              denominatorDataset0.min = val_min;
-            }
-            if(Number.isFinite(val_max)){
-              denominatorDataset0.max = val_max;
-            }
-
-            //sunbmit
-            denominatorDataSeries.push(denominatorDataset0);
-          }
-
-          //=================== calc divided values ============================================================================
-          //calc divided values
-          const dividedDataSeries = dividePlotData(numeratorDataSeries, denominatorDataSeries);
-
-          //resample
-          const bin_width = target.resampleWidth;
-          if(bin_width>0){
-            
-            let resampledDataset;
-            if(objOpts.plot.resample_method=="moving"){
-              //moving averaging
-              resampledDataset = movingAvPointData(dividedDataSeries, [bin_width], objOpts);
-            }else{
-              //block averaging
-              resampledDataset = resamplePointData(dividedDataSeries, [bin_width], objOpts);
-            }
-
-            0
-            const sortedDataset = sortDataSetRowsByModelOrder(resampledDataset, LCCore);
-
-            //fix max/min
-            sortedDataset.min = dividedDataSeries[0].min;
-            sortedDataset.max = dividedDataSeries[0].max;
-
-            dividedDataSeries[0] = sortedDataset;//overwrite
-            dividedDataSeries[0].is_resampled = true;
-          }
-
-          //2. sort dataset map by composite depth(if not exist, keep original order)
-          dividedDataSeries.forEach(dividedData => {
-            if (dividedData.data.length > 0) {
-              if (dividedData.data[0].source == "trinity") {
-                // 1. Create a combined array of objects pairing 'data' and 'depth_map'
-                // (Assumes both arrays have the same length)
-                const combined = dividedData.depth_map.composite_depth.map((list, index) => ({
-                  index,
-                  mapDrillingDepth:  dividedData.depth_map.drilling_depth[index],
-                  mapCompositeDepth: list,
-                  mapEventFreeDepth: dividedData.depth_map.event_free_depth[index],
-                  mapAge:            dividedData.depth_map.age[index],
-                }));
-
-                // 2. Sort the combined array based on 'hname'
-                combined.sort((a, b) => {
-                  const d = a.mapCompositeDepth.value - b.mapCompositeDepth.value;
-                  return d !== 0 ? d : a.index - b.index;  
-                })
-                
-                //sort((a, b) => a.dataItem.hname.localeCompare(b.dataItem.hname));
-
-                // 3. Map the sorted results back to the original properties
-                dividedData.depth_map.drilling_depth = combined.map(c => c.mapDrillingDepth);
-                dividedData.depth_map.composite_depth = combined.map(c => c.mapCompositeDepth);
-                dividedData.depth_map.event_free_depth = combined.map(c => c.mapEventFreeDepth);
-                dividedData.depth_map.age = combined.map(c => c.mapAge);
-                
-              }
-            }
-          });
-
-          //submit
-          LCPlotData.draw_collections.push(dividedDataSeries);
-
-          //console.timeEnd("[Renderer]: Making multi-level data: ")       
-        }
-
-        if(["root","developer"].includes(objOpts.developer.mode)){
-          console.log("[Renderer]: Plot data: ",LCPlotData)
-        }else{
-          console.log("[Renderer]: Plot data is loaded.")
-        }
-      }else{
-        console.log(
-          "[Renderer]: There is no plot data or information: ",
-          objOpts.plotter.selected_options,
-          LCPlotData?.data_collections ?? null
-        )
-      }
-           
+      applyPlotOptionsToPlotData();
       updateView();
     }catch(er){
       console.error(er)
@@ -1799,6 +1765,7 @@ document.addEventListener("DOMContentLoaded", () => {
           await loadAge(selected_age_model_id)
           await loadPlotData("age");
           await loadPlotData("data")
+          applyPlotOptionsToPlotData();
           updateView();   
 
         }else if (result == "duplicate_holes"){
@@ -2127,6 +2094,8 @@ document.addEventListener("DOMContentLoaded", () => {
           if(result==true){
             await undo("save","Connect Markers");//undo
             await loadModel(false, false);
+            await loadPlotData("data");
+            applyPlotOptionsToPlotData();
             const fromIdx = getIdxById(LCCore, fromId);
             const fromMarkerData = LCCore.projects[fromIdx[0]].holes[fromIdx[1]].sections[fromIdx[2]].markers[fromIdx[3]];
             const toIdx = getIdxById(LCCore, toId);
@@ -2181,6 +2150,8 @@ document.addEventListener("DOMContentLoaded", () => {
           if(result==true){
             await undo("save","Connect Sections");//undo
             await loadModel(false,false);
+            await loadPlotData("data");
+            applyPlotOptionsToPlotData();
             const changedData = await getUpdatedSectionIds("depth");
             console.log("[Renderer]: Affected sections:",changedData);
             //const affectedSections = getConnectedSectionIds([fromId, toId]);
@@ -2220,6 +2191,8 @@ document.addEventListener("DOMContentLoaded", () => {
           if(result == true){
             await undo("save","Disconnect Sections");//undo
             await loadModel(false,false);
+            await loadPlotData("data");
+            applyPlotOptionsToPlotData();
 
             const changedData = await getUpdatedSectionIds("depth");
             console.log("[Renderer]: Affected sections:",changedData);
@@ -2448,6 +2421,7 @@ document.addEventListener("DOMContentLoaded", () => {
           await loadAge(document.getElementById("AgeModelSelect").value);
           await loadPlotData("age");
           await loadPlotData("data")
+          applyPlotOptionsToPlotData();
           
           const changedData = await getUpdatedSectionIds("depth");          
           console.log("[Renderer]: Affected sections:",changedData);
@@ -2477,6 +2451,7 @@ document.addEventListener("DOMContentLoaded", () => {
           await loadAge(document.getElementById("AgeModelSelect").value);
           await loadPlotData("age");
           await loadPlotData("data")
+          applyPlotOptionsToPlotData();
           updateView();
           console.log("[Renderer]: Delete master.");
         }else{
@@ -2536,6 +2511,7 @@ document.addEventListener("DOMContentLoaded", () => {
             await loadAge(document.getElementById("AgeModelSelect").value);
             await loadPlotData("age");
             await loadPlotData("data")
+            applyPlotOptionsToPlotData();
             updateView();
             console.log("[Renderer]: Set a new Zero point.");
           }else{
@@ -2574,6 +2550,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
             await undo("save","Disconnect Marker");//undo
             await loadModel(false,false);
+            await loadPlotData("data");
+            applyPlotOptionsToPlotData();
 
             const changedData = await getUpdatedSectionIds("depth");          
             console.log("[Renderer]: Affected sections:",changedData);
@@ -2682,6 +2660,8 @@ document.addEventListener("DOMContentLoaded", () => {
           if(result==true){
             await undo("save","Delete Marker");//undo
             await loadModel(false,false);
+            await loadPlotData("data");
+            applyPlotOptionsToPlotData();
           }          
         }
       }
@@ -2755,6 +2735,8 @@ document.addEventListener("DOMContentLoaded", () => {
         if(result == true){
           await undo("save","Add Marker");//undo
           await loadModel(false,false);
+          await loadPlotData("data");
+          applyPlotOptionsToPlotData();
         }
         
       }
@@ -2898,6 +2880,7 @@ document.addEventListener("DOMContentLoaded", () => {
             await loadAge(document.getElementById("AgeModelSelect").value);
             await loadPlotData("age");
             await loadPlotData("data")
+            applyPlotOptionsToPlotData();
             const changedData = await getUpdatedSectionIds("depth");          
             console.log("[Renderer]: Affected sections:",changedData);
             //const affectedSections = getConnectedSectionIds([upperId, lowerId]);
@@ -2940,6 +2923,7 @@ document.addEventListener("DOMContentLoaded", () => {
           await loadAge(document.getElementById("AgeModelSelect").value);
           await loadPlotData("age");
           await loadPlotData("data")
+          applyPlotOptionsToPlotData();
           const changedData = await getUpdatedSectionIds("depth");
           console.log("[Renderer]: Affected sections:",changedData);
           //const affectedSections = getConnectedSectionIds([upperId, lowerId]);
@@ -3077,6 +3061,7 @@ document.addEventListener("DOMContentLoaded", () => {
           await loadAge(document.getElementById("AgeModelSelect").value);
           await loadPlotData("age");
           await loadPlotData("data")
+          applyPlotOptionsToPlotData();
           updateView();
         }
       }
@@ -3164,6 +3149,7 @@ document.addEventListener("DOMContentLoaded", () => {
             await loadAge(document.getElementById("AgeModelSelect").value);
             await loadPlotData("age");
             await loadPlotData("data")
+            applyPlotOptionsToPlotData();
           }else{
             console.log("[Renderer]: Failed to add section.")
           }
@@ -3286,6 +3272,8 @@ document.addEventListener("DOMContentLoaded", () => {
             })){
               await undo("save","Connect Sections");//undo
               await loadModel(false,false);
+              await loadPlotData("data");
+              applyPlotOptionsToPlotData();
               const changedData = await getUpdatedSectionIds("depth");
               console.log("[Renderer]: Affected sections:",changedData);
               //const affectedSections = getConnectedSectionIds([fromId, toId]);
@@ -3323,6 +3311,8 @@ document.addEventListener("DOMContentLoaded", () => {
             })){
               await undo("save","Disconnect Markers");//undo
               await loadModel(false,false);
+              await loadPlotData("data");
+              applyPlotOptionsToPlotData();
               const changedData = await getUpdatedSectionIds("depth");
               console.log("[Renderer]: Affected sections:",changedData);
               //const affectedSections = getConnectedSectionIds([fromId, toId]);
@@ -3461,6 +3451,7 @@ document.addEventListener("DOMContentLoaded", () => {
           await loadAge(document.getElementById("AgeModelSelect").value);
           await loadPlotData("age");
           await loadPlotData("data")
+          applyPlotOptionsToPlotData();
           updateView();
         }
       }
@@ -3509,6 +3500,7 @@ document.addEventListener("DOMContentLoaded", () => {
           await loadAge(document.getElementById("AgeModelSelect").value);
           await loadPlotData("age");
           await loadPlotData("data")
+          applyPlotOptionsToPlotData();
           updateView();
         }else if(result=="used"){
           console.log(`[Renderer]: "${response}" is already in use. Please enter a unique name.`);
@@ -3593,6 +3585,7 @@ document.addEventListener("DOMContentLoaded", () => {
           await loadAge(document.getElementById("AgeModelSelect").value);
           await loadPlotData("age");
           await loadPlotData("data")
+          applyPlotOptionsToPlotData();
           updateView();
         }else if(result=="used"){
           console.log(`[Renderer]: "${response}" is already in use. Please enter a unique name.`);
@@ -3652,6 +3645,7 @@ document.addEventListener("DOMContentLoaded", () => {
           await loadAge(document.getElementById("AgeModelSelect").value);
           await loadPlotData("age");
           await loadPlotData("data")
+          applyPlotOptionsToPlotData();
           updateView();
         }
       }
@@ -3711,6 +3705,7 @@ document.addEventListener("DOMContentLoaded", () => {
           await loadAge(document.getElementById("AgeModelSelect").value);
           await loadPlotData("age");
           await loadPlotData("data")
+          applyPlotOptionsToPlotData();
           updateView();
         }else if(result==false){
           console.log("[Renderer]: Failed to move the hole to the selected project.");
@@ -3908,6 +3903,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
       await loadPlotData("age");
       await loadPlotData("data")
+      applyPlotOptionsToPlotData();
 
       //modelImages = initialiseImages();
       modelImages = await updateImageRegistration(modelImages, LCCore);
@@ -4777,6 +4773,7 @@ document.addEventListener("DOMContentLoaded", () => {
         await loadAge(selected_age_model_id);
         await loadPlotData("age");
         await loadPlotData("data")
+        applyPlotOptionsToPlotData();
           
         console.log("[Renderer]: Undo model");
         console.log(LCCore);
@@ -4797,6 +4794,7 @@ document.addEventListener("DOMContentLoaded", () => {
         await loadAge(selected_age_model_id);
         await loadPlotData("age");
         await loadPlotData("data")
+        applyPlotOptionsToPlotData();
           
         console.log("[Renderer]: Redo model");
         console.log(LCCore);
@@ -6540,7 +6538,7 @@ document.addEventListener("DOMContentLoaded", () => {
               const drawResolution = (scrollerBotRealScale - scrollerTopRealScale)/dispPix;//cm/pic
               let zoomLevel = 0;
 
-              if (drawResolution >= 10) {        // 10 cm/pix 〜 7.5 cm/pix
+              if (drawResolution >= 10) {        // 10 cm/pix 、E7.5 cm/pix
                   zoomLevel = 13;
               } else if (drawResolution >= 7.5000) {  
                   zoomLevel = 12;
@@ -7544,6 +7542,7 @@ document.addEventListener("DOMContentLoaded", () => {
     await loadAge(selectedAgeModelId);
     await loadPlotData("age");
     await loadPlotData("data");
+    applyPlotOptionsToPlotData();
 
     return selectedAgeModelId;
   }
@@ -7742,7 +7741,26 @@ document.addEventListener("DOMContentLoaded", () => {
       loadedImageCount: Object.keys(modelImages?.drilling_depth ?? {}).length,
       canvasBackgroundColour: objOpts.canvas.background_colour,
       lastPlotPayload: lcE2ELastPlotPayload,
+      plotApplyCount: lcE2EPlotApplyCount,
+      plotDataCollectionCount: LCPlotData?.data_collections?.length ?? 0,
+      plotDrawCollectionCount: LCPlotData?.draw_collections?.length ?? 0,
+      selectedPlotOptionCount: Array.isArray(objOpts.plotter.selected_options)
+        ? objOpts.plotter.selected_options.length
+        : 0,
     }),
+    reselectCurrentAgeModel: async () => {
+      const selectedAgeModelId = document.getElementById("AgeModelSelect").value;
+      if (!selectedAgeModelId) {
+        return { ok: false, error: "age_model_not_selected" };
+      }
+
+      document.getElementById("AgeModelSelect").value = selectedAgeModelId;
+      document
+        .getElementById("AgeModelSelect")
+        .dispatchEvent(new Event("change", { bubbles: true }));
+
+      return { ok: true, selectedAgeModelId };
+    },
     getFirstSectionReference: () => {
       const firstProject = LCCore?.projects?.[0];
       const firstHole = firstProject?.holes?.[0];
@@ -8115,7 +8133,7 @@ document.addEventListener("DOMContentLoaded", () => {
           const u8  = new Uint8Array(await res.arrayBuffer());   
           LCPlotData =  msgpack.decode(u8);//;await unzip(u8);
         }
-        
+
       }   
     }
   }
@@ -8389,7 +8407,7 @@ function roundSection(ctx, x, y, width, height, radius) {
   ctx.closePath();
 
   ctx.stroke(); // 線で描画
-  // ctx.fill(); // 塗りつぶしで描画する場合はこちらを使用
+  // ctx.fill(); // 塗りつぶしで描画する場合�Eこちらを使用
 }
 
 function filledRoundSection(ctx, x, y, width, height, radius) {
@@ -8405,7 +8423,7 @@ function filledRoundSection(ctx, x, y, width, height, radius) {
   ctx.quadraticCurveTo(x, y, x + radius, y);
   ctx.closePath();
 
-  ctx.fill(); // ここで塗りつぶしを実行
+  ctx.fill(); // ここで塗りつぶしを実衁E
 }
 function fitScaler(zoom_level, mag) {
   let step = null;
@@ -8986,6 +9004,16 @@ function getEventPosiotion(LCCore, event, marker_top, objOpts) {
   let eventTyoe = "none";
   let eventThickness = 0;
   let lowerDepth = null;
+  const warnInvalidEventConnection = () => {
+    const warningKey = JSON.stringify(event);
+    if (!reportedInvalidEventConnections.has(warningKey)) {
+      reportedInvalidEventConnections.add(warningKey);
+      console.warn("Renderer: Invalid event connection detected. The event will be skipped during rendering.", {
+        event,
+        depthScale: objOpts.canvas.depth_scale,
+      });
+    }
+  };
   if (event[1] == "downward" || event[1] == "through-down") {
     if (event[0] == "deposition" || event[0] == "markup") {
       if (event[2] !== null) {
@@ -8993,17 +9021,19 @@ function getEventPosiotion(LCCore, event, marker_top, objOpts) {
         lowerDepth = LCCore.projects[conIdx[0]].holes[conIdx[1]].sections[conIdx[2]].markers[conIdx[3]][objOpts.canvas.depth_scale];
         eventThickness = marker_top - lowerDepth;
       } else {
-        console.group(
-          "Null detected on the Event connection at the idx of [" + event + "]."
-        );
+        warnInvalidEventConnection();
       }
     } else if (event[0] == "erosion") {
       if (objOpts.canvas.depth_scale == "drilling_depth" || objOpts.canvas.depth_scale == "composite_depth" || objOpts.canvas.depth_scale == "event_free_depth" || objOpts.canvas.depth_scale == "age") {
-        const conIdx = this.getIdxById(LCCore, event[2]); //event layer connected MarkerId
-        lowerDepth = LCCore.projects[conIdx[0]].holes[conIdx[1]].sections[conIdx[2]].markers[conIdx[3]][objOpts.canvas.depth_scale];
-        eventThickness = marker_top - lowerDepth;
-        //lowerDepth = marker_top + event[4];
-        //eventThickness = -event[4];
+        if (event[2] !== null) {
+          const conIdx = this.getIdxById(LCCore, event[2]); //event layer connected MarkerId
+          lowerDepth = LCCore.projects[conIdx[0]].holes[conIdx[1]].sections[conIdx[2]].markers[conIdx[3]][objOpts.canvas.depth_scale];
+          eventThickness = marker_top - lowerDepth;
+          //lowerDepth = marker_top + event[4];
+          //eventThickness = -event[4];
+        } else {
+          warnInvalidEventConnection();
+        }
       } else {
         lowerDepth = null;
         eventThickness = 0;
@@ -10797,3 +10827,5 @@ function sortDataSetRowsByModelOrder(dataSet, LCCore){
 
 
 //============================================================================================
+
+

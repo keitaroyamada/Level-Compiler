@@ -35,7 +35,7 @@ After migration, the target baseline should support:
 
 Add these files:
 
-- `playwright.config.js`
+- `tests/playwright.config.js`
 - `tests/e2e/app-startup.spec.js`
 
 ---
@@ -45,7 +45,7 @@ Add these files:
 Add this script:
 
 ```json
-"test:e2e": "playwright test"
+"test:e2e": "playwright test --config tests/playwright.config.js"
 ```
 
 Add these devDependencies:
@@ -57,7 +57,7 @@ Add these devDependencies:
 
 ---
 
-## playwright.config.js
+## tests/playwright.config.js
 
 Create:
 
@@ -65,7 +65,7 @@ Create:
 const path = require("path");
 
 module.exports = {
-  testDir: path.join(__dirname, "tests", "e2e"),
+  testDir: path.join(__dirname, "e2e"),
   timeout: 120000,
   expect: {
     timeout: 10000,
@@ -344,7 +344,7 @@ It only creates stable automation entrypoints.
 ## Recommended Migration Order
 
 1. add Playwright dependencies
-2. add `playwright.config.js`
+2. add `tests/playwright.config.js`
 3. add `tests/e2e/app-startup.spec.js`
 4. add preload direct-path APIs
 5. add `window.__LC_E2E__` in renderer
@@ -378,4 +378,3 @@ This blueprint reflects the current working implementation in this repository:
 - `lcmodel` load E2E
 - `age csv` load E2E
 - Finder `CD / EFD / age` consistency E2E
-

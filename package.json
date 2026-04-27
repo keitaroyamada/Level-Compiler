@@ -8,7 +8,7 @@
     "start": "electron .",
     "test": "node scripts/run-project-tests.js",
     "test:cli": "node -r ./scripts/register-original-fs.js tests/run-all-tests.js",
-    "test:e2e": "playwright test",
+    "test:e2e": "playwright test --config tests/playwright.config.js",
     "export:test-answer": "node -r ./scripts/register-original-fs.js scripts/export-test-answer.js",
     "build:win": "electron-builder --win --x64",
     "build:mac": "electron-builder --mac --arm64",

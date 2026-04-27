@@ -3714,7 +3714,7 @@ function createMainWIndow() {
           calcedData.data_values = values;
           calcedData.data_units  = units;
 
-          if(calcedData.source_type !== "trinity"){
+          if(options.sourceType !== "trinity"){
             calcedData.project  = null;
             calcedData.hole     = null;
             calcedData.section  = null;
@@ -4567,7 +4567,7 @@ function createMainWIndow() {
         results.event_model_version       = calcedIdx !== null ? modelVersion  : NaN;
         results.age_model_version         = calcedIdx !== null ? (LCAge.AgeModels[ageIdx] !== undefined ? LCAge.AgeModels[ageIdx].version : NaN) : NaN;
         results.description               = "";
-        results.source_type = calcedIdx !== null ? type: NaN;
+        results.source_type = type; //calcedIdx !== null ? type: NaN;
         results.calc_type   = cd_list[0][3];
       } else if (type == "composite_depth") {
         //get cd
@@ -5395,7 +5395,7 @@ function createMainWIndow() {
           },
           {
             label: "Model evaluation",
-            visible: false,
+            visible: true,
             click: () => {
               if(LCCore !== null && LCCore.projects.length>0){
                 const results = LCCore.leaveOneOut("in");

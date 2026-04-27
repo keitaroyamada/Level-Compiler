@@ -1,7 +1,7 @@
 const path = require("path");
 
 module.exports = {
-  testDir: path.join(__dirname, "tests", "e2e"),
+  testDir: path.join(__dirname, "e2e"),
   timeout: 120000,
   expect: {
     timeout: 10000,

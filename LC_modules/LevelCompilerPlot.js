@@ -101,6 +101,45 @@ class LevelCompilerPlot {
           }
         })
 
+        if (targetProjectId === null) {
+          //case of added section data
+          const holeName = data[3];
+          const sectionName = data[4];
+          let projectName = null;
+
+          for (const project of LCCore.projects) {
+            let matched = false;
+
+            for (const hole of project.holes) {
+              if (hole.name !== holeName) {
+                continue;
+              }
+
+              for (const section of hole.sections) {
+                if (section.name === sectionName) {
+                  targetProjectId = project.id;
+                  projectName     = project.name;
+                  matched = true;
+                  break;
+                }
+              }
+
+              if (matched) {
+                break;
+              }
+            }
+
+            if (matched) {
+              break;
+            }
+          }
+
+          //if find target project
+          if(targetProjectId!==null){
+            data[2] = projectName
+          }
+        }
+
         if(targetProjectId===null){continue}
 
         //calc

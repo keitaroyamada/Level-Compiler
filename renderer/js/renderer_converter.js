@@ -632,5 +632,65 @@ document.addEventListener("DOMContentLoaded", () => {
         options: await zip(sendData),
       });
     },
+    runCurrentPayload: async () => {
+      for (let i = 0; i < 20; i++) {
+        if (document.getElementById("depth_chooser0") != null) {
+          break;
+        }
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      }
+
+      const sourceType = document.getElementById("cvt_source_type").value;
+      const sendData = {
+        id: dataId,
+        sourceType,
+        polationType: "linear",
+        returnType: "min",
+        headerLines,
+        outType: "import",
+        allowOutside: true,
+        isForceCalculation: true,
+        callFrom: called_from || "converter",
+        isZip: true,
+        precision: 1,
+      };
+      const chooser0 = document.getElementById("depth_chooser0");
+      if (chooser0 == null) {
+        return { ok: false, reason: "source chooser is not ready." };
+      }
+
+      if (sourceType === "age") {
+        sendData.nameIdx = parseInt(chooser0.value);
+        sendData.ageIdx = parseInt(document.getElementById("depth_chooser1").value);
+        sendData.dataStartFrom = Math.max(...[sendData.nameIdx, sendData.ageIdx]);
+      } else if (sourceType === "trinity") {
+        sendData.nameIdx = parseInt(chooser0.value);
+        sendData.holeIdx = parseInt(document.getElementById("depth_chooser1").value);
+        sendData.sectionIdx = parseInt(document.getElementById("depth_chooser2").value);
+        sendData.distanceIdx = parseInt(document.getElementById("depth_chooser3").value);
+        sendData.dataStartFrom = Math.max(
+          ...[sendData.nameIdx, sendData.holeIdx, sendData.sectionIdx, sendData.distanceIdx]
+        );
+      } else if (sourceType === "composite_depth") {
+        sendData.nameIdx = parseInt(chooser0.value);
+        sendData.cdIdx = parseInt(document.getElementById("depth_chooser1").value);
+        sendData.dataStartFrom = Math.max(...[sendData.nameIdx, sendData.cdIdx]);
+      } else if (sourceType === "event_free_depth") {
+        sendData.nameIdx = parseInt(chooser0.value);
+        sendData.efdIdx = parseInt(document.getElementById("depth_chooser1").value);
+        sendData.dataStartFrom = Math.max(...[sendData.nameIdx, sendData.efdIdx]);
+      } else if (sourceType === "drilling_depth") {
+        sendData.nameIdx = parseInt(chooser0.value);
+        sendData.ddIdx = parseInt(document.getElementById("depth_chooser1").value);
+        sendData.dataStartFrom = Math.max(...[sendData.nameIdx, sendData.ddIdx]);
+      } else {
+        return { ok: false, reason: `unsupported_source_type:${sourceType}` };
+      }
+
+      return window.ConverterApi.cvtConverter({
+        options: await zip(sendData),
+      });
+    },
   };
 });
+

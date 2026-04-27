@@ -27,11 +27,11 @@ Record the test-environment changes added in this session so the current setup a
 
 ## Files Added
 
-- [playwright.config.js](C:/Users/slinn/source/repos/Level-Compiler/playwright.config.js)
+- [tests/playwright.config.js](C:/Users/slinn/source/repos/Level-Compiler/tests/playwright.config.js)
 - [tests/e2e/app-startup.spec.js](C:/Users/slinn/source/repos/Level-Compiler/tests/e2e/app-startup.spec.js)
 - [scripts/run-project-tests.js](C:/Users/slinn/source/repos/Level-Compiler/scripts/run-project-tests.js)
 - [scripts/test-suites.js](C:/Users/slinn/source/repos/Level-Compiler/scripts/test-suites.js)
-- [TEST_ENV_CHANGELOG_2026-03-30.md](C:/Users/slinn/source/repos/Level-Compiler/TEST_ENV_CHANGELOG_2026-03-30.md)
+- [tests/docs/TEST_ENV_CHANGELOG_2026-03-30.md](C:/Users/slinn/source/repos/Level-Compiler/tests/docs/TEST_ENV_CHANGELOG_2026-03-30.md)
 
 ## Files Updated
 

@@ -3,3 +3,6 @@ dist/
 test_data_private/
 tests/temp/
 tests/answers/   
+test-results/.last-run.json
+refactor-notes.md
+AGENTS.md

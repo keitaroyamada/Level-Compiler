@@ -14,6 +14,39 @@ document.addEventListener("DOMContentLoaded", () => {
         sendPlotPayload(payload) {
             return window.PlotterApi.sendPlotOptions(payload);
         },
+        importCsvFromPath: async (inputPath) => {
+            const beforeCount = document.getElementById("c_collection").options.length;
+            await window.PlotterApi.getPlotData({ data: {
+                output_type:"import",
+                called_from:"plotter",
+                path:inputPath,
+            }});
+
+            for(let i = 0; i < 100; i += 1){
+                if(document.getElementById("c_collection").options.length > beforeCount){
+                    return window.__LC_PLOTTER_E2E__.getState();
+                }
+                await new Promise((resolve) => setTimeout(resolve, 50));
+            }
+
+            return window.__LC_PLOTTER_E2E__.getState();
+        },
+        addFirstCollectionToPlotList: async () => {
+            if(document.getElementById("c_collection").options.length === 0){
+                return { ok: false, error: "plot_collection_not_loaded" };
+            }
+
+            document.getElementById("c_collection").selectedIndex = 0;
+            document.getElementById("bt_add").click();
+            return {
+                ok: true,
+                ...window.__LC_PLOTTER_E2E__.getState(),
+            };
+        },
+        sendCurrentSelection: (emitType = "new") => {
+            const selectedList = getSelectedData();
+            return window.PlotterApi.sendPlotOptions({ sendData: { data:selectedList, emitType }, to: "renderer" });
+        },
     };
 
     const scroller = document.getElementById("scroller");
