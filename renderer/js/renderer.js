@@ -6592,38 +6592,35 @@ document.addEventListener("DOMContentLoaded", () => {
               let startIndex = binarySearchIndex(depthArr, searchTop, (e) => e.value);
               let endIndex   = binarySearchIndex(depthArr, searchBot, (e) => e.value);
 
-              const targetIdxs = depthArr.slice(startIndex, endIndex).map(e => e.idx).sort((a, b) => a - b);
-              const numPoints = targetIdxs.length;
-
-              //extract
-              /*
-              const searchTop = scrollerTopRealScale - bufferVal;
-              const searchBot = scrollerBotRealScale + bufferVal;
-              let startIndex  = binarySearchIndex(drawDataset.data, searchTop, (d) => d[objOpts.canvas.depth_scale]);
-              let endIndex    = binarySearchIndex(drawDataset.data, searchBot, (d) => d[objOpts.canvas.depth_scale]);
-              const numPoints = endIndex - startIndex ? endIndex - startIndex + 1 : 0;
-
-              const extractedDrawDataset = { ...drawDataset };
-              extractedDrawDataset.data = drawDataset.data.slice(startIndex, endIndex + 1).map(d => ({ ...d }));
-              */
+              //const targetIdxs = depthArr.slice(startIndex, endIndex).map(e => e.idx).sort((a, b) => a - b);
+              //const numPoints = targetIdxs.length;
+              const numPoints = endIndex - startIndex;
+              if (numPoints <= 0) continue;
 
               if(["root"].includes(objOpts.developer.mode)){
                 console.log("Dipslay: Zoom: ",zoomLevel,", hight pix: ",sketch.height * dpir,", hight cm: ", (searchBot-searchTop).toFixed(2)," cm, points: N=", numPoints)
               }
               
               //extract
+              const targetIdxs = new Array(numPoints);
+
+              for (let i = 0, j = startIndex; j < endIndex; i++, j++) {
+                targetIdxs[i] = depthArr[j].idx;
+              }
+
+              targetIdxs.sort((a, b) => a - b);
+
+              // extract
               const extractedDrawDataset = {};
               for (const k in drawDataset) {
                 if (k !== "data") extractedDrawDataset[k] = drawDataset[k];
               }
 
-              extractedDrawDataset.data = new Array(targetIdxs.length);
-              for (let i = 0; i < targetIdxs.length; i++) {
-                const d = drawDataset.data[targetIdxs[i]];
-                extractedDrawDataset.data[i] = { ...d };
+              extractedDrawDataset.data = new Array(numPoints);
+
+              for (let i = 0; i < numPoints; i++) {
+                extractedDrawDataset.data[i] = drawDataset.data[targetIdxs[i]];
               }
-                
-              if(extractedDrawDataset.data.length==0) continue;
               
               //calc position             
               const drawData = calcDrawPosition(extractedDrawDataset, LCCore, objOpts, pOptions);
@@ -6952,9 +6949,11 @@ document.addEventListener("DOMContentLoaded", () => {
                   // Define rectangle coordinates
                   let rectX0;
                   if(firstDataPoint.source === "trinity"){
-                    rectX0 = zeroDataDict[pData.hname][2].pos_x;
+                    //rectX0 = zeroDataDict[pData.hname][2].pos_x; //min
+                    rectX0 = zeroDataDict[pData.hname][0].pos_x; //zero
                   }else{
-                    rectX0 = zeroDataDict["global"][2].pos_x;  
+                    //rectX0 = zeroDataDict["global"][2].pos_x; //min
+                    rectX0 = zeroDataDict["global"][0].pos_x; //zero  
                   }
                   const rectX1 = pData.pos_x;
 
