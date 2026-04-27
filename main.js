@@ -795,11 +795,14 @@ function createMainWIndow() {
     }
 
     //re register Images
-    targetList = tempPath.dataPaths.filter(item=>item.type=="core_images");
+    targetList = tempPath.dataPaths.filter(item=>item.type=="core_images" || item.type=="image_source");
     for(const data of targetList){
       const fullpath = data.path;
       if(fullpath !== undefined){
-        registerCoreImage(fullpath,"core_images",null);
+        registerCoreImage(fullpath, data.type, null, {
+          sourceId: data.sourceId ?? "source_1",
+          label: data.label ?? "Image 1",
+        });
       }
     }
 
@@ -818,8 +821,8 @@ function createMainWIndow() {
     return results;
   });
   ipcMain.handle("CheckImagesInDir", async (_e, payload) => {
-    const { fileName: name } = payload;
-    let targetList = globalPath.dataPaths.filter(item=>item.type=="core_images");
+    const { fileName: name, sourceId = null } = payload;
+    let targetList = getRegisteredImageSources("core_images", sourceId);
     //mainWindow.webContents.send("rendererLog", targetList);
 
     let result = false;
@@ -845,7 +848,12 @@ function createMainWIndow() {
  //============================================================================================
  //image process
   ipcMain.handle('RegisterCoreImage', (_e, payload) => {
-    const { dirHandle: dir_handle, type } = payload;
+    const {
+      dirHandle: dir_handle,
+      type,
+      sourceId = "source_1",
+      label = "Image 1",
+    } = payload;
     try{
       //get file path
       const pathData = path.parse(dir_handle);
@@ -858,21 +866,21 @@ function createMainWIndow() {
       if (pathData.ext === ".zip") {
         // if zip
         dirPath = path.join(pathData.dir, pathData.base);
-        registerCoreImage(dirPath, type, null);
+        registerCoreImage(dirPath, type, null, { sourceId, label });
       } else if(pathData.ext==""){
         //case folder
         dirPath = path.join(pathData.dir, pathData.name);
         //register path
-        registerCoreImage(dirPath, type, null);
+        registerCoreImage(dirPath, type, null, { sourceId, label });
       }else if(pathData.ext==".jpg"|| pathData.ext === ".jpeg"|| pathData.ext === ".tif"|| pathData.ext === ".tiff"|| pathData.ext === ".png"){
         dirPath = pathData.dir;
         //register path
-        registerCoreImage(dirPath, type, pathData.base);
+        registerCoreImage(dirPath, type, pathData.base, { sourceId, label });
       }else if(pathData.ext==".lcsection"){
         //lcsection from labeler
         dirPath = pathData.dir;
         //register path
-        registerCoreImage(dirPath, type, null);
+        registerCoreImage(dirPath, type, null, { sourceId, label });
       }else{
         return false
       }
@@ -890,9 +898,12 @@ function createMainWIndow() {
   });
   async function loadCoreImages(loadOptions, type){
     const isShowMemory = false;
-    progressBar   = progressDialog(getMainWindow(), "Load modeled section images", "Now converting...", false);    
-    //await new Promise(r => progressBar.on('ready', r));
-    await new Promise(r => progressBar.once('ready', r));
+    const silentProgress = loadOptions.silentProgress === true;
+    if (!silentProgress) {
+      progressBar = progressDialog(getMainWindow(), "Load modeled section images", "Now converting...", false);
+      //await new Promise(r => progressBar.on('ready', r));
+      await new Promise(r => progressBar.once('ready', r));
+    }
 
     //console.log("   Load core image called")
     let releasedWorkers = 0;
@@ -905,6 +916,9 @@ function createMainWIndow() {
       //initialise
       
       let coreImages = {
+        sourceId: loadOptions.sourceId ?? "source_1",
+        tier: loadOptions.tier ?? "standard",
+        label: loadOptions.label ?? null,
         load_target_ids: [],
         operations:[],
         image_resolution: {},
@@ -913,17 +927,24 @@ function createMainWIndow() {
         event_free_depth: {},
         age:{},
       };
+      const hasSelectedAgeModel = LCAge?.AgeModels?.length > 0 && LCAge?.selected_id != null;
+      const effectiveOperations = (loadOptions.operations ?? []).filter((operation) => {
+        return operation !== "age" || hasSelectedAgeModel;
+      });
+      coreImages.operations = effectiveOperations;
 
       //get registered image folder path
-      let targetList = globalPath.dataPaths.filter(item=>item.type==type);
+      let targetList = getRegisteredImageSources(type, loadOptions.sourceId);
 
       if(targetList.length < 1){
         console.log("MAIN: There is no registered image folders.")
-        progressBar   = await updateProgress(progressBar, 1, 1);
+        if (!silentProgress) {
+          progressBar = await updateProgress(progressBar, 1, 1);
+        }
         progressBar = null;
         return null
       }
-      console.log("MAIN: Load images: N = "+loadOptions.targetIds.length+"; Operations: ["+loadOptions.operations+"]");
+      console.log("MAIN: Load images: N = "+loadOptions.targetIds.length+"; Operations: ["+effectiveOperations+"]");
 
       //make tasks
       const NUM_WORKERS = Math.min(Math.round(os.cpus().length/2), loadOptions.targetIds.length);
@@ -935,7 +956,7 @@ function createMainWIndow() {
           let idx = null;
           let targetHoleData = null;
           let targetSectionData = null;
-          if(type=="core_images"){
+          if(type=="core_images" || type=="image_source"){
             idx = LCCore.search_idx_list[id.toString()];
             targetHoleData = LCCore.projects[idx[0]].holes[idx[1]];
             targetSectionData = JSON.parse(JSON.stringify(targetHoleData.sections[idx[2]]));
@@ -966,7 +987,8 @@ function createMainWIndow() {
           //calc new image size
           const coreLength = targetSectionData.markers[targetSectionData.markers.length-1].distance - targetSectionData.markers[0].distance;
           let new_height = Math.round(200 * 100); //max
-          const dpcm = loadOptions.dpcm[imBaseName] ? loadOptions.dpcm[imBaseName] : loadOptions.dpcm;
+          const requestedDpcm = getTierDpcm(loadOptions, imBaseName);
+          const dpcm = requestedDpcm[imBaseName] ? requestedDpcm[imBaseName] : requestedDpcm;
           if(new_height > dpcm * coreLength){
             new_height = Math.round(dpcm * coreLength);
           }
@@ -980,7 +1002,7 @@ function createMainWIndow() {
             imageName:imBaseName,
             imagePath:fullpath,            
             imageSize:new_size,
-            operations:loadOptions.operations,
+            operations:effectiveOperations,
             sectionData:targetSectionData,
           })  
         }
@@ -988,7 +1010,9 @@ function createMainWIndow() {
 
       if(tasks.length==0){
         console.log("MAIN: Failed to get tasks", targetList, loadOptions);
-        progressBar   = await updateProgress(progressBar, 1, 1);
+        if (!silentProgress) {
+          progressBar = await updateProgress(progressBar, 1, 1);
+        }
         progressBar = null;
         return null
       }
@@ -996,7 +1020,9 @@ function createMainWIndow() {
       //make worker
       numTotalTasks = tasks.length;
       
-      progressBar   = await updateProgress(progressBar, 0, numTotalTasks);
+      if (!silentProgress) {
+        progressBar = await updateProgress(progressBar, 0, numTotalTasks);
+      }
       const workers = await initialiseWorkerPool(NUM_WORKERS, tasks, idleWorkers, coreImages);
 
       while (tasks.length > 0 && idleWorkers.length > 0) {
@@ -1037,7 +1063,9 @@ function createMainWIndow() {
       });
 
       if(progressBar!==null){
-        progressBar = await updateProgress(progressBar, numTotalTasks, numTotalTasks);
+        if (!silentProgress) {
+          progressBar = await updateProgress(progressBar, numTotalTasks, numTotalTasks);
+        }
         progressBar = null;
       }
       return coreImages;
@@ -1116,7 +1144,9 @@ function createMainWIndow() {
             if(isShowMemory) console.log('recv', process.memoryUsage());
 
             n += 1;
-            progressBar = await updateProgress(progressBar, n, numTotalTasks);
+            if (!silentProgress) {
+              progressBar = await updateProgress(progressBar, n, numTotalTasks);
+            }
 
             mergeMissingKeys(taskResults, result);
 
@@ -1143,7 +1173,9 @@ function createMainWIndow() {
             if (isShowMemory) console.log('error recv', process.memoryUsage());
 
             n += 1;
-            progressBar = await updateProgress(progressBar, n, numTotalTasks);
+            if (!silentProgress) {
+              progressBar = await updateProgress(progressBar, n, numTotalTasks);
+            }
             console.error("Worker error:", err);
 
             if (tasks.length > 0) {
@@ -1319,12 +1351,14 @@ function createMainWIndow() {
     } 
   });
   ipcMain.handle("floatingImageViewer", async (_e, payload) => {
-    const { targetId } = payload;
+    const { targetId, sourceId = "source_1" } = payload;
     try{
       const loadOptions = {
         targetIds: [targetId], 
         operations: ["drilling_depth"],
         dpcm: 100,
+        sourceId,
+        tier: "highres",
       };
       const sectionImage = await loadCoreImages(loadOptions, "core_images");
 
@@ -3086,7 +3120,7 @@ function createMainWIndow() {
         }
 
         //Undo images
-        let imagePaths = globalPath.dataPaths.filter(item=>item.type=="core_images");
+        let imagePaths = getRegisteredImageSources("core_images");
         if(imagePaths.length>0 && changedIds.length>0){
           const coreImages = await loadCoreImages({
             targetIds:changedIds,
@@ -3152,7 +3186,7 @@ function createMainWIndow() {
         }
 
         //Undo images
-        let imagePaths = globalPath.dataPaths.filter(item=>item.type=="core_images");
+        let imagePaths = getRegisteredImageSources("core_images");
         if(imagePaths.length>0 && changedIds.length>0){
           const coreImages = await loadCoreImages({
             targetIds:changedIds,
@@ -4913,14 +4947,67 @@ function createMainWIndow() {
       dataPaths:[], //{type:[lcmodel, csvmodel, csvage, csvplot], path:""}
     };
   }
-  function registerCoreImage(fullpath, type, name){
+  function registerCoreImage(fullpath, type, name, metadata = {}){
     try{
-      globalPath.dataPaths.push({type:type, path:fullpath, name:name});
+      const sourceType = type === "core_images" ? "image_source" : type;
+      const sourceId = metadata.sourceId ?? "source_1";
+      const label = metadata.label ?? "Image 1";
+      globalPath.dataPaths = globalPath.dataPaths.filter((item) => {
+        if (item.type !== sourceType) {
+          return true;
+        }
+        if (sourceType !== "image_source") {
+          return !(item.path === fullpath && item.name === name);
+        }
+        return item.sourceId !== sourceId;
+      });
+      globalPath.dataPaths.push({
+        type: sourceType,
+        path: fullpath,
+        name: name,
+        sourceId,
+        label,
+      });
       console.log("MAIN: Core images in the folder is registered.")
       return true
     }catch(err){
       return false
     } 
+  }
+  function getRegisteredImageSources(type = "core_images", sourceId = null) {
+    const acceptedTypes = new Set([type]);
+    if (type === "core_images") {
+      acceptedTypes.add("image_source");
+    }
+    return globalPath.dataPaths.filter((item) => {
+      if (!acceptedTypes.has(item.type)) {
+        return false;
+      }
+      if (sourceId == null) {
+        return true;
+      }
+      const itemSourceId = item.sourceId ?? "source_1";
+      return itemSourceId === sourceId;
+    });
+  }
+  function getTierDpcm(loadOptions, imageBaseName) {
+    const baseDpcm = loadOptions.dpcm;
+    if (baseDpcm && typeof baseDpcm === "object" && !Array.isArray(baseDpcm)) {
+      return baseDpcm;
+    }
+
+    const fallbackValue =
+      typeof baseDpcm === "number"
+        ? baseDpcm
+        : loadOptions.tier === "thumb"
+          ? 4
+          : loadOptions.tier === "highres"
+            ? 200
+            : 24;
+
+    return {
+      [imageBaseName]: fallbackValue,
+    };
   }
   //--------------------------------------------------------------------------------------------------
   getMainWindow().webContents.once("did-finish-load", () => {    
@@ -5025,7 +5112,10 @@ function createMainWIndow() {
                   const imageDir = await getDirectory(getMainWindow(), "Please select image root directory.")
                   if(imageDir!==false){
                     //register path
-                    globalPath.dataPaths.push({type:"core_images", path:imageDir});
+                    registerCoreImage(imageDir, "core_images", null, {
+                      sourceId: "source_1",
+                      label: "Image 1",
+                    });
 
                     //load
                     let targetIds = [];                    

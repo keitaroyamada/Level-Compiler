@@ -65,6 +65,8 @@ function createCoreImageRegistrationPayload(input) {
   return {
     dirHandle,
     type: input.type,
+    sourceId: input.sourceId ?? null,
+    label: input.label ?? null,
   };
 }
 

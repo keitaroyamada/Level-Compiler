@@ -44,6 +44,8 @@ document.addEventListener("DOMContentLoaded", () => {
   let backup_hole_enable = {};
   let isProcessing = false;
   let isHoleMenuDragging = false;
+  let standardImageLoadTimer = null;
+  const standardImageInFlight = new Set();
   //============================================================================================
 
   //--------------------------------------------------------------------------------------------
@@ -190,6 +192,13 @@ document.addEventListener("DOMContentLoaded", () => {
     objOpts.image.photo_plot_colour = "#ff0000";
     objOpts.image.dpcm = 24;
     objOpts.image.dpcm_highresolution = 200;
+    objOpts.image.active_source_id = "source_1";
+    objOpts.image.visible_tier = "standard";
+    objOpts.image.thumb_dpcm = 4;
+    objOpts.image.standard_dpcm = objOpts.image.dpcm;
+    objOpts.image.highres_dpcm = objOpts.image.dpcm_highresolution;
+    objOpts.image.standard_cache_limit = 30;
+    objOpts.image.highres_cache_limit = 3;
     objOpts.image.is_load_enabled = {composite_depth: true, event_free_depth: true, age: true};
 
     objOpts.age.is_age_visible = true;
@@ -781,7 +790,7 @@ document.addEventListener("DOMContentLoaded", () => {
     //call from main process
     try {
       if(modelImages !== null){
-        modelImages = await assignCoreImages(modelImages, imageBuffers);
+        modelImages = await assignCoreImages(modelImages, imageBuffers, objOpts);
       }
       
     } catch (error) {
@@ -1160,7 +1169,13 @@ document.addEventListener("DOMContentLoaded", () => {
 
       modelImages.image_resolution[holeName+"-"+sectionName] = objOpts.image.dpcm_highresolution;
 
-      modelImages = await loadCoreImages(modelImages, LCCore, objOpts, ["drilling_depth", "composite_depth","event_free_depth","age"]);
+      modelImages = await loadCoreImages(
+        modelImages,
+        LCCore,
+        objOpts,
+        ["drilling_depth", "composite_depth","event_free_depth","age"],
+        { tier: "highres", targetIds: [targetId] }
+      );
       
       updateView();
     }else if(clickResult.includes("holeMoveTo")){
@@ -1265,7 +1280,13 @@ document.addEventListener("DOMContentLoaded", () => {
         modelImages.image_resolution[holeName+"-"+sectionName] = objOpts.image.dpcm;
       }
      
-      modelImages = await loadCoreImages(modelImages, LCCore, objOpts, ["drilling_depth", "composite_depth","event_free_depth","age"]);
+      modelImages = await loadCoreImages(
+        modelImages,
+        LCCore,
+        objOpts,
+        ["drilling_depth", "composite_depth","event_free_depth","age"],
+        { tier: "standard", targetIds: [targetId] }
+      );
 
       updateView();
       objOpts.image.dpcm = curDPCM;
@@ -1821,7 +1842,13 @@ document.addEventListener("DOMContentLoaded", () => {
 
       modelImages.image_resolution[holeName+"-"+sectionName] = objOpts.image.dpcm_highresolution;
 
-      modelImages = await loadCoreImages(modelImages, LCCore, objOpts, ["drilling_depth","composite_depth","event_free_depth", "age"]);
+      modelImages = await loadCoreImages(
+        modelImages,
+        LCCore,
+        objOpts,
+        ["drilling_depth","composite_depth","event_free_depth", "age"],
+        { tier: "highres", targetIds: [targetId] }
+      );
       updateView();
     }else if(clickResult == "plotImageBrightness"){
       if(LCCore){
@@ -1849,7 +1876,10 @@ document.addEventListener("DOMContentLoaded", () => {
       const targetId = [objOpts.edit.hittest.project, objOpts.edit.hittest.hole,objOpts.edit.hittest.section,null];
       if(Object.keys(modelImages["drilling_depth"]).length>0){
         console.log("Renderer: openfloating image viewer");
-        await window.LCapi.floatingImageViewer({ targetId });
+        await window.LCapi.floatingImageViewer({
+          targetId,
+          sourceId: objOpts.image.active_source_id,
+        });
       }
     }else if(clickResult.includes("holeMoveTo")){
       const minHoleOrder = Math.min(...LCCore.projects.flatMap(p => p.holes.map(h => h.order)));
@@ -4520,6 +4550,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     //update plot
     updateView();
+    scheduleVisibleStandardImageRefresh();
   },
   { passive: false }
   );
@@ -5614,15 +5645,21 @@ document.addEventListener("DOMContentLoaded", () => {
               if (objOpts.canvas.is_core_photo_visible) {
                 try {
                   let ptoto_depth_scale;
-                    ptoto_depth_scale = objOpts.canvas.depth_scale;
-                
-                  if (modelImages[ptoto_depth_scale][hole.name + "-" + section.name] !== undefined) {
+                  ptoto_depth_scale = objOpts.canvas.depth_scale;
+                  const sectionKey = hole.name + "-" + section.name;
+                  const img = getRenderableSectionImage(
+                    modelImages,
+                    objOpts,
+                    ptoto_depth_scale,
+                    sectionKey
+                  );
+
+                  if (img !== undefined && img !== null) {
                     isPhtoExist = true;
                   }
 
                   if (isPhtoExist) {
                     try {
-                      const img = modelImages[ptoto_depth_scale][hole.name + "-" + section.name];
                       sketch.image(
                         img,
                         sec_x0,
@@ -5630,7 +5667,7 @@ document.addEventListener("DOMContentLoaded", () => {
                         sec_w,
                         sec_h
                       );
-                      if(objOpts.image.is_core_photo_visible && modelImages.plot_colour[hole.name + "-" + section.name]){
+                      if(objOpts.image.is_core_photo_visible && modelImages.plot_colour[sectionKey]){
                         const getWidth = 10;
                         const scanWidth = (getWidth*2)+1;
                         const imCx = img.width / 2;
@@ -5667,7 +5704,7 @@ document.addEventListener("DOMContentLoaded", () => {
                       }
                     } catch (error) {
                       console.error(error);
-                      console.log(modelImages[ptoto_depth_scale][hole.name + "-" + section.name]);
+                      console.log(img);
                     }
                   }
                 } catch (err) {
@@ -7683,12 +7720,18 @@ document.addEventListener("DOMContentLoaded", () => {
     const registered = await window.LCapi.RegisterCoreImageFromPath({
       dirHandle: dirPath,
       type: "core_images",
+      sourceId: objOpts.image.active_source_id,
+      label: modelImages.source_meta?.[objOpts.image.active_source_id]?.label ?? "Image 1",
     });
     if (!registered) {
       return { ok: false, error: "register_core_images_failed" };
     }
 
-    modelImages = await loadCoreImages(modelImages, LCCore, objOpts, depthScales);
+    modelImages = await loadCoreImages(modelImages, LCCore, objOpts, depthScales, {
+      tier: "thumb",
+      targetIds: [],
+    });
+    await refreshVisibleStandardImages(depthScales);
     if (togglePhoto && !objOpts.canvas.is_core_photo_visible) {
       document.getElementById("bt_core_photo").click();
     }
@@ -7731,6 +7774,11 @@ document.addEventListener("DOMContentLoaded", () => {
     },
     getEvents: () => lcE2EEventLog.map((entry) => ({ ...entry })),
     getRendererState: () => ({
+      activeImageSourceId: objOpts.image.active_source_id,
+      visibleImageTier: objOpts.image.visible_tier,
+      imageSourceIds: Object.keys(modelImages?.sources ?? {}),
+      standardCacheLimit: objOpts.image.standard_cache_limit,
+      highresCacheLimit: objOpts.image.highres_cache_limit,
       isLoadedLCModel,
       projectCount: LCCore?.projects?.length ?? 0,
       holeCount: LCCore?.projects?.reduce((sum, project) => sum + project.holes.length, 0) ?? 0,
@@ -7738,6 +7786,15 @@ document.addEventListener("DOMContentLoaded", () => {
       holeListCount: document.querySelectorAll("#hole_list input[type='checkbox']").length,
       yAxisScale: document.getElementById("YAxisSelect").value,
       loadedImageCount: Object.keys(modelImages?.drilling_depth ?? {}).length,
+      thumbLoadedSectionCount: Object.keys(
+        modelImages?.sources?.[objOpts.image.active_source_id]?.thumb?.drilling_depth ?? {}
+      ).length,
+      standardLoadedSectionCount: Object.keys(
+        modelImages?.sources?.[objOpts.image.active_source_id]?.standard?.drilling_depth ?? {}
+      ).length,
+      highresLoadedSectionCount: Object.keys(
+        modelImages?.sources?.[objOpts.image.active_source_id]?.highres?.drilling_depth ?? {}
+      ).length,
       canvasBackgroundColour: objOpts.canvas.background_colour,
       lastPlotPayload: lcE2ELastPlotPayload,
       plotApplyCount: lcE2EPlotApplyCount,
@@ -7747,6 +7804,33 @@ document.addEventListener("DOMContentLoaded", () => {
         ? objOpts.plotter.selected_options.length
         : 0,
     }),
+    setActiveImageSource: async (sourceId) => {
+      if (!sourceId || !modelImages?.sources?.[sourceId]) {
+        return { ok: false, error: "source_not_found" };
+      }
+      objOpts.image.active_source_id = sourceId;
+      modelImages = syncLegacyImageAliases(modelImages, objOpts);
+      updateView();
+      return { ok: true, sourceId };
+    },
+    forceRefreshVisibleImages: async () => {
+      modelImages = await loadCoreImages(
+        modelImages,
+        LCCore,
+        objOpts,
+        ["drilling_depth", "composite_depth", "event_free_depth", "age"],
+        { tier: "standard", targetIds: [] }
+      );
+      updateView();
+      return { ok: true };
+    },
+    getLoadedSectionKeysByTier: (tier) => {
+      const sourceBucket = modelImages?.sources?.[objOpts.image.active_source_id];
+      if (!sourceBucket || !sourceBucket[tier]) {
+        return [];
+      }
+      return Object.keys(sourceBucket[tier].drilling_depth ?? {});
+    },
     reselectCurrentAgeModel: async () => {
       const selectedAgeModelId = document.getElementById("AgeModelSelect").value;
       if (!selectedAgeModelId) {
@@ -8026,12 +8110,16 @@ document.addEventListener("DOMContentLoaded", () => {
       const imageBuffers = await window.LCapi.LoadCoreImage({
         loadOptions: {
           targetIds: [firstSection.id],
-          operations: [],
+          operations: ["drilling_depth"],
           dpcm: objOpts.image.dpcm,
+          sourceId: objOpts.image.active_source_id,
+          tier: "standard",
         },
         type: "core_images",
       });
-      const datasets = Object.keys(imageBuffers ?? {});
+      const datasets = Object.keys(imageBuffers ?? {}).filter((dataset) =>
+        ["drilling_depth", "composite_depth", "event_free_depth", "age"].includes(dataset)
+      );
       const totalBufferCount = datasets.reduce(
         (count, dataset) => count + Object.keys(imageBuffers?.[dataset] ?? {}).length,
         0
@@ -8059,7 +8147,10 @@ document.addEventListener("DOMContentLoaded", () => {
         return { ok: false, error: "section_not_found" };
       }
 
-      const opened = await window.LCapi.floatingImageViewer({ targetId: firstSection.id });
+      const opened = await window.LCapi.floatingImageViewer({
+        targetId: firstSection.id,
+        sourceId: objOpts.image.active_source_id,
+      });
       return {
         ok: opened === true,
         targetId: firstSection.id,
@@ -8183,21 +8274,266 @@ document.addEventListener("DOMContentLoaded", () => {
       console.log(LCPlotData)
     }
   });
-  function initialiseImages(){
-    let modelImages = {
-      image_dir: "",
-      load_target_ids: [],
-      image_resolution: {},
-      plot_colour:{},
-
+  function createImageTierBucket() {
+    return {
       drilling_depth: {},
       composite_depth: {},
       event_free_depth: {},
-      age:{},
-      
-      operations:[],
+      age: {},
     };
-    return modelImages
+  }
+  function createImageSourceBucket(label = "") {
+    return {
+      label,
+      load_target_ids: [],
+      image_resolution: {},
+      plot_colour: {},
+      thumb: createImageTierBucket(),
+      standard: createImageTierBucket(),
+      highres: createImageTierBucket(),
+      cache_meta: {
+        standard: {},
+        highres: {},
+      },
+      operations: [],
+    };
+  }
+  function ensureImageSource(modelImages, sourceId, label = "") {
+    if (!modelImages.source_meta) {
+      modelImages.source_meta = {};
+    }
+    if (!modelImages.sources) {
+      modelImages.sources = {};
+    }
+    if (!modelImages.sources[sourceId]) {
+      modelImages.sources[sourceId] = createImageSourceBucket(label);
+    }
+    if (!modelImages.sources[sourceId].cache_meta) {
+      modelImages.sources[sourceId].cache_meta = {
+        standard: {},
+        highres: {},
+      };
+    }
+    if (!modelImages.source_meta[sourceId]) {
+      modelImages.source_meta[sourceId] = {
+        label: label || modelImages.sources[sourceId].label || sourceId,
+      };
+    }
+    if (!modelImages.sources[sourceId].label && modelImages.source_meta[sourceId].label) {
+      modelImages.sources[sourceId].label = modelImages.source_meta[sourceId].label;
+    }
+    return modelImages.sources[sourceId];
+  }
+  function getActiveImageSourceBucket(modelImages, objOpts) {
+    if (!modelImages || !objOpts?.image?.active_source_id) {
+      return null;
+    }
+    return ensureImageSource(modelImages, objOpts.image.active_source_id);
+  }
+  function syncLegacyImageAliases(modelImages, objOpts) {
+    const activeSourceId = objOpts?.image?.active_source_id ?? "source_1";
+    const sourceBucket = ensureImageSource(modelImages, activeSourceId);
+    modelImages.active_source_id = activeSourceId;
+    modelImages.load_target_ids = sourceBucket.load_target_ids;
+    modelImages.image_resolution = sourceBucket.image_resolution;
+    modelImages.plot_colour = sourceBucket.plot_colour;
+    modelImages.drilling_depth = sourceBucket.standard.drilling_depth;
+    modelImages.composite_depth = sourceBucket.standard.composite_depth;
+    modelImages.event_free_depth = sourceBucket.standard.event_free_depth;
+    modelImages.age = sourceBucket.standard.age;
+    modelImages.operations = sourceBucket.operations;
+    return modelImages;
+  }
+  function getCurrentImageTier(objOpts) {
+    if (objOpts.canvas.zoom_level[1] <= 0.2) {
+      return "thumb";
+    }
+    return "standard";
+  }
+  function getImageTierBucket(modelImages, objOpts, tier = "standard", sourceId = null) {
+    const activeSourceId = sourceId ?? objOpts?.image?.active_source_id ?? "source_1";
+    const sourceBucket = ensureImageSource(modelImages, activeSourceId);
+    return sourceBucket[tier] ?? sourceBucket.standard;
+  }
+  function getRenderableSectionImage(modelImages, objOpts, depthScale, sectionKey) {
+    const activeSourceId = objOpts?.image?.active_source_id ?? "source_1";
+    const sourceBucket = ensureImageSource(modelImages, activeSourceId);
+    const currentTier = getCurrentImageTier(objOpts);
+    objOpts.image.visible_tier = currentTier;
+    const renderedTier = sourceBucket.highres?.[depthScale]?.[sectionKey]
+      ? "highres"
+      : sourceBucket[currentTier]?.[depthScale]?.[sectionKey]
+        ? currentTier
+        : sourceBucket.standard?.[depthScale]?.[sectionKey]
+          ? "standard"
+          : sourceBucket.thumb?.[depthScale]?.[sectionKey]
+            ? "thumb"
+            : null;
+    if (renderedTier === "standard" || renderedTier === "highres") {
+      if (!sourceBucket.cache_meta) {
+        sourceBucket.cache_meta = { standard: {}, highres: {} };
+      }
+      if (!sourceBucket.cache_meta[renderedTier]) {
+        sourceBucket.cache_meta[renderedTier] = {};
+      }
+      sourceBucket.cache_meta[renderedTier][sectionKey] = {
+        loadedAt: sourceBucket.cache_meta[renderedTier][sectionKey]?.loadedAt ?? Date.now(),
+        lastUsedAt: Date.now(),
+      };
+    }
+
+    return (
+      sourceBucket.highres?.[depthScale]?.[sectionKey] ??
+      sourceBucket[currentTier]?.[depthScale]?.[sectionKey] ??
+      sourceBucket.standard?.[depthScale]?.[sectionKey] ??
+      sourceBucket.thumb?.[depthScale]?.[sectionKey] ??
+      null
+    );
+  }
+  function getSectionKeyById(sectionId) {
+    if (!LCCore || !sectionId) {
+      return null;
+    }
+    const idx = LCCore.search_idx_list?.[sectionId.toString()];
+    if (!idx) {
+      return null;
+    }
+    const hole = LCCore.projects[idx[0]].holes[idx[1]];
+    const section = hole.sections[idx[2]];
+    return hole.name + "-" + section.name;
+  }
+  function collectVisibleSectionIds(bufferRate = 0.35) {
+    if (!LCCore) {
+      return [];
+    }
+
+    const dpir = objOpts.canvas.dpir;
+    const xMag = dpir * objOpts.canvas.zoom_level[0];
+    let yMag = dpir * objOpts.canvas.zoom_level[1];
+    const pad_x = objOpts.canvas.pad_x;
+    let pad_y = objOpts.canvas.pad_y;
+    if (objOpts.canvas.depth_scale == "age") {
+      yMag = yMag * objOpts.canvas.age_zoom_correction[0];
+      pad_y = pad_y + objOpts.canvas.age_zoom_correction[1];
+    }
+
+    const shift_x = objOpts.canvas.shift_x;
+    const shift_y = objOpts.canvas.shift_y;
+    const viewRect = {
+      x: scroller.scrollLeft,
+      y: scroller.scrollTop,
+      width: window.innerWidth,
+      height: window.innerHeight,
+    };
+    const xBuffer = viewRect.width * bufferRate;
+    const yBuffer = viewRect.height * bufferRate;
+    const ids = [];
+
+    for (const project of LCCore.projects) {
+      for (const hole of project.holes) {
+        if (!project.enable || !hole.enable) {
+          continue;
+        }
+        for (const section of hole.sections) {
+          if (!section.markers || section.markers.length === 0) {
+            continue;
+          }
+
+          const sectionTop = section.markers[0][objOpts.canvas.depth_scale];
+          const sectionBottom = section.markers.slice(-1)[0][objOpts.canvas.depth_scale];
+          if (sectionTop == null || sectionBottom == null) {
+            continue;
+          }
+
+          const holeX0 = (objOpts.hole.distance + objOpts.hole.width) * hole.order;
+          const sectionRect = {
+            x: (holeX0 + shift_x) * xMag + pad_x,
+            y: (sectionTop + shift_y) * yMag + pad_y,
+            width: objOpts.section.width * xMag,
+            height: (sectionBottom - sectionTop) * yMag,
+          };
+
+          if (isInside(viewRect, sectionRect, [xBuffer, yBuffer])) {
+            ids.push(section.id);
+          }
+        }
+      }
+    }
+
+    return ids;
+  }
+  async function refreshVisibleStandardImages(operations = ["drilling_depth","composite_depth","event_free_depth","age"]) {
+    if (!LCCore || !modelImages?.sources) {
+      return modelImages;
+    }
+
+    const sourceId = objOpts.image.active_source_id;
+    const sourceBucket = ensureImageSource(modelImages, sourceId);
+    const targetIds = collectVisibleSectionIds().filter((sectionId) => {
+      const sectionKey = getSectionKeyById(sectionId);
+      if (!sectionKey) {
+        return false;
+      }
+      const flightKey = sourceId + "::standard::" + sectionKey;
+      if (standardImageInFlight.has(flightKey)) {
+        return false;
+      }
+      return !sourceBucket.standard.drilling_depth[sectionKey];
+    });
+
+    if (targetIds.length === 0) {
+      return modelImages;
+    }
+
+    for (const sectionId of targetIds) {
+      const sectionKey = getSectionKeyById(sectionId);
+      if (sectionKey) {
+        standardImageInFlight.add(sourceId + "::standard::" + sectionKey);
+      }
+    }
+
+    try {
+      const protectedKeys = collectVisibleSectionIds()
+        .map((sectionId) => getSectionKeyById(sectionId))
+        .filter(Boolean);
+      modelImages = await loadCoreImages(modelImages, LCCore, objOpts, operations, {
+        tier: "standard",
+        targetIds,
+        silentProgress: true,
+        protectedKeys,
+      });
+    } finally {
+      for (const sectionId of targetIds) {
+        const sectionKey = getSectionKeyById(sectionId);
+        if (sectionKey) {
+          standardImageInFlight.delete(sourceId + "::standard::" + sectionKey);
+        }
+      }
+    }
+
+    updateView();
+    return modelImages;
+  }
+  function scheduleVisibleStandardImageRefresh() {
+    if (!objOpts.canvas.is_core_photo_visible || !LCCore) {
+      return;
+    }
+    if (standardImageLoadTimer) {
+      clearTimeout(standardImageLoadTimer);
+    }
+    standardImageLoadTimer = setTimeout(async () => {
+      standardImageLoadTimer = null;
+      await refreshVisibleStandardImages();
+    }, 250);
+  }
+  function initialiseImages(){
+    let modelImages = {
+      image_dir: "",
+      source_meta: {},
+      sources: {},
+    };
+    ensureImageSource(modelImages, "source_1", "Image 1");
+    return syncLegacyImageAliases(modelImages, objOpts);
   }
   async function initialiseCanvas() {
     //canvas initialise
@@ -9232,33 +9568,183 @@ async function undo(type, name="unnamed"){
      resolve(result);
   })
 }
+function createImageTierBucketGlobal() {
+  return {
+    drilling_depth: {},
+    composite_depth: {},
+    event_free_depth: {},
+    age: {},
+  };
+}
+function createImageSourceBucketGlobal(label = "") {
+  return {
+    label,
+    load_target_ids: [],
+    image_resolution: {},
+    plot_colour: {},
+    thumb: createImageTierBucketGlobal(),
+    standard: createImageTierBucketGlobal(),
+    highres: createImageTierBucketGlobal(),
+    cache_meta: {
+      standard: {},
+      highres: {},
+    },
+    operations: [],
+  };
+}
+function ensureImageSourceGlobal(modelImages, sourceId, label = "") {
+  if (!modelImages.source_meta) {
+    modelImages.source_meta = {};
+  }
+  if (!modelImages.sources) {
+    modelImages.sources = {};
+  }
+  if (!modelImages.sources[sourceId]) {
+    modelImages.sources[sourceId] = createImageSourceBucketGlobal(label);
+  }
+  if (!modelImages.sources[sourceId].cache_meta) {
+    modelImages.sources[sourceId].cache_meta = {
+      standard: {},
+      highres: {},
+    };
+  }
+  if (!modelImages.sources[sourceId].cache_meta.standard) {
+    modelImages.sources[sourceId].cache_meta.standard = {};
+  }
+  if (!modelImages.sources[sourceId].cache_meta.highres) {
+    modelImages.sources[sourceId].cache_meta.highres = {};
+  }
+  if (!modelImages.source_meta[sourceId]) {
+    modelImages.source_meta[sourceId] = {
+      label: label || modelImages.sources[sourceId].label || sourceId,
+    };
+  }
+  if (!modelImages.sources[sourceId].label && modelImages.source_meta[sourceId].label) {
+    modelImages.sources[sourceId].label = modelImages.source_meta[sourceId].label;
+  }
+  return modelImages.sources[sourceId];
+}
+function deleteImageTierSection(sourceBucket, tier, sectionKey) {
+  for (const depthScale of ["drilling_depth", "composite_depth", "event_free_depth", "age"]) {
+    delete sourceBucket[tier]?.[depthScale]?.[sectionKey];
+  }
+  if (sourceBucket.cache_meta?.[tier]) {
+    delete sourceBucket.cache_meta[tier][sectionKey];
+  }
+}
+function markImageTierUsed(sourceBucket, tier, sectionKey) {
+  if (tier !== "standard" && tier !== "highres") {
+    return;
+  }
+  if (!sourceBucket.cache_meta) {
+    sourceBucket.cache_meta = { standard: {}, highres: {} };
+  }
+  if (!sourceBucket.cache_meta[tier]) {
+    sourceBucket.cache_meta[tier] = {};
+  }
+  const now = Date.now();
+  sourceBucket.cache_meta[tier][sectionKey] = {
+    loadedAt: sourceBucket.cache_meta[tier][sectionKey]?.loadedAt ?? now,
+    lastUsedAt: now,
+  };
+}
+function evictImageTierCache(modelImages, objOpts, sourceId, tier, protectedKeys = []) {
+  if (tier !== "standard" && tier !== "highres") {
+    return modelImages;
+  }
+
+  const sourceBucket = ensureImageSourceGlobal(modelImages, sourceId);
+  const limit = tier === "standard"
+    ? Number(objOpts.image.standard_cache_limit)
+    : Number(objOpts.image.highres_cache_limit);
+  if (!Number.isFinite(limit)) {
+    return modelImages;
+  }
+
+  const protectedSet = new Set(protectedKeys);
+  const keys = new Set([
+    ...Object.keys(sourceBucket[tier]?.drilling_depth ?? {}),
+    ...Object.keys(sourceBucket[tier]?.composite_depth ?? {}),
+    ...Object.keys(sourceBucket[tier]?.event_free_depth ?? {}),
+    ...Object.keys(sourceBucket[tier]?.age ?? {}),
+  ]);
+  const maxEntries = Math.max(0, Math.floor(limit));
+  const removable = [...keys]
+    .filter((key) => !protectedSet.has(key))
+    .map((key) => ({
+      key,
+      lastUsedAt: sourceBucket.cache_meta?.[tier]?.[key]?.lastUsedAt ?? 0,
+      loadedAt: sourceBucket.cache_meta?.[tier]?.[key]?.loadedAt ?? 0,
+    }))
+    .sort((a, b) => (a.lastUsedAt - b.lastUsedAt) || (a.loadedAt - b.loadedAt));
+
+  let currentSize = keys.size;
+  for (const entry of removable) {
+    if (currentSize <= maxEntries) {
+      break;
+    }
+    deleteImageTierSection(sourceBucket, tier, entry.key);
+    currentSize -= 1;
+  }
+
+  return syncLegacyImageAliasesGlobal(modelImages, objOpts);
+}
+function syncLegacyImageAliasesGlobal(modelImages, objOpts) {
+  const activeSourceId = objOpts?.image?.active_source_id ?? modelImages.active_source_id ?? "source_1";
+  const sourceBucket = ensureImageSourceGlobal(modelImages, activeSourceId);
+  modelImages.active_source_id = activeSourceId;
+  modelImages.load_target_ids = sourceBucket.load_target_ids;
+  modelImages.image_resolution = sourceBucket.image_resolution;
+  modelImages.plot_colour = sourceBucket.plot_colour;
+  modelImages.drilling_depth = sourceBucket.standard.drilling_depth;
+  modelImages.composite_depth = sourceBucket.standard.composite_depth;
+  modelImages.event_free_depth = sourceBucket.standard.event_free_depth;
+  modelImages.age = sourceBucket.standard.age;
+  modelImages.operations = sourceBucket.operations;
+  return modelImages;
+}
 async function updateImageRegistration(modelImages, LCCore){
   return new Promise(async (resolve, reject) => {
-    modelImages.load_target_ids = [];
+    const imageOpts = { image: { active_source_id: modelImages.active_source_id ?? "source_1" } };
+    const sourceBucket = ensureImageSourceGlobal(
+      modelImages,
+      imageOpts.image.active_source_id
+    );
+    if (!sourceBucket) {
+      resolve(modelImages);
+      return;
+    }
+    sourceBucket.load_target_ids = [];
+    syncLegacyImageAliasesGlobal(modelImages, imageOpts);
     for(let p of LCCore.projects){
       for(let h of p.holes){
         for(let s of h.sections){
+          const sectionKey = h.name+"-"+s.name;
           //check loaded im
-          const im_in_array = modelImages.drilling_depth[h.name+"-"+s.name];
+          const im_in_array = sourceBucket.standard.drilling_depth[sectionKey];
           //check folder im
-          //console.log(modelImages.image_dir, h.name+"-"+s.name+".jpg")
-          if(Object.keys(modelImages.drilling_depth).length > 0){
-            const isImExist = await window.LCapi.CheckImagesInDir({ fileName: h.name+"-"+s.name+".jpg" });
+          if(Object.keys(sourceBucket.standard.drilling_depth).length > 0){
+            const isImExist = await window.LCapi.CheckImagesInDir({
+              fileName: sectionKey+".jpg",
+              sourceId: imageOpts.image.active_source_id,
+            });
             //console.log(h.name+"-"+s.name,  isImExist)
 
             // /im_in_dir
             if(im_in_array==undefined){
               if(isImExist == true){
                 //add case
-                modelImages.load_target_ids.push(s.id);//add load list
+                sourceBucket.load_target_ids.push(s.id);//add load list
               }
             }else{
               if(isImExist == false){
                 //remove case
-                delete modelImages.drilling_depth[h.name+"-"+s.name];
-                delete modelImages.composite_depth[h.name+"-"+s.name];
-                delete modelImages.event_free_depth[h.name+"-"+s.name];
-                delete modelImages.age[h.name+"-"+s.name];
+                for (const tier of ["thumb", "standard", "highres"]) {
+                  delete sourceBucket[tier].drilling_depth[sectionKey];
+                  delete sourceBucket[tier].composite_depth[sectionKey];
+                  delete sourceBucket[tier].event_free_depth[sectionKey];
+                  delete sourceBucket[tier].age[sectionKey];
+                }
               }
             }
 
@@ -9268,16 +9754,16 @@ async function updateImageRegistration(modelImages, LCCore){
     }
 
     console.log(modelImages);
-    if(modelImages.load_target_ids.length == 0){
-      modelImages.load_target_ids = null;
+    if(sourceBucket.load_target_ids.length == 0){
+      sourceBucket.load_target_ids = null;
       console.log("[Renderer]: No images added.")
     }
 
-    resolve(modelImages);
+    resolve(syncLegacyImageAliasesGlobal(modelImages, imageOpts));
   });
   
 }
-async function loadCoreImages(modelImages, LCCore, objOpts, operations) {
+async function loadCoreImages(modelImages, LCCore, objOpts, operations, requestOptions = {}) {
 
   //await window.LCapi.progressbar("Load images"+depthScale, txt);
   //await window.LCapi.updateProgressbar(1, 1);
@@ -9292,22 +9778,31 @@ async function loadCoreImages(modelImages, LCCore, objOpts, operations) {
   
   return new Promise(async (resolve, reject) => {
     //initialise
-    let results = modelImages;
+    let results = syncLegacyImageAliasesGlobal(modelImages, objOpts);
 
     try{
       //check
       if (LCCore == null) {
         console.log("[Renderer]: There is no LCCore.");
-        await window.LCapi.updateProgressbar({ current: 1, total: 1 });
+        if (!requestOptions.silentProgress) {
+          await window.LCapi.updateProgressbar({ current: 1, total: 1 });
+        }
         resolve(results);
         return;
       }
       
+      const sourceId = requestOptions.sourceId ?? objOpts.image.active_source_id ?? "source_1";
+      const tier = requestOptions.tier ?? "standard";
+      const label = requestOptions.label ?? results.source_meta?.[sourceId]?.label ?? "Image 1";
+      const sourceBucket = ensureImageSourceGlobal(results, sourceId, label);
+
       if (operations.includes("composite_depth") || operations.includes("event_free_depth") || operations.includes("age")) {
         if(!operations.includes("drilling_depth")){
-          if (Object.keys(modelImages.drilling_depth).length == 0) {
+          if (Object.keys(sourceBucket.standard.drilling_depth).length == 0 && Object.keys(sourceBucket.thumb.drilling_depth).length == 0) {
             console.log("[Renderer]: There is no original image.");
-            await window.LCapi.updateProgressbar({ current: 1, total: 1 });
+            if (!requestOptions.silentProgress) {
+              await window.LCapi.updateProgressbar({ current: 1, total: 1 });
+            }
             resolve(results);
             return;
           }
@@ -9316,18 +9811,32 @@ async function loadCoreImages(modelImages, LCCore, objOpts, operations) {
       }
 
       //get target image list
+      let targetIds = null;
+      if (Array.isArray(requestOptions.targetIds)) {
+        targetIds = [...requestOptions.targetIds];
+      } else if (requestOptions.targetIds === null) {
+        targetIds = [];
+      } else if (sourceBucket.load_target_ids !== null) {
+        targetIds = Array.isArray(sourceBucket.load_target_ids) ? [...sourceBucket.load_target_ids] : [];
+      }
+
       let N = 0;
-      if(modelImages.load_target_ids !== null){
-        if(modelImages.load_target_ids.length == 0){
+      if(targetIds !== null){
+        if(targetIds.length == 0){
           //case all
           console.log("[Renderer]: Load all images]")
           LCCore.projects.forEach((p) => {
             p.holes.forEach((h) => {
               h.sections.forEach((s) => {
-                results.load_target_ids.push(s.id);
-                if ((h.name+"-"+s.name) in modelImages.image_resolution){
+                targetIds.push(s.id);
+                if ((h.name+"-"+s.name) in sourceBucket.image_resolution){
                 }else{
-                  results.image_resolution[h.name+"-"+s.name] = objOpts.image.dpcm;
+                  sourceBucket.image_resolution[h.name+"-"+s.name] =
+                    tier === "thumb"
+                      ? objOpts.image.thumb_dpcm
+                      : tier === "highres"
+                        ? objOpts.image.highres_dpcm
+                        : objOpts.image.standard_dpcm;
                 }
               });
             });
@@ -9337,23 +9846,46 @@ async function loadCoreImages(modelImages, LCCore, objOpts, operations) {
           console.log("[Renderer]: Load selected images]")
         }
         
-        N = results.load_target_ids.length;
+        N = targetIds.length;
       }else{
         N=0;
-        results.load_target_ids=[];
+        targetIds=[];
       }
       
       if(N==0){
         console.log("[Renderer]: There is no update image.")
-        await window.LCapi.updateProgressbar({ current: 1, total: 1 });
+        if (!requestOptions.silentProgress) {
+          await window.LCapi.updateProgressbar({ current: 1, total: 1 });
+        }
         resolve(results);
         return;
       }
 
+      const requestDpcm = {};
+      for (const targetId of targetIds) {
+        const idx = LCCore.search_idx_list[targetId.toString()];
+        if (!idx) {
+          continue;
+        }
+        const holeName = LCCore.projects[idx[0]].holes[idx[1]].name;
+        const sectionName = LCCore.projects[idx[0]].holes[idx[1]].sections[idx[2]].name;
+        const sectionKey = holeName + "-" + sectionName;
+        requestDpcm[sectionKey] =
+          tier === "thumb"
+            ? objOpts.image.thumb_dpcm
+            : tier === "highres"
+              ? (sourceBucket.image_resolution[sectionKey] ?? objOpts.image.highres_dpcm)
+              : objOpts.image.standard_dpcm;
+      }
+
       const loadOptions = {
-        targetIds:results.load_target_ids, 
+        targetIds:targetIds, 
         operations:operations,
-        dpcm:results.image_resolution,//dpcm:objOpts.image.dpcm,
+        dpcm:requestDpcm,
+        sourceId,
+        tier,
+        label,
+        silentProgress: requestOptions.silentProgress === true,
       };
       console.log(loadOptions)
       
@@ -9369,20 +9901,22 @@ async function loadCoreImages(modelImages, LCCore, objOpts, operations) {
         //  resolve(imBufferDict)
         //}) 
 
-        results = await assignCoreImages(results, imageBuffers);
+        results = await assignCoreImages(results, imageBuffers, objOpts, {
+          silentProgress: requestOptions.silentProgress === true,
+          protectedKeys: requestOptions.protectedKeys ?? [],
+        });
 
         for (const ds of Object.keys(imageBuffers || {})) {                 
           for (const k in imageBuffers[ds]) delete imageBuffers[ds][k];     
           delete imageBuffers[ds];                                          
         } 
 
-
-        results.load_target_ids = [];
+        sourceBucket.load_target_ids = [];
       }catch(err){
         console.error(err)
       }
       
-      resolve(results);
+      resolve(syncLegacyImageAliasesGlobal(results, objOpts));
     }catch(err){
       console.error(err);
       reject(results);
@@ -9390,12 +9924,20 @@ async function loadCoreImages(modelImages, LCCore, objOpts, operations) {
   });
 
 }
-async function assignCoreImages(coreImages, imageBuffers) {
+async function assignCoreImages(coreImages, imageBuffers, objOpts, options = {}) {
   const allowedScalses = ["drilling_depth", "composite_depth", "event_free_depth", "age"];
   let results = coreImages;
+  const sourceId = imageBuffers?.sourceId ?? results.active_source_id ?? "source_1";
+  const tier = imageBuffers?.tier ?? "standard";
+  const label = imageBuffers?.label ?? results.source_meta?.[sourceId]?.label ?? "Image 1";
+  const sourceBucket = ensureImageSourceGlobal(results, sourceId, label);
+  const tierBucket = sourceBucket[tier] ?? sourceBucket.standard;
   let suc = 0; 
   let N = 0;
   for(const depthTyep in imageBuffers){
+    if (!allowedScalses.includes(depthTyep)) {
+      continue;
+    }
     N += Object.keys(imageBuffers[depthTyep]).length;
   }
 
@@ -9403,13 +9945,17 @@ async function assignCoreImages(coreImages, imageBuffers) {
     await new Promise((resolve, reject) => {
       new p5(async (p) => {
         try {
-          await window.LCapi.progressbar({ title: "Assigning images", text: "Now assigning...", indeterminate: true });
+          if (!options.silentProgress) {
+            await window.LCapi.progressbar({ title: "Assigning images", text: "Now assigning...", indeterminate: true });
+          }
           //await window.LCapi.updateProgressbar(0, N, "");
           let n = 0;
           if(imageBuffers==null){
             console.log("[Renderer]: Failed to assign images because there are no loaded images.");
             //await window.LCapi.updateProgressbar(N, N, "");
-            await window.LCapi.clearProgressbar();
+            if (!options.silentProgress) {
+              await window.LCapi.clearProgressbar();
+            }
             //reject();
             resolve();
           }
@@ -9426,11 +9972,11 @@ async function assignCoreImages(coreImages, imageBuffers) {
                   let blob = new Blob([imageBuffers[depthScale][imName]], { type: 'image/jpeg' });
                   let url = URL.createObjectURL(blob);
 
-                  if (results[depthScale][imName]) { 
-                    results[depthScale][imName] = undefined; 
+                  if (tierBucket[depthScale][imName]) { 
+                    tierBucket[depthScale][imName] = undefined; 
                   }
 
-                  results[depthScale][imName] = await new Promise((resolveImg, rejectImg)=>{
+                  tierBucket[depthScale][imName] = await new Promise((resolveImg, rejectImg)=>{
                     p.loadImage(
                       url,
                       img => {
@@ -9440,7 +9986,7 @@ async function assignCoreImages(coreImages, imageBuffers) {
                         resolveImg(img);
                       },
                       () => {
-                        results[depthScale][imName] = undefined;
+                        tierBucket[depthScale][imName] = undefined;
                         setTimeout(() => {try { URL.revokeObjectURL(url); } catch(_) {}},0)
                         
                         blob = null;
@@ -9449,7 +9995,8 @@ async function assignCoreImages(coreImages, imageBuffers) {
                     );
                   });
 
-                  results.plot_colour[imName] = false; 
+                  markImageTierUsed(sourceBucket, tier, imName);
+                  sourceBucket.plot_colour[imName] = false; 
                   resolveImage();
                 } catch (err) {
                   console.error(err);
@@ -9476,13 +10023,26 @@ async function assignCoreImages(coreImages, imageBuffers) {
       });
     });
 
-    await window.LCapi.clearProgressbar();
+    if (!options.silentProgress) {
+      await window.LCapi.clearProgressbar();
+    }
+    if (tier === "standard" || tier === "highres") {
+      results = evictImageTierCache(
+        results,
+        objOpts,
+        sourceId,
+        tier,
+        options.protectedKeys ?? []
+      );
+    }
     console.log("[Renderer]: Load " + suc + " images / " + N + " models(DD, CD, EFD, Age).");
-    return results;
+    return syncLegacyImageAliasesGlobal(results, objOpts);
   }catch(err){
     console.error("[Renderer]: An error occurred during image assignment:", err);
-    await window.LCapi.clearProgressbar();
-    return results;
+    if (!options.silentProgress) {
+      await window.LCapi.clearProgressbar();
+    }
+    return syncLegacyImageAliasesGlobal(results, objOpts);
   }  
 }
 

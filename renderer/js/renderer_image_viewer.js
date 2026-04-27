@@ -14,15 +14,70 @@ document.addEventListener("DOMContentLoaded", () => {
   let holeName = "";
   let sectionName = "";
   let rect = null;  
-  let modelImages = {
-    load_target_ids: [],
-    image_resolution: {},
-    drilling_depth: {},
-    composite_depth: {},
-    event_free_depth: {},
-    age:{},
-    operations:[],
-  };
+  function createImageTierBucket() {
+    return {
+      drilling_depth: {},
+      composite_depth: {},
+      event_free_depth: {},
+      age: {},
+    };
+  }
+  function createImageSourceBucket(label = "") {
+    return {
+      label,
+      load_target_ids: [],
+      image_resolution: {},
+      thumb: createImageTierBucket(),
+      standard: createImageTierBucket(),
+      highres: createImageTierBucket(),
+      operations: [],
+    };
+  }
+  function ensureImageSource(modelImages, sourceId, label = "") {
+    if (!modelImages.source_meta) {
+      modelImages.source_meta = {};
+    }
+    if (!modelImages.sources) {
+      modelImages.sources = {};
+    }
+    if (!modelImages.sources[sourceId]) {
+      modelImages.sources[sourceId] = createImageSourceBucket(label);
+    }
+    if (!modelImages.source_meta[sourceId]) {
+      modelImages.source_meta[sourceId] = {
+        label: label || modelImages.sources[sourceId].label || sourceId,
+      };
+    }
+    return modelImages.sources[sourceId];
+  }
+  function getViewerActiveSourceId(images = modelImages) {
+    return images?.active_source_id ?? "source_1";
+  }
+  function getViewerPrimaryTierBucket(images = modelImages) {
+    const sourceBucket = ensureImageSource(images, getViewerActiveSourceId(images));
+    return sourceBucket.highres.drilling_depth && Object.keys(sourceBucket.highres.drilling_depth).length > 0
+      ? sourceBucket.highres
+      : Object.keys(sourceBucket.standard.drilling_depth).length > 0
+        ? sourceBucket.standard
+        : sourceBucket.thumb;
+  }
+  function syncLegacyImageAliases(images = modelImages) {
+    const sourceBucket = ensureImageSource(images, getViewerActiveSourceId(images));
+    const primaryTierBucket = getViewerPrimaryTierBucket(images);
+    images.load_target_ids = sourceBucket.load_target_ids;
+    images.image_resolution = sourceBucket.image_resolution;
+    images.drilling_depth = primaryTierBucket.drilling_depth;
+    images.composite_depth = primaryTierBucket.composite_depth;
+    images.event_free_depth = primaryTierBucket.event_free_depth;
+    images.age = primaryTierBucket.age;
+    images.operations = sourceBucket.operations;
+    return images;
+  }
+  let modelImages = syncLegacyImageAliases({
+    source_meta: {},
+    sources: {},
+    active_source_id: "source_1",
+  });
   let objOpts = {
     tool_on: false,
     hittest: null,
@@ -41,9 +96,20 @@ document.addEventListener("DOMContentLoaded", () => {
       return viewerReady;
     },
     getState() {
+      const activeSourceId = getViewerActiveSourceId();
+      const sourceBucket = ensureImageSource(modelImages, activeSourceId);
       return {
         title: document.title,
+        activeImageSourceId: activeSourceId,
+        viewerImageTier:
+          Object.keys(sourceBucket.highres.drilling_depth).length > 0
+            ? "highres"
+            : Object.keys(sourceBucket.standard.drilling_depth).length > 0
+              ? "standard"
+              : "thumb",
         loadedImageCount: Object.keys(modelImages.drilling_depth || {}).length,
+        loadedHighresSectionCount: Object.keys(sourceBucket.highres.drilling_depth || {}).length,
+        loadedHighresSectionKeys: Object.keys(sourceBucket.highres.drilling_depth || {}),
       };
     },
   };
@@ -91,15 +157,11 @@ document.addEventListener("DOMContentLoaded", () => {
     holeName = "";
     sectionName = "";
     rect = null;
-    modelImages = {
-      load_target_ids: [],
-      image_resolution: {},
-      drilling_depth: {},
-      composite_depth: {},
-      event_free_depth: {},
-      age:{},
-      operations:[],
-    };
+    modelImages = syncLegacyImageAliases({
+      source_meta: {},
+      sources: {},
+      active_source_id: "source_1",
+    });
     objOpts = {
       tool_on: false,
       hittest: null,
@@ -255,10 +317,18 @@ document.addEventListener("DOMContentLoaded", () => {
 
   async function assignCoreImages(coreImages, imageBuffers, objOpts) {
     let results = coreImages;
+    const sourceId = imageBuffers?.sourceId ?? "source_1";
+    const tier = imageBuffers?.tier ?? "highres";
+    const label = imageBuffers?.label ?? "Image 1";
+    results.active_source_id = sourceId;
+    const sourceBucket = ensureImageSource(results, sourceId, label);
+    const tierBucket = sourceBucket[tier] ?? sourceBucket.highres;
     let suc = 0; 
     let N = 0;
     for(const depthTyep in imageBuffers){
-      N += Object.keys(imageBuffers[depthTyep]).length;
+      if (["drilling_depth", "composite_depth", "event_free_depth", "age"].includes(depthTyep)) {
+        N += Object.keys(imageBuffers[depthTyep]).length;
+      }
     }
   
     await new Promise((resolve, reject) => {
@@ -273,12 +343,15 @@ document.addEventListener("DOMContentLoaded", () => {
           const promises = [];
   
           for (const depthScale of Object.keys(imageBuffers)) {
+            if (!["drilling_depth", "composite_depth", "event_free_depth", "age"].includes(depthScale)) {
+              continue;
+            }
             for (const imName in imageBuffers[depthScale]) {
               const promise = new Promise(async (resolveImage) => {
                 try {
                   let blob = new Blob([imageBuffers[depthScale][imName]], { type: 'image/jpeg' });
                   let url = URL.createObjectURL(blob);
-                  results[depthScale][imName] = await p.loadImage(
+                  tierBucket[depthScale][imName] = await p.loadImage(
                     url,
                     async () => {
                       console.log("[Renderer]: Assign image of " + imName +" in "+depthScale);
@@ -290,10 +363,10 @@ document.addEventListener("DOMContentLoaded", () => {
                       resolveImage();
                     }
                   );
-                  results.image_resolution[imName] = objOpts.dpcm;
+                  sourceBucket.image_resolution[imName] = objOpts.dpcm;
                 } catch (err) {
                   console.log(err);
-                  results[depthScale][imName] = undefined;
+                  tierBucket[depthScale][imName] = undefined;
                   resolveImage();
                 }
   
@@ -311,9 +384,9 @@ document.addEventListener("DOMContentLoaded", () => {
         }
       });
     });
-  
+
     console.log("[Renderer]: Load " + suc + " images / " + N + " models.");
-    return results;
+    return syncLegacyImageAliases();
   }  
 
   function makeP5CanvasBase() {
