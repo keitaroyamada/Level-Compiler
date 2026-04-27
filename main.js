@@ -896,6 +896,22 @@ function createMainWIndow() {
     const coreImages = await loadCoreImages(loadOptions, type);
     return coreImages;
   });
+  ipcMain.handle("UnregisterCoreImageSource", (_e, payload) => {
+    const sourceId = payload?.sourceId ?? "source_1";
+    const before = globalPath.dataPaths.length;
+    globalPath.dataPaths = globalPath.dataPaths.filter((item) => {
+      if (item.type !== "image_source" && item.type !== "core_images") {
+        return true;
+      }
+      const itemSourceId = item.sourceId ?? "source_1";
+      return itemSourceId !== sourceId;
+    });
+    return {
+      ok: true,
+      removed: before - globalPath.dataPaths.length,
+      sourceId,
+    };
+  });
   async function loadCoreImages(loadOptions, type){
     const isShowMemory = false;
     const silentProgress = loadOptions.silentProgress === true;
@@ -1880,6 +1896,14 @@ function createMainWIndow() {
                   resolve("plotImageBrightness");                      
                 } 
               },
+              { type: 'separator' },
+              {
+                label: 'Unload current ImageSet',
+                click: () => {
+                  console.log('MAIN: Unload current ImageSet');
+                  resolve("unloadImageSet");
+                }
+              },
             ]
           },          
           {
@@ -2015,6 +2039,14 @@ function createMainWIndow() {
                   console.log('MAIN: reload image'); 
                   resolve("reloadImage");                      
                 } 
+              },
+              { type: 'separator' },
+              {
+                label: 'Unload current ImageSet',
+                click: () => {
+                  console.log('MAIN: Unload current ImageSet');
+                  resolve("unloadImageSet");
+                }
               }
             ]
           },
@@ -3024,7 +3056,7 @@ function createMainWIndow() {
       targetWindow = getDividerWindow();
     }
 
-    const result = await dialog.showMessageBox(targetWindow, options);
+    const result = await showMessageBoxWithE2E(targetWindow, options);
     return result.response === 0;
   });
   ipcMain.handle("SendDepthToFinder", async (_e, payload) => {

@@ -153,6 +153,7 @@ contextBridge.exposeInMainWorld("LCapi", {
     IPC_CHANNELS.REGISTER_CORE_IMAGE,
     createCoreImageRegistrationPayload(payload)
   ),
+  UnregisterCoreImageSource: (payload) => ipcRenderer.invoke("UnregisterCoreImageSource", payload),
   LoadCoreImage: (payload) => ipcRenderer.invoke("LoadCoreImage", payload),
   GetResources: () => ipcRenderer.sendSync("GetResources"),
 

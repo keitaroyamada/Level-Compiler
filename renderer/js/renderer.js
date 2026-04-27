@@ -1295,6 +1295,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
       updateView();
       objOpts.image.dpcm = curDPCM;
+    }else if(clickResult=="unloadImageSet"){
+      await handleUnloadImageSet();
     }else if(clickResult=="reload"){
       document.getElementById("bt_reload").click();
     }else if(clickResult=="finder"){
@@ -7737,6 +7739,7 @@ document.addEventListener("DOMContentLoaded", () => {
       targetIds: [],
     });
     await refreshVisibleStandardImages(depthScales);
+    updateImageSetLoadedState();
     if (togglePhoto && !objOpts.canvas.is_core_photo_visible) {
       document.getElementById("bt_core_photo").click();
     }
@@ -7783,6 +7786,12 @@ document.addEventListener("DOMContentLoaded", () => {
       visibleImageTier: objOpts.image.visible_tier,
       imageSourceIds: Object.keys(modelImages?.sources ?? {}),
       imageSetSelectValue: document.getElementById("ImageSetSelect")?.value ?? null,
+      imageSetOptionStyles: Array.from(document.getElementById("ImageSetSelect")?.options ?? []).map((option) => ({
+        value: option.value,
+        color: option.style.color,
+        fontWeight: option.style.fontWeight,
+      })),
+      loadedImageSetIds: getLoadedImageSetIds(),
       standardCacheLimit: objOpts.image.standard_cache_limit,
       highresCacheLimit: objOpts.image.highres_cache_limit,
       isLoadedLCModel,
@@ -7820,9 +7829,11 @@ document.addEventListener("DOMContentLoaded", () => {
       if (select) {
         select.value = sourceId;
       }
+      updateImageSetLoadedState();
       updateView();
       return { ok: true, sourceId };
     },
+    unloadActiveImageSet: async () => handleUnloadImageSet(),
     forceRefreshVisibleImages: async () => {
       modelImages = await loadCoreImages(
         modelImages,
@@ -8365,19 +8376,9 @@ document.addEventListener("DOMContentLoaded", () => {
     }
     select.value = objOpts.image.active_source_id ?? "source_1";
     modelImages = syncLegacyImageAliases(modelImages, objOpts);
+    updateImageSetLoadedState();
   }
-  async function handleImageSetChange(event) {
-    const sourceId = event.target.value || "source_1";
-    objOpts.image.active_source_id = sourceId;
-    ensureImageSource(modelImages, sourceId, getImageSetLabel(sourceId));
-    modelImages = syncLegacyImageAliases(modelImages, objOpts);
-    if (LCCore) {
-      await refreshVisibleStandardImages();
-    }
-    updateView();
-  }
-  function hasActiveImageSetImages() {
-    const sourceId = objOpts.image.active_source_id ?? "source_1";
+  function hasImageSetImages(sourceId) {
     const sourceBucket = modelImages?.sources?.[sourceId];
     if (!sourceBucket) {
       return false;
@@ -8394,6 +8395,69 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     }
     return false;
+  }
+  function getLoadedImageSetIds() {
+    return Object.keys(modelImages?.sources ?? {}).filter((sourceId) => hasImageSetImages(sourceId));
+  }
+  function updateImageSetLoadedState() {
+    const select = document.getElementById("ImageSetSelect");
+    if (!select) {
+      return;
+    }
+    for (const option of select.options) {
+      const isLoaded = hasImageSetImages(option.value);
+      option.style.color = isLoaded ? "#000000" : "#888888";
+      option.style.fontWeight = isLoaded ? "700" : "";
+    }
+    select.style.color = "";
+    select.style.fontWeight = "";
+  }
+  async function handleUnloadImageSet() {
+    const sourceId = objOpts.image.active_source_id ?? "source_1";
+    const label = modelImages?.source_meta?.[sourceId]?.label ?? getImageSetLabel(sourceId);
+    const response = await window.LCapi.Confirm({
+      opts: {
+        title: "Confirm",
+        message: "Unload images from " + label + "?",
+        parent: "main",
+      },
+    });
+    if (!response) {
+      return { ok: false, cancelled: true };
+    }
+
+    await window.LCapi.UnregisterCoreImageSource({ sourceId });
+    clearImageSet(sourceId);
+    modelImages = syncLegacyImageAliases(modelImages, objOpts);
+    updateImageSetLoadedState();
+    updateView();
+    return { ok: true, sourceId };
+  }
+  function clearImageSet(sourceId) {
+    const label = modelImages?.source_meta?.[sourceId]?.label ?? getImageSetLabel(sourceId);
+    modelImages.sources[sourceId] = createImageSourceBucket(label);
+    modelImages.source_meta[sourceId] = { label };
+
+    for (const flightKey of Array.from(standardImageInFlight)) {
+      if (flightKey.startsWith(sourceId + "::")) {
+        standardImageInFlight.delete(flightKey);
+      }
+    }
+  }
+  async function handleImageSetChange(event) {
+    const sourceId = event.target.value || "source_1";
+    objOpts.image.active_source_id = sourceId;
+    ensureImageSource(modelImages, sourceId, getImageSetLabel(sourceId));
+    modelImages = syncLegacyImageAliases(modelImages, objOpts);
+    updateImageSetLoadedState();
+    if (LCCore) {
+      await refreshVisibleStandardImages();
+    }
+    updateImageSetLoadedState();
+    updateView();
+  }
+  function hasActiveImageSetImages() {
+    return hasImageSetImages(objOpts.image.active_source_id ?? "source_1");
   }
   function syncLegacyImageAliases(modelImages, objOpts) {
     const activeSourceId = objOpts?.image?.active_source_id ?? "source_1";
