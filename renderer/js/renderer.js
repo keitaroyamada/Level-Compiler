@@ -262,6 +262,7 @@ document.addEventListener("DOMContentLoaded", () => {
   //get plot image data
   let agePlotIcons = {};
   let modelImages = initialiseImages();
+  initialiseImageSetSelect();
 
   loadPlotIcons(agePlotIcons, objOpts);
   loadToolIcons(objOpts);
@@ -562,7 +563,7 @@ document.addEventListener("DOMContentLoaded", () => {
   //============================================================================================
   //show core images
   document.getElementById("bt_core_photo").addEventListener("click", async (event) => {
-    if (Object.keys(modelImages[objOpts.canvas.depth_scale]).length === 0) {
+    if (!hasActiveImageSetImages()) {
       return
     }
     if (objOpts.canvas.is_core_photo_visible) {
@@ -575,6 +576,9 @@ document.addEventListener("DOMContentLoaded", () => {
     updateView();
 
     });
+  //============================================================================================
+  //image set chooser
+  document.getElementById("ImageSetSelect").addEventListener("change", handleImageSetChange);
   //============================================================================================
   //rank
   document.getElementById("bt_rank").addEventListener("click", async (event) => {
@@ -772,6 +776,7 @@ document.addEventListener("DOMContentLoaded", () => {
       isLoadedLCModel = false;
 
       modelImages = initialiseImages();
+      initialiseImageSetSelect();
 
       console.log("[Renderer]: Unload Models of Correlations, Ages and Canvas.");
     } else {
@@ -7777,6 +7782,7 @@ document.addEventListener("DOMContentLoaded", () => {
       activeImageSourceId: objOpts.image.active_source_id,
       visibleImageTier: objOpts.image.visible_tier,
       imageSourceIds: Object.keys(modelImages?.sources ?? {}),
+      imageSetSelectValue: document.getElementById("ImageSetSelect")?.value ?? null,
       standardCacheLimit: objOpts.image.standard_cache_limit,
       highresCacheLimit: objOpts.image.highres_cache_limit,
       isLoadedLCModel,
@@ -7810,6 +7816,10 @@ document.addEventListener("DOMContentLoaded", () => {
       }
       objOpts.image.active_source_id = sourceId;
       modelImages = syncLegacyImageAliases(modelImages, objOpts);
+      const select = document.getElementById("ImageSetSelect");
+      if (select) {
+        select.value = sourceId;
+      }
       updateView();
       return { ok: true, sourceId };
     },
@@ -8330,6 +8340,61 @@ document.addEventListener("DOMContentLoaded", () => {
     }
     return ensureImageSource(modelImages, objOpts.image.active_source_id);
   }
+  function getImageSetLabel(sourceId) {
+    const match = sourceId?.match(/^source_(\d+)$/);
+    if (match) {
+      return "ImageSet " + match[1];
+    }
+    return sourceId || "ImageSet";
+  }
+  function initialiseImageSetSelect() {
+    const select = document.getElementById("ImageSetSelect");
+    if (!select) {
+      return;
+    }
+    for (let i = 1; i <= 5; i++) {
+      const sourceId = "source_" + i;
+      const label = "ImageSet " + i;
+      ensureImageSource(modelImages, sourceId, label);
+      modelImages.source_meta[sourceId].label = label;
+      modelImages.sources[sourceId].label = label;
+      const option = select.querySelector(`option[value="${sourceId}"]`);
+      if (option) {
+        option.textContent = label;
+      }
+    }
+    select.value = objOpts.image.active_source_id ?? "source_1";
+    modelImages = syncLegacyImageAliases(modelImages, objOpts);
+  }
+  async function handleImageSetChange(event) {
+    const sourceId = event.target.value || "source_1";
+    objOpts.image.active_source_id = sourceId;
+    ensureImageSource(modelImages, sourceId, getImageSetLabel(sourceId));
+    modelImages = syncLegacyImageAliases(modelImages, objOpts);
+    if (LCCore) {
+      await refreshVisibleStandardImages();
+    }
+    updateView();
+  }
+  function hasActiveImageSetImages() {
+    const sourceId = objOpts.image.active_source_id ?? "source_1";
+    const sourceBucket = modelImages?.sources?.[sourceId];
+    if (!sourceBucket) {
+      return false;
+    }
+    for (const tier of ["thumb", "standard", "highres"]) {
+      const tierBucket = sourceBucket[tier];
+      if (!tierBucket) {
+        continue;
+      }
+      for (const depthScale of ["drilling_depth", "composite_depth", "event_free_depth", "age"]) {
+        if (Object.keys(tierBucket[depthScale] ?? {}).length > 0) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
   function syncLegacyImageAliases(modelImages, objOpts) {
     const activeSourceId = objOpts?.image?.active_source_id ?? "source_1";
     const sourceBucket = ensureImageSource(modelImages, activeSourceId);
@@ -8428,12 +8493,28 @@ document.addEventListener("DOMContentLoaded", () => {
     const xBuffer = viewRect.width * bufferRate;
     const yBuffer = viewRect.height * bufferRate;
     const ids = [];
+    const numDisable = {
+      total: 0,
+      hole: 0,
+    };
 
     for (const project of LCCore.projects) {
+      if (!project.enable) {
+        numDisable.hole += objOpts.project.interval;
+        numDisable.total += project.holes.length + objOpts.project.interval;
+        continue;
+      }
+
       for (const hole of project.holes) {
-        if (!project.enable || !hole.enable) {
+        if (!hole.enable) {
+          numDisable.hole += 1;
           continue;
         }
+
+        const holeX0 =
+          (objOpts.hole.distance + objOpts.hole.width) *
+          (numDisable.total + hole.order - numDisable.hole);
+
         for (const section of hole.sections) {
           if (!section.markers || section.markers.length === 0) {
             continue;
@@ -8445,7 +8526,6 @@ document.addEventListener("DOMContentLoaded", () => {
             continue;
           }
 
-          const holeX0 = (objOpts.hole.distance + objOpts.hole.width) * hole.order;
           const sectionRect = {
             x: (holeX0 + shift_x) * xMag + pad_x,
             y: (sectionTop + shift_y) * yMag + pad_y,
@@ -8458,6 +8538,8 @@ document.addEventListener("DOMContentLoaded", () => {
           }
         }
       }
+
+      numDisable.total += project.holes.length + objOpts.project.interval;
     }
 
     return ids;
@@ -8532,7 +8614,9 @@ document.addEventListener("DOMContentLoaded", () => {
       source_meta: {},
       sources: {},
     };
-    ensureImageSource(modelImages, "source_1", "Image 1");
+    for (let i = 1; i <= 5; i++) {
+      ensureImageSource(modelImages, "source_" + i, "ImageSet " + i);
+    }
     return syncLegacyImageAliases(modelImages, objOpts);
   }
   async function initialiseCanvas() {

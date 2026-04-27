@@ -430,6 +430,10 @@ footer {
   text-align: center;
 }
 
+#ImageSetSelect {
+  margin-left: 4px;
+}
+
 #Yaxis {
   margin-right: 0px;
 }

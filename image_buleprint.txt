@@ -989,3 +989,218 @@ Fixture guidance
     - source_2 = blue-toned images
 - Keep thumbnails visually distinct to make assertions simpler
 - Keep section count small enough for deterministic E2E timing
+
+----------------------------------------------------------------
+Implementation status as of 2026-04-27
+----------------------------------------------------------------
+
+Implemented
+- Source-aware image cache structure is implemented in renderer/js/renderer.js.
+  - modelImages.sources[sourceId].thumb
+  - modelImages.sources[sourceId].standard
+  - modelImages.sources[sourceId].highres
+  - modelImages.source_meta
+- Active image source state is implemented.
+  - objOpts.image.active_source_id
+  - modelImages.active_source_id
+- Tier state and resolution settings are implemented.
+  - objOpts.image.visible_tier
+  - objOpts.image.thumb_dpcm
+  - objOpts.image.standard_dpcm
+  - objOpts.image.highres_dpcm
+- Source/tier helper functions are implemented in the main renderer.
+  - createImageTierBucket()
+  - createImageSourceBucket()
+  - ensureImageSource()
+  - syncLegacyImageAliases()
+  - getImageTierBucket()
+  - getCurrentImageTier()
+  - getRenderableSectionImage()
+- Standard image lazy loading is implemented.
+  - collectVisibleSectionIds()
+  - refreshVisibleStandardImages()
+  - scheduleVisibleStandardImageRefresh()
+  - standard loads use visible/buffer section ids instead of full-model standard loading.
+- Thumb loading is implemented for all active-source sections.
+  - Image import/drop loads thumb tier first.
+  - Standard tier is refreshed separately for visible sections.
+- Renderer-side image assignment is source/tier aware.
+  - assignCoreImages() stores returned images under modelImages.sources[sourceId][tier][depthScale][sectionKey].
+  - Legacy flat aliases are synchronized for compatibility.
+- Main process image loading is source/tier aware.
+  - loadCoreImages(loadOptions, type) accepts sourceId, tier, label, silentProgress.
+  - getRegisteredImageSources(type, sourceId) selects registered paths by sourceId.
+  - old core_images entries are treated as source_1 for compatibility.
+- Main process image registration is source-aware.
+  - RegisterCoreImage accepts sourceId and label.
+  - RegisterCoreImageFromPath accepts sourceId and label.
+  - registerCoreImage() stores source metadata.
+- Floating image viewer high-resolution loading is source/tier aware.
+  - viewer load path requests tier = highres.
+  - sourceId is passed to the viewer-side load path.
+- Viewer renderer has source-aware image buckets.
+  - renderer/js/renderer_image_viewer.js uses source/tier structure.
+  - viewer E2E state exposes activeImageSourceId and highres cache counts.
+- Preload payloads carry source metadata.
+  - preload/preload.js passes sourceId and label for image registration.
+  - preload/preload_image_viewer.js mirrors the same payload shape.
+- Cache limits and release behavior are implemented.
+  - objOpts.image.standard_cache_limit
+  - objOpts.image.highres_cache_limit
+  - standard/highres tiers evict older entries.
+  - standard eviction protects current visible/buffer section keys.
+- Progress behavior was adjusted.
+  - standard lazy loads can use silentProgress.
+  - age image operations are excluded from the progress denominator when no age model is selected.
+- E2E coverage was added and run.
+  - tests/e2e/image-source-switch.spec.js
+  - tests/e2e/image-thumb-standard.spec.js
+  - tests/e2e/image-highres-viewer.spec.js
+  - tests/e2e/helpers/app.js
+  - Full E2E result before push: 41 passed.
+
+Partially implemented
+- Source switching exists as internal/E2E functionality and normal footer UI.
+  - window.__LC_E2E__.setActiveImageSource(sourceId) works for registered sources.
+  - ImageSetSelect provides a user-facing fixed-slot source selector.
+- Multiple source registration is structurally supported.
+  - sourceId and label are accepted by the IPC path.
+  - The normal UI flow for creating/selecting source_2, source_3, etc. is not yet implemented.
+- Menu naming and UX are still mostly legacy.
+  - Existing "Load Core Images" style flow remains.
+  - It is not yet generalized into a complete "Load Section Images / choose source slot" user flow.
+- Main-view tier selection is conservative.
+  - Main view uses standard with thumb fallback.
+  - highres remains explicit viewer/request behavior, not automatic main-view rendering.
+
+Not implemented yet
+- User-facing source creation / naming flow.
+  - Fixed ImageSet 1-5 slots are implemented.
+  - Dynamic Add/Delete source slot management is not implemented and is not needed for the first GUI version.
+- Source label editing.
+  - Labels are stored, but there is no complete UI for editing them.
+- Visual assertion that different sources produce different rendered pixels in normal UI.
+  - Current E2E validates state/cache behavior, not full pixel-level visual difference.
+- Main-process E2E counters for last requested sourceId/tier/targetIds.
+  - Current tests rely mostly on renderer/viewer state.
+
+Current practical behavior
+- One active source is rendered at a time.
+- Dropping/importing images registers them to the current active source.
+- Thumb images are loaded broadly.
+- Standard images are loaded for visible/buffer sections.
+- High-resolution images are loaded only through explicit high-resolution/viewer paths.
+- Switching to another source is supported by the ImageSet dropdown.
+- Normal users can select one of three GUI-visible ImageSet slots.
+- Internally, five ImageSet slots remain available.
+- Dropped images are loaded into the currently selected ImageSet.
+
+----------------------------------------------------------------
+ImageSet GUI design proposal
+----------------------------------------------------------------
+
+Naming
+- Use "ImageSet" as the user-facing term.
+- Internal source ids can remain:
+  - source_1
+  - source_2
+  - source_3
+  - source_4
+  - source_5
+- User-facing labels should be:
+  - ImageSet 1
+  - ImageSet 2
+  - ImageSet 3
+
+Recommended placement
+- Place the ImageSet dropdown in the footer control area.
+- Put it before AgeModelSelect.
+- Recommended order:
+  - YAxisSelect
+  - ImageSetSelect
+  - AgeModelSelect
+  - status text
+
+Reason
+- YAxisSelect chooses the vertical coordinate.
+- ImageSetSelect chooses the image dataset rendered against that coordinate.
+- AgeModelSelect is only relevant when age data or age axis is used.
+- Therefore ImageSet should sit closer to YAxisSelect than AgeModelSelect.
+- The top toolbar should remain mostly action/toggle tools.
+- The existing bt_core_photo button should remain the image show/hide toggle.
+
+Footer layout
+- Current:
+  - [YAxisSelect] [AgeModelSelect] [footerLeftText]
+- Proposed:
+  - [YAxisSelect] [ImageSetSelect] [AgeModelSelect] [footerLeftText]
+
+Toolbar responsibility
+- Keep:
+  - bt_core_photo = image visibility on/off
+- Do not use toolbar for source selection.
+- ImageSet selection is state selection, not a transient tool action.
+
+ImageSet dropdown behavior
+- Internally keep five fixed slots.
+- Show only three slots in the GUI for now.
+- No Add button in the first implementation.
+- No Delete button in the first implementation.
+- No Rename UI in the first implementation.
+- Initial selected value:
+  - source_1 / ImageSet 1
+- Options:
+  - value: source_1, text: ImageSet 1
+  - value: source_2, text: ImageSet 2
+  - value: source_3, text: ImageSet 3
+
+Drop behavior
+- Dropped images are registered to the currently selected ImageSet.
+- Example:
+  - If ImageSet 3 is selected, dropped images are registered with sourceId = source_3.
+- After drop:
+  - register image path to selected sourceId
+  - load thumb tier for that source
+  - load standard tier for visible/buffer sections
+  - updateView()
+- If the selected ImageSet has no registered image path, it renders no images.
+
+Source switch behavior
+- On ImageSetSelect change:
+  - update objOpts.image.active_source_id
+  - sync legacy image aliases
+  - refresh visible standard images for the selected source if needed
+  - updateView()
+- Do not reload all standard images on switch.
+- Thumb can be loaded broadly for the selected source if it has a registered path and thumb cache is empty.
+
+Status text
+- Do not show a persistent "Drop images into ImageSet N" hint in the footer.
+- The selected ImageSet dropdown value is the drop target indicator.
+
+Implementation target
+- File:
+  - renderer/index.html
+- Add:
+  - select id="ImageSetSelect"
+- Location:
+  - between YAxisSelect and AgeModelSelect
+
+- File:
+  - renderer/js/renderer.js
+- Add:
+  - initialiseImageSetSelect()
+  - handleImageSetChange(event)
+- Wire:
+  - ImageSetSelect change event
+  - handleCoreImageImport() already uses objOpts.image.active_source_id, so drop imports should follow the selected ImageSet once this state is updated.
+
+Acceptance criteria
+- ImageSet dropdown appears between YAxisSelect and AgeModelSelect. Implemented.
+- Three GUI-visible ImageSet options are available. Implemented.
+- Five internal ImageSet slots remain initialized. Implemented.
+- Selecting ImageSet changes objOpts.image.active_source_id. Implemented.
+- Dropping images loads them into the selected ImageSet. Implemented through existing drop/import path.
+- Switching back to another ImageSet restores its cached images if available. Implemented by source-aware cache and alias sync.
+- Existing bt_core_photo behavior remains unchanged. Implemented.
+- No LC_modules changes. Confirmed.
