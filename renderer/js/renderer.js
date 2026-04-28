@@ -76,7 +76,7 @@ document.addEventListener("DOMContentLoaded", () => {
     };
 
     //=========== public properties =========== 
-    objOpts.information.version = "2.3";
+    objOpts.information.version = "2.4";
     objOpts.developer.mode = "user";//"user";"developer";"root"; 
     objOpts.canvas.use_touchpad_mode = true;
     objOpts.canvas.depth_scale = "composite_depth";
