@@ -1,7 +1,7 @@
 {
   "name": "levelcompiler",
   "productName": "Level-Compiler",
-  "version": "1.5.3",
+  "version": "1.5.4",
   "description": "Stratigraphic Correlation Viewer and Compiler",
   "main": "main.js",
   "scripts": {
@@ -22,7 +22,7 @@
     "csv-stringify": "^6.6.0",
     "electron-progressbar": "^2.2.1",
     "electron-prompt": "^1.7.0",
-    "electron-updater": "^6.6.2",
+    "electron-updater": "^6.8.3",
     "jsondiffpatch": "^0.7.3",
     "jszip": "^3.10.1",
     "license-checker": "^25.0.1",
@@ -63,8 +63,8 @@
   "devDependencies": {
     "@emnapi/runtime": "^1.5.0",
     "@playwright/test": "^1.58.2",
-    "electron": "^40.0.0",
-    "electron-builder": "^26.5.0",
+    "electron": "^41.3.0",
+    "electron-builder": "^26.8.1",
     "electronmon": "^2.0.3",
     "playwright": "^1.58.2"
   }
