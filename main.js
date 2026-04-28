@@ -843,13 +843,15 @@ function createMainWIndow() {
     return results;
   });
   ipcMain.handle("CheckImagesInDir", async (_e, payload) => {
-    const { fileName: name, sourceId = null } = payload;
+    const { fileName: name, projectName = null, sourceId = null } = payload;
     let targetList = getRegisteredImageSources("core_images", sourceId);
     //mainWindow.webContents.send("rendererLog", targetList);
 
     let result = false;
     for(const target of targetList){
-      const res = await findFileInDir(target.path, name, "check");
+      const projectRoot = projectName ? path.join(target.path, projectName) : null;
+      const searchRoot = projectRoot && fs.existsSync(projectRoot) ? projectRoot : target.path;
+      const res = await findFileInDir(searchRoot, name, "check");
       if(res==true){
         result = true;
         break;
@@ -1003,17 +1005,21 @@ function createMainWIndow() {
             targetSectionData = targetHoleData.sections[0];
           }
           
-          let imBaseName = targetHoleData.name +"-"+targetSectionData.name;
+          const imFileBaseName = targetHoleData.name +"-"+targetSectionData.name;
+          const targetProjectData = idx ? LCCore.projects[idx[0]] : null;
+          const imBaseName = targetProjectData ? targetProjectData.name +"-"+imFileBaseName : imFileBaseName;
+          const projectImageRoot = targetProjectData ? path.join(target.path, targetProjectData.name) : null;
+          const imageSearchRoot = projectImageRoot && fs.existsSync(projectImageRoot) ? projectImageRoot : target.path;
 
           //get image path
           let fullpath;
-          if(imBaseName.includes(".jpg")||imBaseName.includes(".jpeg")||imBaseName.includes(".tif")||imBaseName.includes(".tiff")||imBaseName.includes(".png")){
-            fullpath = await findFileInDir(target.path, imBaseName, "get");
+          if(imFileBaseName.includes(".jpg")||imFileBaseName.includes(".jpeg")||imFileBaseName.includes(".tif")||imFileBaseName.includes(".tiff")||imFileBaseName.includes(".png")){
+            fullpath = await findFileInDir(imageSearchRoot, imFileBaseName, "get");
           }else{
             const exts = [".jpg", ".jpeg", ".png", ".tif", ".tiff"];
 
             for (const ext of exts) {
-              fullpath = await findFileInDir(target.path, imBaseName + ext, "get");
+              fullpath = await findFileInDir(imageSearchRoot, imFileBaseName + ext, "get");
               if (fullpath) break;
             }
           }

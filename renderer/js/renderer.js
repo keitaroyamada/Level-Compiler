@@ -1174,7 +1174,10 @@ document.addEventListener("DOMContentLoaded", () => {
       const holeName = LCCore.projects[targetIdx[0]].holes[targetIdx[1]].name;
       const sectionName = LCCore.projects[targetIdx[0]].holes[targetIdx[1]].sections[targetIdx[2]].name;
 
-      modelImages.image_resolution[holeName+"-"+sectionName] = objOpts.image.dpcm_highresolution;
+      const projectName = LCCore.projects[targetIdx[0]].name;
+      const sectionKey = getSectionImageKey(projectName, holeName, sectionName);
+
+      modelImages.image_resolution[sectionKey] = objOpts.image.dpcm_highresolution;
 
       modelImages = await loadCoreImages(
         modelImages,
@@ -1281,10 +1284,12 @@ document.addEventListener("DOMContentLoaded", () => {
       const reloadDefaultDpcm = true;
       if(reloadDefaultDpcm){
         const targetIdx = getIdxById(LCCore, targetId);
+        const projectName = LCCore.projects[targetIdx[0]].name;
         const holeName = LCCore.projects[targetIdx[0]].holes[targetIdx[1]].name;
         const sectionName = LCCore.projects[targetIdx[0]].holes[targetIdx[1]].sections[targetIdx[2]].name;
+        const sectionKey = getSectionImageKey(projectName, holeName, sectionName);
 
-        modelImages.image_resolution[holeName+"-"+sectionName] = objOpts.image.dpcm;
+        modelImages.image_resolution[sectionKey] = objOpts.image.dpcm;
       }
      
       modelImages = await loadCoreImages(
@@ -1691,10 +1696,12 @@ document.addEventListener("DOMContentLoaded", () => {
       const targetId = [objOpts.edit.hittest.project, objOpts.edit.hittest.hole,objOpts.edit.hittest.section,null];
       modelImages.load_target_ids = [targetId];//load 
       const targetIdx = getIdxById(LCCore, targetId);
+      const projectName = LCCore.projects[targetIdx[0]].name;
       const holeName = LCCore.projects[targetIdx[0]].holes[targetIdx[1]].name;
       const sectionName = LCCore.projects[targetIdx[0]].holes[targetIdx[1]].sections[targetIdx[2]].name;
+      const sectionKey = getSectionImageKey(projectName, holeName, sectionName);
 
-      modelImages.image_resolution[holeName+"-"+sectionName] = objOpts.image.dpcm_highresolution;
+      modelImages.image_resolution[sectionKey] = objOpts.image.dpcm_highresolution;
 
       modelImages = await loadCoreImages(
         modelImages,
@@ -1715,8 +1722,9 @@ document.addEventListener("DOMContentLoaded", () => {
                 if(h.id[1]==ht.hole){
                   h.sections.forEach(s=>{
                     if(s.id[2]==ht.section){
-                      modelImages.plot_colour[h.name+"-"+s.name] = !modelImages.plot_colour[h.name+"-"+s.name];
-                      console.log("Renderer: Draw image brightness: ", h.name+"-"+s.name, modelImages.plot_colour[h.name+"-"+s.name])
+                      const sectionKey = getSectionImageKey(p.name, h.name, s.name);
+                      modelImages.plot_colour[sectionKey] = !modelImages.plot_colour[sectionKey];
+                      console.log("Renderer: Draw image brightness: ", sectionKey, modelImages.plot_colour[sectionKey])
                     }
                   })
                 }              
@@ -5422,7 +5430,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 try {
                   let ptoto_depth_scale;
                   ptoto_depth_scale = objOpts.canvas.depth_scale;
-                  const sectionKey = hole.name + "-" + section.name;
+                  const sectionKey = getSectionImageKey(project.name, hole.name, section.name);
                   const img = getRenderableSectionImage(
                     modelImages,
                     objOpts,
@@ -8749,9 +8757,10 @@ document.addEventListener("DOMContentLoaded", () => {
     if (!idx) {
       return null;
     }
+    const project = LCCore.projects[idx[0]];
     const hole = LCCore.projects[idx[0]].holes[idx[1]];
     const section = hole.sections[idx[2]];
-    return hole.name + "-" + section.name;
+    return getSectionImageKey(project.name, hole.name, section.name);
   }
   function collectVisibleSectionIds(bufferRate = 0.35) {
     if (!LCCore) {
@@ -9969,6 +9978,9 @@ function createImageSourceBucketGlobal(label = "") {
     operations: [],
   };
 }
+function getSectionImageKey(projectName, holeName, sectionName) {
+  return projectName + "-" + holeName + "-" + sectionName;
+}
 function ensureImageSourceGlobal(modelImages, sourceId, label = "") {
   if (!modelImages.source_meta) {
     modelImages.source_meta = {};
@@ -10096,13 +10108,14 @@ async function updateImageRegistration(modelImages, LCCore){
     for(let p of LCCore.projects){
       for(let h of p.holes){
         for(let s of h.sections){
-          const sectionKey = h.name+"-"+s.name;
+          const sectionKey = getSectionImageKey(p.name, h.name, s.name);
           //check loaded im
           const im_in_array = sourceBucket.standard.drilling_depth[sectionKey];
           //check folder im
           if(Object.keys(sourceBucket.standard.drilling_depth).length > 0){
             const isImExist = await window.LCapi.CheckImagesInDir({
-              fileName: sectionKey+".jpg",
+              fileName: h.name+"-"+s.name+".jpg",
+              projectName: p.name,
               sourceId: imageOpts.image.active_source_id,
             });
             //console.log(h.name+"-"+s.name,  isImExist)
@@ -10205,10 +10218,11 @@ async function loadCoreImages(modelImages, LCCore, objOpts, operations, requestO
           LCCore.projects.forEach((p) => {
             p.holes.forEach((h) => {
               h.sections.forEach((s) => {
+                const sectionKey = getSectionImageKey(p.name, h.name, s.name);
                 targetIds.push(s.id);
-                if ((h.name+"-"+s.name) in sourceBucket.image_resolution){
+                if (sectionKey in sourceBucket.image_resolution){
                 }else{
-                  sourceBucket.image_resolution[h.name+"-"+s.name] =
+                  sourceBucket.image_resolution[sectionKey] =
                     tier === "thumb"
                       ? objOpts.image.thumb_dpcm
                       : tier === "highres"
@@ -10244,9 +10258,10 @@ async function loadCoreImages(modelImages, LCCore, objOpts, operations, requestO
         if (!idx) {
           continue;
         }
+        const projectName = LCCore.projects[idx[0]].name;
         const holeName = LCCore.projects[idx[0]].holes[idx[1]].name;
         const sectionName = LCCore.projects[idx[0]].holes[idx[1]].sections[idx[2]].name;
-        const sectionKey = holeName + "-" + sectionName;
+        const sectionKey = getSectionImageKey(projectName, holeName, sectionName);
         requestDpcm[sectionKey] =
           tier === "thumb"
             ? objOpts.image.thumb_dpcm
