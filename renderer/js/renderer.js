@@ -1123,6 +1123,7 @@ document.addEventListener("DOMContentLoaded", () => {
     };
 
     if(objOpts.edit.editable == true){
+      finishEditCommand({ contextmenuEnable: false });
       objOpts.edit.editable = false;
       objOpts.edit.contextmenu_enable = false;
       objOpts.edit.hittest = null;
@@ -1313,6 +1314,62 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
   //0 Context menu--------------------------------------------
+  function removeEditClickHandler() {
+    if (objOpts.edit.handleClick !== null) {
+      document.removeEventListener("click", objOpts.edit.handleClick);
+      objOpts.edit.handleClick = null;
+    }
+  }
+
+  function removeEditMoveHandler() {
+    if (objOpts.edit.handleMove !== null) {
+      document.removeEventListener("mousemove", objOpts.edit.handleMove);
+      objOpts.edit.handleMove = null;
+    }
+  }
+
+  function setEditClickHandler(handler) {
+    if (objOpts.edit.handleClick === handler) {
+      return;
+    }
+    removeEditClickHandler();
+    if (handler !== null) {
+      objOpts.edit.handleClick = handler;
+      document.addEventListener("click", objOpts.edit.handleClick);
+    }
+  }
+
+  function resetEditSelection() {
+    objOpts.edit.hittest = null;
+    objOpts.edit.marker_from = null;
+    objOpts.edit.marker_to = null;
+    objOpts.edit.section_from = null;
+    objOpts.edit.section_to = null;
+  }
+
+  function startEditCommand(mode, moveHandler, options = {}) {
+    removeEditClickHandler();
+    removeEditMoveHandler();
+    if (!options.keepSelection) {
+      resetEditSelection();
+    }
+    objOpts.edit.contextmenu_enable = false;
+    objOpts.edit.mode = mode;
+    objOpts.edit.handleMove = moveHandler;
+    document.addEventListener("mousemove", objOpts.edit.handleMove);
+  }
+
+  function finishEditCommand(options = {}) {
+    removeEditClickHandler();
+    removeEditMoveHandler();
+    objOpts.edit.contextmenu_enable = options.contextmenuEnable !== false;
+    resetEditSelection();
+    if (options.clearMode !== false) {
+      objOpts.edit.mode = "";
+    }
+    isProcessing = false;
+  }
+
   async function handleEditContextmenu(event) {
     event.preventDefault();
 
@@ -1320,133 +1377,31 @@ document.addEventListener("DOMContentLoaded", () => {
     if(clickResult==null) return
 
     if(clickResult == "connectMarkers"){
-      objOpts.edit.contextmenu_enable = false;
-      objOpts.edit.hittest = null;
-      objOpts.edit.marker_from = null;
-      objOpts.edit.marker_to = null;
-      objOpts.edit.mode = "connect_marker";
-      objOpts.edit.handleMove = handleConnectMouseMove;
-      objOpts.edit.handleClick = null;
-      document.addEventListener("mousemove", objOpts.edit.handleMove);
+      startEditCommand("connect_marker", handleConnectMouseMove);
       console.log(objOpts.edit);
     }else if(clickResult == "disconnectMarkers"){
-      objOpts.edit.contextmenu_enable = false;
-      objOpts.edit.hittest = null;
-      objOpts.edit.marker_from = null;
-      objOpts.edit.marker_to = null;
-      objOpts.edit.mode = "disconnect_marker";
-      objOpts.edit.handleMove = handleMarkerMouseMove;
-      objOpts.edit.handleClick = null;
-      if(objOpts.edit.handleClick !== null){
-        document.removeEventListener('click', objOpts.edit.handleClick);
-        objOpts.edit.handleClick = null;
-      }
-      document.addEventListener("mousemove", objOpts.edit.handleMove);
+      startEditCommand("disconnect_marker", handleMarkerMouseMove);
     }else if(clickResult == "connectSections"){
-      objOpts.edit.contextmenu_enable = false;
-      objOpts.edit.hittest = null;
-      objOpts.edit.marker_from = null;
-      objOpts.edit.marker_to = null;
-      objOpts.edit.mode = "connect_section";
-      objOpts.edit.handleMove = handleSectionConnectMouseMove;
-      objOpts.edit.handleClick = null;
-      document.addEventListener("mousemove", objOpts.edit.handleMove);
+      startEditCommand("connect_section", handleSectionConnectMouseMove);
       console.log(objOpts.edit);
     }else if(clickResult == "disconnectSections"){
-      objOpts.edit.contextmenu_enable = false;
-      objOpts.edit.hittest = null;
-      objOpts.edit.marker_from = null;
-      objOpts.edit.marker_to = null;
-      objOpts.edit.mode = "disconnect_section";
-      objOpts.edit.handleMove = handleSectionConnectMouseMove;
-      objOpts.edit.handleClick = null;
-      document.addEventListener("mousemove", objOpts.edit.handleMove);
+      startEditCommand("disconnect_section", handleSectionConnectMouseMove);
     }else if(clickResult == "addMarker"){
-      objOpts.edit.contextmenu_enable = false;
-      objOpts.edit.hittest = null;
-      objOpts.edit.marker_from = null;
-      objOpts.edit.marker_to = null;
-      objOpts.edit.mode = "add_marker";
-      objOpts.edit.handleMove = handleMarkerMouseMove;
-      if(objOpts.edit.handleClick !== null){
-        document.removeEventListener('click', objOpts.edit.handleClick);
-        objOpts.edit.handleClick = null;
-      }
-      document.addEventListener("mousemove", objOpts.edit.handleMove);
+      startEditCommand("add_marker", handleMarkerMouseMove);
     }else if(clickResult == "calcCD"){
       await loadModel(true, true);
     }else if(clickResult == "deleteMarker"){
-      objOpts.edit.contextmenu_enable = false;
-      objOpts.edit.hittest = null;
-      objOpts.edit.marker_from = null;
-      objOpts.edit.marker_to = null;
-      objOpts.edit.mode = "delete_marker";
-      objOpts.edit.handleMove = handleMarkerMouseMove;
-      if(objOpts.edit.handleClick !== null){
-        document.removeEventListener('click', objOpts.edit.handleClick);
-        objOpts.edit.handleClick = null;
-      }
-      document.addEventListener("mousemove", objOpts.edit.handleMove);
+      startEditCommand("delete_marker", handleMarkerMouseMove);
     }else if(clickResult == "changeMarkerName"){
-      objOpts.edit.contextmenu_enable = false;
-      objOpts.edit.hittest = null;
-      objOpts.edit.marker_from = null;
-      objOpts.edit.marker_to = null;
-      objOpts.edit.mode = "change_marker_name";
-      objOpts.edit.handleMove = handleMarkerMouseMove;
-      if(objOpts.edit.handleClick !== null){
-        document.removeEventListener('click', objOpts.edit.handleClick);
-        objOpts.edit.handleClick = null;
-      }
-      document.addEventListener("mousemove", objOpts.edit.handleMove);
+      startEditCommand("change_marker_name", handleMarkerMouseMove);
     }else if(clickResult == "setZeroPoint"){
-      objOpts.edit.contextmenu_enable = false;
-      objOpts.edit.hittest = null;
-      objOpts.edit.marker_from = null;
-      objOpts.edit.marker_to = null;
-      objOpts.edit.mode = "set_zero_point";
-      objOpts.edit.handleMove = handleMarkerMouseMove;
-      if(objOpts.edit.handleClick !== null){
-        document.removeEventListener('click', objOpts.edit.handleClick);
-        objOpts.edit.handleClick = null;
-      }
-      document.addEventListener("mousemove", objOpts.edit.handleMove);
+      startEditCommand("set_zero_point", handleMarkerMouseMove);
     }else if(clickResult == "addMaster"){
-      objOpts.edit.contextmenu_enable = false;
-      objOpts.edit.hittest = null;
-      objOpts.edit.marker_from = null;
-      objOpts.edit.marker_to = null;
-      objOpts.edit.mode = "enable_master";
-      objOpts.edit.handleMove = handleMarkerMouseMove;
-      if(objOpts.edit.handleClick !== null){
-        document.removeEventListener('click', objOpts.edit.handleClick);
-        objOpts.edit.handleClick = null;
-      }
-      document.addEventListener("mousemove", objOpts.edit.handleMove);
+      startEditCommand("enable_master", handleMarkerMouseMove);
     }else if(clickResult == "deleteMaster"){
-      objOpts.edit.contextmenu_enable = false;
-      objOpts.edit.hittest = null;
-      objOpts.edit.marker_from = null;
-      objOpts.edit.marker_to = null;
-      objOpts.edit.mode = "disable_master";
-      objOpts.edit.handleMove = handleMarkerMouseMove;
-      if(objOpts.edit.handleClick !== null){
-        document.removeEventListener('click', objOpts.edit.handleClick);
-        objOpts.edit.handleClick = null;
-      }
-      document.addEventListener("mousemove", objOpts.edit.handleMove);
+      startEditCommand("disable_master", handleMarkerMouseMove);
     }else if(clickResult == "changeMarkerDistance"){
-      objOpts.edit.contextmenu_enable = false;
-      objOpts.edit.hittest = null;
-      objOpts.edit.marker_from = null;
-      objOpts.edit.marker_to = null;
-      objOpts.edit.mode = "change_marker_distance";
-      objOpts.edit.handleMove = handleMarkerMouseMove;
-      if(objOpts.edit.handleClick !== null){
-        document.removeEventListener('click', objOpts.edit.handleClick);
-        objOpts.edit.handleClick = null;
-      }
-      document.addEventListener("mousemove", objOpts.edit.handleMove);
+      startEditCommand("change_marker_distance", handleMarkerMouseMove);
     }else if(clickResult == "changeMarkerDescriptions"){
       if(LCCore){
         if(objOpts.edit.hittest.nearest_marker!==null){
@@ -1479,29 +1434,9 @@ document.addEventListener("DOMContentLoaded", () => {
         }
       }
     }else if(clickResult == "addEvent"){
-      objOpts.edit.contextmenu_enable = false;
-      objOpts.edit.hittest = null;
-      objOpts.edit.marker_from = null;
-      objOpts.edit.marker_to = null;
-      objOpts.edit.mode = "add_event";
-      objOpts.edit.handleMove = handleMarkerMouseMove;
-      if(objOpts.edit.handleClick !== null){
-        document.removeEventListener('click', objOpts.edit.handleClick);
-        objOpts.edit.handleClick = null;
-      }
-      document.addEventListener("mousemove", objOpts.edit.handleMove);
+      startEditCommand("add_event", handleMarkerMouseMove);
     }else if(clickResult == "deleteEvent"){
-      objOpts.edit.contextmenu_enable = false;
-      objOpts.edit.hittest = null;
-      objOpts.edit.marker_from = null;
-      objOpts.edit.marker_to = null;
-      objOpts.edit.mode = "delete_event";
-      objOpts.edit.handleMove = handleMarkerMouseMove;
-      if(objOpts.edit.handleClick !== null){
-        document.removeEventListener('click', objOpts.edit.handleClick);
-        objOpts.edit.handleClick = null;
-      }
-      document.addEventListener("mousemove", objOpts.edit.handleMove);
+      startEditCommand("delete_event", handleMarkerMouseMove);
     }else if(clickResult == "showSectionProperties"){
       if(LCCore){
         if(objOpts.edit.hittest.section!==null){
@@ -1558,17 +1493,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }
       }   
     }else if(clickResult == "changeSectionName"){
-      objOpts.edit.contextmenu_enable = false;
-      objOpts.edit.hittest = null;
-      objOpts.edit.marker_from = null;
-      objOpts.edit.marker_to = null;
-      objOpts.edit.mode = "change_section_name";
-      objOpts.edit.handleMove = handleSectionMouseMove;
-      if(objOpts.edit.handleClick !== null){
-        document.removeEventListener('click', objOpts.edit.handleClick);
-        objOpts.edit.handleClick = null;
-      }
-      document.addEventListener("mousemove", objOpts.edit.handleMove);
+      startEditCommand("change_section_name", handleSectionMouseMove);
     }else if(clickResult == "changeSectionDescriptions"){
       if(LCCore){
         if(objOpts.edit.hittest.section!==null){
@@ -1601,41 +1526,11 @@ document.addEventListener("DOMContentLoaded", () => {
         }
       }
     }else if(clickResult == "addSection"){
-      objOpts.edit.contextmenu_enable = false;
-      objOpts.edit.hittest = null;
-      objOpts.edit.marker_from = null;
-      objOpts.edit.marker_to = null;
-      objOpts.edit.mode = "add_section";
-      objOpts.edit.handleMove = handleHoleMouseMove;
-      if(objOpts.edit.handleClick !== null){
-        document.removeEventListener('click', objOpts.edit.handleClick);
-        objOpts.edit.handleClick = null;
-      }
-      document.addEventListener("mousemove", objOpts.edit.handleMove);
+      startEditCommand("add_section", handleHoleMouseMove);
     }else if(clickResult == "deleteSection"){
-      objOpts.edit.contextmenu_enable = false;
-      objOpts.edit.hittest = null;
-      objOpts.edit.marker_from = null;
-      objOpts.edit.marker_to = null;
-      objOpts.edit.mode = "delete_section";
-      objOpts.edit.handleMove = handleSectionMouseMove;
-      if(objOpts.edit.handleClick !== null){
-        document.removeEventListener('click', objOpts.edit.handleClick);
-        objOpts.edit.handleClick = null;
-      }
-      document.addEventListener("mousemove", objOpts.edit.handleMove);
+      startEditCommand("delete_section", handleSectionMouseMove);
     }else if(clickResult == "changeHoleName"){
-      objOpts.edit.contextmenu_enable = false;
-      objOpts.edit.hittest = null;
-      objOpts.edit.marker_from = null;
-      objOpts.edit.marker_to = null;
-      objOpts.edit.mode = "change_hole_name";
-      objOpts.edit.handleMove = handleHoleMouseMove;
-      if(objOpts.edit.handleClick !== null){
-        document.removeEventListener('click', objOpts.edit.handleClick);
-        objOpts.edit.handleClick = null;
-      }
-      document.addEventListener("mousemove", objOpts.edit.handleMove);
+      startEditCommand("change_hole_name", handleHoleMouseMove);
     }else if(clickResult == "changeHoleDescriptions"){
       if(LCCore){
         if(objOpts.edit.hittest.hole!==null){
@@ -1667,41 +1562,12 @@ document.addEventListener("DOMContentLoaded", () => {
         }
       }
     }else if(clickResult == "deleteHole"){
-      objOpts.edit.contextmenu_enable = false;
-      objOpts.edit.hittest = null;
-      objOpts.edit.marker_from = null;
-      objOpts.edit.marker_to = null;
-      objOpts.edit.mode = "delete_hole";
-      objOpts.edit.handleMove = handleHoleMouseMove;
-      if(objOpts.edit.handleClick !== null){
-        document.removeEventListener('click', objOpts.edit.handleClick);
-        objOpts.edit.handleClick = null;
-      }
-      document.addEventListener("mousemove", objOpts.edit.handleMove);
+      startEditCommand("delete_hole", handleHoleMouseMove);
     }else if(clickResult == "addHole"){
-      objOpts.edit.contextmenu_enable = false;
-      objOpts.edit.hittest = null;
-      objOpts.edit.marker_from = null;
-      objOpts.edit.marker_to = null;
-      objOpts.edit.mode = "add_hole";
-      objOpts.edit.handleMove = handleProjectMouseMove;
-      if(objOpts.edit.handleClick !== null){
-        document.removeEventListener('click', objOpts.edit.handleClick);
-        objOpts.edit.handleClick = null;
-      }
-      document.addEventListener("mousemove", objOpts.edit.handleMove);
+      startEditCommand("add_hole", handleProjectMouseMove);
     }else if(clickResult == "holeMoveToOtherProject"){
-      objOpts.edit.contextmenu_enable = false;
       objOpts.edit.marker_from = JSON.parse(JSON.stringify(objOpts.edit.hittest));
-      objOpts.edit.hittest = null;
-      objOpts.edit.marker_to = null;
-      objOpts.edit.mode = "move_hole_to_project";
-      objOpts.edit.handleMove = handleProjectMouseMove;
-      if(objOpts.edit.handleClick !== null){
-        document.removeEventListener('click', objOpts.edit.handleClick);
-        objOpts.edit.handleClick = null;
-      }
-      document.addEventListener("mousemove", objOpts.edit.handleMove);
+      startEditCommand("move_hole_to_project", handleProjectMouseMove, { keepSelection: true });
     }else if(clickResult == "addProject"){
       if(LCCore){
         if(LCCore.projects[LCCore.projects.length-1].holes.length  <= 0){
@@ -1717,30 +1583,10 @@ document.addEventListener("DOMContentLoaded", () => {
       
       
     }else if(clickResult == "deleteProject"){
-      objOpts.edit.contextmenu_enable = false;
-      objOpts.edit.hittest = null;
-      objOpts.edit.marker_from = null;
-      objOpts.edit.marker_to = null;
-      objOpts.edit.mode = "delete_project";
-      objOpts.edit.handleMove = handleProjectMouseMove;
-      if(objOpts.edit.handleClick !== null){
-        document.removeEventListener('click', objOpts.edit.handleClick);
-        objOpts.edit.handleClick = null;
-      }
-      document.addEventListener("mousemove", objOpts.edit.handleMove);
+      startEditCommand("delete_project", handleProjectMouseMove);
       
     }else if(clickResult == "changeProjectName"){
-      objOpts.edit.contextmenu_enable = false;
-      objOpts.edit.hittest = null;
-      objOpts.edit.marker_from = null;
-      objOpts.edit.marker_to = null;
-      objOpts.edit.mode = "change_project_name";
-      objOpts.edit.handleMove = handleProjectMouseMove;
-      if(objOpts.edit.handleClick !== null){
-        document.removeEventListener('click', objOpts.edit.handleClick);
-        objOpts.edit.handleClick = null;
-      }
-      document.addEventListener("mousemove", objOpts.edit.handleMove);
+      startEditCommand("change_project_name", handleProjectMouseMove);
       
     }else if(clickResult == "changeProjectDescriptions"){
       if(LCCore){
@@ -1952,22 +1798,8 @@ document.addEventListener("DOMContentLoaded", () => {
       
     }else if(clickResult == "cancel"){
       objOpts.edit.editable = true;
-      objOpts.edit.contextmenu_enable = true;
-      objOpts.edit.hittest = null;
-      objOpts.edit.marker_from = null;
-      objOpts.edit.marker_to = null;
-      objOpts.edit.section_from = null;
-      objOpts.edit.section_to = null;
-      objOpts.edit.mode = "";
+      finishEditCommand({ contextmenuEnable: true });
       document.body.style.cursor = "default";
-      if(objOpts.edit.handleClick !== null){
-        document.removeEventListener('click', objOpts.edit.handleClick);
-        objOpts.edit.handleClick = null;
-      }
-      if(objOpts.edit.handleMove !== null){
-        document.removeEventListener('mousemove', objOpts.edit.handleMove);
-        objOpts.edit.handleMove = null;
-      }
       console.log("[Renderer]: Edit cancelled.",objOpts.edit.handleMove, objOpts.edit.handleClick);
       updateView();
     }else if(clickResult == "editWorkspaceName"){
@@ -2051,11 +1883,9 @@ document.addEventListener("DOMContentLoaded", () => {
   
     //context menu
     if (Math.abs(ht.nearest_distance) < objOpts.edit.sensibility) {
-      objOpts.edit.handleClick = handleConnectClick;
-      document.addEventListener('click', objOpts.edit.handleClick);
+      setEditClickHandler(handleConnectClick);
     }else if(objOpts.edit.handleClick !== null){
-      document.removeEventListener('click', objOpts.edit.handleClick);
-      objOpts.edit.handleClick = null;
+      setEditClickHandler(null);
     }
   }
   //1 Connect click--------------------------------------------
@@ -2249,13 +2079,7 @@ document.addEventListener("DOMContentLoaded", () => {
       }
 
       //exit process
-      document.removeEventListener("click", handleConnectClick);
-      document.removeEventListener("mousemove", handleConnectMouseMove);
-      objOpts.edit.contextmenu_enable = false;
-      objOpts.edit.hittest = null;
-      objOpts.edit.marker_from = null;
-      objOpts.edit.marker_to = null;
-      isProcessing = false;
+      finishEditCommand({ contextmenuEnable: true });
     }
   }
   //2 Marker move--------------------------------------------
@@ -2271,35 +2095,27 @@ document.addEventListener("DOMContentLoaded", () => {
     if(objOpts.edit.mode == "add_marker"){
       if(ht.section !== null){
         //console.log(ht.hole+"-"+ht.section+"-"+ht.nearest_marker)
-        objOpts.edit.handleClick = handleMarkerAddClick;
-        document.addEventListener('click', objOpts.edit.handleClick);
+        setEditClickHandler(handleMarkerAddClick);
       }else if(objOpts.edit.handleClick !== null){
-        document.removeEventListener('click', objOpts.edit.handleClick);
-        objOpts.edit.handleClick = null;
+        setEditClickHandler(null);
       }
     }else if(objOpts.edit.mode == "delete_marker"){
       if (ht.section !== null && Math.abs(ht.nearest_distance) < objOpts.edit.sensibility) {
-        objOpts.edit.handleClick = handleMarkerDeleteClick;
-        document.addEventListener('click', objOpts.edit.handleClick);
+        setEditClickHandler(handleMarkerDeleteClick);
       }else if(objOpts.edit.handleClick !== null){
-        document.removeEventListener('click', objOpts.edit.handleClick);
-        objOpts.edit.handleClick = null;
+        setEditClickHandler(null);
       }
     }else if(["change_marker_name","change_marker_distance", "set_zero_point", "enable_master","disable_master","disconnect_marker"].includes(objOpts.edit.mode)){
       if (ht.section !== null && Math.abs(ht.nearest_distance) < objOpts.edit.sensibility) {
-        objOpts.edit.handleClick = handleMarkerChangeClick;
-        document.addEventListener('click', objOpts.edit.handleClick);
+        setEditClickHandler(handleMarkerChangeClick);
       }else if(objOpts.edit.handleClick !== null){
-        document.removeEventListener('click', objOpts.edit.handleClick);
-        objOpts.edit.handleClick = null;
+        setEditClickHandler(null);
       }
     }else if(["add_event","delete_event"].includes(objOpts.edit.mode)){
       if(ht.section !== null){
-        objOpts.edit.handleClick = handleEventAddClick;
-        document.addEventListener('click', objOpts.edit.handleClick);
+        setEditClickHandler(handleEventAddClick);
       }else{
-        document.removeEventListener('click', objOpts.edit.handleClick);
-        objOpts.edit.handleClick = null;
+        setEditClickHandler(null);
       }
     }
     
@@ -2317,6 +2133,7 @@ document.addEventListener("DOMContentLoaded", () => {
       objOpts.edit.marker_from = null;
       objOpts.edit.marker_to = 999999;//dummy
       objOpts.edit.mode = null;
+      finishEditCommand({ contextmenuEnable: true });
       return;
     }
 
@@ -2353,6 +2170,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
             if(!response.response){
               isProcessing = false;
+              finishEditCommand({ contextmenuEnable: true });
               return
             } else{
               response = null;
@@ -2374,6 +2192,7 @@ document.addEventListener("DOMContentLoaded", () => {
             if(!regex.test(response)){
               isProcessing = false;
               alert("Invalid name format. Use: <Hole Name>-<Section Name>-top/bottom");
+              finishEditCommand({ contextmenuEnable: true });
               return
             }
           }          
@@ -2444,7 +2263,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }
         if(numMaster>2){
           alert("Only up to two master markers can be set in the same horizon. Please remove any unnecessary ones first.");
-
+          finishEditCommand({ contextmenuEnable: true });
           return;
         }
         
@@ -2525,6 +2344,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }
 
         if (response.response == false) {
+          finishEditCommand({ contextmenuEnable: true });
           return
         }
 
@@ -2608,12 +2428,8 @@ document.addEventListener("DOMContentLoaded", () => {
     }
     
     if(isShift){
-      objOpts.edit.contextmenu_enable = true;
-      objOpts.edit.hittest = null;
-      objOpts.edit.marker_from = null;
-      objOpts.edit.marker_to = null;
-      objOpts.edit.handleClick = null;
-      objOpts.edit.handleMove = null;
+      objOpts.edit.contextmenu_enable = false;
+      resetEditSelection();
     }else{
       document.removeEventListener("click", objOpts.edit.handleClick);
       document.removeEventListener("mousemove", objOpts.edit.handleMove);      
@@ -2666,6 +2482,7 @@ document.addEventListener("DOMContentLoaded", () => {
       objOpts.edit.marker_from = null;
       objOpts.edit.marker_to = 999999;//dummy
       objOpts.edit.mode = null;
+      finishEditCommand({ contextmenuEnable: true });
       return;
     }
 
@@ -2730,6 +2547,7 @@ document.addEventListener("DOMContentLoaded", () => {
       objOpts.edit.marker_from = null;
       objOpts.edit.marker_to = 999999;//dummy
       objOpts.edit.mode = null;
+      finishEditCommand({ contextmenuEnable: true });
       return;
     }
 
@@ -2781,13 +2599,8 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     if(isShift){
-      objOpts.edit.contextmenu_enable = true;
-      objOpts.edit.hittest = null;
-      objOpts.edit.marker_from = null;
-      objOpts.edit.marker_to = null;
-
-      objOpts.edit.handleClick = null;
-      objOpts.edit.handleMove = null;
+      objOpts.edit.contextmenu_enable = false;
+      resetEditSelection();
     }else{
       document.removeEventListener("click", objOpts.edit.handleClick);
       document.removeEventListener("mousemove", objOpts.edit.handleMove);
@@ -3004,19 +2817,17 @@ document.addEventListener("DOMContentLoaded", () => {
     if(ht.section !== null){
       //on the section
       if(objOpts.edit.mode == "change_section_name"){
-        objOpts.edit.handleClick = handleSectionChangeClick;
-        document.addEventListener('click', objOpts.edit.handleClick);
+        setEditClickHandler(handleSectionChangeClick);
       }else if(objOpts.edit.mode == "delete_section"){
-        objOpts.edit.handleClick = handleSectionDeleteClick;
-        document.addEventListener('click', objOpts.edit.handleClick);
+        setEditClickHandler(handleSectionDeleteClick);
       }else{
         if(objOpts.edit.handleClick !== null){
-          document.removeEventListener('click', objOpts.edit.handleClick);
+          setEditClickHandler(null);
         }        
       }
     }else{
       if(objOpts.edit.handleClick !== null){
-        document.removeEventListener('click', objOpts.edit.handleClick);
+        setEditClickHandler(null);
       }
     }
 
@@ -3197,6 +3008,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
         }
       }else{
+        finishEditCommand({ contextmenuEnable: true });
         return;
       }
     }
@@ -3224,12 +3036,10 @@ document.addEventListener("DOMContentLoaded", () => {
     const hasListener = !!objOpts.edit.handleClick;
     if (ht.section !== null) {
       if (!hasListener) {
-        objOpts.edit.handleClick = handleSectionConnectClick;
-        document.addEventListener('click', objOpts.edit.handleClick, { once:false });
+        setEditClickHandler(handleSectionConnectClick);
       }
     } else if (hasListener) {
-      document.removeEventListener('click', objOpts.edit.handleClick);
-      objOpts.edit.handleClick = null;
+      setEditClickHandler(null);
     }
   }
   //3 Connect click--------------------------------------------
@@ -3368,16 +3178,7 @@ document.addEventListener("DOMContentLoaded", () => {
       }
 
       //exit process
-      document.removeEventListener("click", objOpts.edit.handleClick);
-      document.removeEventListener("mousemove", objOpts.edit.handleMove);
-      objOpts.edit.contextmenu_enable = false;
-      objOpts.edit.hittest = null;
-      objOpts.edit.marker_from = null;
-      objOpts.edit.marker_to = null;
-      objOpts.edit.section_from = null;
-      objOpts.edit.section_to = null;
-      objOpts.edit.handleClick = null;
-    objOpts.edit.handleMove = null; 
+      finishEditCommand({ contextmenuEnable: true });
     }
   }
   //4 Hole move--------------------------------------------
@@ -3393,22 +3194,19 @@ document.addEventListener("DOMContentLoaded", () => {
     if(ht.hole !== null){
       //on the section
       if(objOpts.edit.mode == "change_hole_name"){
-        objOpts.edit.handleClick = handleHoleChangeClick;
-        document.addEventListener('click', objOpts.edit.handleClick);
+        setEditClickHandler(handleHoleChangeClick);
       }else if(objOpts.edit.mode == "add_section"){
-        objOpts.edit.handleClick = handleSectionAddClick;
-        document.addEventListener('click', objOpts.edit.handleClick);
+        setEditClickHandler(handleSectionAddClick);
       }else if(objOpts.edit.mode == "delete_hole"){
-        objOpts.edit.handleClick = handleHoleDeleteClick;
-        document.addEventListener('click', objOpts.edit.handleClick);
+        setEditClickHandler(handleHoleDeleteClick);
       }else{
         if(objOpts.edit.handleClick !== null){
-          document.removeEventListener('click', objOpts.edit.handleClick);
+          setEditClickHandler(null);
         }
       }
     }else{
       if(objOpts.edit.handleClick !== null){
-        document.removeEventListener('click', objOpts.edit.handleClick);
+        setEditClickHandler(null);
       }
     }   
   }
@@ -3571,25 +3369,21 @@ document.addEventListener("DOMContentLoaded", () => {
     if(ht.project !== null){
       //on the section
       if(objOpts.edit.mode == "add_hole"){
-        objOpts.edit.handleClick = handleHoleAddClick;
-        document.addEventListener('click', objOpts.edit.handleClick);
+        setEditClickHandler(handleHoleAddClick);
       }else if(objOpts.edit.mode == "delete_project"){
-        objOpts.edit.handleClick = handleProjectSelectClick;
-        document.addEventListener('click', objOpts.edit.handleClick);
+        setEditClickHandler(handleProjectSelectClick);
       }else if(objOpts.edit.mode == "change_project_name"){
-        objOpts.edit.handleClick = handleProjectSelectClick;
-        document.addEventListener('click', objOpts.edit.handleClick);
+        setEditClickHandler(handleProjectSelectClick);
       }else if(objOpts.edit.mode == "move_hole_to_project"){
-        objOpts.edit.handleClick = handleProjectSelectClick;
-        document.addEventListener('click', objOpts.edit.handleClick);
+        setEditClickHandler(handleProjectSelectClick);
       }else{
         if(objOpts.edit.handleClick !== null){
-          document.removeEventListener('click', objOpts.edit.handleClick);
+          setEditClickHandler(null);
         }
       }
     }else{
       if(objOpts.edit.handleClick !== null){
-        document.removeEventListener('click', objOpts.edit.handleClick);
+        setEditClickHandler(null);
       }
     }   
   }
@@ -4929,29 +4723,9 @@ document.addEventListener("DOMContentLoaded", () => {
         if(objOpts.edit.contextmenu_enable){
           if(event.ctrlKey && event.key ==="1"){
             //same of context menu
-            objOpts.edit.contextmenu_enable = false;
-            objOpts.edit.hittest = null;
-            objOpts.edit.marker_from = null;
-            objOpts.edit.marker_to = null;
-            objOpts.edit.mode = "enable_master";
-            objOpts.edit.handleMove = handleMarkerMouseMove;
-            if(objOpts.edit.handleClick !== null){
-              document.removeEventListener('click', objOpts.edit.handleClick);
-              objOpts.edit.handleClick = null;
-            }
-            document.addEventListener("mousemove", objOpts.edit.handleMove);
+            startEditCommand("enable_master", handleMarkerMouseMove);
           }else if(event.ctrlKey && event.key ==="0"){
-            objOpts.edit.contextmenu_enable = false;
-            objOpts.edit.hittest = null;
-            objOpts.edit.marker_from = null;
-            objOpts.edit.marker_to = null;
-            objOpts.edit.mode = "disable_master";
-            objOpts.edit.handleMove = handleMarkerMouseMove;
-            if(objOpts.edit.handleClick !== null){
-              document.removeEventListener('click', objOpts.edit.handleClick);
-              objOpts.edit.handleClick = null;
-            }
-            document.addEventListener("mousemove", objOpts.edit.handleMove);
+            startEditCommand("disable_master", handleMarkerMouseMove);
           }
         }
       }
@@ -8001,6 +7775,440 @@ document.addEventListener("DOMContentLoaded", () => {
         ok: true,
         added,
         changed,
+      };
+    },
+    getEditCommandState: () => ({
+      editable: objOpts.edit.editable,
+      contextmenuEnable: objOpts.edit.contextmenu_enable,
+      mode: objOpts.edit.mode,
+      hasClickHandler: objOpts.edit.handleClick !== null,
+      hasMoveHandler: objOpts.edit.handleMove !== null,
+      markerFrom: objOpts.edit.marker_from,
+      markerTo: objOpts.edit.marker_to,
+      sectionFrom: objOpts.edit.section_from,
+      sectionTo: objOpts.edit.section_to,
+    }),
+    exerciseEditCommandsOnNewModel: async () => {
+      const operations = [];
+
+      const findProject = (name) => LCCore.projects.find((project) => project.name === name);
+      const findHole = (projectName, holeName) => {
+        const project = findProject(projectName);
+        return project?.holes?.find((hole) => hole.name === holeName) ?? null;
+      };
+      const findSection = (projectName, holeName, sectionName) => {
+        const hole = findHole(projectName, holeName);
+        return hole?.sections?.find((section) => section.name === sectionName) ?? null;
+      };
+      const findMarkerByName = (projectName, holeName, sectionName, markerName) => {
+        const section = findSection(projectName, holeName, sectionName);
+        return section?.markers?.find((marker) => marker.name === markerName) ?? null;
+      };
+      const middleMarker = (projectName, holeName, sectionName) => {
+        const section = findSection(projectName, holeName, sectionName);
+        if (!section || section.markers.length < 3) {
+          return null;
+        }
+        return section.markers[1];
+      };
+      const edgeMarkers = (projectName, holeName, sectionName) => {
+        const section = findSection(projectName, holeName, sectionName);
+        if (!section || section.markers.length < 2) {
+          return null;
+        }
+        return {
+          first: section.markers[0],
+          last: section.markers[section.markers.length - 1],
+        };
+      };
+      const expectModelPart = (value, label) => {
+        if (!value) {
+          throw new Error(`Missing model part during edit command E2E: ${label}`);
+        }
+        return value;
+      };
+      const assertCleanEditState = (name) => {
+        const state = window.__LC_E2E__.getEditCommandState();
+        if (state.hasClickHandler || state.hasMoveHandler || state.mode !== "" || state.contextmenuEnable !== true) {
+          throw new Error(`Edit state was not cleaned after ${name}: ${JSON.stringify(state)}`);
+        }
+      };
+      const reload = async (recalcDepth = false) => {
+        await loadModel(false, recalcDepth);
+      };
+      const runCommand = async (name, mode, moveHandler, action, options = {}) => {
+        if (mode && moveHandler) {
+          startEditCommand(mode, moveHandler, options.startOptions ?? {});
+          if (options.clickHandler) {
+            setEditClickHandler(options.clickHandler);
+          }
+        }
+
+        const result = await action();
+        finishEditCommand({ contextmenuEnable: true });
+        assertCleanEditState(name);
+        operations.push({ name, result });
+        return result;
+      };
+      const runImmediateCommand = async (name, action) => {
+        const result = await action();
+        assertCleanEditState(name);
+        operations.push({ name, result });
+        return result;
+      };
+      const addSectionData = (name, ddTop, ddBottom) => ({
+        name,
+        distance_top: 0,
+        distance_bottom: 100,
+        dd_top: ddTop,
+        dd_bottom: ddBottom,
+      });
+
+      await initialiseCorrelationModel();
+      await initialiseAgeModel();
+      await initialisePlot();
+      await window.LCapi.InitialisePaths();
+      await reload(false);
+
+      objOpts.edit.editable = true;
+      objOpts.edit.contextmenu_enable = true;
+      objOpts.edit.mode = "";
+      await window.LCapi.changeEditMode({ mode: true });
+      assertCleanEditState("enable edit mode");
+
+      await runImmediateCommand("editWorkspaceName", async () => {
+        const result = await window.LCapi.changeWorkspace({ type: "name", value: "E2E Workspace" });
+        await reload(false);
+        return result;
+      });
+      await runImmediateCommand("editWorkspaceDescriptions", async () => {
+        const result = await window.LCapi.changeWorkspace({ type: "descriptions", value: "Created by edit command E2E" });
+        await reload(false);
+        return result;
+      });
+      await runImmediateCommand("cancel", async () => {
+        startEditCommand("add_marker", handleMarkerMouseMove);
+        finishEditCommand({ contextmenuEnable: true });
+        return true;
+      });
+
+      await runImmediateCommand("addProject:P1", async () => {
+        const result = await window.LCapi.addProject({ type: "correlation", name: "P1" });
+        await reload(false);
+        return result;
+      });
+      await runImmediateCommand("addProject:P2", async () => {
+        const result = await window.LCapi.addProject({ type: "duo", name: "P2" });
+        await reload(false);
+        return result;
+      });
+      await runImmediateCommand("changeProjectType", async () => {
+        const project = expectModelPart(findProject("P2"), "P2");
+        const result = await window.LCapi.changeProject({
+          projectId: project.id,
+          type: "model_type",
+          value: "duo",
+        });
+        await reload(false);
+        return result;
+      });
+
+      await runCommand("addHole:A", "add_hole", handleProjectMouseMove, async () => {
+        const project = expectModelPart(findProject("P1"), "P1");
+        const result = await window.LCapi.addHole({ projectId: project.id, name: "A" });
+        await reload(false);
+        return result;
+      }, { clickHandler: handleHoleAddClick });
+      await runCommand("addHole:C", "add_hole", handleProjectMouseMove, async () => {
+        const project = expectModelPart(findProject("P1"), "P1");
+        const result = await window.LCapi.addHole({ projectId: project.id, name: "C" });
+        await reload(false);
+        return result;
+      }, { clickHandler: handleHoleAddClick });
+      await runCommand("addHole:B", "add_hole", handleProjectMouseMove, async () => {
+        const project = expectModelPart(findProject("P2"), "P2");
+        const result = await window.LCapi.addHole({ projectId: project.id, name: "B" });
+        await reload(false);
+        return result;
+      }, { clickHandler: handleHoleAddClick });
+
+      await runImmediateCommand("holeMoveToRight", async () => {
+        const a = expectModelPart(findHole("P1", "A"), "P1/A");
+        const c = expectModelPart(findHole("P1", "C"), "P1/C");
+        const result = await window.LCapi.changeHole({ holeId: a.id, type: "order", value: c.id });
+        await reload(false);
+        return result;
+      });
+      await runImmediateCommand("holeMoveToLeft", async () => {
+        const a = expectModelPart(findHole("P1", "A"), "P1/A");
+        const c = expectModelPart(findHole("P1", "C"), "P1/C");
+        const result = await window.LCapi.changeHole({ holeId: a.id, type: "order", value: c.id });
+        await reload(false);
+        return result;
+      });
+
+      for (const section of [
+        ["P1", "A", "A-01", 0, 100],
+        ["P1", "A", "A-02", 100, 200],
+        ["P2", "B", "B-01", 0, 100],
+        ["P2", "B", "B-02", 100, 200],
+      ]) {
+        await runCommand(`addSection:${section[2]}`, "add_section", handleHoleMouseMove, async () => {
+          const hole = expectModelPart(findHole(section[0], section[1]), `${section[0]}/${section[1]}`);
+          const result = await window.LCapi.addSection({
+            sectionId: hole.id,
+            data: addSectionData(section[2], section[3], section[4]),
+          });
+          await reload(false);
+          return result;
+        }, { clickHandler: handleSectionAddClick });
+      }
+
+      await runCommand("addMarker:P1", "add_marker", handleMarkerMouseMove, async () => {
+        const section = expectModelPart(findSection("P1", "A", "A-01"), "P1/A-01");
+        const result = await window.LCapi.addMarker({
+          sectionId: section.id,
+          depth: 50,
+          depthScale: "distance",
+          relativeX: 0.5,
+        });
+        await reload(false);
+        return result;
+      }, { clickHandler: handleMarkerAddClick });
+      await runCommand("addMarker:P2", "add_marker", handleMarkerMouseMove, async () => {
+        const section = expectModelPart(findSection("P2", "B", "B-01"), "P2/B-01");
+        const result = await window.LCapi.addMarker({
+          sectionId: section.id,
+          depth: 50,
+          depthScale: "distance",
+          relativeX: 0.5,
+        });
+        await reload(false);
+        return result;
+      }, { clickHandler: handleMarkerAddClick });
+
+      await runCommand("changeMarkerName:P1", "change_marker_name", handleMarkerMouseMove, async () => {
+        const marker = expectModelPart(middleMarker("P1", "A", "A-01"), "P1 middle marker");
+        const result = await window.LCapi.changeMarker({ markerId: marker.id, type: "name", value: "P1-A-M" });
+        await reload(false);
+        return result;
+      }, { clickHandler: handleMarkerChangeClick });
+      await runCommand("changeMarkerName:P2", "change_marker_name", handleMarkerMouseMove, async () => {
+        const marker = expectModelPart(middleMarker("P2", "B", "B-01"), "P2 middle marker");
+        const result = await window.LCapi.changeMarker({ markerId: marker.id, type: "name", value: "P2-B-M" });
+        await reload(false);
+        return result;
+      }, { clickHandler: handleMarkerChangeClick });
+      await runCommand("changeMarkerDistance", "change_marker_distance", handleMarkerMouseMove, async () => {
+        const marker = expectModelPart(findMarkerByName("P1", "A", "A-01", "P1-A-M"), "P1-A-M");
+        const result = await window.LCapi.changeMarker({ markerId: marker.id, type: "distance", value: 55 });
+        await reload(false);
+        return result;
+      }, { clickHandler: handleMarkerChangeClick });
+      await runImmediateCommand("changeMarkerDescriptions", async () => {
+        const marker = expectModelPart(findMarkerByName("P1", "A", "A-01", "P1-A-M"), "P1-A-M");
+        const result = await window.LCapi.changeMarker({ markerId: marker.id, type: "descriptions", value: "marker note" });
+        await reload(false);
+        return result;
+      });
+
+      await runCommand("connectMarkers:project-to-project", "connect_marker", handleConnectMouseMove, async () => {
+        const from = expectModelPart(findMarkerByName("P1", "A", "A-01", "P1-A-M"), "P1-A-M");
+        const to = expectModelPart(findMarkerByName("P2", "B", "B-01", "P2-B-M"), "P2-B-M");
+        const result = await window.LCapi.connectMarkers({ fromId: from.id, toId: to.id, direction: "horizontal" });
+        await reload(false);
+        return result;
+      }, { clickHandler: handleConnectClick });
+      await runCommand("disconnectMarkers:project-to-project", "disconnect_marker", handleMarkerMouseMove, async () => {
+        const from = expectModelPart(findMarkerByName("P1", "A", "A-01", "P1-A-M"), "P1-A-M");
+        const result = await window.LCapi.disconnectAllConnections({ fromId: from.id, direction: "horizontal" });
+        await reload(false);
+        return result;
+      }, { clickHandler: handleMarkerChangeClick });
+      await runCommand("connectMarkers:for-master", "connect_marker", handleConnectMouseMove, async () => {
+        const from = expectModelPart(findMarkerByName("P1", "A", "A-01", "P1-A-M"), "P1-A-M");
+        const to = expectModelPart(findMarkerByName("P2", "B", "B-01", "P2-B-M"), "P2-B-M");
+        const result = await window.LCapi.connectMarkers({ fromId: from.id, toId: to.id, direction: "horizontal" });
+        await reload(false);
+        return result;
+      }, { clickHandler: handleConnectClick });
+      await runCommand("addMaster", "enable_master", handleMarkerMouseMove, async () => {
+        const marker = expectModelPart(findMarkerByName("P1", "A", "A-01", "P1-A-M"), "P1-A-M");
+        const result = await window.LCapi.SetMaster({ markerId: marker.id, type: "enable" });
+        await reload(false);
+        return result;
+      }, { clickHandler: handleMarkerChangeClick });
+      await runCommand("deleteMaster", "disable_master", handleMarkerMouseMove, async () => {
+        const marker = expectModelPart(findMarkerByName("P1", "A", "A-01", "P1-A-M"), "P1-A-M");
+        const result = await window.LCapi.SetMaster({ markerId: marker.id, type: "disable" });
+        await reload(false);
+        return result;
+      }, { clickHandler: handleMarkerChangeClick });
+      await runCommand("disconnectMarkers:after-master", "disconnect_marker", handleMarkerMouseMove, async () => {
+        const marker = expectModelPart(findMarkerByName("P1", "A", "A-01", "P1-A-M"), "P1-A-M");
+        const result = await window.LCapi.disconnectAllConnections({ fromId: marker.id, direction: "horizontal" });
+        await reload(false);
+        return result;
+      }, { clickHandler: handleMarkerChangeClick });
+
+      await runCommand("setZeroPoint", "set_zero_point", handleMarkerMouseMove, async () => {
+        const marker = expectModelPart(findMarkerByName("P1", "A", "A-01", "P1-A-M"), "P1-A-M");
+        const result = await window.LCapi.SetZeroPoint({ markerId: marker.id, value: 55 });
+        await reload(false);
+        return result;
+      }, { clickHandler: handleMarkerChangeClick });
+      await runCommand("addEvent", "add_event", handleMarkerMouseMove, async () => {
+        const markers = expectModelPart(edgeMarkers("P1", "A", "A-01"), "P1/A-01 edges");
+        const result = await window.LCapi.AddEvent({
+          upperId: markers.first.id,
+          lowerId: markers.last.id,
+          depositionType: "deposition",
+          value: "general",
+        });
+        await reload(false);
+        return result;
+      }, { clickHandler: handleEventAddClick });
+      await runCommand("deleteEvent", "delete_event", handleMarkerMouseMove, async () => {
+        const markers = expectModelPart(edgeMarkers("P1", "A", "A-01"), "P1/A-01 edges");
+        const result = await window.LCapi.DeleteEvent({ upperId: markers.first.id, lowerId: markers.last.id, type: [] });
+        await reload(false);
+        return result;
+      }, { clickHandler: handleEventAddClick });
+
+      await runCommand("connectSections:P1", "connect_section", handleSectionConnectMouseMove, async () => {
+        const from = expectModelPart(edgeMarkers("P1", "A", "A-01"), "P1/A-01 edges").last;
+        const to = expectModelPart(edgeMarkers("P1", "A", "A-02"), "P1/A-02 edges").first;
+        const result = await window.LCapi.connectMarkers({ fromId: from.id, toId: to.id, direction: "vertical" });
+        await reload(false);
+        return result;
+      }, { clickHandler: handleSectionConnectClick });
+      await runCommand("disconnectSections:P1", "disconnect_section", handleSectionConnectMouseMove, async () => {
+        const from = expectModelPart(edgeMarkers("P1", "A", "A-01"), "P1/A-01 edges").last;
+        const to = expectModelPart(edgeMarkers("P1", "A", "A-02"), "P1/A-02 edges").first;
+        const result = await window.LCapi.disconnectMarkers({ fromId: from.id, toId: to.id, direction: "vertical" });
+        await reload(false);
+        return result;
+      }, { clickHandler: handleSectionConnectClick });
+      await runCommand("connectSections:P2", "connect_section", handleSectionConnectMouseMove, async () => {
+        const from = expectModelPart(edgeMarkers("P2", "B", "B-01"), "P2/B-01 edges").last;
+        const to = expectModelPart(edgeMarkers("P2", "B", "B-02"), "P2/B-02 edges").first;
+        const result = await window.LCapi.connectMarkers({ fromId: from.id, toId: to.id, direction: "vertical" });
+        await reload(false);
+        return result;
+      }, { clickHandler: handleSectionConnectClick });
+      await runCommand("disconnectSections:P2", "disconnect_section", handleSectionConnectMouseMove, async () => {
+        const from = expectModelPart(edgeMarkers("P2", "B", "B-01"), "P2/B-01 edges").last;
+        const to = expectModelPart(edgeMarkers("P2", "B", "B-02"), "P2/B-02 edges").first;
+        const result = await window.LCapi.disconnectMarkers({ fromId: from.id, toId: to.id, direction: "vertical" });
+        await reload(false);
+        return result;
+      }, { clickHandler: handleSectionConnectClick });
+
+      await runImmediateCommand("showSectionProperties", async () => {
+        const section = expectModelPart(findSection("P1", "A", "A-01"), "P1/A-01");
+        return section.markers.length >= 2;
+      });
+      await runCommand("changeSectionName", "change_section_name", handleSectionMouseMove, async () => {
+        const section = expectModelPart(findSection("P1", "A", "A-02"), "P1/A-02");
+        const result = await window.LCapi.changeSection({ sectionId: section.id, type: "name", value: "A-02R" });
+        await reload(false);
+        return result;
+      }, { clickHandler: handleSectionChangeClick });
+      await runImmediateCommand("changeSectionDescriptions", async () => {
+        const section = expectModelPart(findSection("P1", "A", "A-02R"), "P1/A-02R");
+        const result = await window.LCapi.changeSection({ sectionId: section.id, type: "descriptions", value: "section note" });
+        await reload(false);
+        return result;
+      });
+      await runCommand("changeHoleName", "change_hole_name", handleHoleMouseMove, async () => {
+        const hole = expectModelPart(findHole("P1", "A"), "P1/A");
+        const result = await window.LCapi.changeHole({ holeId: hole.id, type: "name", value: "A-renamed" });
+        await reload(false);
+        return result;
+      }, { clickHandler: handleHoleChangeClick });
+      await runImmediateCommand("changeHoleDescriptions", async () => {
+        const hole = expectModelPart(findHole("P1", "A-renamed"), "P1/A-renamed");
+        const result = await window.LCapi.changeHole({ holeId: hole.id, type: "descriptions", value: "hole note" });
+        await reload(false);
+        return result;
+      });
+      await runCommand("changeProjectName", "change_project_name", handleProjectMouseMove, async () => {
+        const project = expectModelPart(findProject("P2"), "P2");
+        const result = await window.LCapi.changeProject({ projectId: project.id, type: "name", value: "P2-renamed" });
+        await reload(false);
+        return result;
+      }, { clickHandler: handleProjectSelectClick });
+      await runImmediateCommand("changeProjectDescriptions", async () => {
+        const project = expectModelPart(findProject("P2-renamed"), "P2-renamed");
+        const result = await window.LCapi.changeProject({ projectId: project.id, type: "descriptions", value: "project note" });
+        await reload(false);
+        return result;
+      });
+      await runCommand("holeMoveToOtherProject", "move_hole_to_project", handleProjectMouseMove, async () => {
+        const hole = expectModelPart(findHole("P1", "C"), "P1/C");
+        const project = expectModelPart(findProject("P2-renamed"), "P2-renamed");
+        const result = await window.LCapi.moveHoleToProject({ holeId: hole.id, projectId: project.id });
+        await reload(false);
+        return result;
+      }, { clickHandler: handleProjectSelectClick });
+
+      await runCommand("deleteMarker", "delete_marker", handleMarkerMouseMove, async () => {
+        const marker = expectModelPart(findMarkerByName("P2-renamed", "B", "B-01", "P2-B-M"), "P2-B-M");
+        const result = await window.LCapi.deleteMarker({ markerId: marker.id });
+        await reload(false);
+        return result;
+      }, { clickHandler: handleMarkerDeleteClick });
+      await runCommand("deleteSection", "delete_section", handleSectionMouseMove, async () => {
+        const section = expectModelPart(findSection("P2-renamed", "B", "B-02"), "P2/B-02");
+        const result = await window.LCapi.deleteSection({ sectionId: section.id });
+        await reload(false);
+        return result;
+      }, { clickHandler: handleSectionDeleteClick });
+      await runCommand("deleteHole", "delete_hole", handleHoleMouseMove, async () => {
+        const hole = expectModelPart(findHole("P2-renamed", "C"), "P2/C");
+        const result = await window.LCapi.deleteHole({ holeId: hole.id });
+        await reload(false);
+        return result;
+      }, { clickHandler: handleHoleDeleteClick });
+      await runImmediateCommand("addProject:temp-delete", async () => {
+        const result = await window.LCapi.addProject({ type: "duo", name: "P3-delete" });
+        await reload(false);
+        return result;
+      });
+      await runCommand("deleteProject", "delete_project", handleProjectMouseMove, async () => {
+        await window.LCapi.e2ePushDialogResponse(1);
+        const project = expectModelPart(findProject("P3-delete"), "P3-delete");
+        const result = await window.LCapi.deleteProject({ projectId: project.id });
+        await reload(false);
+        return result;
+      }, { clickHandler: handleProjectSelectClick });
+      await runImmediateCommand("calcCD", async () => {
+        await reload(true);
+        return true;
+      });
+      await runImmediateCommand("mergeProjects", async () => {
+        const result = await window.LCapi.mergeProjects();
+        await reload(false);
+        return result;
+      });
+
+      startEditCommand("add_marker", handleMarkerMouseMove);
+      objOpts.edit.editable = false;
+      await window.LCapi.changeEditMode({ mode: false });
+      finishEditCommand({ contextmenuEnable: false });
+      const finalState = window.__LC_E2E__.getEditCommandState();
+      operations.push({ name: "editModeOffCleansPendingCommand", result: !finalState.hasClickHandler && !finalState.hasMoveHandler });
+
+      return {
+        ok: operations.every((operation) =>
+          operation.result === true ||
+          operation.result?.success > 0 ||
+          operation.result === "Model type cannot be changed because the same type is selected."
+        ),
+        operations,
+        finalState,
+        projectCount: LCCore?.projects?.length ?? 0,
+        holeCount: LCCore?.projects?.reduce((sum, project) => sum + project.holes.length, 0) ?? 0,
       };
     },
     allowCloseWithoutSaving: async () => {

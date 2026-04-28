@@ -4127,7 +4127,7 @@ function createMainWIndow() {
       message: "Do you aslo want to delete the connections between projects?",
     };
 
-    const { response } = await dialog.showMessageBox(getMainWindow(), options);
+    const { response } = await showMessageBoxWithE2E(getMainWindow(), options);
 
     const result = LCCore.deleteProject(projectId, response);
 
