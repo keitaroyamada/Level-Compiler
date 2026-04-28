@@ -46,6 +46,7 @@ document.addEventListener("DOMContentLoaded", () => {
   let isHoleMenuDragging = false;
   let standardImageLoadTimer = null;
   const standardImageInFlight = new Set();
+  let footerMessageTimer = null;
   //============================================================================================
 
   //--------------------------------------------------------------------------------------------
@@ -4437,13 +4438,7 @@ document.addEventListener("DOMContentLoaded", () => {
   });
   //============================================================================================
   window.LCapi.receive("footerLeft", async (data) => {
-
-    document.getElementById("footerLeftText").textContent = data; 
-    
-    setTimeout(() => {
-      document.getElementById("footerLeftText").textContent = "";
-    }, 10000);
-
+    showFooterMessage(data, 10000);
   });
   //============================================================================================
   //FInder send event (move to)
@@ -7791,6 +7786,7 @@ document.addEventListener("DOMContentLoaded", () => {
         color: option.style.color,
         fontWeight: option.style.fontWeight,
       })),
+      footerLeftText: document.getElementById("footerLeftText")?.textContent ?? "",
       loadedImageSetIds: getLoadedImageSetIds(),
       standardCacheLimit: objOpts.image.standard_cache_limit,
       highresCacheLimit: objOpts.image.highres_cache_limit,
@@ -8358,6 +8354,24 @@ document.addEventListener("DOMContentLoaded", () => {
     }
     return sourceId || "ImageSet";
   }
+  function showFooterMessage(message, timeoutMs = 0) {
+    const footerLeftText = document.getElementById("footerLeftText");
+    if (!footerLeftText) {
+      return;
+    }
+    if (footerMessageTimer) {
+      clearTimeout(footerMessageTimer);
+      footerMessageTimer = null;
+    }
+    footerLeftText.textContent = message ?? "";
+    if (timeoutMs > 0) {
+      footerMessageTimer = setTimeout(() => {
+        footerLeftText.textContent = "";
+        footerMessageTimer = null;
+      }, timeoutMs);
+    }
+  }
+  window.__LC_SHOW_FOOTER_MESSAGE__ = showFooterMessage;
   function initialiseImageSetSelect() {
     const select = document.getElementById("ImageSetSelect");
     if (!select) {
@@ -8565,8 +8579,6 @@ document.addEventListener("DOMContentLoaded", () => {
     for (const project of LCCore.projects) {
       if (!project.enable) {
         numDisable.hole += objOpts.project.interval;
-        numDisable.total += project.holes.length + objOpts.project.interval;
-        continue;
       }
 
       for (const hole of project.holes) {
@@ -8614,6 +8626,11 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     const sourceId = objOpts.image.active_source_id;
+    if (!hasImageSetImages(sourceId)) {
+      showFooterMessage("");
+      return modelImages;
+    }
+
     const sourceBucket = ensureImageSource(modelImages, sourceId);
     const targetIds = collectVisibleSectionIds().filter((sectionId) => {
       const sectionKey = getSectionKeyById(sectionId);
@@ -8642,11 +8659,15 @@ document.addEventListener("DOMContentLoaded", () => {
       const protectedKeys = collectVisibleSectionIds()
         .map((sectionId) => getSectionKeyById(sectionId))
         .filter(Boolean);
+      const footerProgressLabel = "Loading " + getImageSetLabel(sourceId) + " standard images";
+      showFooterMessage(footerProgressLabel + ": 0/" + targetIds.length);
       modelImages = await loadCoreImages(modelImages, LCCore, objOpts, operations, {
         tier: "standard",
         targetIds,
         silentProgress: true,
         protectedKeys,
+        footerProgressLabel,
+        footerProgressTotal: targetIds.length,
       });
     } finally {
       for (const sectionId of targetIds) {
@@ -10052,6 +10073,8 @@ async function loadCoreImages(modelImages, LCCore, objOpts, operations, requestO
         results = await assignCoreImages(results, imageBuffers, objOpts, {
           silentProgress: requestOptions.silentProgress === true,
           protectedKeys: requestOptions.protectedKeys ?? [],
+          footerProgressLabel: requestOptions.footerProgressLabel ?? null,
+          footerProgressTotal: requestOptions.footerProgressTotal ?? 0,
         });
 
         for (const ds of Object.keys(imageBuffers || {})) {                 
@@ -10062,6 +10085,9 @@ async function loadCoreImages(modelImages, LCCore, objOpts, operations, requestO
         sourceBucket.load_target_ids = [];
       }catch(err){
         console.error(err)
+        if (requestOptions.footerProgressLabel && Number(requestOptions.footerProgressTotal ?? 0) > 0) {
+          showAssignFooterMessage("");
+        }
       }
       
       resolve(syncLegacyImageAliasesGlobal(results, objOpts));
@@ -10072,9 +10098,46 @@ async function loadCoreImages(modelImages, LCCore, objOpts, operations, requestO
   });
 
 }
+function showAssignFooterMessage(message, timeoutMs = 0) {
+  if (typeof window !== "undefined" && typeof window.__LC_SHOW_FOOTER_MESSAGE__ === "function") {
+    window.__LC_SHOW_FOOTER_MESSAGE__(message, timeoutMs);
+  }
+}
+function countAssignableImageBuffers(imageBuffers) {
+  const allowedScalses = ["drilling_depth", "composite_depth", "event_free_depth", "age"];
+  if (imageBuffers == null) {
+    return 0;
+  }
+  return allowedScalses.reduce((count, depthScale) => {
+    return count + Object.keys(imageBuffers[depthScale] ?? {}).length;
+  }, 0);
+}
 async function assignCoreImages(coreImages, imageBuffers, objOpts, options = {}) {
   const allowedScalses = ["drilling_depth", "composite_depth", "event_free_depth", "age"];
   let results = coreImages;
+  if (imageBuffers == null) {
+    console.log("[Renderer]: Failed to assign images because there are no loaded images.");
+    if (options.footerProgressLabel && Number(options.footerProgressTotal ?? 0) > 0) {
+      showAssignFooterMessage("");
+    }
+    if (!options.silentProgress) {
+      await window.LCapi.clearProgressbar();
+    }
+    return syncLegacyImageAliasesGlobal(results, objOpts);
+  }
+
+  const assignableCount = countAssignableImageBuffers(imageBuffers);
+  if (assignableCount === 0) {
+    console.log("[Renderer]: There are no image buffers to assign.");
+    if (options.footerProgressLabel && Number(options.footerProgressTotal ?? 0) > 0) {
+      showAssignFooterMessage("");
+    }
+    if (!options.silentProgress) {
+      await window.LCapi.clearProgressbar();
+    }
+    return syncLegacyImageAliasesGlobal(results, objOpts);
+  }
+
   const sourceId = imageBuffers?.sourceId ?? results.active_source_id ?? "source_1";
   const tier = imageBuffers?.tier ?? "standard";
   const label = imageBuffers?.label ?? results.source_meta?.[sourceId]?.label ?? "Image 1";
@@ -10082,12 +10145,12 @@ async function assignCoreImages(coreImages, imageBuffers, objOpts, options = {})
   const tierBucket = sourceBucket[tier] ?? sourceBucket.standard;
   let suc = 0; 
   let N = 0;
-  for(const depthTyep in imageBuffers){
-    if (!allowedScalses.includes(depthTyep)) {
-      continue;
-    }
-    N += Object.keys(imageBuffers[depthTyep]).length;
-  }
+  const imageAssignTimeoutMs = Number(options.imageAssignTimeoutMs ?? 30000);
+  const footerProgressLabel = options.footerProgressLabel ?? null;
+  const footerProgressTotal = Number(options.footerProgressTotal ?? 0);
+  let footerProgressCurrent = 0;
+  const footerProgressSeenKeys = new Set();
+  N = assignableCount;
 
   try{
     await new Promise((resolve, reject) => {
@@ -10098,14 +10161,8 @@ async function assignCoreImages(coreImages, imageBuffers, objOpts, options = {})
           }
           //await window.LCapi.updateProgressbar(0, N, "");
           let n = 0;
-          if(imageBuffers==null){
-            console.log("[Renderer]: Failed to assign images because there are no loaded images.");
-            //await window.LCapi.updateProgressbar(N, N, "");
-            if (!options.silentProgress) {
-              await window.LCapi.clearProgressbar();
-            }
-            //reject();
-            resolve();
+          if (footerProgressLabel && footerProgressTotal > 0) {
+            showAssignFooterMessage(footerProgressLabel + ": 0/" + footerProgressTotal);
           }
   
           const promises = [];
@@ -10124,21 +10181,39 @@ async function assignCoreImages(coreImages, imageBuffers, objOpts, options = {})
                     tierBucket[depthScale][imName] = undefined; 
                   }
 
-                  tierBucket[depthScale][imName] = await new Promise((resolveImg, rejectImg)=>{
+                  tierBucket[depthScale][imName] = await new Promise((resolveImg)=>{
+                    let settled = false;
+                    const finish = (img, loaded = false) => {
+                      if (settled) {
+                        return;
+                      }
+                      settled = true;
+                      clearTimeout(timeoutId);
+                      if (loaded) {
+                        suc += 1;
+                      }
+                      setTimeout(() => {
+                        try {
+                          URL.revokeObjectURL(url);
+                        } catch (_) {}
+                      }, 0);
+                      blob = null;
+                      resolveImg(img);
+                    };
+                    const timeoutId = setTimeout(() => {
+                      tierBucket[depthScale][imName] = undefined;
+                      console.warn("[Renderer]: Timed out assigning image: " + imName);
+                      finish(undefined, false);
+                    }, imageAssignTimeoutMs);
+
                     p.loadImage(
                       url,
                       img => {
-                        suc += 1;
-                        setTimeout(() => URL.revokeObjectURL(url),0);
-                        blob = null;
-                        resolveImg(img);
+                        finish(img, true);
                       },
                       () => {
                         tierBucket[depthScale][imName] = undefined;
-                        setTimeout(() => {try { URL.revokeObjectURL(url); } catch(_) {}},0)
-                        
-                        blob = null;
-                        resolveImg(undefined);
+                        finish(undefined, false);
                       }
                     );
                   });
@@ -10154,6 +10229,13 @@ async function assignCoreImages(coreImages, imageBuffers, objOpts, options = {})
                 }
   
                 n+=1;
+                if (footerProgressLabel && footerProgressTotal > 0 && !footerProgressSeenKeys.has(imName)) {
+                  footerProgressSeenKeys.add(imName);
+                  footerProgressCurrent = Math.min(footerProgressTotal, footerProgressCurrent + 1);
+                  showAssignFooterMessage(
+                    footerProgressLabel + ": " + footerProgressCurrent + "/" + footerProgressTotal
+                  );
+                }
                 //await window.LCapi.updateProgressbar(n, N, "");
               });
               promises.push(promise);            
@@ -10171,9 +10253,6 @@ async function assignCoreImages(coreImages, imageBuffers, objOpts, options = {})
       });
     });
 
-    if (!options.silentProgress) {
-      await window.LCapi.clearProgressbar();
-    }
     if (tier === "standard" || tier === "highres") {
       results = evictImageTierCache(
         results,
@@ -10184,13 +10263,20 @@ async function assignCoreImages(coreImages, imageBuffers, objOpts, options = {})
       );
     }
     console.log("[Renderer]: Load " + suc + " images / " + N + " models(DD, CD, EFD, Age).");
+    if (footerProgressLabel && footerProgressTotal > 0) {
+      showAssignFooterMessage("");
+    }
     return syncLegacyImageAliasesGlobal(results, objOpts);
   }catch(err){
     console.error("[Renderer]: An error occurred during image assignment:", err);
+    if (footerProgressLabel && footerProgressTotal > 0) {
+      showAssignFooterMessage(footerProgressLabel + " failed", 5000);
+    }
+    return syncLegacyImageAliasesGlobal(results, objOpts);
+  } finally {
     if (!options.silentProgress) {
       await window.LCapi.clearProgressbar();
     }
-    return syncLegacyImageAliasesGlobal(results, objOpts);
   }  
 }
 

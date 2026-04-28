@@ -89,6 +89,28 @@ let e2eOpenDialogResponse = {
 };
 let isMainWindowClosing = false;
 
+function closeProgress(progress) {
+  if (!progress) {
+    return null;
+  }
+  try {
+    if (typeof progress.isCompleted === "function" && !progress.isCompleted()) {
+      progress.setCompleted();
+    }
+  } catch (_) {}
+  try {
+    if (typeof progress.close === "function") {
+      progress.close();
+    }
+  } catch (_) {}
+  return null;
+}
+
+function closeGlobalProgressBar() {
+  progressBar = closeProgress(progressBar);
+  return true;
+}
+
 function resetTransientAppState() {
   globalTempData = null;
   sendBuffer = null;
@@ -1088,6 +1110,10 @@ function createMainWIndow() {
     }catch(err){
       console.log(err)
       return null;
+    } finally {
+      if (!silentProgress && progressBar) {
+        closeGlobalProgressBar();
+      }
     }
       //-----------------------------------------------------------
       
@@ -1479,7 +1505,7 @@ function createMainWIndow() {
   });
   ipcMain.handle("progressbar", async (_e, progressbarPayload) => {
     const { title, text, indeterminate, targetWindow: requestedWindow = "mainWindow" } = progressbarPayload;
-    progressBar = null;
+    closeGlobalProgressBar();
     let targetWindow = getMainWindow();
     if(requestedWindow == "converterWindow"){
       targetWindow = getConverterWindow();
@@ -1504,11 +1530,7 @@ function createMainWIndow() {
     return true
   });
   ipcMain.handle("clearProgressbar", async (_e) => {
-    if(progressBar){
-      progressBar.close();
-      progressBar = null; 
-      return true
-    }         
+    return closeGlobalProgressBar();
   });
   ipcMain.handle("askdialog", (_e, dialogPayload) => {
     const { opts } = dialogPayload;
@@ -5939,10 +5961,7 @@ async function updateProgress(progress, n, N){
     await new Promise(resolve => setTimeout(resolve, 0));
 
     if (n >= N) {
-      if (!progress.isCompleted()) {
-        progress.setCompleted();
-      }
-      return null;
+      return closeProgress(progress);
     }
 
     return progress;

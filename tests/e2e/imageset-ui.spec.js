@@ -1,5 +1,7 @@
+const fs = require("fs");
+const path = require("path");
 const { test, expect } = require("@playwright/test");
-const { FIXTURE_PATHS, launchApp, closeApp } = require("./helpers/app");
+const { FIXTURE_PATHS, ROOT_DIR, launchApp, closeApp } = require("./helpers/app");
 
 test("ImageSet selector exposes GUI slots and updates the active source", async () => {
   const app = await launchApp();
@@ -47,6 +49,30 @@ test("ImageSet selector exposes GUI slots and updates the active source", async 
       { value: "source_2", color: "rgb(136, 136, 136)", fontWeight: "" },
       { value: "source_3", color: "rgb(136, 136, 136)", fontWeight: "" },
     ]);
+
+    await app.firstWindow.locator("#ImageSetSelect").selectOption("source_2");
+    await app.firstWindow.waitForFunction(() => {
+      const state = window.__LC_E2E__.getRendererState();
+      return state.activeImageSourceId === "source_2" && state.footerLeftText === "";
+    });
+
+    const emptySourceState = await app.firstWindow.evaluate(() => window.__LC_E2E__.getRendererState());
+    expect(emptySourceState.loadedImageSetIds).not.toContain("source_2");
+
+    const emptyImageDir = path.join(ROOT_DIR, "tests", "temp", "empty-imageset");
+    fs.mkdirSync(emptyImageDir, { recursive: true });
+    await app.firstWindow.evaluate(
+      async ({ emptyImageDir }) => {
+        await window.__LC_E2E__.loadCoreImagesFromPath(emptyImageDir);
+      },
+      { emptyImageDir }
+    );
+
+    const emptyLoadState = await app.firstWindow.evaluate(() => window.__LC_E2E__.getRendererState());
+    expect(emptyLoadState.loadedImageSetIds).not.toContain("source_2");
+    expect(emptyLoadState.footerLeftText).toBe("");
+
+    await app.firstWindow.locator("#ImageSetSelect").selectOption("source_1");
 
     await app.firstWindow.evaluate(async () => {
       await window.__LC_E2E__.pushDialogResponse(0);
