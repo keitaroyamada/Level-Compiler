@@ -829,6 +829,49 @@ test("deleteSection payload updates the main renderer state", async () => {
   }
 });
 
+test("undo after addSection keeps renderer and main model in sync", async () => {
+  const { electronApp, firstWindow, runtimeIssueMonitor } = await launchApp();
+  try {
+    await firstWindow.evaluate(
+      async ({ lcmodel }) => window.__LC_E2E__.loadLcModelFromPath(lcmodel),
+      { lcmodel: FIXTURE_PATHS.lcmodel }
+    );
+
+    const result = await firstWindow.evaluate(() =>
+      window.__LC_E2E__.addSectionUndoThenDeleteFirstSection()
+    );
+
+    expect(result.ok, JSON.stringify(result, null, 2)).toBe(true);
+    expect(result.afterAddCount).toBe(result.beforeSectionCount + 1);
+    expect(result.afterUndoCount).toBe(result.beforeSectionCount);
+    expect(result.deleteResult.ok).toBe(true);
+  } finally {
+    await closeElectronApp(electronApp, firstWindow, runtimeIssueMonitor);
+  }
+});
+
+test("addSection refreshes images that were loaded before the section existed", async () => {
+  const { electronApp, firstWindow, runtimeIssueMonitor } = await launchApp();
+  try {
+    await firstWindow.evaluate(
+      async ({ lcmodel }) => window.__LC_E2E__.loadLcModelFromPath(lcmodel),
+      { lcmodel: FIXTURE_PATHS.lcmodel }
+    );
+
+    const result = await firstWindow.evaluate(
+      async ({ coreImagesDir }) =>
+        window.__LC_E2E__.addMissingSectionAfterImageLoadRefreshesImages(coreImagesDir),
+      { coreImagesDir: FIXTURE_PATHS.coreImagesDir }
+    );
+
+    expect(result.ok, JSON.stringify(result, null, 2)).toBe(true);
+    expect(result.beforeThumbLoaded).toBe(false);
+    expect(result.afterThumbLoaded || result.afterStandardLoaded).toBe(true);
+  } finally {
+    await closeElectronApp(electronApp, firstWindow, runtimeIssueMonitor);
+  }
+});
+
 test("sendSaveState and getChangedSectionIds payloads report a changed section", async () => {
   const { electronApp, firstWindow, runtimeIssueMonitor } = await launchApp();
   try {

@@ -3160,14 +3160,8 @@ function createMainWIndow() {
         Object.assign(LCCore, result.state);
         LCCore.updateSearchIdx();
 
-        //get changed sections
-        const changedSections = getChangedSections(result.delta);
-        let changedIds = [];
-        changedSections.forEach(i=>{          
-          changedIds.push(LCCore.projects[i.project].holes[i.hole].sections[i.section].id);
-          
-          //LCCore.projects[i.project].holes[i.hole].sections[i.section].markers.forEach(m=>{          })
-        })       
+        //get changed sections that still exist after undo
+        let changedIds = getExistingChangedSectionIds(LCCore, result.delta);
 
         //Undo image
         //set image resolution
@@ -3227,13 +3221,8 @@ function createMainWIndow() {
         LCCore.calcEventFreeDepth();
         LCCore.updateSearchIdx();
 
-        //get changed sections
-        const changedSections = getChangedSections(result.delta);
-
-        let changedIds = [];
-        changedSections.forEach(i=>{          
-          changedIds.push(LCCore.projects[i.project].holes[i.hole].sections[i.section].id);
-        })
+        //get changed sections that still exist after redo
+        let changedIds = getExistingChangedSectionIds(LCCore, result.delta);
 
         //Undo image
         //set image resolution
@@ -3381,6 +3370,23 @@ function createMainWIndow() {
         }
     }
     return Array.from(changed).map(item => JSON.parse(item));
+  }
+  function getExistingChangedSectionIds(core, delta) {
+    const changedSections = getChangedSections(delta);
+    const ids = [];
+
+    changedSections.forEach((i) => {
+      const sectionData = core.projects?.[i.project]?.holes?.[i.hole]?.sections?.[i.section];
+      if (!sectionData?.id) {
+        return;
+      }
+      if (!core.search_idx_list?.[sectionData.id.toString()]) {
+        return;
+      }
+      ids.push(sectionData.id);
+    });
+
+    return ids;
   }
   function getChangedSectionIds(lastState, delta) {
     const changes = getChangedSections(delta);

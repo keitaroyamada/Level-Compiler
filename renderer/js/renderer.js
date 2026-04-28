@@ -1908,7 +1908,6 @@ document.addEventListener("DOMContentLoaded", () => {
     if(objOpts.edit.marker_from !== null && objOpts.edit.marker_to !== null){
       objOpts.edit.marker_from = null;
       objOpts.edit.marker_to = null;
-      objOpts.edit.mode = null;
     }
 
     //if clicked same hole
@@ -2140,7 +2139,6 @@ document.addEventListener("DOMContentLoaded", () => {
     if(objOpts.edit.marker_from !== null ){
       objOpts.edit.marker_from = null;
       objOpts.edit.marker_to = 999999;//dummy
-      objOpts.edit.mode = null;
       finishEditCommand({ contextmenuEnable: true });
       return;
     }
@@ -2439,16 +2437,7 @@ document.addEventListener("DOMContentLoaded", () => {
       objOpts.edit.contextmenu_enable = false;
       resetEditSelection();
     }else{
-      document.removeEventListener("click", objOpts.edit.handleClick);
-      document.removeEventListener("mousemove", objOpts.edit.handleMove);      
-
-      objOpts.edit.contextmenu_enable = true;
-      objOpts.edit.hittest = null;
-      objOpts.edit.marker_from = null;
-      objOpts.edit.marker_to = null;
-      objOpts.edit.handleClick = null;
-      objOpts.edit.handleMove = null;
-      //objOpts.edit.mode=null; // if enable, continuous mode need shift.
+      finishEditCommand({ contextmenuEnable: true });
 
       ///update scroller position
       let canvasPosY = null;
@@ -2489,7 +2478,6 @@ document.addEventListener("DOMContentLoaded", () => {
     if(objOpts.edit.marker_from !== null ){
       objOpts.edit.marker_from = null;
       objOpts.edit.marker_to = 999999;//dummy
-      objOpts.edit.mode = null;
       finishEditCommand({ contextmenuEnable: true });
       return;
     }
@@ -2529,15 +2517,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }
       }
     }
-    document.removeEventListener("click", objOpts.edit.handleClick);
-    document.removeEventListener("mousemove", objOpts.edit.handleMove);
-    objOpts.edit.contextmenu_enable = true;
-    objOpts.edit.hittest = null;
-    objOpts.edit.marker_from = null;
-    objOpts.edit.marker_to = null;
-    objOpts.edit.handleClick = null;
-    objOpts.edit.handleMove = null;
-    isProcessing = false;
+    finishEditCommand({ contextmenuEnable: true });
     updateView();
   }
   //2 Marker click--------------------------------------------
@@ -2554,7 +2534,6 @@ document.addEventListener("DOMContentLoaded", () => {
     if(objOpts.edit.marker_from !== null ){
       objOpts.edit.marker_from = null;
       objOpts.edit.marker_to = 999999;//dummy
-      objOpts.edit.mode = null;
       finishEditCommand({ contextmenuEnable: true });
       return;
     }
@@ -2610,17 +2589,7 @@ document.addEventListener("DOMContentLoaded", () => {
       objOpts.edit.contextmenu_enable = false;
       resetEditSelection();
     }else{
-      document.removeEventListener("click", objOpts.edit.handleClick);
-      document.removeEventListener("mousemove", objOpts.edit.handleMove);
-
-      //objOpts.edit.mode=null; // if enable, continuous mode need shift.
-      objOpts.edit.contextmenu_enable = true;
-      objOpts.edit.hittest = null;
-      objOpts.edit.marker_from = null;
-      objOpts.edit.marker_to = null;
-
-      objOpts.edit.handleClick = null;
-      objOpts.edit.handleMove = null;   
+      finishEditCommand({ contextmenuEnable: true });
 
       ///update scroller position
       let canvasPosY = null;
@@ -2799,16 +2768,7 @@ document.addEventListener("DOMContentLoaded", () => {
       
     }
 
-    objOpts.edit.mode=null;
-    objOpts.edit.contextmenu_enable = true;
-    objOpts.edit.hittest = null;
-    objOpts.edit.marker_from = null;
-    objOpts.edit.marker_to = null;
-    document.removeEventListener("click", objOpts.edit.handleClick);
-    document.removeEventListener("mousemove", objOpts.edit.handleMove);
-    objOpts.edit.handleClick = null;
-    objOpts.edit.handleMove = null;
-    isProcessing = false;
+    finishEditCommand({ contextmenuEnable: true });
 
     updateView();
   }
@@ -2877,14 +2837,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }
       }
     }
-    document.removeEventListener("click", objOpts.edit.handleClick);
-    document.removeEventListener("mousemove", objOpts.edit.handleMove);
-    objOpts.edit.contextmenu_enable = true;
-    objOpts.edit.hittest = null;
-    objOpts.edit.marker_from = null;
-    objOpts.edit.marker_to = null;
-    objOpts.edit.handleClick = null;
-    objOpts.edit.handleMove = null;
+    finishEditCommand({ contextmenuEnable: true });
     updateView();
   }
   //3 Section click--------------------------------------------
@@ -2907,31 +2860,29 @@ document.addEventListener("DOMContentLoaded", () => {
         }
       );
       if (response.response) {
-        const targetId = [ht.project, ht.hole, ht.section, null];
-        
-        const result = await window.LCapi.deleteSection({
-          sectionId: targetId,
-        });
-        if(result){
-          await undo("save","Delete Section");//undo
-          await loadModel(false,false);
-          await loadAge(document.getElementById("AgeModelSelect").value);
-          await loadPlotData("age");
-          await loadPlotData("data")
-          applyPlotOptionsToPlotData();
-          updateView();
+        const targetId = LCCore.projects?.[ht.projectIdx]
+          ?.holes?.[ht.holeIdx]
+          ?.sections?.[ht.sectionIdx]
+          ?.id;
+        if (!targetId) {
+          console.warn("[Renderer]: Failed to delete section because the clicked section was not resolved.", ht);
+        } else {
+          const result = await window.LCapi.deleteSection({
+            sectionId: targetId,
+          });
+          if(result){
+            await undo("save","Delete Section");//undo
+            await loadModel(false,false);
+            await loadAge(document.getElementById("AgeModelSelect").value);
+            await loadPlotData("age");
+            await loadPlotData("data")
+            applyPlotOptionsToPlotData();
+            updateView();
+          }
         }
       }
     }
-    document.removeEventListener("click", objOpts.edit.handleClick);
-    document.removeEventListener("mousemove", objOpts.edit.handleMove);
-    objOpts.edit.contextmenu_enable = true;
-    objOpts.edit.hittest = null;
-    objOpts.edit.marker_from = null;
-    objOpts.edit.marker_to = null;
-    objOpts.edit.handleClick = null;
-    objOpts.edit.handleMove = null;
-    isProcessing = false;
+    finishEditCommand({ contextmenuEnable: true });
     updateView();
   }
   //3 Section click--------------------------------------------
@@ -3007,6 +2958,7 @@ document.addEventListener("DOMContentLoaded", () => {
             await loadPlotData("age");
             await loadPlotData("data")
             applyPlotOptionsToPlotData();
+            await refreshImagesAfterModelStructureChange();
           }else{
             console.log("[Renderer]: Failed to add section.")
           }
@@ -3020,15 +2972,7 @@ document.addEventListener("DOMContentLoaded", () => {
         return;
       }
     }
-    document.removeEventListener("click", objOpts.edit.handleClick);
-    document.removeEventListener("mousemove", objOpts.edit.handleMove);
-    objOpts.edit.contextmenu_enable = true;
-    objOpts.edit.hittest = null;
-    objOpts.edit.marker_from = null;
-    objOpts.edit.marker_to = null;
-    objOpts.edit.handleClick = null;
-    objOpts.edit.handleMove = null;
-    objOpts.edit.mode = "";
+    finishEditCommand({ contextmenuEnable: true });
     updateView();
   }
   //3 Connect move--------------------------------------------
@@ -3062,7 +3006,6 @@ document.addEventListener("DOMContentLoaded", () => {
     if(objOpts.edit.section_from !== null && objOpts.edit.section_to !== null){
       objOpts.edit.section_from = null;
       objOpts.edit.section_to = null;
-      objOpts.edit.mode = null;
     }
 
     //if clicked same hole
@@ -3254,14 +3197,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }        
       }
     }
-    document.removeEventListener("click", objOpts.edit.handleClick);
-    document.removeEventListener("mousemove", objOpts.edit.handleMove);
-    objOpts.edit.contextmenu_enable = true;
-    objOpts.edit.hittest = null;
-    objOpts.edit.marker_from = null;
-    objOpts.edit.marker_to = null;
-    objOpts.edit.handleClick = null;
-    objOpts.edit.handleMove = null;
+    finishEditCommand({ contextmenuEnable: true });
     updateView();
   }
   //4 Hole click--------------------------------------------
@@ -3300,14 +3236,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }
       }
     }
-    document.removeEventListener("click", objOpts.edit.handleClick);
-    document.removeEventListener("mousemove", objOpts.edit.handleMove);
-    objOpts.edit.contextmenu_enable = true;
-    objOpts.edit.hittest = null;
-    objOpts.edit.marker_from = null;
-    objOpts.edit.marker_to = null;
-    objOpts.edit.handleClick = null;
-    objOpts.edit.handleMove = null;
+    finishEditCommand({ contextmenuEnable: true });
     updateView();
   }
   //4 Hole click--------------------------------------------
@@ -3353,15 +3282,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }
       }
     }
-    document.removeEventListener("click", objOpts.edit.handleClick);
-    document.removeEventListener("mousemove", objOpts.edit.handleMove);
-    objOpts.edit.contextmenu_enable = true;
-    objOpts.edit.hittest = null;
-    objOpts.edit.marker_from = null;
-    objOpts.edit.marker_to = null;
-    objOpts.edit.handleClick = null;
-    objOpts.edit.handleMove = null;
-    objOpts.edit.mode = "";
+    finishEditCommand({ contextmenuEnable: true });
     updateView();
   }
   //5 Project Move--------------------------------------------
@@ -3443,15 +3364,7 @@ document.addEventListener("DOMContentLoaded", () => {
           alert(`"${response}" is an invalid type. Please select 'correlation' or 'duo'.`);
         }
     }
-    document.removeEventListener("click", objOpts.edit.handleClick);
-    document.removeEventListener("mousemove", objOpts.edit.handleMove);
-    objOpts.edit.contextmenu_enable = true;
-    objOpts.edit.hittest = null;
-    objOpts.edit.marker_from = null;
-    objOpts.edit.marker_to = null;
-    objOpts.edit.handleClick = null;
-    objOpts.edit.handleMove = null;
-    objOpts.edit.mode = "";
+    finishEditCommand({ contextmenuEnable: true });
   }
   //5 Project click--------------------------------------------
   async function handleProjectSelectClick(event) {
@@ -3554,15 +3467,7 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     }
 
-    document.removeEventListener("click", objOpts.edit.handleClick);
-    document.removeEventListener("mousemove", objOpts.edit.handleMove);
-    objOpts.edit.contextmenu_enable = true;
-    objOpts.edit.hittest = null;
-    objOpts.edit.marker_from = null;
-    objOpts.edit.marker_to = null;
-    objOpts.edit.handleClick = null;
-    objOpts.edit.handleMove = null;
-    objOpts.edit.mode = "";
+    finishEditCommand({ contextmenuEnable: true });
     updateView();
   }
   
@@ -7686,6 +7591,117 @@ document.addEventListener("DOMContentLoaded", () => {
         afterSectionCount,
       };
     },
+    addSectionUndoThenDeleteFirstSection: async () => {
+      const firstProject = LCCore?.projects?.[0];
+      const firstHole = firstProject?.holes?.[0];
+      const firstSection = firstHole?.sections?.[0];
+      if (!firstProject || !firstHole || !firstSection) {
+        return { ok: false, error: "section_not_found" };
+      }
+
+      const beforeSectionCount = firstHole.sections.length;
+      const maxDrillingDepth = Math.max(
+        ...firstHole.sections.flatMap((section) =>
+          section.markers.map((marker) => Number(marker.drilling_depth)).filter(Number.isFinite)
+        )
+      );
+      const addResult = await window.LCapi.addSection({
+        sectionId: firstHole.id,
+        data: {
+          name: "E2E_UNDO",
+          distance_top: 0,
+          distance_bottom: 10,
+          dd_top: maxDrillingDepth + 10,
+          dd_bottom: maxDrillingDepth + 20,
+        },
+      });
+      if (addResult !== true) {
+        return { ok: false, error: "add_section_failed", addResult };
+      }
+
+      await undo("save", "E2E Add Section");
+      await loadModel(false, false);
+      const afterAddCount = LCCore?.projects?.[0]?.holes?.[0]?.sections?.length ?? 0;
+      const undoResult = await undo("undo");
+      if (undoResult === true) {
+        await loadModel(false, false);
+      }
+      const afterUndoCount = LCCore?.projects?.[0]?.holes?.[0]?.sections?.length ?? 0;
+      const deleteResult = await window.__LC_E2E__.deleteFirstSection();
+
+      return {
+        ok:
+          undoResult === true &&
+          deleteResult.ok === true &&
+          afterAddCount === beforeSectionCount + 1 &&
+          afterUndoCount === beforeSectionCount,
+        addResult,
+        undoResult,
+        deleteResult,
+        beforeSectionCount,
+        afterAddCount,
+        afterUndoCount,
+      };
+    },
+    addMissingSectionAfterImageLoadRefreshesImages: async (coreImagesDir) => {
+      const firstProject = LCCore?.projects?.[0];
+      const firstHole = firstProject?.holes?.[0];
+      const removedSection = firstHole?.sections?.[1];
+      if (!firstProject || !firstHole || !removedSection) {
+        return { ok: false, error: "section_not_found" };
+      }
+
+      const topMarker = removedSection.markers[0];
+      const bottomMarker = removedSection.markers[removedSection.markers.length - 1];
+      const sectionName = removedSection.name;
+      const sectionKey = getSectionImageKey(firstProject.name, firstHole.name, sectionName);
+      const sectionData = {
+        name: sectionName,
+        distance_top: Number(topMarker.distance),
+        distance_bottom: Number(bottomMarker.distance),
+        dd_top: Number(topMarker.drilling_depth),
+        dd_bottom: Number(bottomMarker.drilling_depth),
+      };
+
+      const deleteResult = await window.LCapi.deleteSection({ sectionId: removedSection.id });
+      if (deleteResult !== true) {
+        return { ok: false, error: "delete_section_failed", deleteResult };
+      }
+      await loadModel(false, false);
+
+      const loadResult = await window.__LC_E2E__.loadCoreImagesFromPath(coreImagesDir);
+      if (!loadResult.ok) {
+        return { ok: false, error: "load_images_failed", loadResult };
+      }
+      const beforeThumbLoaded =
+        modelImages?.sources?.[objOpts.image.active_source_id]?.thumb?.drilling_depth?.[sectionKey] != null;
+      const beforeStandardLoaded =
+        modelImages?.sources?.[objOpts.image.active_source_id]?.standard?.drilling_depth?.[sectionKey] != null;
+
+      const addResult = await window.LCapi.addSection({
+        sectionId: firstHole.id,
+        data: sectionData,
+      });
+      if (addResult !== true) {
+        return { ok: false, error: "add_section_failed", addResult };
+      }
+      await loadModel(false, false);
+      await refreshImagesAfterModelStructureChange();
+
+      const afterThumbLoaded =
+        modelImages?.sources?.[objOpts.image.active_source_id]?.thumb?.drilling_depth?.[sectionKey] != null;
+      const afterStandardLoaded =
+        modelImages?.sources?.[objOpts.image.active_source_id]?.standard?.drilling_depth?.[sectionKey] != null;
+
+      return {
+        ok: beforeThumbLoaded === false && (afterThumbLoaded || afterStandardLoaded),
+        sectionKey,
+        beforeThumbLoaded,
+        beforeStandardLoaded,
+        afterThumbLoaded,
+        afterStandardLoaded,
+      };
+    },
     depthConvert: async (payload) => window.LCapi.depthConverter(payload),
     addEventToFirstAvailablePair: async () => {
       if (!LCCore) {
@@ -8896,6 +8912,30 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     updateView();
+    return modelImages;
+  }
+  async function refreshImagesAfterModelStructureChange() {
+    const sourceId = objOpts.image.active_source_id ?? "source_1";
+    if (!LCCore || !hasImageSetImages(sourceId)) {
+      return modelImages;
+    }
+
+    modelImages = await updateImageRegistration(modelImages, LCCore);
+    const sourceBucket = ensureImageSource(modelImages, sourceId);
+    const targetIds = Array.isArray(sourceBucket.load_target_ids)
+      ? [...sourceBucket.load_target_ids]
+      : [];
+    if (targetIds.length > 0) {
+      modelImages = await loadCoreImages(
+        modelImages,
+        LCCore,
+        objOpts,
+        ["drilling_depth", "composite_depth", "event_free_depth", "age"],
+        { tier: "thumb", targetIds }
+      );
+    }
+    await refreshVisibleStandardImages();
+    updateImageSetLoadedState();
     return modelImages;
   }
   function scheduleVisibleStandardImageRefresh() {
@@ -10110,9 +10150,16 @@ async function updateImageRegistration(modelImages, LCCore){
         for(let s of h.sections){
           const sectionKey = getSectionImageKey(p.name, h.name, s.name);
           //check loaded im
-          const im_in_array = sourceBucket.standard.drilling_depth[sectionKey];
+          const im_in_array =
+            sourceBucket.thumb.drilling_depth[sectionKey] ??
+            sourceBucket.standard.drilling_depth[sectionKey] ??
+            sourceBucket.highres.drilling_depth[sectionKey];
           //check folder im
-          if(Object.keys(sourceBucket.standard.drilling_depth).length > 0){
+          const hasLoadedImages =
+            Object.keys(sourceBucket.thumb.drilling_depth).length > 0 ||
+            Object.keys(sourceBucket.standard.drilling_depth).length > 0 ||
+            Object.keys(sourceBucket.highres.drilling_depth).length > 0;
+          if(hasLoadedImages){
             const isImExist = await window.LCapi.CheckImagesInDir({
               fileName: h.name+"-"+s.name+".jpg",
               projectName: p.name,
