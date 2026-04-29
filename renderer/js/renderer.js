@@ -1176,7 +1176,6 @@ document.addEventListener("DOMContentLoaded", () => {
     if(clickResult=="loadHighResolutionImage"){
 
       const targetId = [objOpts.edit.hittest.project, objOpts.edit.hittest.hole,objOpts.edit.hittest.section,null];
-      modelImages.load_target_ids = [targetId];//load target
       const targetIdx = getIdxById(LCCore, targetId);
       const holeName = LCCore.projects[targetIdx[0]].holes[targetIdx[1]].name;
       const sectionName = LCCore.projects[targetIdx[0]].holes[targetIdx[1]].sections[targetIdx[2]].name;
@@ -1286,8 +1285,6 @@ document.addEventListener("DOMContentLoaded", () => {
     }else if(clickResult=="reloadImage"){
       const curDPCM = JSON.parse(JSON.stringify(objOpts.image.dpcm));
       const targetId = [objOpts.edit.hittest.project, objOpts.edit.hittest.hole,objOpts.edit.hittest.section,null];      
-      modelImages.load_target_ids = [targetId];//load target
-      
       const reloadDefaultDpcm = true;
       if(reloadDefaultDpcm){
         const targetIdx = getIdxById(LCCore, targetId);
@@ -1749,7 +1746,6 @@ document.addEventListener("DOMContentLoaded", () => {
     }else if(clickResult == "loadHighResolutionImage"){
 
       const targetId = [objOpts.edit.hittest.project, objOpts.edit.hittest.hole,objOpts.edit.hittest.section,null];
-      modelImages.load_target_ids = [targetId];//load 
       const targetIdx = getIdxById(LCCore, targetId);
       const projectName = LCCore.projects[targetIdx[0]].name;
       const holeName = LCCore.projects[targetIdx[0]].holes[targetIdx[1]].name;
@@ -2039,8 +2035,7 @@ document.addEventListener("DOMContentLoaded", () => {
             console.log("[Renderer]: Affected sections:",changedData);
             //const affectedSections = getConnectedSectionIds(targetIds);
             if(changedData.ids.length>0){
-              modelImages.load_target_ids = changedData.ids;
-              modelImages = await loadCoreImages(modelImages, LCCore, objOpts, changedData.details);
+              await reloadAffectedCoreImages(changedData);
             }
             isProcessing = false;
             updateView();
@@ -2083,8 +2078,7 @@ document.addEventListener("DOMContentLoaded", () => {
             console.log("[Renderer]: Affected sections:",changedData);
             //const affectedSections = getConnectedSectionIds([fromId, toId]);
             if(changedData.ids.length>0){
-              modelImages.load_target_ids = changedData.ids;
-              modelImages = await loadCoreImages(modelImages, LCCore, objOpts, changedData.details);
+              await reloadAffectedCoreImages(changedData);
             }
             
             updateView();
@@ -2125,8 +2119,7 @@ document.addEventListener("DOMContentLoaded", () => {
             console.log("[Renderer]: Affected sections:",changedData);
             //const affectedSections = getConnectedSectionIds([fromId, toId]);
             if(changedData.ids.length>0){
-              modelImages.load_target_ids = changedData.ids;
-              modelImages = await loadCoreImages(modelImages, LCCore, objOpts, changedData.details);
+              await reloadAffectedCoreImages(changedData);
             }
   
             updateView();
@@ -2351,8 +2344,7 @@ document.addEventListener("DOMContentLoaded", () => {
           console.log("[Renderer]: Affected sections:",changedData);
 
           if(changedData.ids.length>0){
-              modelImages.load_target_ids = changedData.ids;
-              modelImages = await loadCoreImages(modelImages, LCCore, objOpts, changedData.details);//11111111
+              await reloadAffectedCoreImages(changedData);
           }
             
           updateView();
@@ -2483,8 +2475,7 @@ document.addEventListener("DOMContentLoaded", () => {
             //const affectedSections = getConnectedSectionIds(disconnectedIds);
             
             if(changedData.ids.length>0){
-              modelImages.load_target_ids = changedData.ids;
-              modelImages = await loadCoreImages(modelImages, LCCore, objOpts, changedData.details);
+              await reloadAffectedCoreImages(changedData);
             }
   
             updateView();
@@ -2792,8 +2783,7 @@ document.addEventListener("DOMContentLoaded", () => {
             console.log("[Renderer]: Affected sections:",changedData);
             //const affectedSections = getConnectedSectionIds([upperId, lowerId]);
             if(changedData.ids.length>0 && (objOpts.image.is_load_enabled.event_free_depth || objOpts.image.is_load_enabled.age)){
-              modelImages.load_target_ids = changedData.ids;
-              modelImages = await loadCoreImages(modelImages, LCCore, objOpts, changedData.details);
+              await reloadAffectedCoreImages(changedData);
             }
 
             console.log("[Renderer]: Add a new event.]");
@@ -2834,8 +2824,7 @@ document.addEventListener("DOMContentLoaded", () => {
           console.log("[Renderer]: Affected sections:",changedData);
           //const affectedSections = getConnectedSectionIds([upperId, lowerId]);
           if(changedData.ids.length>0 && (objOpts.image.is_load_enabled.event_free_depth || objOpts.image.is_load_enabled.age)){
-            modelImages.load_target_ids = changedData.ids;
-            modelImages = await loadCoreImages(modelImages, LCCore, objOpts, changedData.details);
+            await reloadAffectedCoreImages(changedData);
           }
           updateView();
           console.log("[Renderer]: Deleted selected event.")
@@ -3269,8 +3258,7 @@ document.addEventListener("DOMContentLoaded", () => {
               console.log("[Renderer]: Affected sections:",changedData);
               //const affectedSections = getConnectedSectionIds([fromId, toId]);
               if(changedData.ids.length>0){
-                modelImages.load_target_ids = changedData.ids;
-                modelImages = await loadCoreImages(modelImages, LCCore, objOpts, changedData.details);
+                await reloadAffectedCoreImages(changedData);
               }
               
               updateView();
@@ -3308,8 +3296,7 @@ document.addEventListener("DOMContentLoaded", () => {
               console.log("[Renderer]: Affected sections:",changedData);
               //const affectedSections = getConnectedSectionIds([fromId, toId]);
               if(changedData.ids.length>0){
-                modelImages.load_target_ids = changedData.ids;
-                modelImages = await loadCoreImages(modelImages, LCCore, objOpts, changedData.details);
+                await reloadAffectedCoreImages(changedData);
               }
     
               updateView();
@@ -9245,54 +9232,95 @@ document.addEventListener("DOMContentLoaded", () => {
 
     return output;
   }
+  async function reloadCoreImagesForSectionIds(sectionIds, operations, requestOptions = {}) {
+    if (!Array.isArray(sectionIds) || sectionIds.length === 0) {
+      return;
+    }
+    modelImages = await loadCoreImages(
+      modelImages,
+      LCCore,
+      objOpts,
+      operations,
+      {
+        ...requestOptions,
+        targetIds: sectionIds,
+      }
+    );
+  }
+
+  async function reloadAffectedCoreImages(changedData, requestOptions = {}) {
+    if (Array.isArray(changedData?.items) && changedData.items.length > 0) {
+      const grouped = new Map();
+      for (const item of changedData.items) {
+        if (!Array.isArray(item?.id) || !Array.isArray(item?.details) || item.details.length === 0) {
+          continue;
+        }
+        const operations = [...new Set(item.details)].sort();
+        const key = JSON.stringify(operations);
+        if (!grouped.has(key)) {
+          grouped.set(key, { operations, ids: [] });
+        }
+        grouped.get(key).ids.push(item.id);
+      }
+
+      for (const group of grouped.values()) {
+        await reloadCoreImagesForSectionIds(group.ids, group.operations, requestOptions);
+      }
+      return;
+    }
+
+    await reloadCoreImagesForSectionIds(changedData?.ids, changedData?.details ?? [], requestOptions);
+  }
+
   async function getUpdatedSectionIds(mode="normal"){
     //mode: normal, depth
     const changedSectionIds = await undo("getChangedSectionIds");
     
     let ids = [];
     let details = new Set();
+    let items = [];
     for(let i=0; i< changedSectionIds.length; i++){
       const changedData = changedSectionIds[i];
       
       if(changedData.change == "updated"){
         if(mode == "depth"){
           if(changedData.details.includes("drilling_depth") || changedData.details.includes("composite_depth") || changedData.details.includes("event_free_depth") || changedData.details.includes("age")){
+            const itemDetails = new Set(changedData.details);
             ids.push(changedData.id);
-            changedData.details.forEach(d=>{
+            itemDetails.forEach(d=>{
               details.add(d);
             })
-            if(details.size>0 && !details.has("drilling_depth")){
-              details.add("drilling_depth");
-            }
+            items.push({ id: changedData.id, details: Array.from(itemDetails) });
           }        
         }else if(mode == "normal"){
           ids.push(changedData.id);
           changedData.details.forEach(d=>{
             details.add(d);
           })
+          items.push({ id: changedData.id, details: [...changedData.details] });
         }        
       } else if(changedData.change == "deleted"){
 
       } else if(changedData.change == "added"){
         if(mode == "depth"){
           if(changedData.details.includes("drilling_depth") || changedData.details.includes("composite_depth") || changedData.details.includes("event_free_depth") || changedData.details.includes("age")){
+            const itemDetails = new Set(changedData.details);
             ids.push(changedData.id);
-            changedData.details.forEach(d=>{
+            itemDetails.forEach(d=>{
               details.add(d);
             })
-            if(details.size>0 && !details.has("drilling_depth")){
-              details.add("drilling_depth");
-            }
+            items.push({ id: changedData.id, details: Array.from(itemDetails) });
           } 
         }else if(mode == "normal"){
           ids.push(changedData.id);
           changedData.details.forEach(d=>{
             details.add(d);
           })
+          items.push({ id: changedData.id, details: [...changedData.details] });
         }
       }
     }
-    return {ids: ids, details:Array.from(details)};
+    return {ids: ids, details:Array.from(details), items};
   }
   
   //============================================================================================
@@ -10467,11 +10495,11 @@ async function loadCoreImages(modelImages, LCCore, objOpts, operations, requestO
 
       //get target image list
       let targetIds = null;
-      if (Array.isArray(requestOptions.targetIds)) {
+      if (Object.prototype.hasOwnProperty.call(requestOptions, "targetIds") && Array.isArray(requestOptions.targetIds)) {
         targetIds = [...requestOptions.targetIds];
-      } else if (requestOptions.targetIds === null) {
+      } else if (Object.prototype.hasOwnProperty.call(requestOptions, "targetIds") && requestOptions.targetIds === null) {
         targetIds = [];
-      } else if (sourceBucket.load_target_ids !== null) {
+      } else if (Array.isArray(sourceBucket.load_target_ids) && sourceBucket.load_target_ids.length > 0) {
         targetIds = Array.isArray(sourceBucket.load_target_ids) ? [...sourceBucket.load_target_ids] : [];
       }
 
