@@ -4877,15 +4877,23 @@ document.addEventListener("DOMContentLoaded", () => {
         let hole_top = Infinity;
         let hole_bottom = -Infinity;
         for (let s = 0; s < LCCore.projects[p].holes[h].sections.length; s++) {
-          const section_top_cd = LCCore.projects[p].holes[h].sections[s].markers[0][objOpts.canvas.depth_scale];
-          if(section_top_cd!==null &&section_top_cd!==undefined&& hole_top > section_top_cd){
-            hole_top = section_top_cd;
+          const markers = LCCore.projects[p].holes[h].sections[s].markers ?? [];
+          for (let m = 0; m < markers.length; m++) {
+            const rawDepth = markers[m][objOpts.canvas.depth_scale];
+            if (rawDepth === null || rawDepth === undefined || rawDepth === "") {
+              continue;
+            }
+            const markerDepth = Number(rawDepth);
+            if (!Number.isFinite(markerDepth)) {
+              continue;
+            }
+            if (hole_top > markerDepth) {
+              hole_top = markerDepth;
+            }
+            if (hole_bottom < markerDepth) {
+              hole_bottom = markerDepth;
+            }
           }
-          
-          const section_bottom_cd = LCCore.projects[p].holes[h].sections[s].markers.slice(-1)[0][objOpts.canvas.depth_scale];
-          if(section_bottom_cd!==null && section_bottom_cd!==undefined && hole_bottom<section_bottom_cd){
-            hole_bottom = section_bottom_cd;
-          } 
         }
         
         if (hole_top !== Infinity && hole_top !== null && holes_top > hole_top) {
@@ -5213,7 +5221,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const prj_padx = objOpts.project.pad_x;//objOpts.hole.distance * xMag;
         const prj_pady = objOpts.project.pad_y;
         const project_x0 = -prj_padx + ((objOpts.section.width + objOpts.hole.distance) * prj_num_enable_left + shift_x) * xMag + pad_x;
-        const project_y0 = -prj_pady + (shift_y) * yMag + pad_y;
+        let project_y0 = -prj_pady + (shift_y) * yMag + pad_y;
         let project_w  = prj_padx/2 + (objOpts.section.width + objOpts.hole.distance) * (prj_num_enable_right-1) * xMag + pad_x;
         if(project_w<=0){
           project_w = 100;
@@ -5224,19 +5232,26 @@ document.addEventListener("DOMContentLoaded", () => {
         let project_bot = -Infinity;
 
         for (let i = 0, n = project.holes.length; i < n; i++) {
-          if (!project.holes[i].sections?.length) continue;
-          if (!project.holes[i].sections[0]?.markers?.length) continue;
-          if (!project.holes[i].sections[project.holes[i].sections.length - 1]?.markers?.length) continue;
-
-          const vmin = project.holes[i].sections[0].markers[0][objOpts.canvas.depth_scale];
-          if (vmin < project_top) project_top = vmin;
-
-          const vmax = project.holes[i].sections[project.holes[i].sections.length - 1]
-            .markers[project.holes[i].sections[project.holes[i].sections.length - 1].markers.length - 1][objOpts.canvas.depth_scale];
-          if (vmax > project_bot) project_bot = vmax;
+          const sections = project.holes[i].sections ?? [];
+          for (let s = 0; s < sections.length; s++) {
+            const markers = sections[s].markers ?? [];
+            for (let m = 0; m < markers.length; m++) {
+              const rawDepth = markers[m][objOpts.canvas.depth_scale];
+              if (rawDepth === null || rawDepth === undefined || rawDepth === "") {
+                continue;
+              }
+              const markerDepth = Number(rawDepth);
+              if (!Number.isFinite(markerDepth)) {
+                continue;
+              }
+              if (markerDepth < project_top) project_top = markerDepth;
+              if (markerDepth > project_bot) project_bot = markerDepth;
+            }
+          }
         }
 
         if(project_top !== Infinity && project_bot !== -Infinity){
+          project_y0 = -prj_pady + (project_top + shift_y) * yMag + pad_y;
           project_h = 2*prj_pady + (project_bot - project_top) * yMag;
         }        
                 
