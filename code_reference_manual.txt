@@ -1,0 +1,787 @@
+Level-Compiler Code Reference Manual
+====================================
+
+DATE: 2026-04-29
+PURPOSE: コード全体を検索しやすく把握するための説明書。
+FORMAT: `FILE:`, `DIR:`, `AREA:`, `SYMBOL:`, `IPC:`, `DOM:`, `TEST:`, `GUARDRAIL:` で検索できる索引形式。
+SCOPE: main.js, main/, LC_modules/, preload/, renderer/, tests/, scripts/, resources/ の役割整理。
+NOTE: この説明書作成ではアプリコードと LC_modules は変更していない。
+
+
+Quick Search Keys
+-----------------
+KEY: FILE: 対象ファイルの役割。
+KEY: DIR: ディレクトリの役割。
+KEY: AREA: 機能領域。
+KEY: SYMBOL: クラス、関数、主要変数。
+KEY: IPC: Electron IPC チャンネル。
+KEY: PRELOAD_API: renderer から見える contextBridge API。
+KEY: RENDERER: renderer 側の画面ロジック。
+KEY: DOM: HTML の主要 DOM ID / class。
+KEY: TEST: テストファイルと検証対象。
+KEY: GUARDRAIL: 変更禁止・注意点。
+KEY: SEARCH: 今後の検索機能で索引化しやすい対象。
+
+
+Repository Overview
+-------------------
+DIR: root
+ROLE: Electron デスクトップアプリのリポジトリ。
+ENTRYPOINT: main.js
+PACKAGE: package.json
+APP_NAME: levelcompiler / Level-Compiler
+APP_VERSION: 1.5.4
+RUNTIME: Electron, Node.js, BrowserWindow, IPC, renderer JavaScript, p5.js
+DOMAIN: stratigraphic correlation model, depth conversion, age model, plot, core image display, finder, divider, converter, labeler.
+
+DIR: LC_modules
+ROLE: ドメイン中核。相関モデル、年代モデル、プロットデータ、エンティティ、補助関数、Undo を保持。
+GUARDRAIL: LC_modules は影響範囲が広い。明示承認なしに変更しない。
+
+DIR: main
+ROLE: main.js から切り出し途中の補助層。ウィンドウ定義、命名規約。
+
+DIR: preload
+ROLE: contextBridge で renderer に IPC API を公開する層。
+
+DIR: renderer
+ROLE: HTML/CSS/JS による各ウィンドウの UI。
+
+DIR: renderer/js
+ROLE: renderer 実装。main window は renderer.js。サブウィンドウは renderer_*.js。
+GUARDRAIL: p5.min.js, msgpack.min.js など vendor/minified ファイルは通常編集しない。
+
+DIR: tests
+ROLE: CLI 回帰テスト、Playwright Electron E2E、テスト補助。
+
+DIR: resources
+ROLE: ツールアイコン、プロットアイコンなど静的リソース。
+
+DIR: test_data
+ROLE: サンプルモデル、画像、E2E/手動確認用データ。
+
+
+Runtime Architecture
+--------------------
+AREA: Application boot
+FILE: package.json
+SYMBOL: main = main.js
+SCRIPT: npm start -> electron .
+SCRIPT: npm test -> node scripts/run-project-tests.js
+SCRIPT: npm run test:cli -> node -r ./scripts/register-original-fs.js tests/run-all-tests.js
+SCRIPT: npm run test:e2e -> playwright test --config tests/playwright.config.js
+SCRIPT: npm run build:win -> electron-builder --win --x64
+SCRIPT: npm run build:mac -> electron-builder --mac --arm64
+
+AREA: Main process
+FILE: main.js
+ROLE: アプリ起動、ウィンドウ管理、IPC、モデル読込/保存、画像処理、設定、アップデート、メニュー、Undo/Redo。
+SYMBOL: LCCore = new LevelCompilerCore()
+SYMBOL: LCAge = new LevelCompilerAge()
+SYMBOL: LCPlot = new LevelCompilerPlot()
+SYMBOL: history = new UndoManager()
+SYMBOL: mainWindow, finderWindow, dividerWindow, converterWindow, labelerWindow, settingsWindow, imageViewerWindow, plotWindow
+SYMBOL: globalPath
+SYMBOL: mainSettings
+SYMBOL: globalTempData
+SYMBOL: isEditMode
+GUARDRAIL: main.js 内の計算、相関、年代、深度、シリアライズ処理は core logic 扱い。UI IPC 追加と混同しない。
+
+AREA: Renderer process
+FILE: renderer/js/renderer.js
+ROLE: メイン画面。モデル描画、ツールバー操作、p5 canvas、右側 hole list、フッター、画像表示、plot 表示、編集 UI、E2E hooks。
+RENDERER: renderer.js は LCCore 相当のモデルデータを renderer 側に持ち、LoadModelFromLCCore などで同期する。
+RENDERER: p5Canvas は model view、p5penCanvas はペン、p5measureCanvas は計測、rasterCanvas は画像/スナップショット用途。
+
+AREA: IPC bridge
+DIR: preload
+ROLE: renderer が直接 Node/Electron API に触らないよう、window.LCapi などを公開する。
+PRELOAD_API: window.LCapi -> main window
+PRELOAD_API: window.FinderApi -> Finder
+PRELOAD_API: window.DividerApi -> Divider
+PRELOAD_API: window.ConverterApi -> Converter
+PRELOAD_API: window.LabelerApi -> Labeler
+PRELOAD_API: window.ViewerApi -> Image Viewer
+PRELOAD_API: window.PlotterApi -> Plotter
+PRELOAD_API: window.SettingsApi -> Settings
+PRELOAD_API: window.AboutApi -> About
+
+
+Main Window And Child Windows
+-----------------------------
+FILE: main/windows.js
+ROLE: ウィンドウ種別ごとの BrowserWindow option と HTML/preload の対応を定義する補助層。
+SYMBOL: WINDOW_TYPES.MAIN -> renderer/index.html + preload/preload.js
+SYMBOL: WINDOW_TYPES.FINDER -> renderer/finder.html + preload/preload_finder.js
+SYMBOL: WINDOW_TYPES.DIVIDER -> renderer/divider.html + preload/preload_divider.js
+SYMBOL: WINDOW_TYPES.CONVERTER -> renderer/converter.html + preload/preload_converter.js
+SYMBOL: WINDOW_TYPES.LABELER -> renderer/labeler.html + preload/preload_labeler.js
+SYMBOL: WINDOW_TYPES.SETTINGS -> renderer/settings.html + preload/preload_settings.js
+SYMBOL: WINDOW_TYPES.IMAGE_VIEWER -> renderer/image_viewer.html + preload/preload_image_viewer.js
+SYMBOL: WINDOW_TYPES.PLOTTER -> renderer/plotter.html + preload/preload_plotter.js
+SYMBOL: WINDOW_TYPES.ABOUT -> renderer/about.html + preload/preload_about.js
+SYMBOL: createWindow(type, options)
+SYMBOL: getWindowDefinition(type, options)
+SYMBOL: getWindow(type)
+SYMBOL: setWindow(type, windowRef)
+SYMBOL: clearWindow(type)
+SYMBOL: hasWindow(type)
+SYMBOL: getAllWindows()
+
+FILE: main/conventions.js
+ROLE: staged refactor 用の命名規約。現状は副作用なし。
+SYMBOL: WINDOW_TYPES
+SYMBOL: IPC_CHANNEL_RULES
+SYMBOL: IPC_PAYLOAD_RULES
+SYMBOL: buildChannelName(scope, action)
+
+
+Core Domain Modules
+-------------------
+FILE: LC_modules/LevelCompilerCore.js
+ROLE: 相関モデルの中核。projects / holes / sections / markers / events / connections / depth conversions / import-export を扱う。
+SYMBOL: class LevelCompilerCore extends EventEmitter
+SYMBOL: setStatus(newStatus, statusDetails)
+SYMBOL: setError(errorMessage, statusDetails)
+SYMBOL: loadModelFromCsv(model_path, type)
+SYMBOL: loadModelFromLcmodel(lcdata)
+SYMBOL: loadEventListFromCsv(filepath)
+SYMBOL: replaceNewId()
+SYMBOL: connectDuoModel()
+SYMBOL: calcCompositeDepth(emitUpdate)
+SYMBOL: calcEventFreeDepth(emitUpdate)
+SYMBOL: searchDepth(calcType, applyInterpolation)
+SYMBOL: convertDepthDuo2Master(calcType)
+SYMBOL: getModelSummary()
+SYMBOL: checkModel(...)
+SYMBOL: upgradeToLatestMembers()
+SYMBOL: getDepthFromTrinity(targetId, trinityList, calcType, allowExtrapolation, isForce)
+SYMBOL: getEFDfromCD(targetCD)
+SYMBOL: getCDfromEFD(targetEFD)
+SYMBOL: calcMarkerAges(LCAge)
+SYMBOL: findSectionIdByName(projectId, hole_name, section_name)
+SYMBOL: getHoleListFromCsv(projectData)
+SYMBOL: getSectionListFromCsv(projectData, holeIdx)
+SYMBOL: getMarkerListFromCsv(projectData, sectionIdx)
+SYMBOL: connectEventPairs(projectId)
+SYMBOL: checkReliability()
+SYMBOL: getMarkerNameFromId(id)
+SYMBOL: getDataByIdx(idxs)
+SYMBOL: sortModelByOrder()
+SYMBOL: sortModel()
+SYMBOL: updateSearchIdx()
+SYMBOL: searchShortestVerticalPath(startId, endId)
+SYMBOL: findZeroPointId()
+SYMBOL: graphSearch(startNodeId, startVal, calcType, method)
+SYMBOL: getNeighborSet(currentMarkerId, calcType, direction)
+SYMBOL: applyMarkerPolation(calcType)
+SYMBOL: getPolationList(p, calcType, isIsolated)
+SYMBOL: polation(polationList, calcType, interpolationType)
+SYMBOL: interpolation(targetIds, upperMarkerData, lowerMarkerData, calcType, interpolationRank)
+SYMBOL: extrapolation(targetIds, upperMarkerData, lowerMarkerData, calcType, extrapolationRank)
+SYMBOL: searchNearestMarkers(startMarkerData, calcType)
+SYMBOL: connectMarkers(fromId, toId, direction, isAlertDisconnection)
+SYMBOL: disconnectMarkers(fromId, toId, direction)
+SYMBOL: deleteMarker(targetId)
+SYMBOL: addMarker(...)
+SYMBOL: setZeroPoint(markerId, value)
+SYMBOL: setMaster(markerid, type)
+SYMBOL: changeDistance(markerId, distance)
+SYMBOL: changeDrillingDepth(markerId, dd)
+SYMBOL: addEvent(upperId, lowerId, depositionType, value)
+SYMBOL: deleteEvent(upperId, lowerId, type)
+SYMBOL: deleteSection(sectionId)
+SYMBOL: addSection(holeId, inData)
+SYMBOL: addSectionModel(holeId, sectionModel)
+SYMBOL: deleteHole(holeId, deleteConnections)
+SYMBOL: addHole(projectId, name)
+SYMBOL: moveHoleToProject(holeId, toProjectId)
+SYMBOL: changeHoleOrder(holeId1, holeId2)
+SYMBOL: addProject(type, name)
+SYMBOL: deleteProject(projectId, isDeleteConnection)
+SYMBOL: mergeProjects()
+SYMBOL: changeProjectType(targetId, to)
+SYMBOL: changeName(targetId, value)
+SYMBOL: changeDescriptions(targetId, value)
+SYMBOL: changeEnable(targetId, isEnable)
+SYMBOL: searchHconnection(startId)
+SYMBOL: searchVconnection(startId)
+SYMBOL: getMarkerIdsByDistance(sectionId, dist)
+SYMBOL: getNearestTrinity(targetId, depth, calcType)
+SYMBOL: getIdxFromTrinity(projectId, [holeName, sectionName, distance], epsilon)
+SYMBOL: constructModelMap()
+SYMBOL: constructCSVforLC(resultIds, targetProjectID)
+SYMBOL: constructCSVforLF(resultIds, targetProjectID)
+SYMBOL: changeBaseProject(baseProjectId)
+SYMBOL: exportSerialisedModel()
+SYMBOL: convertLF2LC(filepath)
+SYMBOL: updateVersionInfo(date)
+SYMBOL: isConnectMasterProject(targetId)
+SYMBOL: leaveOneOut(target)
+SYMBOL: getMasterPositionList(targetId)
+SYMBOL: exportTestAnswer(outputPath, options)
+GUARDRAIL: ここは検索 UI 実装でも変更禁止。検索は renderer 側で既存データを読む。
+
+FILE: LC_modules/LevelCompilerAge.js
+ROLE: 年代モデル。age CSV 読込、age-depth 更新、EFD/CD と age の変換、補間。
+SYMBOL: class LevelCompilerAge
+SYMBOL: loadAgeFromCsv(LCCore, age_path, type)
+SYMBOL: getModelData()
+SYMBOL: sortAges()
+SYMBOL: checkAges()
+SYMBOL: addAge(ageData)
+SYMBOL: updateAgeDepth(LCCore)
+SYMBOL: removeAge(targetAgeDataId)
+SYMBOL: getAgeFromEFD(efd, method)
+SYMBOL: getEFDFromAge(age, method)
+SYMBOL: interpolate(upperAgeData, lowerAgeData, target, efd, method)
+SYMBOL: linearInterp(D1, D3, d2d1, d3d1)
+SYMBOL: equalName(a, b)
+GUARDRAIL: 年代補間・変換は core logic。検索機能では直接編集しない。
+
+FILE: LC_modules/LevelCompilerPlot.js
+ROLE: プロットデータセット管理とモデル位置計算。
+SYMBOL: class LevelCompilerPlot
+SYMBOL: initialiseDataCollection()
+SYMBOL: addNewDataset()
+SYMBOL: addDataset(data)
+SYMBOL: calcDataCollectionPosition(LCCore, LCAge)
+SYMBOL: sortDataBy(LCCore, idx, target)
+SYMBOL: sortDataSetRowsByModelOrder(dataSet, LCCore)
+
+FILE: LC_modules/Project.js
+ROLE: Project entity。holes と metadata を保持。
+SYMBOL: class Project
+SYMBOL: clone()
+SYMBOL: load(obj)
+
+FILE: LC_modules/Hole.js
+ROLE: Hole entity。sections と metadata を保持。
+SYMBOL: class Hole
+SYMBOL: clone()
+SYMBOL: load(obj)
+
+FILE: LC_modules/Section.js
+ROLE: Section entity。markers と depth/section metadata を保持。
+SYMBOL: class Section
+SYMBOL: clone()
+SYMBOL: load(obj)
+
+FILE: LC_modules/Marker.js
+ROLE: Marker entity。name, distance, drilling depth, connection, event, age 等の単位データ。
+SYMBOL: class Marker
+SYMBOL: clone()
+SYMBOL: load(obj)
+
+FILE: LC_modules/Event.js
+ROLE: Event entity。marker 間イベント情報。
+SYMBOL: class Event
+
+FILE: LC_modules/Age.js
+ROLE: Age entity。年代データ単位。
+SYMBOL: class Age
+
+FILE: LC_modules/AgeSet.js
+ROLE: AgeSet entity。年代セット単位。
+SYMBOL: class AgeSet
+
+FILE: LC_modules/PlotDataset.js
+ROLE: PlotDataset entity。プロット CSV/系列データ単位。
+SYMBOL: class PlotDataset
+
+FILE: LC_modules/Trinity.js
+ROLE: Project/Hole/Section/Marker を指す ID/名前/深度の複合参照。
+SYMBOL: class Trinity
+
+FILE: LC_modules/UndoManager.js
+ROLE: Undo/Redo 履歴管理。
+SYMBOL: class UndoManager
+
+FILE: LC_modules/lcfnc.js
+ROLE: CSV 読み書き、ID 生成、名前検証、丸めなどの補助関数。
+SYMBOL: readcsv(data_path)
+SYMBOL: writecsv(data_path, data)
+SYMBOL: uuidv4original()
+SYMBOL: findCsvIdx(data, txt, rn, cn)
+SYMBOL: makeUniqeIdList(rn, cn)
+SYMBOL: validateName(name, keywords)
+SYMBOL: makeMarkerIdBase(rn, cn)
+SYMBOL: getUniqueId(reserved_idxs)
+SYMBOL: zeroPadding(str)
+SYMBOL: randNormal(mean, std, n)
+SYMBOL: round(val, order)
+
+FILE: LC_modules/makeModelImageWorker.js
+ROLE: 画像処理を worker_threads で扱う補助。zip 内ファイル抽出など。
+SYMBOL: extractFileByPath(basePath, innerPath)
+
+
+Main Process IPC Map
+--------------------
+AREA: Model initialisation and loading
+IPC: InitialiseCorrelationModel -> LCCore 初期化。
+IPC: InitialiseAgeModel -> LCAge 初期化。
+IPC: initialisePlotDataCollection -> LCPlot 初期化。
+IPC: InitialisePaths -> globalPath 初期化/返却。
+IPC: RegisterModelFromCsv -> LC CSV 読込。
+IPC: RegistertAgeFromCsv -> age CSV 読込。名前に typo があるため呼び出し側もこの spelling。
+IPC: RegisterLCmodel -> .lcmodel 読込。
+IPC: LoadModelFromLCCore -> main process の LCCore を renderer に返す。
+IPC: LoadAgeFromLCAge -> LCAge を renderer に返す。
+IPC: MirrorAgeList -> age model list 同期。
+IPC: Reregister -> 読込済みモデルの再登録。
+
+AREA: File dialogs and file helpers
+IPC: getFilePath -> File object から path を取得。
+IPC: CheckImagesInDir -> 画像ディレクトリ確認。
+IPC: FileChoseDialog -> ファイル選択。
+IPC: FolderChoseDialog -> フォルダ選択。
+IPC: isExistFile -> ファイル存在確認。
+IPC: addSectionFromLcsection -> lcsection から section 追加。
+
+AREA: Core images and image viewer
+IPC: RegisterCoreImage -> core image source 登録。
+IPC: LoadCoreImage -> section image 読込。
+IPC: UnregisterCoreImageSource -> image source 登録解除。
+IPC: floatingImageViewer -> floating image viewer を開く。
+
+AREA: Dialogs and progress
+IPC: progressbar -> progress bar 作成。
+IPC: updateProgressbar -> progress 更新。
+IPC: clearProgressbar -> progress 終了。
+IPC: askdialog -> message box。
+IPC: inputdialog -> prompt。
+IPC: Confirm -> confirm dialog。
+IPC: showContextMenu -> context menu 表示。
+
+AREA: Export
+IPC: ExportCorrelationAsCsvFromRenderer -> LC CSV export。
+IPC: ExportCorrelationAsLFFromRenderer -> LF CSV export。
+
+AREA: Labeler
+IPC: InitialiseTempCore -> labeler 用 tempCore 初期化。
+IPC: LabelerAddSectionData -> labeler section 追加。
+IPC: LabelerAddMarkerData -> labeler marker 追加。
+IPC: LabelerChangeMarker -> labeler marker 変更。
+IPC: LabelerDeleteMarker -> labeler marker 削除。
+IPC: LabelerSaveData -> labeler 保存。
+IPC: LabelerLoadSectionModel -> section model 読込。
+IPC: LabelerLoadModel -> labeler model 読込。
+
+AREA: Plotter and converter
+IPC: ChangeDepthScale -> plotter depth scale 変更。
+IPC: PlotterGetData -> plotter データ取得。
+IPC: ConverterClose -> converter close。
+IPC: PlotterClose -> plotter close/hide。
+IPC: LoadPlotData -> plot data 読込。
+IPC: sendPlotOptions -> plot options を main renderer に送る。
+IPC: cvtGetAgeModelList -> converter age model list。
+IPC: cvtGetCorrelationModelList -> converter correlation model list。
+IPC: cvtLoadCsv -> converter target CSV 読込。
+IPC: cvtConverter -> depth conversion 実行。
+IPC: depthConverter -> depth/age 変換。
+
+AREA: Depth and age calculation
+IPC: CalcCompositeDepth -> composite depth 計算。
+IPC: CalcEventFreeDepth -> event free depth 計算。
+IPC: GetAgeFromEFD -> EFD から age 取得。
+IPC: GetAgeFromCD -> CD から age 取得。
+GUARDRAIL: これらの handler 内部は core logic に近い。
+
+AREA: Finder and Divider
+IPC: OpenDivider -> Divider window を開く。
+IPC: CloseDivider -> Divider window を閉じる。
+IPC: dividerReflow -> Divider 再計算。
+IPC: dividerExport -> Divider export。
+IPC: dividerConverter -> Divider 用変換。
+IPC: OpenFinder -> Finder window を開く。
+IPC: CloseFinder -> Finder window を閉じる。
+IPC: SendDepthToFinder -> main から Finder に深度を送る。
+IPC: finderGetCoreList -> Finder/Divider 用 model list。
+IPC: changeFix -> Finder fix mode。
+IPC: getSectionLimit -> section range 取得。
+IPC: MoveToHorizon -> 指定 horizon へ移動。
+IPC: saveBookmarks -> Finder bookmark 保存。
+IPC: requestCurrentPosition -> main view の現在位置を返す。
+
+AREA: Window/dev/log/settings
+IPC: windowCloseButton -> window close button。
+IPC: request-mainprocess-info -> main process 情報。
+IPC: toggle-devtools -> devtools toggle。
+IPC: terminalLog -> main console log。
+IPC: rendererLog -> renderer log relay。
+IPC: changeEditMode -> edit mode 切替。
+IPC: sendSettings -> settings 保存/反映。
+IPC: openExtarnalLink -> 外部リンクを開く。spelling は Extarnal。
+
+AREA: Undo/Redo
+IPC: sendUndo -> undo。
+IPC: sendRedo -> redo。
+IPC: sendSaveState -> save state。
+IPC: getChangedSectionIds -> changed section IDs。
+
+AREA: E2E support
+IPC: e2eSetCloseDialogResponse -> E2E dialog close response。
+IPC: e2ePushDialogResponse -> E2E dialog response queue。
+IPC: e2eGetAndClearDialogLog -> E2E dialog log。
+IPC: e2eSetOpenDialogResponse -> E2E open dialog response。
+IPC: e2eGetOpenDialogResponse -> E2E open dialog response 確認。
+
+AREA: Model editing
+IPC: changeWorkspace -> workspace metadata 変更。
+IPC: addProject -> Project 追加。
+IPC: deleteProject -> Project 削除。
+IPC: changeProject -> Project 変更。
+IPC: mergeProjects -> Project 結合。
+IPC: addHole -> Hole 追加。
+IPC: deleteHole -> Hole 削除。
+IPC: changeHole -> Hole 変更。
+IPC: moveHoleToProject -> Hole 所属 project 変更。
+IPC: addSection -> Section 追加。
+IPC: deleteSection -> Section 削除。
+IPC: changeSection -> Section 変更。
+IPC: addMarker -> Marker 追加。
+IPC: deleteMarker -> Marker 削除。
+IPC: changeMarker -> Marker 変更。
+IPC: AddEvent -> Event 追加。
+IPC: DeleteEvent -> Event 削除。
+IPC: connectMarkers -> Marker 接続。
+IPC: disconnectMarkers -> Marker 接続解除。
+IPC: disconnectAllConnections -> 接続全解除。
+IPC: SetZeroPoint -> zero point 設定。
+IPC: SetMaster -> master marker 設定。
+IPC: changeEnable -> enable/disable 切替。
+GUARDRAIL: これらはモデル変更を起こす。検索機能から実行する場合は確認/権限設計が必要。
+
+
+Preload API Map
+---------------
+FILE: preload/preload.js
+PRELOAD_API: LCapi
+ROLE: main window 用の API。モデル読込、export、Finder/Divider、画像、dialog、edit command、E2E hook。
+PRELOAD_API: LCapi.InitialiseCorrelationModel -> IPC InitialiseCorrelationModel
+PRELOAD_API: LCapi.InitialiseAgeModel -> IPC InitialiseAgeModel
+PRELOAD_API: LCapi.InitialiseDataPlot -> IPC initialisePlotDataCollection
+PRELOAD_API: LCapi.InitialisePaths -> IPC InitialisePaths
+PRELOAD_API: LCapi.RegisterModelFromCsv / RegisterModelFromPath -> IPC RegisterModelFromCsv
+PRELOAD_API: LCapi.RegisterAgeFromCsv / RegisterAgeFromPath -> IPC RegistertAgeFromCsv
+PRELOAD_API: LCapi.RegisterLCmodel / RegisterLCmodelFromPath -> IPC RegisterLCmodel
+PRELOAD_API: LCapi.LoadModelFromLCCore -> IPC LoadModelFromLCCore
+PRELOAD_API: LCapi.LoadAgeFromLCAge -> IPC LoadAgeFromLCAge
+PRELOAD_API: LCapi.LoadPlotData -> IPC LoadPlotData
+PRELOAD_API: LCapi.ExportCorrelationAsCsv -> IPC ExportCorrelationAsCsvFromRenderer
+PRELOAD_API: LCapi.ExportCorrelationAsLF -> IPC ExportCorrelationAsLFFromRenderer
+PRELOAD_API: LCapi.CalcCompositeDepth -> IPC CalcCompositeDepth
+PRELOAD_API: LCapi.CalcEventFreeDepth -> IPC CalcEventFreeDepth
+PRELOAD_API: LCapi.OpenFinder / CloseFinder -> IPC OpenFinder / CloseFinder
+PRELOAD_API: LCapi.OpenDivider / CloseDivider -> IPC OpenDivider / CloseDivider
+PRELOAD_API: LCapi.RegisterCoreImage / RegisterCoreImageFromPath -> IPC RegisterCoreImage
+PRELOAD_API: LCapi.LoadCoreImage -> IPC LoadCoreImage
+PRELOAD_API: LCapi.floatingImageViewer -> IPC floatingImageViewer
+PRELOAD_API: LCapi.showContextMenu -> IPC showContextMenu
+PRELOAD_API: LCapi.connectMarkers / disconnectMarkers / disconnectAllConnections
+PRELOAD_API: LCapi.addProject / deleteProject / changeProject / mergeProjects
+PRELOAD_API: LCapi.addHole / deleteHole / changeHole / moveHoleToProject
+PRELOAD_API: LCapi.addSection / deleteSection / changeSection
+PRELOAD_API: LCapi.addMarker / deleteMarker / changeMarker
+PRELOAD_API: LCapi.SetZeroPoint / SetMaster / AddEvent / DeleteEvent / changeEnable
+PRELOAD_API: LCapi.sendUndo / sendRedo / sendSaveState / getChangedSectionIds
+PRELOAD_API: LCapi.receive(channel, func) -> ipcRenderer.on wrapper
+
+FILE: preload/preload_finder.js
+PRELOAD_API: FinderApi
+PRELOAD_API: finderGetCoreList, changeFix, depthConverter, getSectionLimit, MoveToHorizon, saveBookmarks, requestCurrentPosition
+
+FILE: preload/preload_divider.js
+PRELOAD_API: DividerApi
+PRELOAD_API: dividerGetCoreList, changeFix, depthConverter, getSectionLimit, MoveToHorizon, writeCsv, dividerConverter, dividerReflow, Confirm
+
+FILE: preload/preload_converter.js
+PRELOAD_API: ConverterApi
+PRELOAD_API: cvtGetAgeModelList, cvtGetCorrelationModelList, cvtLoadCsv, depthConverter, cvtConverter, cvtExport, dataImport, progressbar
+
+FILE: preload/preload_labeler.js
+PRELOAD_API: LabelerApi
+PRELOAD_API: InitialiseTempCore, RegisterCoreImage, LoadCoreImage, LoadSectionModel, addSectionData, addMarkerData, changeMarker, deleteMarker, saveLabelerData, loadModel
+
+FILE: preload/preload_image_viewer.js
+PRELOAD_API: ViewerApi
+PRELOAD_API: RegisterCoreImage, LoadCoreImage, LoadSectionModel, showContextMenu, saveLabelerData
+
+FILE: preload/preload_plotter.js
+PRELOAD_API: PlotterApi
+PRELOAD_API: getPlotData, initialisePlotDataCollection, sendPlotOptions, clearProgressbar, PlotterClose, ConverterClose, windowCloseButton
+
+FILE: preload/preload_settings.js
+PRELOAD_API: SettingsApi
+PRELOAD_API: sendSettings, askdialog, inputdialog, toggleDevTools
+
+FILE: preload/preload_about.js
+PRELOAD_API: AboutApi
+PRELOAD_API: openExtarnalLink, askdialog, inputdialog, toggleDevTools
+
+
+Renderer Windows
+----------------
+FILE: renderer/index.html
+RENDERER: main window HTML。
+DOM: #toolbar -> ツールボタン列。
+DOM: #bt_reload -> reload。
+DOM: #bt_grid -> grid toggle。
+DOM: #bt_finder -> Finder。
+DOM: #bt_target -> pointer/target line。
+DOM: #bt_zoomin -> zoom in。
+DOM: #bt_zoom0 -> reset zoom。
+DOM: #bt_zoomout -> zoom out。
+DOM: #bt_zoomactual -> actual scale。
+DOM: #bt_core_model -> model show/hide。
+DOM: #bt_event_layer -> marker layer collapse/expand。
+DOM: #bt_connection -> connection show/hide。
+DOM: #bt_show_labels -> labels。
+DOM: #bt_source -> depth source display。
+DOM: #bt_rank -> interpolation reliability。
+DOM: #bt_chart -> plot visibility。
+DOM: #bt_core_photo -> section image visibility。
+DOM: #bt_divider -> Divider。
+DOM: #bt_measure -> measure tool。
+DOM: #bt_snapshot -> snapshot。
+DOM: #bt_pen -> pen overlay。
+DOM: #overlay -> overlay layer。
+DOM: #scroller -> main scroll container。
+DOM: #canvasBase -> p5 canvas base。
+DOM: #p5Canvas -> vector/model canvas。
+DOM: #p5penCanvas -> pen canvas。
+DOM: #p5measureCanvas -> measure canvas。
+DOM: #rasterCanvas -> raster/snapshot canvas。
+DOM: .rightsidemenu -> right side panel。
+DOM: .hole_menu -> hole list panel。
+DOM: #hole_list -> Project/Hole/Section 表示・選択。
+DOM: #YAxisSelect -> depth scale select。
+DOM: #ImageSetSelect -> image set select。
+DOM: #AgeModelSelect -> age model select。
+DOM: #footerLeftText -> current model/cursor info。
+DOM: #footerRightText -> depth/cursor info。
+SEARCH: toolbar 右端に検索 UI を追加する場合は #toolbar 直下が候補。#hole_list は既存 tree として保持する。
+
+FILE: renderer/js/renderer.js
+RENDERER: main renderer。p5 setup/draw、tool buttons、model load、image registration、plot drawing、context menus、edit mode、E2E hooks を含む。
+SYMBOL: binarySearchIndex(arr, target, getValueFn)
+SYMBOL: isConnectMasterProject(LCCpre, targetId)
+SYMBOL: rotateText(ctx, txt, degree, center, objOpts)
+SYMBOL: roundSection(ctx, x, y, width, height, radius)
+SYMBOL: filledRoundSection(ctx, x, y, width, height, radius)
+SYMBOL: fitScaler(zoom_level, mag)
+SYMBOL: getNearestConnectedMarkerIdx(LCCore, idFrom, objOpts)
+SYMBOL: getIdxById(LCCore, id)
+SYMBOL: getDataFromId(LCCore, id)
+SYMBOL: countMaster(LCCore, markerData, calcRange)
+SYMBOL: isPointInRect(point, rect)
+SYMBOL: getFooterInfo(LCCore, hittest, objOpts)
+SYMBOL: getEventPosiotion(LCCore, event, marker_top, objOpts)
+SYMBOL: loadPlotIcons(agePlotIcons, objOpts)
+SYMBOL: sortProjectByOrder(LCCore)
+SYMBOL: sortHoleByOrder(LCCore)
+SYMBOL: unzip(result)
+SYMBOL: zip(data)
+SYMBOL: createCircleImage(p, canvasSize, radius, color)
+SYMBOL: isInside(rectA, rectB, pad)
+SYMBOL: undo(type, name)
+SYMBOL: createImageTierBucketGlobal()
+SYMBOL: createImageSourceBucketGlobal(label)
+SYMBOL: getSectionImageKey(projectName, holeName, sectionName)
+SYMBOL: ensureImageSourceGlobal(modelImages, sourceId, label)
+SYMBOL: evictImageTierCache(modelImages, objOpts, sourceId, tier, protectedKeys)
+SYMBOL: syncLegacyImageAliasesGlobal(modelImages, objOpts)
+SYMBOL: updateImageRegistration(modelImages, LCCore)
+SYMBOL: loadCoreImages(modelImages, LCCore, objOpts, operations, requestOptions)
+SYMBOL: assignCoreImages(coreImages, imageBuffers, objOpts, options)
+SYMBOL: loadResourcePath(objOpts)
+SYMBOL: loadToolIcons(objOpts)
+SYMBOL: getClickedItemIdx(mouseX, mouseY, LCCore, objOpts)
+SYMBOL: getPlotPosiotion(data, LCCore, objOpts)
+SYMBOL: drawPointDataset()
+SYMBOL: drawPointData(data, LCCore)
+SYMBOL: resamplePointData(inDataset, th, objOpts)
+SYMBOL: movingAvPointData(inDataset, th, objOpts)
+SYMBOL: dividePlotData(numeratorDataSeries, denominatorDataSeries)
+SYMBOL: calcDrawPosition(drawPointDataset, LCCore, objOpts, pOptions)
+SYMBOL: equalName(a, b)
+SYMBOL: sortDataSetRowsByModelOrder(dataSet, LCCore)
+SEARCH: buildSearchIndex を追加するなら renderer.js が最小変更候補。LCCore の projects/holes/sections/markers を読むだけにする。
+
+FILE: renderer/finder.html
+FILE: renderer/js/renderer_finder.js
+RENDERER: Finder window。Hole/Section/position/DD/CD/EFD/Age の相互移動と bookmark。
+DOM: #fix, #link, #holeOptions, #sectionOptions, #distanceInput, #ddInput, #cdInput, #efdInput, #ageInput, #bookmarksOptions
+PRELOAD_API: FinderApi.depthConverter, FinderApi.MoveToHorizon, FinderApi.saveBookmarks
+
+FILE: renderer/divider.html
+FILE: renderer/js/renderer_divider.js
+RENDERER: Divider window。定義 depth と target depth を表形式で扱い、sampling depth を再投影する。
+DOM: #holeOptions, #sectionOptions, #directionOptions, #calcButton, #exportButton
+DOM: #depth_table, #depth_body, #target_table, #target_body, #plot_graph, #plot_canvas
+PRELOAD_API: DividerApi.dividerConverter, DividerApi.dividerReflow, DividerApi.writeCsv
+
+FILE: renderer/converter.html
+FILE: renderer/js/renderer_converter.js
+RENDERER: Converter window。外部 CSV をモデル座標/DD/CD/EFD/Age 間で変換し、import/export する。
+DOM: #cvt_bt_import, #cvt_bt_convert, #allow_outside_data, #allow_unconnected_models, #precision
+DOM: #cvt_correlation_model, #cvt_age_model, #cvt_source_type, #cvt_source_chooser, #data_table
+PRELOAD_API: ConverterApi.cvtLoadCsv, ConverterApi.depthConverter, ConverterApi.cvtConverter
+
+FILE: renderer/labeler.html
+FILE: renderer/js/renderer_labeler.js
+RENDERER: Labeler window。section image 上で marker 追加/編集/削除、距離変更、名前変更、export。
+DOM: #bt_change_distance, #bt_change_dd, #bt_change_name, #bt_add_marker, #bt_delete_marker, #bt_zoom0
+DOM: #exportButton, #resetButton, #scroller, #canvasBase, #p5Canvas, #footerLeftText
+PRELOAD_API: LabelerApi.addMarkerData, changeMarker, deleteMarker, saveLabelerData
+
+FILE: renderer/image_viewer.html
+FILE: renderer/js/renderer_image_viewer.js
+RENDERER: floating image viewer。section image 表示、drag/drop、context menu。
+DOM: #drag-header, #container, #scroller, #canvasBase, #p5Canvas
+PRELOAD_API: ViewerApi.LoadCoreImage, ViewerApi.showContextMenu
+
+FILE: renderer/plotter.html
+FILE: renderer/js/renderer_plotter.js
+RENDERER: Plotter window。CSV plot data collection を読み、plot list と depth scale を設定して main renderer に反映。
+DOM: #c_collection, #bt_add, #plot_list, #depth_scale, #scroller, #canvasBase, #p5Canvas
+PRELOAD_API: PlotterApi.getPlotData, initialisePlotDataCollection, sendPlotOptions
+
+FILE: renderer/settings.html
+FILE: renderer/js/renderer_settings.js
+RENDERER: Settings window。設定項目を動的に生成し、sendSettings で保存/反映。
+DOM: #container, #title, #default, #menu-container
+PRELOAD_API: SettingsApi.sendSettings
+
+FILE: renderer/about.html
+FILE: renderer/js/renderer_about.js
+RENDERER: About window。version 表示、外部リンク。
+DOM: #app_version, #app_license, #link
+PRELOAD_API: AboutApi.openExtarnalLink
+
+
+Main Data Flow
+--------------
+AREA: Load LC model
+FLOW: renderer drag/drop or menu -> LCapi.RegisterLCmodel/RegisterModelFromCsv -> main.js handler -> LCCore.loadModelFromLcmodel/loadModelFromCsv -> renderer LCapi.LoadModelFromLCCore -> renderer.js loadModel -> #hole_list 更新 -> p5 redraw。
+
+AREA: Load age model
+FLOW: renderer -> LCapi.RegisterAgeFromCsv/RegisterAgeFromPath -> main.js RegistertAgeFromCsv -> LCAge.loadAgeFromCsv -> LCapi.LoadAgeFromLCAge -> AgeModelSelect 更新 -> renderer depth/age display 更新。
+
+AREA: Load images
+FLOW: renderer drag/drop/folder -> LCapi.RegisterCoreImage -> main.js RegisterCoreImage -> LCapi.LoadCoreImage -> renderer.js loadCoreImages/assignCoreImages -> modelImages cache -> p5Canvas/raster display。
+
+AREA: Open Finder
+FLOW: main toolbar #bt_finder -> LCapi.OpenFinder -> main.js OpenFinder -> finder BrowserWindow -> FinderApi.finderGetCoreList/depthConverter/MoveToHorizon。
+
+AREA: Open Divider
+FLOW: main toolbar #bt_divider -> LCapi.OpenDivider -> main.js OpenDivider -> divider BrowserWindow -> DividerApi.dividerConverter -> CSV export via dividerExport。
+
+AREA: Open Plotter
+FLOW: menu/window path in main.js -> plotter BrowserWindow -> PlotterApi.getPlotData/load -> PlotterApi.sendPlotOptions -> main renderer receives plot options -> renderer.js plot visibility/draw。
+
+AREA: Edit model
+FLOW: renderer context menu/edit mode -> LCapi.add/change/delete/connect APIs -> main.js edit IPC -> LCCore mutation -> UndoManager save state -> renderer reload/redraw。
+GUARDRAIL: edit flow mutates model. Search should start with navigation/action discovery, not implicit mutation.
+
+
+Search Feature Implementation Notes
+-----------------------------------
+SEARCH: Existing searchable data in renderer.js likely includes workspace/model metadata, LCCore.projects, project.holes, hole.sections, section.markers, age list, plot collections, image sets.
+SEARCH: Existing actionable feature buttons in renderer/index.html are #bt_reload, #bt_grid, #bt_finder, #bt_target, #bt_zoomin, #bt_zoom0, #bt_zoomout, #bt_zoomactual, #bt_core_model, #bt_event_layer, #bt_connection, #bt_show_labels, #bt_source, #bt_rank, #bt_chart, #bt_core_photo, #bt_divider, #bt_measure, #bt_snapshot, #bt_pen.
+SEARCH: First-pass search can call existing button.click() for view/navigation actions.
+SEARCH: First-pass search should not call model edit IPC by default.
+SEARCH: Search result type labels should include feature, project, hole, section, marker, age, plot, image, bookmark.
+SEARCH: Data navigation should scroll existing #scroller and/or select existing #hole_list entries without changing model data.
+SEARCH: For final scope, Converter/Labeler/Plotter/About/Check update may need main/preload IPC wrappers if not reachable from main renderer.
+SEARCH: Search UI placement specified by blueprint: far right of #toolbar, independent, not inside .rightsidemenu and not replacing #hole_list.
+FILE: blueprint.txt
+ROLE: 検索機能の blueprints と append-only implementation log ルール。
+
+
+Tests And Verification
+----------------------
+FILE: tests/run-all-tests.js
+TEST: CLI regression runner。
+
+FILE: scripts/run-project-tests.js
+TEST: npm test の統合入口。
+
+FILE: tests/current-code.test.js
+TEST: 現行コードの model import/export answer 比較。
+
+FILE: tests/depth-conversion.test.js
+TEST: depth conversion regression。
+
+FILE: tests/cd-efd-regression.test.js
+TEST: CD/EFD regression。
+
+FILE: tests/age-regression.test.js
+TEST: age model regression。
+
+FILE: tests/input-validation.test.js
+TEST: invalid input/model の検出。
+
+FILE: tests/main-windows.test.js
+TEST: main/windows.js と window definitions。
+
+FILE: tests/test-framework.test.js
+TEST: test harness 自体。
+
+DIR: tests/e2e
+TEST: Playwright Electron E2E。
+FILE: tests/e2e/app-startup.spec.js
+TEST: app startup, fixture loading, nested folder behavior。
+FILE: tests/e2e/edit-commands.spec.js
+TEST: edit command flow。
+FILE: tests/e2e/image-source-switch.spec.js
+TEST: image source switching。
+FILE: tests/e2e/image-highres-viewer.spec.js
+TEST: high-res image viewer。
+FILE: tests/e2e/image-thumb-standard.spec.js
+TEST: thumbnail/standard image behavior。
+FILE: tests/e2e/imageset-ui.spec.js
+TEST: ImageSet UI。
+FILE: tests/e2e/plot-reapply.spec.js
+TEST: plot options reapply。
+
+FILE: tests/e2e/helpers/app.js
+TEST: Electron app launch helper。
+
+FILE: tests/helpers/load-fixtures.js
+TEST: fixture loader。
+FILE: tests/helpers/compare-answers.js
+TEST: answer comparison helper。
+FILE: tests/helpers/mutate-lcmodel.js
+TEST: lcmodel mutation helper。
+FILE: tests/helpers/mutate-csv.js
+TEST: CSV mutation helper。
+FILE: tests/helpers/test-harness.js
+TEST: registerTest/getRegisteredTests。
+
+
+Change Guardrails
+-----------------
+GUARDRAIL: LC_modules/LevelCompilerCore.js は明示承認なしに変更しない。
+GUARDRAIL: LC_modules/LevelCompilerAge.js は明示承認なしに変更しない。
+GUARDRAIL: LC_modules/LevelCompilerPlot.js は明示承認なしに変更しない。
+GUARDRAIL: main.js の calculation/correlation/age/depth/serialization ロジックは明示承認なしに変更しない。
+GUARDRAIL: UI-only change は renderer/index.html, renderer/index_styles.css, renderer/js/renderer.js, preload/preload.js の最小差分から検討する。
+GUARDRAIL: preload API 追加は既存 IPC handler を薄く呼ぶだけにし、core mutation を増やさない。
+GUARDRAIL: vendor/minified files は編集しない。
+GUARDRAIL: 既存の dirty worktree 変更を戻さない。
+GUARDRAIL: blueprint.txt は検索機能実装時 append-only log として扱う。実装ログ削除は禁止。
+
+
+Recommended Commands
+--------------------
+COMMAND: rg "KEYWORD" code_reference_manual.txt
+COMMAND: rg "IPC: OpenFinder" code_reference_manual.txt
+COMMAND: rg "PRELOAD_API: LCapi" code_reference_manual.txt
+COMMAND: rg "DOM: #bt_finder" code_reference_manual.txt
+COMMAND: rg "SYMBOL: loadModelFromCsv" code_reference_manual.txt
+COMMAND: rg "GUARDRAIL" code_reference_manual.txt
+COMMAND: npm test
+COMMAND: npm run test:e2e
+

@@ -1,4 +1,4 @@
-document.addEventListener("DOMContentLoaded", () => {
+﻿document.addEventListener("DOMContentLoaded", () => {
   let labelerReady = true;
   window.__LC_LABELER_E2E__ = {
     isReady() {
@@ -87,6 +87,41 @@ document.addEventListener("DOMContentLoaded", () => {
       };
     },
   };
+
+  function showInputDialog(askData) {
+    const type = askData.type === "number" ? "numberText" : askData.type;
+    return window.LCModal.show({
+      title: askData.title ?? "",
+      subtitle: askData.label ?? "",
+      submitLabel: "OK",
+      fields: [
+        {
+          name: "value",
+          label: askData.label ? "" : "Value",
+          type,
+          value: type === "numberText" ? window.LCModal.formatDecimal(askData.value ?? 0) : askData.value ?? "",
+        },
+      ],
+      validate(values) {
+        if (type === "numberText") {
+          const value = window.LCModal.parseDecimal(values.value, 0.1);
+          if (!Number.isFinite(value)) {
+            return { ok: false, message: "Please enter a valid number.", field: "value" };
+          }
+          return { ok: true, values: value };
+        }
+        return { ok: true, values: values.value };
+      },
+    });
+  }
+  function showErrorDialog(message, title = "Error") {
+    return window.LCModal.show({
+      title,
+      message,
+      submitLabel: "OK",
+      hideCancel: true,
+    });
+  }
 
   //-------------------------------------------------------------------------------------------
   const scroller = document.getElementById("scroller");
@@ -786,7 +821,7 @@ document.addEventListener("DOMContentLoaded", () => {
             tempCore.projects[0].holes[0].sections[0].markers.filter(m=>m.id[3]==ht.nearest_marker)[0].name.includes("top") ||
             tempCore.projects[0].holes[0].sections[0].markers.filter(m=>m.id[3]==ht.nearest_marker)[0].name.includes("bottom") 
           ){
-            alert("Top/Bottom marker is not allowed to change name.");
+            await showErrorDialog("Top/Bottom marker is not allowed to change name.");
             return
           }
 
@@ -797,7 +832,7 @@ document.addEventListener("DOMContentLoaded", () => {
             value:"",
             type:"text",
           };
-          response = await window.LabelerApi.inputdialog(askData);
+          response = await showInputDialog(askData);
           console.log("[Labeler]: Change marker: " + target);
         }else if(objOpts.mode == "change_marker_distance"){
           target = "distance";
@@ -807,7 +842,7 @@ document.addEventListener("DOMContentLoaded", () => {
             value:0.0,
             type:"number",
           };
-          response = await window.LabelerApi.inputdialog(askData);
+          response = await showInputDialog(askData);
             
           console.log("[Labeler]: Change marker: " + target);
         }else if(objOpts.mode == "change_marker_dd"){
@@ -818,7 +853,7 @@ document.addEventListener("DOMContentLoaded", () => {
             value:0.0,
             type:"number",
           };
-          response = await window.LabelerApi.inputdialog(askData);
+          response = await showInputDialog(askData);
             
           console.log("[Labeler]: Change marker: " + target);
         }
@@ -987,7 +1022,7 @@ document.addEventListener("DOMContentLoaded", () => {
         value:"",
         type:"text",
       };
-      const response = await window.LabelerApi.inputdialog(askData);
+      const response = await showInputDialog(askData);
 
       if (response !== null) {
         const upperId   = [objOpts.marker_from.project, objOpts.marker_from.hole, objOpts.marker_from.section, objOpts.marker_from.upper_marker];
@@ -1055,7 +1090,7 @@ document.addEventListener("DOMContentLoaded", () => {
         alert("Successfully saved data.")
         console.log("Successfully saved data.")
       }else{
-        alert("Failed to save annotated data.")
+        await showErrorDialog("Failed to save annotated data.")
       }
       
     }
@@ -1721,7 +1756,6 @@ document.addEventListener("DOMContentLoaded", () => {
       sketch.resizeCanvas(scroller.clientWidth, scroller.clientHeight);
     };
   }
-
   //---------------------------------------------------------
   let saveBuffer;
   const dpcm = 90;
@@ -1741,7 +1775,7 @@ document.addEventListener("DOMContentLoaded", () => {
     coreLength = tempCore.projects[0].holes[0].sections[0].markers[tempCore.projects[0].holes[0].sections[0].markers.length-1].distance - tempCore.projects[0].holes[0].sections[0].markers[0].distance;
     console.log("Load image size:"+modelImages["drilling_depth"][holeName+"-"+sectionName].width+","+modelImages["drilling_depth"][holeName+"-"+sectionName].height)
 
-    //おそらくbuffer drawSize の上限サイズ(13000, おおくは8192？)を超えるため、padサイズの調整が必要 
+    //おそらくbuffer drawSize の上限サイズ(13000, おおく�E8192�E�Eを趁E��るため、padサイズの調整が忁E��E
     outRate = parseInt(coreLength * dpcm  * density) / (modelImages["drilling_depth"][holeName+"-"+sectionName].height);   
 
     drawSize[0] =  parseInt(bufferPad[0]/outRate + modelImages["drilling_depth"][holeName+"-"+sectionName].width  + bufferPad[1]/outRate);
@@ -1972,7 +2006,7 @@ document.addEventListener("DOMContentLoaded", () => {
           
           /*
           sketch.resizeCanvas(outSize[0], outSize[1]); // キャンバスをリサイズ
-          sketch.image(img, 0, 0);                    // トリミング後の画像を描画
+          sketch.image(img, 0, 0);                    // トリミング後�E画像を描画
           sketch.saveCanvas(holeName+"-"+sectionName, 'jpg');
           */
         };

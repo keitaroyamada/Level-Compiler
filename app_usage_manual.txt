@@ -1,0 +1,432 @@
+Level-Compiler User Usage Manual
+================================
+
+DATE: 2026-04-29
+PURPOSE: ユーザーが Level-Compiler の使い方を検索しながら理解するための説明書。
+FORMAT: `USER_GUIDE:`, `WORKFLOW:`, `SCREEN:`, `TOOL:`, `MENU:`, `INPUT:`, `OUTPUT:`, `SEARCH_ITEM:`, `CAUTION:` で検索できる形式。
+PAIR_DOCUMENT: code_reference_manual.txt は開発者向けコード索引。このファイルは利用者向け操作説明。
+NOTE: この説明書作成ではアプリコードと LC_modules は変更していない。
+
+
+Quick Search Keys
+-----------------
+KEY: USER_GUIDE: 利用者向けの説明。
+KEY: WORKFLOW: 代表的な作業手順。
+KEY: SCREEN: 画面の説明。
+KEY: TOOL: ツールボタンやサブウィンドウ。
+KEY: MENU: メニュー操作。
+KEY: INPUT: 読み込めるデータ。
+KEY: OUTPUT: 保存・書き出しできるデータ。
+KEY: SEARCH_ITEM: 将来の検索機能に入れるべき項目名。
+KEY: SEARCH_QUERY: ユーザーが入力しそうな検索語。
+KEY: SEARCH_ALIAS: 同義語、表記ゆれ、日本語/英語の別名。
+KEY: SEARCH_ANSWER: 検索結果でそのまま短く返せる回答文。
+KEY: CAUTION: 注意点、失敗しやすい点。
+
+
+Application Overview
+--------------------
+USER_GUIDE: Level-Compiler は、複数の堆積物コアや層序セクションを同じ深度軸・年代軸上で管理し、相関モデルを作成・確認・変換するためのデスクトップアプリ。
+USER_GUIDE: 主な目的は、Project、Hole、Section、Marker を使って相関モデルを組み立て、Composite depth、Event free depth、Age などの軸で確認すること。
+USER_GUIDE: 画像、年代モデル、プロットデータを重ねて確認できる。
+USER_GUIDE: Finder は指定深度や年代へ移動するための小窓。
+USER_GUIDE: Divider はサンプリング位置をモデル上の深度へ再投影するための小窓。
+USER_GUIDE: Converter は外部 CSV の深度・年代変換をまとめて行う小窓。
+USER_GUIDE: Labeler はコア画像上でマーカーや位置情報を編集するための小窓。
+USER_GUIDE: Plotter は外部データをモデル上にプロットするための小窓。
+
+
+Main Screen
+-----------
+SCREEN: Main window
+USER_GUIDE: メイン画面中央は相関モデルの表示領域。縦方向に深度または年代、横方向に Hole/Section が並ぶ。
+USER_GUIDE: 上部の toolbar には表示切替、ズーム、Finder、Divider、計測、スナップショットなどのツールが並ぶ。
+USER_GUIDE: 右側の hole list は Project/Hole/Section の表示・非表示を切り替える領域。
+USER_GUIDE: 下部左側の select では Y-axis、ImageSet、Age model を切り替える。
+USER_GUIDE: 下部 footer にはカーソル位置や現在の情報が表示される。
+SEARCH_ITEM: Main window
+SEARCH_ITEM: toolbar
+SEARCH_ITEM: hole list
+SEARCH_ITEM: Y-axis
+SEARCH_ITEM: ImageSet
+SEARCH_ITEM: Age model
+
+
+Basic Workflow
+--------------
+WORKFLOW: 最小基本手順
+STEP: 1. 相関モデルを読み込む。
+STEP: 2. 必要なら年代モデルを読み込む。
+STEP: 3. 必要ならコア画像を読み込む。
+STEP: 4. Y-axis を Drilling depth / Composite depth / Event free depth / Age から選んで表示を確認する。
+STEP: 5. Finder で目的の深度・年代へ移動する。
+STEP: 6. Grid、Labels、Connection、Event layer、Plot、Section images を必要に応じて表示切替する。
+STEP: 7. 必要なら Divider / Converter / Labeler / Plotter を開く。
+STEP: 8. 編集した場合は保存または export する。
+SEARCH_ITEM: Load model
+SEARCH_ITEM: Load age model
+SEARCH_ITEM: Load core images
+SEARCH_ITEM: Save
+SEARCH_ITEM: Export
+
+
+Loading Correlation Models
+--------------------------
+WORKFLOW: 相関モデルを読み込む
+INPUT: .lcmodel
+INPUT: LC model CSV
+USER_GUIDE: .lcmodel は Level-Compiler の推奨保存形式。内部構造や編集履歴に近い情報を保ちやすい。
+USER_GUIDE: LC model CSV は読み込み可能だが、ファイル名と CSV 構造の規約に従う必要がある。
+USER_GUIDE: モデルはメニュー操作またはメイン画面への drag and drop で読み込む。
+CAUTION: Level Finder 用 CSV は LC model CSV と形式が違う。通常の Load model ではなく Import 経由で扱う。
+CAUTION: ファイル名規約や列構造が合わない CSV は読み込みに失敗する可能性がある。
+SEARCH_ITEM: Load Correlation Model from lcmodel
+SEARCH_ITEM: Load Correlation Model from csv
+SEARCH_ITEM: Import Correlation Model for Level Finder
+SEARCH_ITEM: Reload
+SEARCH_ITEM: Unload all models
+
+
+Loading Age Models
+------------------
+WORKFLOW: 年代モデルを読み込む
+INPUT: Age model CSV
+USER_GUIDE: 年代モデルを読み込むと、Event free depth や Composite depth から Age 表示・変換を行える。
+USER_GUIDE: 読み込んだ年代モデルは下部の AgeModelSelect から切り替える。
+USER_GUIDE: Age 軸を使う場合は、先に相関モデルと年代モデルが正しく対応している必要がある。
+CAUTION: 年代モデルの地点名、深度、イベントフリー深度などが相関モデルと対応しない場合、補間や表示が期待通りにならない。
+SEARCH_ITEM: Load Age model
+SEARCH_ITEM: Age model
+SEARCH_ITEM: Age set
+SEARCH_ITEM: Change active Age model
+SEARCH_ITEM: Age axis
+
+
+Loading Core Images
+-------------------
+WORKFLOW: コア画像を読み込む
+INPUT: image folder
+INPUT: image zip
+INPUT: jpg, png, tif などの画像ファイル
+USER_GUIDE: Project 名と対応するフォルダに画像を置くと、Hole/Section に対応した画像として表示できる。
+USER_GUIDE: 画像名は Hole 名と Section 名が対応する規約に従う必要がある。
+USER_GUIDE: 画像を読み込むと ImageSetSelect で表示対象を切り替えられる。
+USER_GUIDE: toolbar の Section images ボタンで画像表示を on/off できる。
+CAUTION: zip 内画像は展開処理が入るため、通常フォルダより時間と容量を使う。
+CAUTION: 深い入れ子の zip や大きすぎる画像セットは読み込みが重くなる。
+SEARCH_ITEM: Load Core Images
+SEARCH_ITEM: ImageSet
+SEARCH_ITEM: Registered core image source
+SEARCH_ITEM: Loaded core image section
+SEARCH_ITEM: Section images visibility
+SEARCH_ITEM: Change active ImageSet
+
+
+Navigation And View Controls
+----------------------------
+TOOL: Reload
+USER_GUIDE: 読み込み済みモデルを再描画・再同期する。
+SEARCH_ITEM: Reload
+
+TOOL: Grid
+USER_GUIDE: 深度軸のグリッド表示を切り替える。
+SEARCH_ITEM: Toggle grid
+
+TOOL: Pointer / target line
+USER_GUIDE: マウス位置に対応するターゲット線やポインタ表示を切り替える。
+SEARCH_ITEM: Toggle pointer
+SEARCH_ITEM: Target line
+
+TOOL: Zoom in
+USER_GUIDE: 表示を拡大する。
+SEARCH_ITEM: Zoom in
+
+TOOL: Zoom out
+USER_GUIDE: 表示を縮小する。
+SEARCH_ITEM: Zoom out
+
+TOOL: Zoom reset
+USER_GUIDE: 表示倍率を標準状態に戻す。
+SEARCH_ITEM: Zoom default
+
+TOOL: Zoom actual scale
+USER_GUIDE: 実寸または基準スケールに近い表示へ切り替える。
+SEARCH_ITEM: Zoom actual scale
+
+TOOL: Model visibility
+USER_GUIDE: 相関モデルの表示を切り替える。
+SEARCH_ITEM: Toggle model visibility
+
+TOOL: Event layer
+USER_GUIDE: Event/marker layer の展開・折りたたみを切り替える。
+SEARCH_ITEM: Toggle event layer
+
+TOOL: Connection
+USER_GUIDE: Marker 間の接続線表示を切り替える。
+SEARCH_ITEM: Toggle connection visibility
+
+TOOL: Labels
+USER_GUIDE: Marker 名や位置ラベルの表示を切り替える。
+SEARCH_ITEM: Toggle marker labels
+
+TOOL: Depth source
+USER_GUIDE: depth source 表示を切り替える。
+SEARCH_ITEM: Toggle depth source display
+
+TOOL: Rank / reliability
+USER_GUIDE: 補間の信頼性や rank 表示を切り替える。
+SEARCH_ITEM: Toggle interpolation reliability display
+
+TOOL: Plot visibility
+USER_GUIDE: Plotter から渡されたプロット表示を切り替える。
+SEARCH_ITEM: Toggle plot visibility
+
+TOOL: Section images
+USER_GUIDE: 読み込み済みコア画像の表示を切り替える。
+SEARCH_ITEM: Toggle section images visibility
+
+TOOL: Measure
+USER_GUIDE: 画面上で距離や位置を計測する。
+SEARCH_ITEM: Measure
+
+TOOL: Snapshot
+USER_GUIDE: 現在表示している画面を画像として出力する。
+SEARCH_ITEM: Snapshot
+SEARCH_ITEM: Full snapshot
+
+TOOL: Pen
+USER_GUIDE: 表示上に手書きメモや線を描くための overlay を切り替える。
+SEARCH_ITEM: Toggle pen
+
+
+Y Axis And Depth Scale
+----------------------
+SCREEN: YAxisSelect
+USER_GUIDE: 下部の Y-axis select で縦軸を切り替える。
+USER_GUIDE: Drilling depth は各 section/hole の実測深度に近い表示。
+USER_GUIDE: Composite depth は相関モデルに基づく統合深度。
+USER_GUIDE: Event free depth は event の影響を取り除いた深度。
+USER_GUIDE: Age は年代モデルに基づく時間軸表示。
+CAUTION: Composite depth、Event free depth、Age を使うには、モデル計算や年代モデルが正しく読み込まれている必要がある。
+SEARCH_ITEM: Change Y-axis
+SEARCH_ITEM: Drilling depth
+SEARCH_ITEM: Composite depth
+SEARCH_ITEM: Event free depth
+SEARCH_ITEM: Age
+
+
+Finder
+------
+SCREEN: Finder
+TOOL: Finder
+SEARCH_QUERY: finder usage
+SEARCH_QUERY: how to use finder
+SEARCH_QUERY: Finder の使い方
+SEARCH_QUERY: 深度を探す
+SEARCH_QUERY: 年代で移動
+SEARCH_ALIAS: Finder
+SEARCH_ALIAS: LC Finder
+SEARCH_ALIAS: position search
+SEARCH_ALIAS: depth search
+SEARCH_ALIAS: horizon search
+SEARCH_ALIAS: bookmark
+SEARCH_ANSWER: Finder は、Hole/Section と Position、Drilling depth、Composite depth、Event free depth、Age のいずれかを指定して、メイン画面上の対応位置へ移動するための小窓です。toolbar の Finder ボタンから開き、必要な値を入力して位置を確認します。よく使う位置は Bookmark に登録できます。
+USER_GUIDE: Finder は Hole/Section/Distance/DD/CD/EFD/Age を指定して、モデル上の対応位置へ移動するための小窓。
+USER_GUIDE: メイン toolbar の Finder ボタンで開く。
+USER_GUIDE: Hole と Section を選び、Position、Drilling depth、Composite depth、Event free depth、Age のいずれかを入力して位置を探す。
+USER_GUIDE: Bookmark を登録すると、よく使う位置に戻りやすくなる。
+CAUTION: 年代検索は Age model が必要。
+CAUTION: モデル外や未接続の範囲は変換できない場合がある。
+SEARCH_ITEM: Finder
+SEARCH_ITEM: Bookmark
+SEARCH_ITEM: Move to depth
+SEARCH_ITEM: Move to horizon
+
+
+Divider
+-------
+SCREEN: Divider
+TOOL: Divider
+SEARCH_QUERY: divider usage
+SEARCH_QUERY: how to use divider
+SEARCH_QUERY: Divider の使い方
+SEARCH_QUERY: サンプリング深度を計算
+SEARCH_QUERY: sample depth calculation
+SEARCH_ALIAS: Divider
+SEARCH_ALIAS: sampling depth
+SEARCH_ALIAS: reproject samples
+SEARCH_ALIAS: definition depth
+SEARCH_ALIAS: target depth
+SEARCH_ANSWER: Divider は、選択した Hole/Section で定義深度や対象区間を入力し、相関モデル上の深度・年代へ再投影する小窓です。Calculation で計算し、結果は Export できます。
+USER_GUIDE: Divider は、定義した深度位置やサンプリング区間を、モデル上の深度・年代へ変換するための小窓。
+USER_GUIDE: メイン toolbar の Divider ボタンで開く。
+USER_GUIDE: Hole、Section、方向を選び、depth table と target table に対象を追加して計算する。
+USER_GUIDE: 計算結果は export できる。
+CAUTION: Divider の結果は相関モデルと深度計算に依存する。
+SEARCH_ITEM: Divider
+SEARCH_ITEM: Calculation
+SEARCH_ITEM: Add definition
+SEARCH_ITEM: Add target
+SEARCH_ITEM: Add batch target
+SEARCH_ITEM: Divider export
+
+
+Converter
+---------
+SCREEN: Converter
+TOOL: Converter
+SEARCH_QUERY: converter usage
+SEARCH_QUERY: how to use converter
+SEARCH_QUERY: Converter の使い方
+SEARCH_QUERY: CSV を変換
+SEARCH_QUERY: depth conversion csv
+SEARCH_ALIAS: Converter
+SEARCH_ALIAS: batch depth conversion
+SEARCH_ALIAS: convert DD CD EFD Age
+SEARCH_ALIAS: CSV conversion
+SEARCH_ANSWER: Converter は、外部 CSV の深度・年代列を Level-Compiler のモデルに基づいて別の軸へ変換する小窓です。CSV、source type、モデル、列対応、precision を指定して Convert します。
+USER_GUIDE: Converter は外部 CSV の深度・年代情報を、Level-Compiler のモデルに基づいて別の軸へ変換する。
+USER_GUIDE: CSV を選択し、source type、correlation model、age model、列対応、precision を設定して Convert する。
+USER_GUIDE: 変換元として trinity、CD、EFD、DD、Age などを扱える。
+CAUTION: 入力 CSV の列選択を間違えると変換結果も間違う。
+CAUTION: Age 変換には age model が必要。
+SEARCH_ITEM: Converter
+SEARCH_ITEM: Batch depth conversion
+SEARCH_ITEM: Convert CSV
+SEARCH_ITEM: Import converted data
+SEARCH_ITEM: Export converted data
+
+
+Labeler
+-------
+SCREEN: Labeler
+TOOL: Labeler
+SEARCH_QUERY: labeler usage
+SEARCH_QUERY: how to use labeler
+SEARCH_QUERY: Labeler の使い方
+SEARCH_QUERY: 画像にマーカーを追加
+SEARCH_QUERY: marker on image
+SEARCH_ALIAS: Labeler
+SEARCH_ALIAS: image marker editor
+SEARCH_ALIAS: core image labeling
+SEARCH_ALIAS: change marker position
+SEARCH_ANSWER: Labeler は、コア画像上で Marker の追加、位置変更、drilling depth 変更、名前変更、削除を行う小窓です。対象 section と画像を確認してから編集し、最後に保存します。
+USER_GUIDE: Labeler はコア画像上でマーカー位置、名前、drilling depth などを編集するための小窓。
+USER_GUIDE: 画像を読み込み、Add marker、Change position、Change drilling depth、Change name、Delete marker を使う。
+USER_GUIDE: 編集後は save/export する。
+CAUTION: Labeler はモデルデータ編集につながるため、保存前に対象 section を確認する。
+SEARCH_ITEM: Labeler
+SEARCH_ITEM: Add marker on image
+SEARCH_ITEM: Change marker position
+SEARCH_ITEM: Change marker drilling depth
+SEARCH_ITEM: Change marker name
+SEARCH_ITEM: Delete marker on image
+
+
+Plotter
+-------
+SCREEN: Plotter
+TOOL: Plotter
+SEARCH_QUERY: plotter usage
+SEARCH_QUERY: how to use plotter
+SEARCH_QUERY: Plotter の使い方
+SEARCH_QUERY: CSV をプロット
+SEARCH_QUERY: plot data on model
+SEARCH_ALIAS: Plotter
+SEARCH_ALIAS: plot series
+SEARCH_ALIAS: plot data collection
+SEARCH_ALIAS: draw collection
+SEARCH_ANSWER: Plotter は、外部 CSV データを読み込んでモデル表示に重ねるプロット系列を設定する小窓です。CSV collection を選び、Add to Plot List で系列を追加し、depth scale や表示項目を調整します。
+USER_GUIDE: Plotter は外部 CSV データを読み、モデル表示に重ねる plot series を設定する。
+USER_GUIDE: CSV collection を選び、Add to Plot List で series を追加し、depth scale や表示設定を調整する。
+USER_GUIDE: 設定は main window の plot 表示に反映される。
+CAUTION: プロット対象データがモデルの深度軸と対応していない場合、表示位置が期待通りにならない。
+SEARCH_ITEM: Plotter
+SEARCH_ITEM: Plot data collection
+SEARCH_ITEM: Plot draw collection
+SEARCH_ITEM: Add plot series
+SEARCH_ITEM: Plot options
+
+
+Editing Model Data
+------------------
+WORKFLOW: モデル編集
+USER_GUIDE: Edit mode では Project、Hole、Section、Marker の追加・削除・名称変更・説明変更・接続変更などを行う。
+USER_GUIDE: Marker を接続すると correlation model の深度変換に影響する。
+USER_GUIDE: Master marker、zero horizon、event の設定はモデル計算に大きく影響する。
+CAUTION: 編集操作はモデル自体を変更する。検索機能から編集コマンドを直接実行する場合は確認が必要。
+SEARCH_ITEM: Edit mode
+SEARCH_ITEM: Add Project
+SEARCH_ITEM: Edit project name
+SEARCH_ITEM: Delete project
+SEARCH_ITEM: Add Hole
+SEARCH_ITEM: Edit hole name
+SEARCH_ITEM: Delete hole
+SEARCH_ITEM: Add Section
+SEARCH_ITEM: Edit section name
+SEARCH_ITEM: Delete section
+SEARCH_ITEM: Add Marker
+SEARCH_ITEM: Edit marker name
+SEARCH_ITEM: Edit marker position
+SEARCH_ITEM: Delete marker
+SEARCH_ITEM: Set master
+SEARCH_ITEM: Remove master
+SEARCH_ITEM: Connect markers
+SEARCH_ITEM: Disconnect markers
+SEARCH_ITEM: Add event
+SEARCH_ITEM: Delete event
+SEARCH_ITEM: Set zero horizon
+
+
+Save And Export
+---------------
+WORKFLOW: 保存と書き出し
+OUTPUT: .lcmodel
+OUTPUT: LC CSV
+OUTPUT: LF CSV
+OUTPUT: snapshot image
+OUTPUT: Divider CSV
+USER_GUIDE: 作業中の相関モデルは .lcmodel として保存するのが基本。
+USER_GUIDE: 他ツールや表計算で使う場合は LC CSV または LF CSV export を使う。
+USER_GUIDE: 表示状態を画像として残す場合は Snapshot を使う。
+CAUTION: LF CSV は Level Finder 用の形式で、LC model CSV とは用途が違う。
+SEARCH_ITEM: Save correlation model
+SEARCH_ITEM: Save correlation model with ages
+SEARCH_ITEM: Save correlation As
+SEARCH_ITEM: Export csv model for Level Compiler
+SEARCH_ITEM: Export csv model for Level Finder
+SEARCH_ITEM: Snapshot
+
+
+Settings And Help
+-----------------
+SCREEN: Settings
+USER_GUIDE: Settings では表示、保存、更新確認などアプリ全体の設定を扱う。
+SEARCH_ITEM: Settings
+SEARCH_ITEM: Preferences
+
+SCREEN: About
+USER_GUIDE: About ではアプリのバージョンやライセンス、外部リンクを確認する。
+SEARCH_ITEM: About
+SEARCH_ITEM: Version
+SEARCH_ITEM: License
+
+TOOL: Check update
+USER_GUIDE: 更新確認はアプリのアップデータ機能を使う。
+SEARCH_ITEM: Check update
+
+
+Troubleshooting
+---------------
+USER_GUIDE: モデルが表示されない場合は、読み込み形式、ファイル名規約、右側 hole list の表示チェック、Y-axis、zoom 状態を確認する。
+USER_GUIDE: Age が表示されない場合は、Age model が読み込まれているか、AgeModelSelect で選択されているか、モデルと年代データが対応しているか確認する。
+USER_GUIDE: 画像が表示されない場合は、ImageSetSelect、画像フォルダ名、画像ファイル名、Section images 表示状態を確認する。
+USER_GUIDE: Plot が表示されない場合は、Plotter 側の collection と series、depth scale、メイン toolbar の plot visibility を確認する。
+USER_GUIDE: Finder/Converter で変換できない場合は、モデル外の値、未接続の範囲、Age model 未選択、列指定ミスを疑う。
+USER_GUIDE: 表示が見づらい場合は、Zoom reset、Grid、Labels、Connection、Event layer、Plot、Images を切り替える。
+SEARCH_ITEM: Model not visible
+SEARCH_ITEM: Age not visible
+SEARCH_ITEM: Images not visible
+SEARCH_ITEM: Plot not visible
+SEARCH_ITEM: Conversion failed
+SEARCH_ITEM: Reset view

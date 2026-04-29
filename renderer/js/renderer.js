@@ -1111,10 +1111,10 @@ document.addEventListener("DOMContentLoaded", () => {
         value:"",
         type:"password",
       };
-      response = await window.LCapi.inputdialog(askData);
+      response = await showInputDialog(askData);
       if(response !==null){
         if(response !== objOpts.edit.passwards){
-          alert("Please enter the correct passwords.");
+          await showErrorDialog("Please enter the correct passwords.");
           return
         }
       }else{
@@ -1151,9 +1151,10 @@ document.addEventListener("DOMContentLoaded", () => {
     event.preventDefault();
     let clickResult = null;
 
-    if(objOpts.edit.hittest==null) return
-    if(objOpts.edit.hittest.hole!==null){
-      if(objOpts.edit.hittest.section!==null){
+    const ht = updateContextHittest(event);
+    if(ht==null) return
+    if(ht.hole!==null){
+      if(ht.section!==null){
         clickResult = await window.LCapi.showContextMenu({ type: "sectionContextMenu" });
       }else{
         clickResult = await window.LCapi.showContextMenu({ type: "holeContextMenu" });
@@ -1375,8 +1376,169 @@ document.addEventListener("DOMContentLoaded", () => {
     isProcessing = false;
   }
 
+  function getPointerHittest(event) {
+    if (!LCCore) {
+      return null;
+    }
+    const canvas = document.getElementById("p5Canvas");
+    if (!canvas) {
+      return null;
+    }
+    const rect = canvas.getBoundingClientRect();
+    const mouseX = event.clientX - rect.left;
+    const mouseY = event.clientY - rect.top;
+    return JSON.parse(JSON.stringify(getClickedItemIdx(mouseX, mouseY, LCCore, objOpts)));
+  }
+
+  function updateContextHittest(event) {
+    const ht = getPointerHittest(event);
+    if (ht !== null) {
+      objOpts.edit.hittest = ht;
+      updateView();
+    }
+    return ht;
+  }
+
+  function isMarkerHittest(ht) {
+    return ht
+      && ht.nearest_marker !== null
+      && Number.isFinite(ht.nearest_distance)
+      && Math.abs(ht.nearest_distance) < objOpts.edit.sensibility;
+  }
+
+  async function editDescriptionForHittest(kind, ht) {
+    if (!LCCore || !ht) {
+      return false;
+    }
+
+    let targetId = null;
+    let title = "";
+    let value = "";
+    let applyChange = null;
+
+    if (kind === "marker") {
+      if (!isMarkerHittest(ht)) {
+        return false;
+      }
+      targetId = [ht.project, ht.hole, ht.section, ht.nearest_marker];
+      const targetIdx = getIdxById(LCCore, targetId);
+      const projectName = LCCore.projects[targetIdx[0]].name;
+      const holeName = LCCore.projects[targetIdx[0]].holes[targetIdx[1]].name;
+      const sectionName = LCCore.projects[targetIdx[0]].holes[targetIdx[1]].sections[targetIdx[2]].name;
+      const marker = LCCore.projects[targetIdx[0]].holes[targetIdx[1]].sections[targetIdx[2]].markers[targetIdx[3]];
+      title = "Edit marker descriptions: " + projectName + " " + holeName + "-" + sectionName + "-" + marker.name;
+      value = marker.descriptions;
+      applyChange = response => window.LCapi.changeMarker({ markerId: targetId, type: "descriptions", value: response });
+    } else if (kind === "section") {
+      if (ht.section === null) {
+        return false;
+      }
+      targetId = [ht.project, ht.hole, ht.section, null];
+      const targetIdx = getIdxById(LCCore, targetId);
+      const projectName = LCCore.projects[targetIdx[0]].name;
+      const holeName = LCCore.projects[targetIdx[0]].holes[targetIdx[1]].name;
+      const section = LCCore.projects[targetIdx[0]].holes[targetIdx[1]].sections[targetIdx[2]];
+      title = "Edit section descriptions: " + projectName + " " + holeName + "-" + section.name;
+      value = section.descriptions;
+      applyChange = response => window.LCapi.changeSection({ sectionId: targetId, type: "descriptions", value: response });
+    } else if (kind === "hole") {
+      if (ht.hole === null) {
+        return false;
+      }
+      targetId = [ht.project, ht.hole, null, null];
+      const targetIdx = getIdxById(LCCore, targetId);
+      const projectName = LCCore.projects[targetIdx[0]].name;
+      const hole = LCCore.projects[targetIdx[0]].holes[targetIdx[1]];
+      title = "Edit hole descriptions: " + projectName + " " + hole.name;
+      value = hole.descriptions;
+      applyChange = response => window.LCapi.changeHole({ holeId: targetId, type: "descriptions", value: response });
+    } else if (kind === "project") {
+      if (ht.project === null) {
+        return false;
+      }
+      targetId = [ht.project, null, null, null];
+      const targetIdx = getIdxById(LCCore, targetId);
+      const project = LCCore.projects[targetIdx[0]];
+      title = "Edit project descriptions: " + project.name;
+      value = project.descriptions;
+      applyChange = response => window.LCapi.changeProject({ projectId: targetId, type: "descriptions", value: response });
+    } else {
+      return false;
+    }
+
+    const response = await showDescriptionDialog({ title, value });
+    if (response === null) {
+      return true;
+    }
+
+    const result = await applyChange(response);
+    if (result === true) {
+      console.log("[Renderer]: Change " + kind + " descriptions.");
+      await loadModel(false, false);
+      updateView();
+      return true;
+    }
+    return false;
+  }
+
+  function showInputDialog(askData) {
+    const type = askData.type === "number" ? "numberText" : askData.type;
+    return window.LCModal.show({
+      title: askData.title ?? "",
+      subtitle: askData.label ?? "",
+      submitLabel: "OK",
+      fields: [
+        {
+          name: "value",
+          label: askData.label ? "" : "Value",
+          type,
+          value: type === "numberText" ? window.LCModal.formatDecimal(askData.value ?? 0) : askData.value ?? "",
+        },
+      ],
+      validate(values) {
+        if (type === "numberText") {
+          const value = window.LCModal.parseDecimal(values.value, 0.1);
+          if (!Number.isFinite(value)) {
+            return { ok: false, message: "Please enter a valid number.", field: "value" };
+          }
+          return { ok: true, values: value };
+        }
+        return { ok: true, values: values.value };
+      },
+    });
+  }
+
+  function showDescriptionDialog({ title, value }) {
+    return window.LCModal.show({
+      title,
+      submitLabel: "Save",
+      initialFocus: "description",
+      fields: [
+        {
+          name: "description",
+          label: "Description",
+          type: "textarea",
+          value: value ?? "",
+        },
+      ],
+      validate(values) {
+        return { ok: true, values: values.description };
+      },
+    });
+  }
+
+  function showErrorDialog(message, title = "Error") {
+    return window.LCModal.show({
+      title,
+      message,
+      submitLabel: "OK",
+      hideCancel: true,
+    });
+  }
+
   async function handleEditContextmenu(event) {
     event.preventDefault();
+    updateContextHittest(event);
 
     const clickResult = await window.LCapi.showContextMenu({ type: "editContextMenu" });
     if(clickResult==null) return
@@ -1408,36 +1570,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }else if(clickResult == "changeMarkerDistance"){
       startEditCommand("change_marker_distance", handleMarkerMouseMove);
     }else if(clickResult == "changeMarkerDescriptions"){
-      if(LCCore){
-        if(objOpts.edit.hittest.nearest_marker!==null){
-          const ht = objOpts.edit.hittest;
-          const targetId  = [ht.project, ht.hole, ht.section, ht.nearest_marker];
-          const targetIdx = getIdxById(LCCore, targetId); 
-          const projectName = LCCore.projects[targetIdx[0]].name
-          const holeName    = LCCore.projects[targetIdx[0]].holes[targetIdx[1]].name;
-          const sectionName = LCCore.projects[targetIdx[0]].holes[targetIdx[1]].sections[targetIdx[2]].name;
-          const markerName  = LCCore.projects[targetIdx[0]].holes[targetIdx[1]].sections[targetIdx[2]].markers[targetIdx[3]].name;
-
-          const askData = {
-            title:"Edit marker descriptions: " + projectName +" " +holeName+"-"+sectionName+"-"+markerName,
-            label:"",
-            value:LCCore.projects[targetIdx[0]].holes[targetIdx[1]].sections[targetIdx[2]].markers[targetIdx[3]].descriptions,
-            type:"textarea",
-          };
-          const response = await window.LCapi.inputdialog(askData);
-          if(response !== null){
-            const result = await window.LCapi.changeMarker({
-              markerId: targetId,
-              type: "descriptions",
-              value: response,
-            });
-            if(result == true){
-              console.log("[Renderer]: Chnage marker descriptions.")
-              await loadModel(false, false);
-            }
-          }
-        }
-      }
+      startEditCommand("change_marker_descriptions", handleMarkerMouseMove);
     }else if(clickResult == "addEvent"){
       startEditCommand("add_event", handleMarkerMouseMove);
     }else if(clickResult == "deleteEvent"){
@@ -1500,36 +1633,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }else if(clickResult == "changeSectionName"){
       startEditCommand("change_section_name", handleSectionMouseMove);
     }else if(clickResult == "changeSectionDescriptions"){
-      if(LCCore){
-        if(objOpts.edit.hittest.section!==null){
-          const ht = objOpts.edit.hittest;
-          const targetId  = [ht.project, ht.hole, ht.section, null];
-          const targetIdx = getIdxById(LCCore, targetId); 
-                    
-          const projectName = LCCore.projects[targetIdx[0]].name
-          const holeName    = LCCore.projects[targetIdx[0]].holes[targetIdx[1]].name;
-          const sectionName = LCCore.projects[targetIdx[0]].holes[targetIdx[1]].sections[targetIdx[2]].name;
-
-          const askData = {
-            title:"Edit section descriptions: " + projectName +" " +holeName+"-"+sectionName,
-            label:"",
-            value:LCCore.projects[targetIdx[0]].holes[targetIdx[1]].sections[targetIdx[2]].descriptions,
-            type:"textarea",
-          };
-          const response = await window.LCapi.inputdialog(askData);
-          if(response !== null){
-            const result = await window.LCapi.changeSection({
-              sectionId: targetId,
-              type: "descriptions",
-              value: response,
-            });
-            if(result == true){
-              console.log("[Renderer]: Chnage section descriptions.")
-              await loadModel(false,false);
-            }
-          }
-        }
-      }
+      startEditCommand("change_section_descriptions", handleSectionMouseMove);
     }else if(clickResult == "addSection"){
       startEditCommand("add_section", handleHoleMouseMove);
     }else if(clickResult == "deleteSection"){
@@ -1537,35 +1641,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }else if(clickResult == "changeHoleName"){
       startEditCommand("change_hole_name", handleHoleMouseMove);
     }else if(clickResult == "changeHoleDescriptions"){
-      if(LCCore){
-        if(objOpts.edit.hittest.hole!==null){
-          const ht = objOpts.edit.hittest;
-          const targetId  = [ht.project, ht.hole, null, null];
-          const targetIdx = getIdxById(LCCore, targetId); 
-
-          const projectName = LCCore.projects[targetIdx[0]].name
-          const holeName    = LCCore.projects[targetIdx[0]].holes[targetIdx[1]].name;
-
-          const askData = {
-            title:"Edit hole descriptions: " + projectName +" " +holeName,
-            label:"",
-            value:LCCore.projects[targetIdx[0]].holes[targetIdx[1]].descriptions,
-            type:"textarea",
-          };
-          const response = await window.LCapi.inputdialog(askData);
-          if(response !== null){
-            const result = await window.LCapi.changeHole({
-              holeId: targetId,
-              type: "descriptions",
-              value: response,
-            });
-            if(result == true){
-              console.log("[Renderer]: Chnage hole descriptions.")
-              await loadModel(false,false);
-            }
-          }
-        }
-      }
+      startEditCommand("change_hole_descriptions", handleHoleMouseMove);
     }else if(clickResult == "deleteHole"){
       startEditCommand("delete_hole", handleHoleMouseMove);
     }else if(clickResult == "addHole"){
@@ -1594,34 +1670,7 @@ document.addEventListener("DOMContentLoaded", () => {
       startEditCommand("change_project_name", handleProjectMouseMove);
       
     }else if(clickResult == "changeProjectDescriptions"){
-      if(LCCore){
-        if(objOpts.edit.hittest.project!==null){
-          const ht = objOpts.edit.hittest;
-          const targetId  = [ht.project, null, null, null];
-          const targetIdx = getIdxById(LCCore, targetId); 
-
-          const projectName = LCCore.projects[targetIdx[0]].name
-
-          const askData = {
-            title:"Edit project descriptions: " + projectName,
-            label:"",
-            value:LCCore.projects[targetIdx[0]].descriptions,
-            type:"textarea",
-          };
-          const response = await window.LCapi.inputdialog(askData);
-          if(response !== null){
-            const result = await window.LCapi.changeProject({
-              projectId: targetId,
-              type: "descriptions",
-              value: response,
-            });
-            if(result == true){
-              console.log("[Renderer]: Chnage project descriptions.")
-              await loadModel(false,false);
-            }
-          }
-        }
-      }
+      startEditCommand("change_project_descriptions", handleProjectMouseMove);
     }else if(clickResult == "mergeProjects"){
       const response = await window.LCapi.askdialog(
         {
@@ -1675,7 +1724,7 @@ document.addEventListener("DOMContentLoaded", () => {
             value:newType,
             type:"textarea",
           };
-          const response = await window.LCapi.inputdialog(askData);
+          const response = await showInputDialog(askData);
 
           if(response !== null){
             const result = await window.LCapi.changeProject({
@@ -1818,7 +1867,7 @@ document.addEventListener("DOMContentLoaded", () => {
           value:LCCore.descriptions,
           type:"text",
         };
-        const response = await window.LCapi.inputdialog(askData);
+        const response = await showInputDialog(askData);
         if(response !== null){
           const result = await window.LCapi.changeWorkspace({
             type: "name",
@@ -1834,13 +1883,10 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     }else if(clickResult == "editWorkspaceDescriptions"){
       if(LCCore){
-        const askData = {
-          title:"Edit workspace descriptions: ",
-          label:"",
-          value:LCCore.descriptions,
-          type:"textarea",
-        };
-        const response = await window.LCapi.inputdialog(askData);
+        const response = await showDescriptionDialog({
+          title: "Edit workspace descriptions: ",
+          value: LCCore.descriptions,
+        });
         if(response !== null){
           const result = await window.LCapi.changeWorkspace({
             type: "descriptions",
@@ -2112,7 +2158,7 @@ document.addEventListener("DOMContentLoaded", () => {
       }else if(objOpts.edit.handleClick !== null){
         setEditClickHandler(null);
       }
-    }else if(["change_marker_name","change_marker_distance", "set_zero_point", "enable_master","disable_master","disconnect_marker"].includes(objOpts.edit.mode)){
+    }else if(["change_marker_name","change_marker_distance","change_marker_descriptions", "set_zero_point", "enable_master","disable_master","disconnect_marker"].includes(objOpts.edit.mode)){
       if (ht.section !== null && Math.abs(ht.nearest_distance) < objOpts.edit.sensibility) {
         setEditClickHandler(handleMarkerChangeClick);
       }else if(objOpts.edit.handleClick !== null){
@@ -2134,6 +2180,15 @@ document.addEventListener("DOMContentLoaded", () => {
     const mouseY = event.clientY - rect.top;
     const ht = JSON.parse(JSON.stringify(getClickedItemIdx(mouseX, mouseY, LCCore, objOpts)));
     event.preventDefault();
+
+    if(objOpts.edit.mode == "change_marker_descriptions"){
+      isProcessing = true;
+      await editDescriptionForHittest("marker", ht);
+      isProcessing = false;
+      finishEditCommand({ contextmenuEnable: true });
+      updateView();
+      return;
+    }
 
     //initialise
     if(objOpts.edit.marker_from !== null ){
@@ -2190,14 +2245,14 @@ document.addEventListener("DOMContentLoaded", () => {
             type:"text",
           };
 
-          response = await window.LCapi.inputdialog(askData);
+          response = await showInputDialog(askData);
 
           //if top/bottom
           if(objOpts.edit.marker_from.markerName.includes("-top") || objOpts.edit.marker_from.markerName.includes("-bottom")){            
             const regex = new RegExp(`^${objOpts.edit.marker_from.holeName}-${objOpts.edit.marker_from.sectionName}-(top|bottom)$`);
             if(!regex.test(response)){
               isProcessing = false;
-              alert("Invalid name format. Use: <Hole Name>-<Section Name>-top/bottom");
+              await showErrorDialog("Invalid name format. Use: <Hole Name>-<Section Name>-top/bottom");
               finishEditCommand({ contextmenuEnable: true });
               return
             }
@@ -2213,7 +2268,7 @@ document.addEventListener("DOMContentLoaded", () => {
             value:0.0,
             type:"number",
           };
-          response = await window.LCapi.inputdialog(askData);
+          response = await showInputDialog(askData);
             
           console.log("[Editor]: Change marker: " + target);
         } 
@@ -2247,7 +2302,7 @@ document.addEventListener("DOMContentLoaded", () => {
             }
             
             if(txt !== ""){
-              alert(txt);
+              await showErrorDialog(txt);
             }
             
           }
@@ -2268,7 +2323,7 @@ document.addEventListener("DOMContentLoaded", () => {
           }          
         }
         if(numMaster>2){
-          alert("Only up to two master markers can be set in the same horizon. Please remove any unnecessary ones first.");
+          await showErrorDialog("Only up to two master markers can be set in the same horizon. Please remove any unnecessary ones first.");
           finishEditCommand({ contextmenuEnable: true });
           return;
         }
@@ -2360,7 +2415,7 @@ document.addEventListener("DOMContentLoaded", () => {
           value:0.0,
           type:"number",
         };
-        response = await window.LCapi.inputdialog(askData);
+        response = await showInputDialog(askData);
         if(response !== null){
           const targetId = [ht.project, ht.hole, ht.section, ht.nearest_marker];
           //console.log(targetId,response)
@@ -2648,56 +2703,74 @@ document.addEventListener("DOMContentLoaded", () => {
   
     //
     if(objOpts.edit.mode == "add_event"){
-      let askData = {
-        title:"Add new event",
-        label:'Event type? ["deposition", "erosion", "markup"]',
-        value:"deposition",
-        type:"text"
-      };
-      
-      const response1 = await window.LCapi.inputdialog(askData);
+      const eventData = await window.LCModal.show({
+        title: "Add Event",
+        subtitle: "Select the event type and required value.",
+        submitLabel: "Add",
+        fields: [
+          {
+            name: "type",
+            label: "Type",
+            type: "select",
+            value: "deposition",
+            options: [
+              { value: "deposition", label: "Deposition" },
+              { value: "erosion", label: "Erosion" },
+              { value: "markup", label: "Markup" },
+            ],
+          },
+          {
+            name: "colour",
+            label: "Colour",
+            type: "select",
+            value: "general",
+            visibleWhen: { field: "type", values: ["deposition", "markup"] },
+            options: [
+              { value: "general", label: "General" },
+              { value: "tephra", label: "Tephra" },
+              { value: "disturbed", label: "Disturbed" },
+              { value: "void", label: "Void" },
+            ],
+          },
+          {
+            name: "thickness",
+            label: "Erosion Thickness (cm)",
+            type: "numberText",
+            value: window.LCModal.formatDecimal(0),
+            visibleWhen: { field: "type", values: ["erosion"] },
+          },
+        ],
+        validate(values) {
+          if (values.type === "erosion") {
+            const thickness = window.LCModal.parseDecimal(values.thickness, 0.1);
+            if (!Number.isFinite(thickness)) {
+              return { ok: false, message: "Erosion thickness must be a valid number.", field: "thickness" };
+            }
+            return { ok: true, values: { type: values.type, value: thickness } };
+          }
+          return { ok: true, values: { type: values.type, value: values.colour } };
+        },
+      });
       isProcessing = true;
-      if (response1 !== null) {
-        let response2 = null;
-        if(["deposition","d","markup","m"].includes(response1.toLowerCase())){
-          askData = {
-            title:"Add new event",
-            label:'Colour tyep? ["general", "tephra", "disturbed","void"]',
-            value:"general",
-            type:"text"
-          };
-          response2 = await window.LCapi.inputdialog(askData);
-        }else if(["erosion","e"].includes(response1.toLowerCase())){
-          data = {
-            title:"Add new event",
-            label:"Erosion thickness? (cm).",
-            value:0.0,
-            type:"number"
-          };
-          response2 = await window.LCapi.inputdialog(data);
-        }
-
-        if(response2 !== null){
+      if (eventData !== null) {
           const upperId   = [ht.project, ht.hole, ht.section, ht.upper_marker];
           const lowerId   = [ht.project, ht.hole, ht.section, ht.lower_marker];
           //console.log("[Editor]: Add event between " + upperId +" and "+lowerId);
 
           let result = null;
-          if(["deposition","d","markup","m"].includes(response1.toLowerCase())){
-            if(["general","tephra","disturbed","void","g","t","d","v"].includes(response2.toLowerCase())){
-              result = await window.LCapi.AddEvent({
-                upperId,
-                lowerId,
-                depositionType: response1,
-                value: response2,
-              });
-            }
-          }else  if(["erosion","e"].includes(response1.toLowerCase())){
+          if(eventData.type === "deposition" || eventData.type === "markup"){
+            result = await window.LCapi.AddEvent({
+              upperId,
+              lowerId,
+              depositionType: eventData.type,
+              value: eventData.value,
+            });
+          }else if(eventData.type === "erosion"){
             result = await window.LCapi.AddEvent({
               upperId,
               lowerId: [],
-              depositionType: response1,
-              value: response2,
+              depositionType: eventData.type,
+              value: eventData.value,
             });
           }
 
@@ -2719,10 +2792,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
             console.log("[Renderer]: Add a new event.]");
           }else if(result == "occupied"){
-            alert("This event deposition type is already used between the markers.");
+            await showErrorDialog("This event deposition type is already used between the markers.");
 
           }
-        }        
       }
     }else if(objOpts.edit.mode == "delete_event"){
       const response = await window.LCapi.askdialog(
@@ -2786,6 +2858,8 @@ document.addEventListener("DOMContentLoaded", () => {
       //on the section
       if(objOpts.edit.mode == "change_section_name"){
         setEditClickHandler(handleSectionChangeClick);
+      }else if(objOpts.edit.mode == "change_section_descriptions"){
+        setEditClickHandler(handleSectionChangeClick);
       }else if(objOpts.edit.mode == "delete_section"){
         setEditClickHandler(handleSectionDeleteClick);
       }else{
@@ -2817,7 +2891,7 @@ document.addEventListener("DOMContentLoaded", () => {
         value:"",
         type:"text",
       };
-      const response = await window.LCapi.inputdialog(askData);
+      const response = await showInputDialog(askData);
       if (response !== null) {
         const targetId = [ht.project, ht.hole, ht.section, null];
         
@@ -2828,7 +2902,7 @@ document.addEventListener("DOMContentLoaded", () => {
         });
         if(result=="used"){
           console.log(`[Renderer]: "${response}" is already in use. Please enter a unique name.`);
-          alert(`"${response}" is already in use. Please enter a unique name.`);
+          await showErrorDialog(`"${response}" is already in use. Please enter a unique name.`);
 
         }else if(result==true){
           await undo("save","Change Section Name");//undo
@@ -2836,6 +2910,8 @@ document.addEventListener("DOMContentLoaded", () => {
           updateView();
         }
       }
+    }else if(objOpts.edit.mode == "change_section_descriptions"){
+      await editDescriptionForHittest("section", ht);
     }
     finishEditCommand({ contextmenuEnable: true });
     updateView();
@@ -2886,6 +2962,160 @@ document.addEventListener("DOMContentLoaded", () => {
     updateView();
   }
   //3 Section click--------------------------------------------
+  function parseAddSectionNumber(value) {
+    return window.LCModal.parseDecimal(value, 0.1);
+  }
+
+  function getAddSectionRange(section) {
+    const markers = section?.markers ?? [];
+    const topMarker = markers[0] ?? {};
+    const bottomMarker = markers[markers.length - 1] ?? {};
+    return {
+      distance_top: Number(topMarker.distance),
+      distance_bottom: Number(bottomMarker.distance),
+      dd_top: Number(topMarker.drilling_depth),
+      dd_bottom: Number(bottomMarker.drilling_depth),
+    };
+  }
+
+  function buildNextSectionName(sections, referenceSection) {
+    const names = sections.map(section => String(section.name ?? ""));
+    const referenceName = String(referenceSection?.name ?? names[names.length - 1] ?? "");
+    const match = referenceName.match(/^(.*?)(\d+)$/);
+    if (!match) {
+      let candidateIndex = sections.length + 1;
+      let candidate = String(candidateIndex).padStart(2, "0");
+      while (names.includes(candidate)) {
+        candidateIndex++;
+        candidate = String(candidateIndex).padStart(2, "0");
+      }
+      return candidate;
+    }
+
+    const prefix = match[1];
+    const width = match[2].length;
+    let nextNumber = Number(match[2]) + 1;
+    let candidate = prefix + String(nextNumber).padStart(width, "0");
+    while (names.includes(candidate)) {
+      nextNumber++;
+      candidate = prefix + String(nextNumber).padStart(width, "0");
+    }
+    return candidate;
+  }
+
+  function normalizeAddSectionName(name) {
+    const value = String(name ?? "").trim();
+    return /^\d+$/.test(value) ? value.padStart(2, "0") : value;
+  }
+
+  function inferAddSectionDefaults(ht) {
+    const project = LCCore.projects?.[ht.projectIdx];
+    const hole = project?.holes?.[ht.holeIdx];
+    const sections = [...(hole?.sections ?? [])].sort((a, b) => {
+      const aRange = getAddSectionRange(a);
+      const bRange = getAddSectionRange(b);
+      return aRange.dd_top - bRange.dd_top;
+    });
+
+    let referenceSection = null;
+    if (Number.isInteger(ht.sectionIdx)) {
+      referenceSection = LCCore.projects?.[ht.projectIdx]?.holes?.[ht.holeIdx]?.sections?.[ht.sectionIdx] ?? null;
+    }
+    if (!referenceSection && sections.length > 0) {
+      referenceSection = sections[sections.length - 1];
+      if (Number.isFinite(ht.y)) {
+        const scale = ht.depth_scale;
+        const beforeClicked = sections.filter(section => {
+          const markers = section.markers ?? [];
+          const topValue = Number(markers[0]?.[scale]);
+          const bottomValue = Number(markers[markers.length - 1]?.[scale]);
+          return (Number.isFinite(bottomValue) && bottomValue <= ht.y) || (Number.isFinite(topValue) && topValue <= ht.y);
+        });
+        referenceSection = beforeClicked[beforeClicked.length - 1] ?? referenceSection;
+      }
+    }
+
+    const range = getAddSectionRange(referenceSection);
+    const sectionLength = Number.isFinite(range.distance_bottom - range.distance_top) && range.distance_bottom > range.distance_top
+      ? range.distance_bottom - range.distance_top
+      : 100;
+    const ddLength = Number.isFinite(range.dd_bottom - range.dd_top) && range.dd_bottom > range.dd_top
+      ? range.dd_bottom - range.dd_top
+      : sectionLength;
+    const clickedDdTop = ht.depth_scale === "drilling_depth" && Number.isFinite(ht.y) ? ht.y : NaN;
+    const ddTop = Number.isFinite(clickedDdTop)
+      ? clickedDdTop
+      : Number.isFinite(range.dd_bottom)
+        ? range.dd_bottom
+        : 0;
+
+    return {
+      name: buildNextSectionName(sections, referenceSection),
+      distance_top: Number.isFinite(range.distance_top) ? range.distance_top : 0,
+      distance_bottom: Number.isFinite(range.distance_bottom) ? range.distance_bottom : sectionLength,
+      dd_top: ddTop,
+      dd_bottom: ddTop + ddLength,
+      targetLabel: `${project?.name ?? "Project"} / ${hole?.name ?? "Hole"}`,
+      existingNames: sections.map(section => normalizeAddSectionName(section.name)),
+    };
+  }
+
+  function showAddSectionDialog(defaults) {
+    return window.LCModal.show({
+      title: "Add Section",
+      subtitle: defaults.targetLabel,
+      submitLabel: "Add",
+      initialFocus: "name",
+      fields: [
+        { name: "name", label: "Section", type: "text", value: defaults.name, required: true },
+        {
+          type: "matrix",
+          columns: [{ label: "Drilling Depth" }, { label: "Position" }],
+          rows: [
+            {
+              label: "Top",
+              fields: [
+                { name: "dd_top", type: "numberText", value: window.LCModal.formatDecimal(defaults.dd_top), required: true },
+                { name: "distance_top", type: "numberText", value: window.LCModal.formatDecimal(defaults.distance_top), required: true },
+              ],
+            },
+            {
+              label: "Bottom",
+              fields: [
+                { name: "dd_bottom", type: "numberText", value: window.LCModal.formatDecimal(defaults.dd_bottom, 100), required: true },
+                { name: "distance_bottom", type: "numberText", value: window.LCModal.formatDecimal(defaults.distance_bottom, 100), required: true },
+              ],
+            },
+          ],
+        },
+      ],
+      validate(values) {
+        const inData = {
+          name: values.name.trim(),
+          distance_top: parseAddSectionNumber(values.distance_top),
+          distance_bottom: parseAddSectionNumber(values.distance_bottom),
+          dd_top: parseAddSectionNumber(values.dd_top),
+          dd_bottom: parseAddSectionNumber(values.dd_bottom),
+        };
+
+        if (!inData.name) {
+          return { ok: false, message: "Section name is required.", field: "name" };
+        }
+        if (defaults.existingNames.includes(normalizeAddSectionName(inData.name))) {
+          return { ok: false, message: `"${normalizeAddSectionName(inData.name)}" is already in use in this hole.`, field: "name" };
+        }
+        if (!Number.isFinite(inData.distance_top) || !Number.isFinite(inData.distance_bottom) || !Number.isFinite(inData.dd_top) || !Number.isFinite(inData.dd_bottom)) {
+          return { ok: false, message: "All depth values must be valid numbers." };
+        }
+        if (inData.distance_top >= inData.distance_bottom || inData.dd_top >= inData.dd_bottom) {
+          return { ok: false, message: "Bottom values must be greater than top values." };
+        }
+
+        return { ok: true, values: inData };
+      },
+    });
+  }
+
   async function handleSectionAddClick(event) {
     const rect = document.getElementById("p5Canvas").getBoundingClientRect(); 
     const mouseX = event.clientX - rect.left;
@@ -2896,54 +3126,10 @@ document.addEventListener("DOMContentLoaded", () => {
     
     if(objOpts.edit.mode == "add_section"){
       
-      //let inData = {name:"00",distance_top:0, distance_bottom:100,dd_top:1000,dd_bottom:1100};
-      let inData = {};
-      let askData = {
-        title:"Add a new section",
-        label:"Section Name?",
-        value:"",
-        type:"text",
-      };
-      inData.name = await window.LCapi.inputdialog(askData);
-      if(inData.name!==null){
-        askData = {
-          title:"Add a new section",
-          label:"Section TOP distance (cm)?",
-          value:"0.0",
-          type:"number",
-        };
-        inData.distance_top    = parseFloat(await window.LCapi.inputdialog(askData));
-        if(!isNaN(inData.distance_top)){
-          askData = {
-            title:"Add a new section",
-            label:"Section BOTTOM distance (cm)?",
-            value:"100.0",
-            type:"number",
-          };
-          inData.distance_bottom = parseFloat(await window.LCapi.inputdialog(askData));
-          if(!isNaN(inData.distance_bottom)){
-            askData = {
-              title:"Add a new section",
-              label:"Section TOP drilling depth (cm)?",
-              value:"0.0",
-              type:"number",
-            };
-            inData.dd_top = parseFloat(await window.LCapi.inputdialog(askData));
-            if(!isNaN(inData.dd_top)){
-              askData = {
-                title:"Add a new section",
-                label:"Section BOTTOM drilling depth (cm)?",
-                value:100.0,
-                type:"number",
-              };
-              inData.dd_bottom       = parseFloat(await window.LCapi.inputdialog(askData));
-            }
-          }
-        }
-      }
+      const inData = await showAddSectionDialog(inferAddSectionDefaults(ht));
       
       //check data
-      if(inData.distance_top !== null && inData.distance_bottom !== null && inData.dd_top !== null && inData.dd_bottom !== null){
+      if(inData !== null && inData.distance_top !== null && inData.distance_bottom !== null && inData.dd_top !== null && inData.dd_bottom !== null){
         if(inData.distance_top<inData.distance_bottom && inData.dd_top<inData.dd_bottom){
           const targetId = [ht.project, ht.hole, null, null];
                   
@@ -2963,7 +3149,7 @@ document.addEventListener("DOMContentLoaded", () => {
             console.log("[Renderer]: Failed to add section.")
           }
         }else{
-          alert("Incorrect input values detected.");
+          await showErrorDialog("Incorrect input values detected.");
           console.log("[Renderer]: Input data contains incorrect values.");
 
         }
@@ -3146,6 +3332,8 @@ document.addEventListener("DOMContentLoaded", () => {
       //on the section
       if(objOpts.edit.mode == "change_hole_name"){
         setEditClickHandler(handleHoleChangeClick);
+      }else if(objOpts.edit.mode == "change_hole_descriptions"){
+        setEditClickHandler(handleHoleChangeClick);
       }else if(objOpts.edit.mode == "add_section"){
         setEditClickHandler(handleSectionAddClick);
       }else if(objOpts.edit.mode == "delete_hole"){
@@ -3177,7 +3365,7 @@ document.addEventListener("DOMContentLoaded", () => {
         value:"",
         type:"text",
       };
-      const response = await window.LCapi.inputdialog(askData);
+      const response = await showInputDialog(askData);
       if (response !== null) {
         const targetId = [ht.project, ht.hole, null, null];
         console.log(targetId)
@@ -3189,13 +3377,15 @@ document.addEventListener("DOMContentLoaded", () => {
         });
         if(result=="used"){
           console.log(`[Renderer]: "${response}" is already in use. Please enter a unique name.`);
-          alert(`"${response}" is already in use. Please enter a unique name.`);
+          await showErrorDialog(`"${response}" is already in use. Please enter a unique name.`);
 
         }else if(result==true){
           await undo("save","Change Hole Name");//undo
           await loadModel(false,false);
         }        
       }
+    }else if(objOpts.edit.mode == "change_hole_descriptions"){
+      await editDescriptionForHittest("hole", ht);
     }
     finishEditCommand({ contextmenuEnable: true });
     updateView();
@@ -3254,7 +3444,7 @@ document.addEventListener("DOMContentLoaded", () => {
         value:"",
         type:"text",
       };
-      const response = await window.LCapi.inputdialog(askData);
+      const response = await showInputDialog(askData);
       if (response !== null) {
         const targetId = [ht.project, null, null, null];
         
@@ -3277,7 +3467,7 @@ document.addEventListener("DOMContentLoaded", () => {
           updateView();
         }else if(result=="used"){
           console.log(`[Renderer]: "${response}" is already in use. Please enter a unique name.`);
-          alert(`"${response}" is already in use. Please enter a unique name.`);
+          await showErrorDialog(`"${response}" is already in use. Please enter a unique name.`);
 
         }
       }
@@ -3303,6 +3493,8 @@ document.addEventListener("DOMContentLoaded", () => {
         setEditClickHandler(handleProjectSelectClick);
       }else if(objOpts.edit.mode == "change_project_name"){
         setEditClickHandler(handleProjectSelectClick);
+      }else if(objOpts.edit.mode == "change_project_descriptions"){
+        setEditClickHandler(handleProjectSelectClick);
       }else if(objOpts.edit.mode == "move_hole_to_project"){
         setEditClickHandler(handleProjectSelectClick);
       }else{
@@ -3318,26 +3510,34 @@ document.addEventListener("DOMContentLoaded", () => {
   }
   //5 Project click--------------------------------------------
   async function ProjectAdd(){
-    let askData = {
-      title:"Add new project",
-      label:"Please input a type of a new Project: 'correlation' OR 'duo'.",
-      value:"correlation",
-      type:"text",
-    };
-    const response = await window.LCapi.inputdialog(askData);
-    if (response !== null) {
-      if(response == "correlation" || response == "duo"){
-        askData = {
-          title:"Add new project",
-          label:"Please input a unique name of a new Project.",
-          value:"",
-          type:"text",
-        };
-        const response2 = await window.LCapi.inputdialog(askData);
-
+    const projectData = await window.LCModal.show({
+      title: "Add Project",
+      submitLabel: "Add",
+      fields: [
+        {
+          name: "type",
+          label: "Type",
+          type: "select",
+          value: "correlation",
+          options: [
+            { value: "correlation", label: "Correlation" },
+            { value: "duo", label: "Duo" },
+          ],
+        },
+        { name: "name", label: "Name", type: "text", value: "", required: true },
+      ],
+      validate(values) {
+        const name = values.name.trim();
+        if (!name) {
+          return { ok: false, message: "Project name is required.", field: "name" };
+        }
+        return { ok: true, values: { type: values.type, name } };
+      },
+    });
+    if (projectData !== null) {
         const result = await window.LCapi.addProject({
-          type: response,
-          name: response2,
+          type: projectData.type,
+          name: projectData.name,
         });
         if(result == true){
           await undo("save","Add Project");//undo
@@ -3349,19 +3549,14 @@ document.addEventListener("DOMContentLoaded", () => {
           applyPlotOptionsToPlotData();
           updateView();
         }else if(result=="used"){
-          console.log(`[Renderer]: "${response}" is already in use. Please enter a unique name.`);
-          alert(`"${response}" is already in use. Please enter a unique name.`);
+          console.log(`[Renderer]: "${projectData.name}" is already in use. Please enter a unique name.`);
+          await showErrorDialog(`"${projectData.name}" is already in use. Please enter a unique name.`);
         }else if(result == "correlation_exist"){
           console.log("[Renderer]: A base correlation model already exists. Please use a duo model.");
-          alert("A base correlation model already exists. Please use a duo model.");
+          await showErrorDialog("A base correlation model already exists. Please use a duo model.");
         }else if(result == "no_correlation"){
           console.log("[Renderer]: A duo model requires a base correlation model. Please load a correlation model first.");
-          alert("A duo model requires a base correlation model. Please load a correlation model first.");
-        }
-
-        }else{
-          console.log(`[Renderer]: "${response}" is an invalid type. Please select 'correlation' or 'duo'.`);
-          alert(`"${response}" is an invalid type. Please select 'correlation' or 'duo'.`);
+          await showErrorDialog("A duo model requires a base correlation model. Please load a correlation model first.");
         }
     }
     finishEditCommand({ contextmenuEnable: true });
@@ -3409,7 +3604,7 @@ document.addEventListener("DOMContentLoaded", () => {
         value:"",
         type:"text",
       };
-      const response = await window.LCapi.inputdialog(askData);
+      const response = await showInputDialog(askData);
       if(response !== null){
         const targetId = [ht.project, null, null, null];
         const result = await window.LCapi.changeProject({
@@ -3425,10 +3620,12 @@ document.addEventListener("DOMContentLoaded", () => {
           updateView();
         }else if(result=="used"){
           console.log(`[Renderer]: "${response}" is already in use. Please enter a unique name.`);
-          alert(`"${response}" is already in use. Please enter a unique name.`);
+          await showErrorDialog(`"${response}" is already in use. Please enter a unique name.`);
 
         }
       }
+    }else if(objOpts.edit.mode == "change_project_descriptions"){
+      await editDescriptionForHittest("project", ht);
     }else if(objOpts.edit.mode == "move_hole_to_project"){
       const response = await window.LCapi.askdialog(
         {
@@ -5088,10 +5285,10 @@ document.addEventListener("DOMContentLoaded", () => {
           }          
 
           //live hittest
-          if(objOpts.edit.hittest){
-            //console.log(objOpts.edit.hittest.project, objOpts.edit.hittest.hole)
-            if(["add_hole","delete_project","change_project_name","move_hole_to_project"].includes(objOpts.edit.mode)){
-              if(objOpts.edit.hittest.project == project.id[0]){
+            if(objOpts.edit.hittest){
+              //console.log(objOpts.edit.hittest.project, objOpts.edit.hittest.hole)
+              if(["add_hole","delete_project","change_project_name","change_project_descriptions","move_hole_to_project"].includes(objOpts.edit.mode)){
+                if(objOpts.edit.hittest.project == project.id[0]){
                 
                 sketch.push();//save
                 sketch.fill(0,0,0,0);
@@ -5233,7 +5430,7 @@ document.addEventListener("DOMContentLoaded", () => {
             //show live hitttest
             if(objOpts.edit.hittest){
               if(objOpts.edit.hittest.project == hole.id[0] && objOpts.edit.hittest.hole == hole.id[1]){
-                if(["change_hole_name","delete_hole","add_section"].includes(objOpts.edit.mode)){
+                if(["change_hole_name","change_hole_descriptions","delete_hole","add_section"].includes(objOpts.edit.mode)){
                   let hole_bottom_e = null;
                   if(hole_bottom == null){
                     if(project.composite_depth_bottom !== null){
@@ -5306,7 +5503,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
               //hittest
               if(objOpts.edit.hittest){
-                if(["change_section_name","delete_section","connect_section", "disconnect_section"].includes(objOpts.edit.mode)){
+                if(["change_section_name","change_section_descriptions","delete_section","connect_section", "disconnect_section"].includes(objOpts.edit.mode)){
                   if(objOpts.edit.hittest.hole == hole.id[1] && objOpts.edit.hittest.section == section.id[2]){
                     sketch.strokeWeight(3);
                     sketch.stroke("#ff0000");
@@ -5533,7 +5730,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 if(objOpts.edit.editable){
                   //live hittest
                   if(objOpts.edit.hittest !== null){
-                    if(["connect_marker","disconnect_marker", "delete_marker","change_marker_name","change_marker_distance","set_zero_point","enable_master","disable_master"].includes(objOpts.edit.mode)){
+                    if(["connect_marker","disconnect_marker", "delete_marker","change_marker_name","change_marker_descriptions","change_marker_distance","set_zero_point","enable_master","disable_master"].includes(objOpts.edit.mode)){
                       const hitId = [objOpts.edit.hittest.project, objOpts.edit.hittest.hole, objOpts.edit.hittest.section, objOpts.edit.hittest.nearest_marker];
                       if(Math.abs(objOpts.edit.hittest.nearest_distance) < objOpts.edit.sensibility){
                         if(hitId.toString() == marker.id.toString()){

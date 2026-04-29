@@ -208,37 +208,35 @@ document.addEventListener("DOMContentLoaded", () => {
   //calc main
     let type = "Distance";
 
-     let askData = {
-            title:"Batch input",
-            label:"Please input START position(cm).",
-            value:1.0,
-            type:"number",
-          };
-      let start = parseFloat(await window.DividerApi.inputdialog(askData));
-
-      if(isNaN(start)){
+      const batchData = await window.LCModal.show({
+        title: "Batch Input",
+        subtitle: `${holeName} / ${sectionName}`,
+        submitLabel: "Add",
+        fields: [
+          { name: "start", label: "Start Position (cm)", type: "numberText", value: window.LCModal.formatDecimal(1), required: true },
+          { name: "end", label: "End Position (cm)", type: "numberText", value: window.LCModal.formatDecimal(10), required: true },
+          { name: "interval", label: "Interval (cm)", type: "numberText", value: window.LCModal.formatDecimal(1), required: true },
+        ],
+        validate(values) {
+          const start = window.LCModal.parseDecimal(values.start, 0.1);
+          const end = window.LCModal.parseDecimal(values.end, 0.1);
+          const interval = window.LCModal.parseDecimal(values.interval, 0.1);
+          if (!Number.isFinite(start) || !Number.isFinite(end) || !Number.isFinite(interval)) {
+            return { ok: false, message: "All values must be valid numbers." };
+          }
+          if (interval <= 0) {
+            return { ok: false, message: "Interval must be greater than zero.", field: "interval" };
+          }
+          if (start >= end) {
+            return { ok: false, message: "End must be greater than start.", field: "end" };
+          }
+          return { ok: true, values: { start, end, interval } };
+        },
+      });
+      if(batchData === null){
         return;
       }
-      askData = {
-            title:"Batch input",
-            label:"Please input END position(cm).",
-            value:10.0,
-            type:"number",
-          };
-      let end = parseFloat(await window.DividerApi.inputdialog(askData));
-      if(isNaN(end)){
-        return;
-      }
-      askData = {
-            title:"Batch input",
-            label:"Please input interval(cm).",
-            value:1.0,
-            type:"number",
-          };
-      let interval = parseFloat(await window.DividerApi.inputdialog(askData));
-      if(isNaN(interval)){
-        return;
-      }
+      const { start, end, interval } = batchData;
 
     //make target list
     console.log(start, interval, end)

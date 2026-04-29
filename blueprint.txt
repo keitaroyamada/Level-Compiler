@@ -1,0 +1,539 @@
+Level-Compiler Search Blueprint
+================================
+
+Goal
+----
+Implement a combined feature/data search that makes the main app easier to approach.
+This blueprint is intentionally limited to planning. It must not modify LC_modules.
+
+Core Logic Constraint
+---------------------
+Do not modify:
+
+- LC_modules/LevelCompilerCore.js
+- LC_modules/LevelCompilerAge.js
+- LC_modules/LevelCompilerPlot.js
+- depth, age, correlation, calculation, import/export serialization logic in main.js
+
+Search must stay in the UI/navigation layer:
+
+- read existing renderer-side LCCore data
+- trigger existing UI actions where possible
+- avoid new model mutation paths
+
+Recommended Direction
+---------------------
+Add an independent Search UI at the far right of the existing tool row in the main renderer.
+
+The current main window already has:
+
+- renderer/index.html
+  - #toolbar
+  - existing tool buttons
+  - .rightsidemenu / .hole_menu / #hole_list
+- renderer/index_styles.css
+  - #toolbar button sizing and layout
+  - .rightsidemenu and #hole_list styles
+
+Place search as a separate block at the right end of #toolbar, not inside the right side menu.
+Keep the existing #hole_list and right side menu unchanged.
+
+Target Files
+------------
+1. renderer/index.html
+
+Add a compact search block at the far right of #toolbar, after the existing tool buttons.
+
+Suggested elements:
+
+- #lc_search_panel
+- #lc_search_input
+- #lc_search_results
+- #lc_search_empty
+
+Keep #hole_list unchanged.
+
+2. renderer/index_styles.css
+
+Add styles for the search panel:
+
+- #toolbar right-end placement
+- independent layout block separated from icon tools
+- white background
+- thin #ccc border
+- compact font size
+- stable input width
+- results dropdown positioned below the search input
+- scrollable results
+- simple selected/hover state
+
+Do not introduce a visually heavy card layout. Match the existing practical toolbar style.
+Use margin-left: auto or equivalent flex layout so search stays at the far right of the tool row.
+
+3. renderer/js/renderer.js
+
+Add all first-pass search behavior here.
+
+Suggested functions:
+
+- buildSearchIndex()
+- normaliseSearchText(value)
+- searchItems(query)
+- renderSearchResults(results)
+- runSearchItem(item)
+- clearSearchResults()
+- scrollToSearchItem(item)
+- scrollToDepth(depthValue)
+
+Rebuild the search index after loadModel() updates LCCore and the hole list.
+Clear the search state when models are unloaded or LCCore is reset.
+
+4. preload/preload.js
+
+No change required for the first implementation if feature actions only use existing LCapi methods.
+
+Only add new preload APIs if a later phase needs to open tools that currently have no main-renderer API.
+
+5. main.js
+
+Avoid changing this in the first implementation.
+
+Only add small UI IPC wrappers in a later phase if search needs to open:
+
+- Converter
+- Labeler
+- Plotter window
+- About
+- Check update
+
+Do not touch core calculations, age/depth conversion, correlation logic, or serialization.
+
+Initial Search Scope
+--------------------
+Data search:
+
+- Project
+- Hole
+- Section
+- Marker
+
+Feature search:
+
+- Finder
+- Divider
+- Settings
+- Zoom in
+- Zoom out
+- Zoom reset
+- Grid
+- Show labels
+- Connection
+- Event layer
+- Core images visibility
+- Plot visibility
+- Export LC CSV
+- Export LF CSV
+
+Defer these until explicit IPC wrappers are added:
+
+- Converter
+- Labeler
+- Plotter window
+- About
+- Check update
+
+Final Search Scope
+------------------
+The final search experience should index both "where to go" and "what to do".
+Items should be grouped by type in the result list, but searched from one input.
+
+Final data targets:
+
+- Workspace / model name
+- Project
+- Hole
+- Section
+- Marker
+- Event / event interval where represented in the renderer model
+- Age model
+- Age set / age dataset where available
+- Plot data collection
+- Plot draw collection / configured plot series
+- ImageSet
+- Registered core image source
+- Loaded core image section
+- Bookmark
+
+Final feature/tool targets:
+
+- Finder
+- Divider
+- Converter
+- Labeler
+- Plotter
+- Settings / Preferences
+- Image Viewer / floating image viewer
+- About
+- Usage / help link
+- Check update
+- Developer tools, only when developer/root mode allows it
+
+Final file/model actions:
+
+- Load Correlation Model from lcmodel
+- Load Correlation Model from csv
+- Load Age model
+- Load Core Images
+- Reload
+- Import Correlation Model for Level Finder
+- Import Event List for Level Finder
+- Import Age Model for Level Finder
+- Save correlation model
+- Save correlation model with ages
+- Save correlation As...
+- Export csv model for Level Compiler
+- Export csv model for Level Finder
+- Unload all models
+
+Final view/navigation actions:
+
+- Zoom in
+- Zoom out
+- Zoom default
+- Zoom actual scale
+- Toggle grid
+- Toggle pointer/target line
+- Toggle model visibility
+- Toggle event layer expand/collapse
+- Toggle connection visibility
+- Toggle marker labels
+- Toggle depth source display
+- Toggle interpolation reliability display
+- Toggle plot visibility
+- Toggle section images visibility
+- Toggle pen
+- Snapshot
+- Full snapshot
+- Measure
+- Change Y-axis/depth scale:
+  - drilling depth
+  - composite depth
+  - event free depth
+  - age
+- Change active ImageSet
+- Change active Age model
+
+Final edit/correlation actions:
+
+- Edit mode
+- Add new Project
+- Edit project name
+- Edit project descriptions
+- Merge projects
+- Change project type
+- Delete project
+- Add new Hole
+- Edit hole name
+- Edit hole descriptions
+- Move hole right
+- Move hole left
+- Move hole to other project
+- Delete hole
+- Add new Section
+- Section properties
+- Edit section name
+- Edit section descriptions
+- Delete section
+- Add new Marker
+- Edit marker name
+- Edit marker descriptions
+- Edit marker position
+- Delete marker
+- Set master
+- Remove master
+- Connect markers
+- Disconnect markers
+- Connect sections
+- Disconnect sections
+- Disconnect all connections
+- Add event
+- Delete event
+- Set zero horizon
+- Set master project
+- Enable/disable project
+- Enable/disable hole
+
+Final image actions:
+
+- Register core image source
+- Load low-resolution image
+- Load high-resolution image
+- Reload image
+- Show floating image
+- Plot image brightness
+- Unload current ImageSet
+- Switch ImageSet 1
+- Switch ImageSet 2
+- Switch ImageSet 3
+
+Final settings targets:
+
+- Canvas settings
+- Project display settings
+- Hole display settings
+- Section display settings
+- Marker display settings
+- Event display settings
+- Plot settings
+- Plotter settings
+- Image loading settings
+- Developer mode settings where visible
+
+Final result type labels:
+
+- Tool
+- Command
+- View
+- Edit
+- Data
+- Project
+- Hole
+- Section
+- Marker
+- Event
+- Age
+- Plot
+- Image
+- Setting
+- Bookmark
+- Help
+
+Final Japanese aliases:
+
+- 検索: Finder, search
+- 移動: Finder, data jump
+- 分割: Divider
+- 変換: Converter
+- 画像: Image Viewer, Labeler, core images, ImageSet
+- ラベル: Labeler, marker labels
+- 年代: Age model, age scale, age import
+- 深度: depth scale, converter
+- プロット: Plotter, plot visibility
+- グラフ: Plotter, chart
+- 設定: Settings
+- 保存: Save actions
+- 読み込み: Load actions
+- インポート: Import actions
+- 書き出し: Export actions
+- 出力: Export actions
+- 接続: connection commands
+- イベント: event layer and event commands
+- マーカー: marker commands and marker data
+- セクション: section commands and section data
+- ホール: hole commands and hole data
+- プロジェクト: project commands and project data
+
+Final implementation rule:
+
+Add these final targets incrementally. Prefer existing renderer buttons, existing LCapi methods,
+and small main-process UI wrappers. Do not make final search coverage a reason to touch core logic.
+
+Implementation Log Rule
+-----------------------
+When code implementation starts, keep this blueprint as a living append-only tracker.
+
+Rules:
+
+- Do not delete existing blueprint content.
+- Do not rewrite completed log entries.
+- Append new log entries under "Implementation Log".
+- If a previous entry was wrong, append a correction entry instead of editing or deleting it.
+- Every implementation step must record:
+  - date
+  - changed files
+  - implemented search targets
+  - intentionally deferred targets
+  - verification performed
+  - remaining risks or known gaps
+- Keep entries concise, but specific enough to tell what is already implemented.
+- Explicitly state whether LC_modules were untouched.
+- If core logic would be needed, stop and record that explicit approval is required before editing.
+
+Suggested entry format:
+
+YYYY-MM-DD
+
+- Changed files:
+  - path/to/file
+- Implemented:
+  - item
+- Deferred:
+  - item
+- Verification:
+  - command or manual check
+- Guardrail:
+  - LC_modules untouched: yes/no
+- Notes:
+  - short note
+
+Implementation Log
+------------------
+No implementation has been performed yet.
+
+Data Index Design
+-----------------
+Build a plain array from renderer-side LCCore:
+
+{
+  type: "project" | "hole" | "section" | "marker" | "feature",
+  label: string,
+  subtitle: string,
+  id: array | null,
+  keywords: string,
+  action: string
+}
+
+Suggested labels:
+
+- Project: project.name
+- Hole: hole.name
+- Section: section.name
+- Marker: marker.name
+
+Suggested subtitles:
+
+- Project: "Project"
+- Hole: "Project / Hole"
+- Section: "Project / Hole / Section"
+- Marker: "Project / Hole / Section / Marker"
+
+Search Matching
+---------------
+Use simple local matching first:
+
+- lowercase
+- trim
+- collapse repeated whitespace
+- split query by spaces
+- require all terms to match somewhere in keywords
+
+Scoring:
+
+1. exact label match
+2. label starts with query
+3. keyword starts with query
+4. keyword includes query
+5. feature/data priority tie-breaker
+
+Limit rendered results to about 30 items.
+
+Feature Aliases
+---------------
+Add English and Japanese aliases directly to feature keywords.
+
+Examples:
+
+- finder, search, move, find, 検索, 移動
+- divider, divide, split, 分割
+- settings, preferences, 設定
+- plot, chart, graph, プロット, グラフ
+- image, photo, core image, 画像
+- export, csv, 書き出し, 出力
+- age, 年代
+- marker, horizon, マーカー
+
+Data Navigation
+---------------
+Reuse the existing scroll math from the Finder move handler in renderer.js.
+
+Initial version:
+
+- Marker: scroll to marker[current depth scale]
+- Section: scroll to midpoint of first and last marker where available
+- Hole: scroll to first section top marker
+- Project: scroll to first hole/section top marker
+
+Vertical movement is enough for phase 1.
+Horizontal movement can be added later using project/hole order calculations if needed.
+
+Feature Execution
+-----------------
+Prefer existing buttons and LCapi calls:
+
+- Finder: #bt_finder.click()
+- Divider: #bt_divider.click()
+- Grid: #bt_grid.click()
+- Show labels: #bt_show_labels.click()
+- Connection: #bt_connection.click()
+- Event layer: #bt_event_layer.click()
+- Core images: #bt_core_photo.click()
+- Plot visibility: #bt_chart.click()
+- Export LC CSV: window.LCapi.ExportCorrelationAsCsv()
+- Export LF CSV: window.LCapi.ExportCorrelationAsLF()
+
+Settings can use the existing sendSettings flow used by SettingsMenuClicked in renderer.js.
+
+UI Behavior
+-----------
+Search input placeholder:
+
+Search data and tools...
+
+Behavior:
+
+- search input sits independently at the far right of the tool row
+- search results open as a dropdown below the input
+- input updates results immediately
+- Enter runs the first result
+- Escape clears query/results
+- ArrowUp/ArrowDown move selected result
+- clicking a result runs it
+
+Empty states:
+
+- no model loaded: show feature results only
+- query has no match: show "No results"
+- empty query: optional recent/common tools list
+
+Implementation Notes
+--------------------
+Use textContent for result labels/subtitles.
+Avoid innerHTML for search results.
+
+Keep functions local to renderer.js unless reuse becomes necessary.
+Do not introduce a new dependency.
+Do not add a new window for the first version.
+
+Testing Plan
+------------
+Add focused E2E coverage after implementation.
+
+Candidate file:
+
+- tests/e2e/app-startup.spec.js
+
+Test cases:
+
+1. Load fixture lcmodel.
+2. Type a known Hole/Section/Marker name into #lc_search_input.
+3. Verify results appear.
+4. Click a data result and verify scroller position changes.
+5. Type "finder" and run the result.
+6. Verify LC Finder opens.
+
+Optional E2E helpers in window.__LC_E2E__:
+
+- getSearchState()
+- search(query)
+- runFirstSearchResult()
+
+Non-goals For First Pass
+------------------------
+- no LC_modules changes
+- no core logic changes
+- no persistence of search history
+- no fuzzy matching dependency
+- no global command palette
+- no deep settings-item search
+- no cross-window search UI
+- no horizontal centering unless it is trivial and low-risk
