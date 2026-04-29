@@ -1135,6 +1135,11 @@ document.addEventListener("DOMContentLoaded", () => {
       document.addEventListener('contextmenu', handleNormalContextmenu);
     }else{
       objOpts.edit.editable = true;
+      objOpts.marker.is_rank_visible = true;
+      const rankButton = document.getElementById("bt_rank");
+      if (rankButton) {
+        rankButton.style.backgroundColor = "#ccc";
+      }
       await window.LCapi.changeEditMode({ mode: objOpts.edit.editable });
       objOpts.edit.contextmenu_enable = true;
       document.body.style.cursor = "crosshair"; 
@@ -1143,6 +1148,7 @@ document.addEventListener("DOMContentLoaded", () => {
         document.removeEventListener('contextmenu', handleNormalContextmenu);
       }
     }
+    updateView();
   });
   //============================================================================================
 
