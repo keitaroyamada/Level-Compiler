@@ -7839,28 +7839,44 @@ document.addEventListener("DOMContentLoaded", () => {
       return { ok: false, error: "path_resolution_failed" };
     }
 
-    const registered = await window.LCapi.RegisterCoreImageFromPath({
-      dirHandle: dirPath,
-      type: "core_images",
-      sourceId: objOpts.image.active_source_id,
-      label: modelImages.source_meta?.[objOpts.image.active_source_id]?.label ?? "Image 1",
-    });
-    if (!registered) {
-      return { ok: false, error: "register_core_images_failed" };
-    }
+    try {
+      const sourceId = objOpts.image.active_source_id ?? "source_1";
+      const registered = await window.LCapi.RegisterCoreImageFromPath({
+        dirHandle: dirPath,
+        type: "core_images",
+        sourceId,
+        label: modelImages.source_meta?.[sourceId]?.label ?? getImageSetLabel(sourceId),
+      });
+      if (!registered) {
+        return { ok: false, error: "register_core_images_failed" };
+      }
 
-    modelImages = await loadCoreImages(modelImages, LCCore, objOpts, depthScales, {
-      tier: "thumb",
-      targetIds: [],
-    });
-    await refreshVisibleStandardImages(depthScales);
-    updateImageSetLoadedState();
-    if (togglePhoto && !objOpts.canvas.is_core_photo_visible) {
-      document.getElementById("bt_core_photo").click();
-    }
-    updateView();
+      clearImageSet(sourceId);
+      modelImages = syncLegacyImageAliases(modelImages, objOpts);
 
-    return { ok: true };
+      const targetIds = await collectAvailableCoreImageTargetIds(LCCore, sourceId);
+      if (targetIds.length === 0) {
+        console.log("[Renderer]: No matching core images were found in the selected source.");
+        updateImageSetLoadedState();
+        updateView();
+        return { ok: false, error: "no_matching_core_images" };
+      }
+
+      modelImages = await loadCoreImages(modelImages, LCCore, objOpts, depthScales, {
+        tier: "thumb",
+        targetIds,
+      });
+      await refreshVisibleStandardImages(depthScales);
+      updateImageSetLoadedState();
+      if (togglePhoto && !objOpts.canvas.is_core_photo_visible) {
+        document.getElementById("bt_core_photo").click();
+      }
+      updateView();
+
+      return { ok: true };
+    } finally {
+      await window.LCapi.clearProgressbar();
+    }
   }
   function setAgeList(loadResult){
     if(loadResult !== false){
@@ -10513,6 +10529,53 @@ function createImageSourceBucketGlobal(label = "") {
 function getSectionImageKey(projectName, holeName, sectionName) {
   return projectName + "-" + holeName + "-" + sectionName;
 }
+function hasSelectedAgeModelForImages() {
+  const ageModelSelect = document.getElementById("AgeModelSelect");
+  return Boolean(ageModelSelect?.value) && (age_model_list?.length ?? 0) > 0;
+}
+function getEnabledImageOperations(operations, objOpts) {
+  let enabledOperations = [...new Set(operations ?? [])];
+  for (const op in objOpts.image.is_load_enabled) {
+    if (!objOpts.image.is_load_enabled[op]) {
+      enabledOperations = enabledOperations.filter((item) => item !== op);
+    }
+  }
+  if (!hasSelectedAgeModelForImages()) {
+    enabledOperations = enabledOperations.filter((item) => item !== "age");
+  }
+  return enabledOperations;
+}
+async function collectAvailableCoreImageTargetIds(LCCore, sourceId) {
+  const targetIds = [];
+  const imageExtensions = [".jpg", ".jpeg", ".png", ".tif", ".tiff"];
+  if (!LCCore) {
+    return targetIds;
+  }
+
+  for (const project of LCCore.projects ?? []) {
+    for (const hole of project.holes ?? []) {
+      for (const section of hole.sections ?? []) {
+        const fileBaseName = hole.name + "-" + section.name;
+        let isImageAvailable = false;
+        for (const ext of imageExtensions) {
+          isImageAvailable = await window.LCapi.CheckImagesInDir({
+            fileName: fileBaseName + ext,
+            projectName: project.name,
+            sourceId,
+          });
+          if (isImageAvailable) {
+            break;
+          }
+        }
+        if (isImageAvailable) {
+          targetIds.push(section.id);
+        }
+      }
+    }
+  }
+
+  return targetIds;
+}
 function ensureImageSourceGlobal(modelImages, sourceId, label = "") {
   if (!modelImages.source_meta) {
     modelImages.source_meta = {};
@@ -10690,7 +10753,7 @@ async function updateImageRegistration(modelImages, LCCore){
 
     resolve(syncLegacyImageAliasesGlobal(modelImages, imageOpts));
   });
-  
+
 }
 async function loadCoreImages(modelImages, LCCore, objOpts, operations, requestOptions = {}) {
 
@@ -10698,12 +10761,14 @@ async function loadCoreImages(modelImages, LCCore, objOpts, operations, requestO
   //await window.LCapi.updateProgressbar(1, 1);
 
   //check operations
-  
-  for (const op in objOpts.image.is_load_enabled) {
-    if(!objOpts.image.is_load_enabled[op]){
-      operations = operations.filter(item => item !== op);
+  operations = getEnabledImageOperations(operations, objOpts);
+  if (operations.length === 0) {
+    console.log("[Renderer]: There are no enabled image operations.");
+    if (!requestOptions.silentProgress) {
+      await window.LCapi.clearProgressbar();
     }
-  }  
+    return syncLegacyImageAliasesGlobal(modelImages, objOpts);
+  }
   
   return new Promise(async (resolve, reject) => {
     //initialise
@@ -10856,6 +10921,10 @@ async function loadCoreImages(modelImages, LCCore, objOpts, operations, requestO
     }catch(err){
       console.error(err);
       reject(results);
+    }
+  }).finally(async () => {
+    if (!requestOptions.silentProgress) {
+      await window.LCapi.clearProgressbar();
     }
   });
 

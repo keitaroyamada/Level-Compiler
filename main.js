@@ -987,7 +987,6 @@ function createMainWIndow() {
       console.log("MAIN: Load images: N = "+loadOptions.targetIds.length+"; Operations: ["+effectiveOperations+"]");
 
       //make tasks
-      const NUM_WORKERS = Math.min(Math.round(os.cpus().length/2), loadOptions.targetIds.length);
       const tasks = []; // Task queue
       const idleWorkers = []; // Idle worker list
 
@@ -1063,6 +1062,7 @@ function createMainWIndow() {
       //submit
       //make worker
       numTotalTasks = tasks.length;
+      const NUM_WORKERS = Math.max(1, Math.min(Math.round(os.cpus().length / 2), numTotalTasks));
       
       if (!silentProgress) {
         progressBar = await updateProgress(progressBar, 0, numTotalTasks);
@@ -1212,7 +1212,7 @@ function createMainWIndow() {
                 if(w && !w._exitSent){
                   w._exitSent = true;
                   //w.postMessage({type:"exit"});
-                  worker.terminate();
+                  w.terminate();
                 }
               }
             }
