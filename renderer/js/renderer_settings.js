@@ -44,7 +44,33 @@ window.addEventListener("DOMContentLoaded", () => {
     let settings = {};
     let isEditable = false;
 
-    function createMenu(data, editables, container) {
+    function formatSettingName(name) {
+      return String(name)
+        .replace(/[_-]+/g, " ")
+        .replace(/\b\w/g, (letter) => letter.toUpperCase());
+    }
+
+    function getValueType(value) {
+      if (value === null) return "empty";
+      if (typeof value === "boolean") return "boolean";
+      if (typeof value === "number") return "number";
+      if (typeof value === "string") {
+        const s = new Option().style;
+        s.color = "";
+        s.color = value;
+        return s.color !== "" ? "color" : "text";
+      }
+      return "text";
+    }
+
+    function countLeafSettings(value) {
+      if (value === null || typeof value !== "object" || Array.isArray(value)) {
+        return 1;
+      }
+      return Object.values(value).reduce((count, child) => count + countLeafSettings(child), 0);
+    }
+
+    function createMenu(data, editables, container, depth = 0) {
       Object.entries(data).forEach(([key, value]) => {
         let isEditableObj;
         if (typeof editables === "object"){
@@ -55,23 +81,36 @@ window.addEventListener("DOMContentLoaded", () => {
 
         if (typeof value === "object" && value !== null) {
           const details = document.createElement("details");
+          details.classList.add("settings-section", `settings-depth-${Math.min(depth, 3)}`);
+
           const summary = document.createElement("summary");
-          summary.textContent = key;
-          summary.style.fontSize = "25px";
-          details.style.fontSize = "20px";
+          summary.classList.add("settings-section-title");
+
+          const title = document.createElement("span");
+          title.classList.add("settings-section-name");
+          title.textContent = formatSettingName(key);
+
+          const count = document.createElement("span");
+          count.classList.add("settings-section-count");
+          count.textContent = `${countLeafSettings(value)} items`;
+
+          summary.appendChild(title);
+          summary.appendChild(count);
           details.appendChild(summary);
 
-          createMenu(value, isEditableObj, details);
+          createMenu(value, isEditableObj, details, depth + 1);
           container.appendChild(details);
         } else {
           const wrapper = document.createElement("div");
-          wrapper.classList.add("settings-item");
+          wrapper.classList.add("settings-item", `settings-value-${getValueType(value)}`);
           const label = document.createElement("label");
-          label.textContent = key;
+          label.textContent = formatSettingName(key);
 
           
           if (isEditable && isEditableObj) {
             const input = createInput(value);
+            const field = document.createElement("div");
+            field.classList.add("settings-field");
             input.addEventListener("change", () => {
               data[key] = parseInputValue(input, value);
               const parentNames = [];
@@ -90,12 +129,12 @@ window.addEventListener("DOMContentLoaded", () => {
               });
             });
             wrapper.appendChild(label);
-            wrapper.appendChild(input);
+            field.appendChild(input);
+            wrapper.appendChild(field);
           } else {
             const textNode = document.createElement("span");
             textNode.textContent = value;
-            label.style.fontSize = "25px";
-            textNode.style.fontSize = "25px";
+            textNode.classList.add("settings-readonly-value");
             wrapper.appendChild(label);
             wrapper.appendChild(textNode);
           }
@@ -175,6 +214,7 @@ window.addEventListener("DOMContentLoaded", () => {
         input = document.createElement("input");
         input.type = "color";
         input.value = hex;
+        input.setAttribute("aria-label", "Color value");
       }else if(typeof value === "string" && fontOptions.includes(value)){
         input = document.createElement("select");
         fontOptions.forEach(font => {
@@ -199,8 +239,6 @@ window.addEventListener("DOMContentLoaded", () => {
         input = document.createElement("input");
         input.type = "checkbox";
         input.checked = value;
-        input.style.marginTop = "15px";
-        input.style.marginBottom = "15px";
       } else {
         console.log(value, typeof value)
       
