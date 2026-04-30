@@ -70,6 +70,12 @@ window.addEventListener("DOMContentLoaded", () => {
       }
       return Object.values(value).reduce((count, child) => count + countLeafSettings(child), 0);
     }
+    function updatePreferenceActions(options = {}) {
+      const isPreferences = options.title === "Preferences";
+      const isDeveloperMode = ["root", "developer"].includes(settings?.developer?.mode);
+      document.getElementById("default").style.display = isPreferences ? "block" : "none";
+      document.getElementById("open_settings_folder").style.display = isPreferences && isDeveloperMode ? "block" : "none";
+    }
 
     function createMenu(data, editables, container, depth = 0, fields = {}) {
       Object.entries(data).forEach(([key, value]) => {
@@ -135,6 +141,7 @@ window.addEventListener("DOMContentLoaded", () => {
                 currentElement = currentElement.parentElement;
               }
               console.log("Updated: ", parentNames);
+              updatePreferenceActions({ title: document.getElementById("title").textContent });
               window.SettingsApi.sendSettings({
                 sendData: {data: settings, editable:null, options:null},
                 to: "renderer",
@@ -298,17 +305,10 @@ window.addEventListener("DOMContentLoaded", () => {
 
       document.getElementById("title").textContent = receivedData.options.title;
 
-        if(receivedData.options.title=="Preferences"){
-          document.getElementById("default").style.display = "block";
-          document.getElementById("open_settings_folder").style.display = "block";
-        }else{
-        document.getElementById("default").style.display = "none";
-        document.getElementById("open_settings_folder").style.display = "none";
-        }
-          
         settings = receivedData.data;
         isEditable = receivedData.options.editable;
         settingFields = receivedData.options.fields ?? {};
+        updatePreferenceActions(receivedData.options);
         const container = document.getElementById("menu-container");
         if (container) {
           container.innerHTML = "";
