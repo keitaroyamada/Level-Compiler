@@ -129,7 +129,7 @@ document.addEventListener("DOMContentLoaded", () => {
     objOpts.section.font_angle =  -90;
     objOpts.section.font_pos_x = -10;
     objOpts.section.font_colour = "#000000";
-    objOpts.section.name_position_mode = "center";
+    objOpts.section.name_position_mode = "adaptive";
 
     objOpts.marker.is_name_labels_visible = true;
     objOpts.marker.is_position_labels_visible = true;
@@ -6233,8 +6233,17 @@ document.addEventListener("DOMContentLoaded", () => {
                 const isMarkerLabelVisibleAtZoom = objOpts.canvas.zoom_level[1] >= objOpts.marker.ignore_zoom_level;
                 const shouldDrawMarkerName = isMarkerLabelVisibleAtZoom && objOpts.marker.is_name_labels_visible;
                 const shouldDrawMarkerPosition = isMarkerLabelVisibleAtZoom && objOpts.marker.is_position_labels_visible;
-                const markerLabelY = marker_y0 - 2;
-                const shouldDrawMarkerLabelRow = (shouldDrawMarkerName || shouldDrawMarkerPosition) && markerLabelY - lastMarkerLabelY >= markerLabelMinGap;
+                const markerBaseLabelY = marker_y0 - 2;
+                let markerLabelY = markerBaseLabelY;
+                if(markerLabelY - lastMarkerLabelY < markerLabelMinGap){
+                  markerLabelY = lastMarkerLabelY + markerLabelMinGap;
+                }
+                const markerLabelMaxOffset = markerLabelLineHeight * 1.5;
+                const markerLabelBottomLimit = sec_y0 + sec_h - 2;
+                const shouldDrawMarkerLabelRow =
+                  (shouldDrawMarkerName || shouldDrawMarkerPosition) &&
+                  Math.abs(markerLabelY - markerBaseLabelY) <= markerLabelMaxOffset &&
+                  markerLabelY <= markerLabelBottomLimit;
                 if(shouldDrawMarkerLabelRow){
                   sketch.fill(objOpts.marker.font_colour);
                   sketch.noStroke();

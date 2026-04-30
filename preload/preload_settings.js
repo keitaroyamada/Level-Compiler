@@ -28,6 +28,7 @@ contextBridge.exposeInMainWorld("SettingsApi", {
   toggleDevTools: (target) => ipcRenderer.send("toggle-devtools", { target }),
 
   sendSettings:(payload) => ipcRenderer.invoke("sendSettings", payload),
+  openSettingsFolder: () => ipcRenderer.invoke("openSettingsFolder"),
   //main -> renderer
   receive: (channel, func) => {
     ipcRenderer.on(channel, (event, ...args) => func(...args));

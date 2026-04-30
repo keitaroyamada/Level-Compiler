@@ -46,12 +46,14 @@ body {
 
 #menu_button {
   display: flex;
+  gap: 8px;
   justify-content: flex-end;
   margin: -30px 0 16px;
   min-height: 34px;
 }
 
-#default {
+#default,
+#open_settings_folder {
   display: none;
   min-width: 92px;
   height: 34px;
@@ -64,11 +66,20 @@ body {
   cursor: pointer;
 }
 
+#open_settings_folder {
+  background-color: var(--accent);
+}
+
+#open_settings_folder:hover {
+  background-color: var(--accent-strong);
+}
+
 #default:hover {
   background-color: var(--danger-hover);
 }
 
 #default:focus-visible,
+#open_settings_folder:focus-visible,
 summary:focus-visible,
 input:focus-visible,
 select:focus-visible {

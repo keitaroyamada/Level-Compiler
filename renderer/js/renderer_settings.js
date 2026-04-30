@@ -300,8 +300,10 @@ window.addEventListener("DOMContentLoaded", () => {
 
         if(receivedData.options.title=="Preferences"){
           document.getElementById("default").style.display = "block";
+          document.getElementById("open_settings_folder").style.display = "block";
         }else{
-        document.getElementById("default").style.display = "none";  
+        document.getElementById("default").style.display = "none";
+        document.getElementById("open_settings_folder").style.display = "none";
         }
           
         settings = receivedData.data;
@@ -332,6 +334,18 @@ window.addEventListener("DOMContentLoaded", () => {
         })
       }
       
+    });
+    document.getElementById("open_settings_folder").addEventListener("click", async () => {
+      const result = await window.SettingsApi.openSettingsFolder();
+      if (!result?.ok) {
+        await window.SettingsApi.askdialog({
+          opts: {
+            title: "Open settings folder",
+            message: result?.error || "Failed to open the settings folder.",
+            parent: "settings",
+          },
+        });
+      }
     });
     document.addEventListener("keydown", (e) => {
       if (e.key === "F12") {

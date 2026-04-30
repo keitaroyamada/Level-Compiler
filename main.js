@@ -4038,6 +4038,15 @@ function createMainWIndow() {
       setSettings("settingsRenderer", sendData.data)
     }    
   });
+  ipcMain.handle("openSettingsFolder", async () => {
+    const settingsFolder = app.getPath("userData");
+    const result = await shell.openPath(settingsFolder);
+    return {
+      ok: result === "",
+      path: settingsFolder,
+      error: result || null,
+    };
+  });
   ipcMain.handle("saveBookmarks", (_e, payload) => {
     const { bookmarks: data } = payload;
     let LCBookmarkSet= getSettings("bookmarks");
