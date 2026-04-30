@@ -5025,6 +5025,7 @@ document.addEventListener("DOMContentLoaded", () => {
       //get shift amounts
       const shift_x = objOpts.canvas.shift_x;
       const shift_y = objOpts.canvas.shift_y;
+      const nearestConnectionLookup = buildNearestConnectionLookup(LCCore, objOpts);
 
       const scrollerLeftRealScale  = (scroller.scrollLeft - pad_x) / xMag - shift_x;//cm
       const scrollerRightRealScale = (scroller.scrollLeft + window.innerWidth - pad_x) / xMag - shift_x;//cm
@@ -5627,6 +5628,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
               //make marker objects=================================================================================
               let msaterDirection = "none";
+              const markerLabelLineHeight = Math.max(parseFloat(objOpts.marker.font_size) || 12, 10) + 2;
+              const markerLabelMinGap = markerLabelLineHeight * 1.25;
+              let lastMarkerLabelY = -Infinity;
               for (let m = 0; m < section.markers.length; m++) {
                 //load marker data
                 const marker = section.markers[m];
@@ -6022,46 +6026,57 @@ document.addEventListener("DOMContentLoaded", () => {
 
                 }
                 
+                const isMarkerLabelVisibleAtZoom = objOpts.canvas.zoom_level[1] >= objOpts.marker.ignore_zoom_level;
+                const shouldDrawMarkerName = isMarkerLabelVisibleAtZoom && objOpts.marker.is_name_labels_visible;
+                const shouldDrawMarkerPosition = isMarkerLabelVisibleAtZoom && objOpts.marker.is_position_labels_visible;
+                const markerLabelY = marker_y0 - 2;
+                const shouldDrawMarkerLabelRow = (shouldDrawMarkerName || shouldDrawMarkerPosition) && markerLabelY - lastMarkerLabelY >= markerLabelMinGap;
+                if(shouldDrawMarkerLabelRow){
+                  sketch.fill(objOpts.marker.font_colour);
+                  sketch.noStroke();
+                  sketch.textFont(objOpts.marker.font);
+                  sketch.textSize(objOpts.marker.font_size);
+                }
+
                 //add marker name without top/bottom name
-                if(objOpts.marker.is_name_labels_visible){
+                if(shouldDrawMarkerLabelRow && shouldDrawMarkerName){
                   //add marker name--------------------------------------------
                   if (m !== 0 && m !== section.markers.length - 1) {
                     let markerDispName = marker.name;
                     if(["root"].includes(objOpts.developer.mode)){
                       markerDispName = marker.id[3].slice(0,5);
                     }
-                    sketch.fill(objOpts.marker.font_colour);
-                    sketch.noStroke();
-                    sketch.textFont(objOpts.marker.font);
-                    sketch.textSize(objOpts.marker.font_size);
+                    sketch.textAlign(sketch.RIGHT);
                     sketch.text(
                       markerDispName,
-                      (hole_x0 + shift_x) * xMag + pad_x - sketch.textWidth(marker.name) - 5,//+ 10,
-                      (marker_top + shift_y) * yMag + pad_y - 2
+                      (hole_x0 + shift_x) * xMag + pad_x - 5,//+ 10,
+                      markerLabelY
+                    );
+                    sketch.textAlign(sketch.LEFT);
+                  }
+                }
+                if(shouldDrawMarkerLabelRow && shouldDrawMarkerPosition){
+                  //add marker distance----------------------------------------
+                  const markerDistance = Number(marker.distance);
+                  if(Number.isFinite(markerDistance)){
+                    let markerDistanceLabel = (Math.round(markerDistance * 10) / 10).toFixed(1);
+                    if(["root"].includes(objOpts.developer.mode)){
+                      const compositeDepth = Number(marker["composite_depth"]);
+                      const unreliability = Number(marker.unreliability);
+                      const compositeDepthLabel = Number.isFinite(compositeDepth) ? (Math.round(compositeDepth * 10) / 10).toFixed(1) : "---";
+                      const unreliabilityLabel = Number.isFinite(unreliability) ? unreliability.toFixed(2) : "---";
+                      markerDistanceLabel = compositeDepthLabel + "(" + markerDistanceLabel + ")[" + unreliabilityLabel + "]";
+                    }
+                    sketch.text(
+                      markerDistanceLabel,
+                      (hole_x0 + shift_x) * xMag + pad_x + objOpts.marker.width * xMag + 5,
+                      markerLabelY
                     );
                   }
                 }
-                if(objOpts.marker.is_position_labels_visible){
-                  //add marker distance----------------------------------------
-                  sketch.fill(objOpts.marker.font_colour);
-                  sketch.noStroke();
-                  sketch.textFont(objOpts.marker.font);
-                  sketch.textSize(objOpts.marker.font_size);
-                  if(["root"].includes(objOpts.developer.mode)){
-                    sketch.text(
-                      //objOpts.canvas.depth_scale
-                      (Math.round(marker["composite_depth"] * 10) / 10).toFixed(1).toString()+'('+(Math.round(marker.distance * 10) / 10).toFixed(1).toString()+')['+marker.unreliability?.toFixed(2).toString()+']',
-                      (hole_x0 + shift_x) * xMag + pad_x + objOpts.marker.width * xMag + 5,
-                      (marker_top + shift_y) * yMag + pad_y - 2
-                    );
-                  }else{
-                    sketch.text(
-                      (Math.round(marker.distance * 10) / 10).toFixed(1).toString(),
-                      (hole_x0 + shift_x) * xMag + pad_x + objOpts.marker.width * xMag + 5,
-                      (marker_top + shift_y) * yMag + pad_y - 2
-                    );
-                  }                
-                }              
+                if(shouldDrawMarkerLabelRow){
+                  lastMarkerLabelY = markerLabelY;
+                }
 
                 //-----------------------------------------------------------
                 //make connection objects=================================================================================
@@ -6133,7 +6148,7 @@ document.addEventListener("DOMContentLoaded", () => {
                   }
 
                   //h_connection--------------------------------------------
-                  const connectionData = this.getNearestConnectedMarkerIdx( LCCore, marker.id, objOpts);
+                  const connectionData = this.getNearestConnectedMarkerIdx(LCCore, marker.id, objOpts, nearestConnectionLookup);
 
                   //check connection
                   if (connectionData == null) {
@@ -9633,19 +9648,9 @@ function getNearestConnectedMarkerIdx(LCCore, idFrom, objOpts) {
   }
 }
   */
-function getNearestConnectedMarkerIdx(LCCore, idFrom, objOpts) {
-  // --- (Helper & List Generation logic remains the same) ---
-  const getListIdx = (list, p, h) => {
-    let output = null;
-    list.forEach((hl) => {
-      if (hl[3] == p && hl[4] == h) {
-        output = hl[0];
-      }
-    });
-    return output;
-  };
-
-  let holeList = [];
+function buildNearestConnectionLookup(LCCore, objOpts) {
+  const holeList = [];
+  const listIndexByProjectHole = new Map();
   for (let p = 0; p < LCCore.projects.length; p++) {
     for (let h = 0; h < LCCore.projects[p].holes.length; h++) {
       holeList.push([
@@ -9660,16 +9665,34 @@ function getNearestConnectedMarkerIdx(LCCore, idFrom, objOpts) {
     }
   }
 
-  holeList.sort((a, b) => (a[2] < b[2] ? -1 : 1));
-  holeList.sort((a, b) => (a[1] < b[1] ? -1 : 1));
+  holeList.sort((a, b) => {
+    if (a[1] !== b[1]) return a[1] - b[1];
+    return a[2] - b[2];
+  });
 
   holeList.forEach((h, i) => {
     h[0] = i;
+    listIndexByProjectHole.set(h[3] + "," + h[4], i);
   });
 
+  return { LCCore, holeList, listIndexByProjectHole, idxMemo: new Map() };
+}
+function getNearestConnectedMarkerIdx(LCCore, idFrom, objOpts, nearestConnectionLookup = null) {
+  const lookup = nearestConnectionLookup ?? buildNearestConnectionLookup(LCCore, objOpts);
+  const { holeList, listIndexByProjectHole, idxMemo } = lookup;
+  const getIdx = (id) => {
+    const key = id.toString();
+    if (!idxMemo.has(key)) {
+      idxMemo.set(key, this.getIdxById(LCCore, id));
+    }
+    return idxMemo.get(key);
+  };
+  const getListIdx = (p, h) => listIndexByProjectHole.get(p + "," + h);
+
   // --- (Start Marker & Connection Check logic remains same) ---
-  const idxFrom  = this.getIdxById(LCCore, idFrom);
-  const listFrom = getListIdx(holeList, idxFrom[0], idxFrom[1]);
+  const idFromKey = idFrom.toString();
+  const idxFrom  = getIdx(idFrom);
+  const listFrom = getListIdx(idxFrom[0], idxFrom[1]);
   const currentTotalOrder  = holeList[listFrom][0];
   const currentMarkerData  = LCCore.projects[idxFrom[0]].holes[idxFrom[1]].sections[idxFrom[2]].markers[idxFrom[3]];
   const currentHoleData    = LCCore.projects[idxFrom[0]].holes[idxFrom[1]];
@@ -9680,7 +9703,7 @@ function getNearestConnectedMarkerIdx(LCCore, idFrom, objOpts) {
     return null;
   } else {
     currentMarkerData.h_connection.forEach((c) => {
-      const idx = this.getIdxById(LCCore, c);
+      const idx = getIdx(c);
       if (idx.every(id=>id!==null)){
         if (LCCore.projects[idx[0]].holes[idx[1]].sections[idx[2]].markers[idx[3]].isMaster) {
           isMasterConnection += 1;
@@ -9702,9 +9725,9 @@ function getNearestConnectedMarkerIdx(LCCore, idFrom, objOpts) {
   
   for (let i = 0; i < currentMarkerData.h_connection.length; i++) {
     idTo = currentMarkerData.h_connection[i];
-    idxTo = this.getIdxById(LCCore, idTo);
+    idxTo = getIdx(idTo);
     if(idxTo.every(id=>id===null)) continue
-    listTo = getListIdx(holeList, idxTo[0], idxTo[1]);
+    listTo = getListIdx(idxTo[0], idxTo[1]);
 
     // Check Project & Hole Enable
     const isTargetEnable = LCCore.projects[idxTo[0]].enable && LCCore.projects[idxTo[0]].holes[idxTo[1]].enable;
@@ -9800,14 +9823,14 @@ function getNearestConnectedMarkerIdx(LCCore, idFrom, objOpts) {
   } else {
     let isBiconnect = false;
     connectedMarkerData.h_connection.forEach(hc=>{
-      if(hc.toString() === idFrom.toString()){
+      if(hc.toString() === idFromKey){
         isBiconnect = true;
       }
     });
     if(!isBiconnect) return null;
 
     let isNext = false;
-    const idxTo = this.getIdxById(LCCore, connectedMarkerData.id);
+    const idxTo = getIdx(connectedMarkerData.id);
     
     // Effective distance (in Hole units) = Raw distance - (Disabled holes + Interval of disabled projects)
     const validDistance = betweenRange[1] - betweenRange[0] - numBetweenDisable;
@@ -9843,32 +9866,42 @@ function getIdxById(LCCore, id) {
   let relative_idxs = [null, null, null, null];
 
   try{
-    if (id[0] !== null || id[0] !== "") {
+    if (id[0] !== null && id[0] !== "") {
       for (let p = 0; p < LCCore.projects.length; p++) {
         const projectData = LCCore.projects[p];
         if (projectData.id[0] == id[0]) {
           relative_idxs[0] = p;
+          if (id[1] === null || id[1] === "") {
+            return relative_idxs;
+          }
 
-          if (id[1] !== null || id[1] !== "") {
+          if (id[1] !== null && id[1] !== "") {
             const num_holes = projectData.holes.length;
             for (let h = 0; h < num_holes; h++) {
               const holeData = projectData.holes[h];
               if (holeData.id[1] == id[1]) {
                 relative_idxs[1] = h;
+                if (id[2] === null || id[2] === "") {
+                  return relative_idxs;
+                }
 
-                if (id[2] !== null || id[2] !== "") {
+                if (id[2] !== null && id[2] !== "") {
                   const num_sections = holeData.sections.length;
                   for (let s = 0; s < num_sections; s++) {
                     const sectionData = holeData.sections[s];
                     if (sectionData.id[2] == id[2]) {
                       relative_idxs[2] = s;
+                      if (id[3] === null || id[3] === "") {
+                        return relative_idxs;
+                      }
 
-                      if (id[3] !== null || id[3] !== "") {
+                      if (id[3] !== null && id[3] !== "") {
                         const num_markers = sectionData.markers.length;
                         for (let m = 0; m < num_markers; m++) {
                           const markerData = sectionData.markers[m];
                           if (markerData.id[3] == id[3]) {
                             relative_idxs[3] = m;
+                            return relative_idxs;
                           }
                         }
                       }
