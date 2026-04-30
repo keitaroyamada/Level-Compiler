@@ -108,7 +108,7 @@ window.addEventListener("DOMContentLoaded", () => {
 
           
           if (isEditable && isEditableObj) {
-            const input = createInput(value);
+            const input = createInput(value, key);
             const field = document.createElement("div");
             field.classList.add("settings-field");
             input.addEventListener("change", () => {
@@ -144,7 +144,7 @@ window.addEventListener("DOMContentLoaded", () => {
         }
       });
     } 
-    function createInput(value) {
+    function createInput(value, key = "") {
       console.log(value, typeof value)
       let input;
 
@@ -188,6 +188,9 @@ window.addEventListener("DOMContentLoaded", () => {
         "Verdana",
         "Yu Gothic",
       ];
+      const selectOptionsByKey = {
+        name_position_mode: ["center", "adaptive"],
+      };
 
       let isString = false;
       if(value === null){
@@ -195,7 +198,18 @@ window.addEventListener("DOMContentLoaded", () => {
       }
         
         
-      if (typeof value === "string" && isColor) {
+      if (typeof value === "string" && selectOptionsByKey[key]) {
+        input = document.createElement("select");
+        selectOptionsByKey[key].forEach(optionValue => {
+          const option = document.createElement("option");
+          option.value = optionValue;
+          option.textContent = formatSettingName(optionValue);
+          if (optionValue === value) {
+            option.selected = true;
+          }
+          input.appendChild(option);
+        });
+      }else if (typeof value === "string" && isColor) {
         const dummy = document.createElement("div");
         dummy.style.color = value;
         document.body.appendChild(dummy);

@@ -129,6 +129,7 @@ document.addEventListener("DOMContentLoaded", () => {
     objOpts.section.font_angle =  -90;
     objOpts.section.font_pos_x = -10;
     objOpts.section.font_colour = "#000000";
+    objOpts.section.name_position_mode = "center";
 
     objOpts.marker.is_name_labels_visible = true;
     objOpts.marker.is_position_labels_visible = true;
@@ -5612,6 +5613,14 @@ document.addEventListener("DOMContentLoaded", () => {
               if(["root"].includes(objOpts.developer.mode)){
                 secDispName = section.id[2].slice(0,5);
               }
+              let sectionLabelMid = section_mid;
+              if(objOpts.section.name_position_mode === "adaptive" && !objOpts.edit.is_full_snapshot){
+                const visibleSectionTop = Math.max(section_top, scrollerTopRealScale);
+                const visibleSectionBottom = Math.min(section_bottom, scrollerBotRealScale);
+                if(visibleSectionTop <= visibleSectionBottom){
+                  sectionLabelMid = (visibleSectionTop + visibleSectionBottom) / 2;
+                }
+              }
 
               sketch.fill(objOpts.section.font_colour);
               sketch.noStroke();
@@ -5620,7 +5629,7 @@ document.addEventListener("DOMContentLoaded", () => {
               sketch.push();
               sketch.translate(
                 (hole_x0 + shift_x) * xMag + pad_x + objOpts.section.font_pos_x, //-10
-                (section_mid + shift_y) * yMag + pad_y + sketch.textWidth(secDispName)/2
+                (sectionLabelMid + shift_y) * yMag + pad_y + sketch.textWidth(secDispName)/2
               );
               sketch.rotate((objOpts.section.font_angle / 180) * Math.PI);
               sketch.text(secDispName, 0, 0);
