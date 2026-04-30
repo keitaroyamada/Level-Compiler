@@ -4218,36 +4218,198 @@ document.addEventListener("DOMContentLoaded", () => {
       editable.image.active_source_id = false;
     }
 
+    const buildSettingsFieldDefinitions = () => {
+      const fields = {
+        developer:{
+          description:"Developer-facing application mode.",
+          mode:{description:"Application mode name. Use user for normal operation."},
+        },
+        canvas:{
+          description:"Canvas display and navigation settings.",
+          use_touchpad_mode:{description:"Use touchpad-friendly canvas navigation."},
+          depth_scale:{
+            type:"select",
+            options:["drilling_depth", "composite_depth", "event_free_depth", "age"],
+            description:"Vertical scale used to draw the model.",
+          },
+          background_colour:{description:"Canvas background color."},
+          display_height:{description:"Displayed model height in the canvas."},
+          is_model_visible:{description:"Show or hide the model drawing."},
+          is_event_expanded:{description:"Draw events at expanded width instead of folded width."},
+          is_connection_visible:{description:"Show marker and section connections."},
+          is_target_visible:{description:"Show the mouse target indicator."},
+          is_core_photo_visible:{description:"Show core images on sections."},
+          is_grid_visible:{description:"Show the depth grid."},
+          grid_width:{description:"Line width of the depth grid."},
+          grid_colour:{description:"Line color of the depth grid."},
+          finder_colour:{description:"Color used for finder position markers."},
+          zoom_level:{description:"Canvas zoom level as horizontal and vertical scale."},
+          age_zoom_correction:{description:"Zoom correction applied when the vertical scale is age."},
+          dpir:{description:"Device pixel ratio used by the renderer."},
+          pad_x:{description:"Horizontal canvas padding in pixels."},
+          pad_y:{description:"Vertical canvas padding in pixels."},
+          shift_x:{description:"Horizontal model shift in centimeters."},
+          shift_y:{description:"Vertical model shift in centimeters."},
+          bottom_pad:{description:"Extra bottom padding in centimeters."},
+          buffer_depth:{description:"Vertical offscreen drawing buffer rate."},
+          buffer_width:{description:"Horizontal offscreen drawing buffer rate."},
+        },
+        project:{
+          description:"Project area drawing settings.",
+          interval:{description:"Horizontal interval inserted between projects."},
+          is_area_visible:{description:"Show project background areas."},
+          area_colour:{description:"Project background color."},
+          area_colour_disconnected:{description:"Project background color for disconnected projects."},
+          pad_x:{description:"Project horizontal padding."},
+          pad_y:{description:"Project vertical padding."},
+          font:{description:"Project label font."},
+          font_size:{description:"Project label font size."},
+          font_colour:{description:"Project label color."},
+        },
+        hole:{
+          description:"Hole drawing settings.",
+          distance:{description:"Horizontal distance between holes."},
+          width:{description:"Hole display width."},
+          line_colour:{description:"Hole outline color."},
+          line_width:{description:"Hole outline width."},
+          font:{description:"Hole label font."},
+          font_size:{description:"Hole label font size."},
+          font_colour:{description:"Hole label color."},
+        },
+        section:{
+          description:"Section drawing settings.",
+          line_colour:{description:"Section outline color."},
+          face_colour:{description:"Section fill color."},
+          line_width:{description:"Section outline width."},
+          width:{description:"Section display width."},
+          font:{description:"Section label font."},
+          font_size:{description:"Section label font size."},
+          font_angle:{description:"Section label rotation angle."},
+          font_pos_x:{description:"Section label horizontal offset."},
+          font_colour:{description:"Section label color."},
+          name_position_mode:{
+            type:"select",
+            options:["center", "adaptive"],
+            description:"Section label position mode.",
+          },
+        },
+        marker:{
+          description:"Marker drawing and label settings.",
+          is_name_labels_visible:{description:"Show marker name labels."},
+          is_position_labels_visible:{description:"Show marker distance labels."},
+          is_reverse_highlighted:{description:"Highlight reversed marker intervals."},
+          is_rank_visible:{description:"Show marker rank indicators."},
+          line_colour:{description:"Marker line color."},
+          line_width:{description:"Marker line width."},
+          width:{description:"Marker display width."},
+          rank_colours:{description:"Colors used for marker rank indicators."},
+          ignore_zoom_level:{description:"Hide markers and labels below this zoom level."},
+          font:{description:"Marker label font."},
+          font_size:{description:"Marker label font size."},
+          font_colour:{description:"Marker label color."},
+        },
+        event:{
+          description:"Event layer drawing settings.",
+          line_colour:{description:"Event outline color."},
+          face_colour:{description:"Event fill colors by event type."},
+          line_width:{description:"Event outline width."},
+          folded_width:{description:"Event width rate when events are folded."},
+          face_height:{description:"Event fill height rate."},
+        },
+        connection:{
+          description:"Connection drawing settings.",
+          is_master_connections_highlighted:{description:"Highlight master connections."},
+          master_section_line_width:{description:"Line width for master sections."},
+          base_master_section_colour:{description:"Master section color for base projects."},
+          duo_master_section_colour:{description:"Master section color for duo projects."},
+          line_colour:{description:"Connection line color."},
+          line_width:{description:"Connection line width."},
+          tab_length:{description:"Horizontal tab length for connection lines."},
+          is_non_horizontal_connections_highlighted:{description:"Highlight non-horizontal connections."},
+          is_remote_connections_visible:{description:"Show connections to non-adjacent holes."},
+          is_remote_connections_highlighted:{description:"Draw remote connections with highlight styling."},
+          is_source_visible:{description:"Show connection source indicators."},
+        },
+        plot:{
+          description:"Plot overlay settings.",
+          is_plot_visible:{description:"Show plot data on the model."},
+          is_axis_visible:{description:"Show plot axes."},
+          resample_method:{
+            type:"select",
+            options:["block", "moving"],
+            description:"Method used when resampling plot data.",
+          },
+          barplot_width:{description:"Bar plot width."},
+          scatterplot_size:{description:"Scatter plot point size."},
+          lineplot_stroke:{description:"Line plot stroke width."},
+          lineplot_split_sections:{description:"Split line plots at section boundaries."},
+          lineplot_ignore_invalid:{description:"Ignore invalid values when drawing line plots."},
+          invalid_values:{description:"Text values treated as invalid plot data."},
+        },
+        pen:{
+          description:"Pen annotation settings.",
+          colour:{description:"Pen drawing color."},
+        },
+        image:{
+          description:"Core image loading and display settings.",
+          is_core_photo_visible:{description:"Show core photo images."},
+          photo_plot_colour:{description:"Color used for image-derived plot overlays."},
+          dpcm:{description:"Standard image resolution in dots per centimeter."},
+          dpcm_highresolution:{description:"High resolution image dots per centimeter."},
+          active_source_id:{description:"Current image source. Change this from the image source selector."},
+          visible_tier:{
+            type:"select",
+            options:["thumb", "standard", "highres"],
+            description:"Preferred image quality tier for display.",
+          },
+          thumb_dpcm:{description:"Thumbnail image dots per centimeter."},
+          standard_dpcm:{description:"Standard image dots per centimeter."},
+          highres_dpcm:{description:"High resolution image dots per centimeter."},
+          standard_cache_limit:{description:"Maximum number of standard images kept in memory."},
+          highres_cache_limit:{description:"Maximum number of high resolution images kept in memory."},
+          is_load_enabled:{description:"Enable image loading by depth scale."},
+        },
+        age:{
+          description:"Age model overlay settings.",
+          is_age_visible:{description:"Show age control points."},
+          age_precision:{description:"Decimal precision for age labels."},
+          incon_size:{description:"Age point icon size."},
+          alt_radius:{description:"Alternative age point radius."},
+          is_age_label_visible:{description:"Show age point labels."},
+          font_colour:{description:"Age label color."},
+          font:{description:"Age label font."},
+          font_size:{description:"Age label font size."},
+          incon_list:{description:"Age icon styles by age type."},
+        },
+      };
+      const formatFieldName = (name) => String(name)
+        .replace(/[_-]+/g, " ")
+        .replace(/\b\w/g, (letter) => letter.toUpperCase());
+      const fillDescriptions = (settingsNode, fieldNode, path = []) => {
+        if (!settingsNode || typeof settingsNode !== "object") return;
+        for (const key in settingsNode) {
+          if (!fieldNode[key] || typeof fieldNode[key] !== "object") {
+            fieldNode[key] = {};
+          }
+          const value = settingsNode[key];
+          const nextPath = [...path, key];
+          if (!fieldNode[key].description) {
+            fieldNode[key].description = "Configure " + nextPath.map(formatFieldName).join(" > ") + ".";
+          }
+          if (value && typeof value === "object") {
+            fillDescriptions(value, fieldNode[key], nextPath);
+          }
+        }
+      };
+      fillDescriptions(settings, fields);
+      return fields;
+    };
+
     const options={
       editable:true,
       called_from:"renderer",
       title:"Preferences",
-      fields:{
-        canvas:{
-          depth_scale:{
-            type:"select",
-            options:["drilling_depth", "composite_depth", "event_free_depth", "age"],
-          },
-        },
-        image:{
-          visible_tier:{
-            type:"select",
-            options:["thumb", "standard", "highres"],
-          },
-        },
-        plot:{
-          resample_method:{
-            type:"select",
-            options:["block", "moving"],
-          },
-        },
-        section:{
-          name_position_mode:{
-            type:"select",
-            options:["center", "adaptive"],
-          },
-        },
-      },
+      fields:buildSettingsFieldDefinitions(),
     }
 
     const sendData = {

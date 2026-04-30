@@ -73,6 +73,7 @@ window.addEventListener("DOMContentLoaded", () => {
 
     function createMenu(data, editables, container, depth = 0, fields = {}) {
       Object.entries(data).forEach(([key, value]) => {
+        const fieldOptions = settingFieldsForKey(fields, key);
         let isEditableObj;
         if (typeof editables === "object"){
           isEditableObj = editables[key];
@@ -86,6 +87,9 @@ window.addEventListener("DOMContentLoaded", () => {
 
           const summary = document.createElement("summary");
           summary.classList.add("settings-section-title");
+          if (fieldOptions.description) {
+            summary.title = fieldOptions.description;
+          }
 
           const title = document.createElement("span");
           title.classList.add("settings-section-name");
@@ -99,18 +103,24 @@ window.addEventListener("DOMContentLoaded", () => {
           summary.appendChild(count);
           details.appendChild(summary);
 
-          const childFields = settingFieldsForKey(fields, key);
+          const childFields = fieldOptions;
           createMenu(value, isEditableObj, details, depth + 1, childFields);
           container.appendChild(details);
         } else {
           const wrapper = document.createElement("div");
           wrapper.classList.add("settings-item", `settings-value-${getValueType(value)}`);
+          if (fieldOptions.description) {
+            wrapper.title = fieldOptions.description;
+          }
           const label = document.createElement("label");
           label.textContent = formatSettingName(key);
+          if (fieldOptions.description) {
+            label.title = fieldOptions.description;
+          }
 
           
           if (isEditable && isEditableObj) {
-            const input = createInput(value, settingFieldsForKey(fields, key));
+            const input = createInput(value, fieldOptions);
             const field = document.createElement("div");
             field.classList.add("settings-field");
             input.addEventListener("change", () => {
