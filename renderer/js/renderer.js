@@ -7851,9 +7851,6 @@ document.addEventListener("DOMContentLoaded", () => {
         return { ok: false, error: "register_core_images_failed" };
       }
 
-      clearImageSet(sourceId);
-      modelImages = syncLegacyImageAliases(modelImages, objOpts);
-
       const targetIds = await collectAvailableCoreImageTargetIds(LCCore, sourceId);
       if (targetIds.length === 0) {
         console.log("[Renderer]: No matching core images were found in the selected source.");
