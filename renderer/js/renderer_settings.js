@@ -43,6 +43,7 @@ window.addEventListener("DOMContentLoaded", () => {
 
     let settings = {};
     let isEditable = false;
+    let settingFields = {};
 
     function formatSettingName(name) {
       return String(name)
@@ -70,7 +71,7 @@ window.addEventListener("DOMContentLoaded", () => {
       return Object.values(value).reduce((count, child) => count + countLeafSettings(child), 0);
     }
 
-    function createMenu(data, editables, container, depth = 0) {
+    function createMenu(data, editables, container, depth = 0, fields = {}) {
       Object.entries(data).forEach(([key, value]) => {
         let isEditableObj;
         if (typeof editables === "object"){
@@ -98,7 +99,8 @@ window.addEventListener("DOMContentLoaded", () => {
           summary.appendChild(count);
           details.appendChild(summary);
 
-          createMenu(value, isEditableObj, details, depth + 1);
+          const childFields = settingFieldsForKey(fields, key);
+          createMenu(value, isEditableObj, details, depth + 1, childFields);
           container.appendChild(details);
         } else {
           const wrapper = document.createElement("div");
@@ -108,7 +110,7 @@ window.addEventListener("DOMContentLoaded", () => {
 
           
           if (isEditable && isEditableObj) {
-            const input = createInput(value, key);
+            const input = createInput(value, settingFieldsForKey(fields, key));
             const field = document.createElement("div");
             field.classList.add("settings-field");
             input.addEventListener("change", () => {
@@ -144,7 +146,13 @@ window.addEventListener("DOMContentLoaded", () => {
         }
       });
     } 
-    function createInput(value, key = "") {
+    function settingFieldsForKey(fields, key) {
+      if (fields && typeof fields === "object" && fields[key] && typeof fields[key] === "object") {
+        return fields[key];
+      }
+      return {};
+    }
+    function createInput(value, fieldOptions = {}) {
       console.log(value, typeof value)
       let input;
 
@@ -188,19 +196,15 @@ window.addEventListener("DOMContentLoaded", () => {
         "Verdana",
         "Yu Gothic",
       ];
-      const selectOptionsByKey = {
-        name_position_mode: ["center", "adaptive"],
-      };
-
       let isString = false;
       if(value === null){
         isString = true;
       }
         
         
-      if (typeof value === "string" && selectOptionsByKey[key]) {
+      if (typeof value === "string" && fieldOptions.type === "select" && Array.isArray(fieldOptions.options)) {
         input = document.createElement("select");
-        selectOptionsByKey[key].forEach(optionValue => {
+        fieldOptions.options.forEach(optionValue => {
           const option = document.createElement("option");
           option.value = optionValue;
           option.textContent = formatSettingName(optionValue);
@@ -292,10 +296,11 @@ window.addEventListener("DOMContentLoaded", () => {
           
         settings = receivedData.data;
         isEditable = receivedData.options.editable;
+        settingFields = receivedData.options.fields ?? {};
         const container = document.getElementById("menu-container");
         if (container) {
           container.innerHTML = "";
-          createMenu(settings,receivedData.editable, container);
+          createMenu(settings,receivedData.editable, container, 0, settingFields);
         }
     });
 

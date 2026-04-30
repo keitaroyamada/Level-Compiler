@@ -4210,11 +4210,44 @@ document.addEventListener("DOMContentLoaded", () => {
         editable[k] = true;
       }
     }
+    if (settings.image && editable.image === true) {
+      editable.image = {};
+      for (const key in settings.image) {
+        editable.image[key] = true;
+      }
+      editable.image.active_source_id = false;
+    }
 
     const options={
       editable:true,
       called_from:"renderer",
       title:"Preferences",
+      fields:{
+        canvas:{
+          depth_scale:{
+            type:"select",
+            options:["drilling_depth", "composite_depth", "event_free_depth", "age"],
+          },
+        },
+        image:{
+          visible_tier:{
+            type:"select",
+            options:["thumb", "standard", "highres"],
+          },
+        },
+        plot:{
+          resample_method:{
+            type:"select",
+            options:["block", "moving"],
+          },
+        },
+        section:{
+          name_position_mode:{
+            type:"select",
+            options:["center", "adaptive"],
+          },
+        },
+      },
     }
 
     const sendData = {
