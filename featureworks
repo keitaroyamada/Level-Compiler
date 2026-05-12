@@ -1,0 +1,24 @@
+DD target line extension memo
+
+- Goal: When the canvas depth scale is drilling_depth and Finder has a clicked target, show target lines not only on the clicked section, but also on sections that correspond to the same composite_depth.
+- Current behavior: DD target line is limited to the clicked hole/section because drilling_depth is local and the same DD value is not comparable across sections.
+- Proposed display-only approach:
+  - Keep the canvas axis as drilling_depth.
+  - Use finderData.composite_depth as the shared reference depth.
+  - For each visible section, check whether the section contains that composite_depth between adjacent markers.
+  - If contained, interpolate the corresponding drilling_depth in that section.
+  - Draw the Finder target line at that interpolated drilling_depth.
+- Scope:
+  - Prefer renderer/js/renderer.js only.
+  - No core logic change should be needed.
+- Helper idea:
+  - Add a small renderer-side interpolation helper such as interpolateSectionDepth(section, sourceField, targetField, sourceValue).
+  - For this feature, sourceField is composite_depth and targetField is drilling_depth.
+- Safety:
+  - Do not extrapolate at first. Draw only when the composite_depth is inside a marker interval.
+  - Skip intervals with null composite_depth or null drilling_depth.
+  - Multiple matching sections may draw multiple target lines; this is acceptable initially and can be narrowed later if needed.
+- Estimated cost:
+  - Implementation: 30-60 minutes.
+  - Manual verification: 20-30 minutes.
+  - Risk: low to medium, if kept as display-only renderer logic.

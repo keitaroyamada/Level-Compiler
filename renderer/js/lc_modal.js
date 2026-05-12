@@ -210,13 +210,34 @@
 
     activeDialog = new Promise(resolve => {
       const stopDialogEvent = event => event.stopPropagation();
+      const stopBackdropEvent = event => {
+        if (event.target === backdrop) {
+          event.stopPropagation();
+        }
+      };
+      const handleFormKeydown = event => {
+        event.stopPropagation();
+        if (event.key === "Escape") {
+          event.preventDefault();
+          cancel();
+        }
+      };
       const cleanup = () => {
         form.removeEventListener("submit", handleSubmit);
+        form.removeEventListener("pointerdown", stopDialogEvent);
+        form.removeEventListener("mousedown", stopDialogEvent);
+        form.removeEventListener("mouseup", stopDialogEvent);
         form.removeEventListener("click", stopDialogEvent);
+        form.removeEventListener("dblclick", stopDialogEvent);
+        form.removeEventListener("mousemove", stopDialogEvent);
+        form.removeEventListener("wheel", stopDialogEvent);
+        form.removeEventListener("keydown", handleFormKeydown);
+        backdrop.removeEventListener("pointerdown", stopBackdropEvent);
+        backdrop.removeEventListener("mousedown", stopBackdropEvent);
+        backdrop.removeEventListener("mouseup", stopBackdropEvent);
         backdrop.removeEventListener("click", handleBackdropClick);
-        backdrop.removeEventListener("mousemove", stopDialogEvent);
-        backdrop.removeEventListener("mousedown", stopDialogEvent);
-        backdrop.removeEventListener("wheel", stopDialogEvent);
+        backdrop.removeEventListener("mousemove", stopBackdropEvent);
+        backdrop.removeEventListener("wheel", stopBackdropEvent);
         closeButton.removeEventListener("click", handleCancel);
         cancelButton.removeEventListener("click", handleCancel);
         document.removeEventListener("keydown", handleKeydown);
@@ -232,7 +253,11 @@
         cleanup();
         resolve(null);
       };
-      const handleCancel = () => cancel();
+      const handleCancel = event => {
+        event?.preventDefault();
+        event?.stopPropagation();
+        cancel();
+      };
       const handleBackdropClick = event => {
         event.stopPropagation();
         if (event.target === backdrop) {
@@ -246,6 +271,7 @@
       };
       const handleSubmit = event => {
         event.preventDefault();
+        event.stopPropagation();
         const values = {};
         for (const [name, field] of Object.entries(fields)) {
           if (field.closest("[hidden]")) {
@@ -267,11 +293,20 @@
         field.addEventListener("change", updateVisibility);
       }
       form.addEventListener("submit", handleSubmit);
+      form.addEventListener("pointerdown", stopDialogEvent);
+      form.addEventListener("mousedown", stopDialogEvent);
+      form.addEventListener("mouseup", stopDialogEvent);
       form.addEventListener("click", stopDialogEvent);
+      form.addEventListener("dblclick", stopDialogEvent);
+      form.addEventListener("mousemove", stopDialogEvent);
+      form.addEventListener("wheel", stopDialogEvent);
+      form.addEventListener("keydown", handleFormKeydown);
+      backdrop.addEventListener("pointerdown", stopBackdropEvent);
+      backdrop.addEventListener("mousedown", stopBackdropEvent);
+      backdrop.addEventListener("mouseup", stopBackdropEvent);
       backdrop.addEventListener("click", handleBackdropClick);
-      backdrop.addEventListener("mousemove", stopDialogEvent);
-      backdrop.addEventListener("mousedown", stopDialogEvent);
-      backdrop.addEventListener("wheel", stopDialogEvent);
+      backdrop.addEventListener("mousemove", stopBackdropEvent);
+      backdrop.addEventListener("wheel", stopBackdropEvent);
       closeButton.addEventListener("click", handleCancel);
       cancelButton.addEventListener("click", handleCancel);
       document.addEventListener("keydown", handleKeydown);

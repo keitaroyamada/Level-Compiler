@@ -5,7 +5,9 @@ class Marker {
     this.name = "";
     this.distance = null;
     this.composite_depth = null;
+    this.local_composite_depth = null;
     this.event_free_depth = null;
+    this.local_event_free_depth = null;
     this.drilling_depth = null;
     this.event = [];
     this.age = null;

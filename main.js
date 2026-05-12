@@ -88,6 +88,17 @@ let e2eOpenDialogResponse = {
   folder: null,
 };
 let isMainWindowClosing = false;
+let suppressCoreAlertRenderer = false;
+
+function withSuppressedCoreAlertRenderer(action) {
+  const previousValue = suppressCoreAlertRenderer;
+  suppressCoreAlertRenderer = true;
+  try {
+    return action();
+  } finally {
+    suppressCoreAlertRenderer = previousValue;
+  }
+}
 
 function closeProgress(progress) {
   if (!progress) {
@@ -3025,6 +3036,27 @@ function createMainWIndow() {
     });
 
 
+    const finderPrecision = {
+      position: 1,
+      cd: 1,
+      efd: 1,
+      age: 0,
+    };
+    const buildFinderPrecisionMenu = (label, key) => ({
+      label,
+      submenu: [0, 1, 2, 3].map((precision) => ({
+        label: precision === 0 ? "Integer" : `${precision} decimal${precision === 1 ? "" : "s"}`,
+        type: "radio",
+        checked: finderPrecision[key] === precision,
+        click: () => {
+          finderPrecision[key] = precision;
+          if (hasFinderWindow()) {
+            sendToFinderWindow("FinderPrecisionChanged", { key, precision });
+          }
+        },
+      })),
+    });
+
     const customMenu = Menu.buildFromTemplate([
       {
         label: "Settings",
@@ -3039,6 +3071,11 @@ function createMainWIndow() {
               }
             }
           },
+          { type: "separator" },
+          buildFinderPrecisionMenu("Position digits", "position"),
+          buildFinderPrecisionMenu("CD digits", "cd"),
+          buildFinderPrecisionMenu("EFD digits", "efd"),
+          buildFinderPrecisionMenu("Age digits", "age"),
         ]
       }
     ]);
@@ -3672,18 +3709,18 @@ function createMainWIndow() {
           //update header
           if(i==0){
             if(options.sourceType !== "trinity"){
-              header[1] += " [PASEUDO]";
-              header[2] += " [PASEUDO]";
-              header[3] += " [PASEUDO]";
-              header[4] += " [PASEUDO]";   
+              header[1] += " [PSEUDO]";
+              header[2] += " [PSEUDO]";
+              header[3] += " [PSEUDO]";
+              header[4] += " [PSEUDO]";   
               if(options.sourceType ==="event_free_depth" || options.sourceType ==="age"){
-                header[9] += " [PASEUDO]";
+                header[9] += " [PSEUDO]";
               }else if(options.sourceType ==="drilling_depth"){
-                header[9] += " [PASEUDO]";
-                header[10] += " [PASEUDO]";
-                header[11] += " [PASEUDO]";
-                header[12] += " [PASEUDO]";
-                header[13] += " [PASEUDO]";
+                header[9] += " [PSEUDO]";
+                header[10] += " [PSEUDO]";
+                header[11] += " [PSEUDO]";
+                header[12] += " [PSEUDO]";
+                header[13] += " [PSEUDO]";
               }           
             }
           }
@@ -3705,14 +3742,14 @@ function createMainWIndow() {
           }
 
           //make output array
-          const allowPaseudoTrinity = false;
+          const allowPseudoTrinity = false;
           let rowData = [
             calcedData.name, //data name
-            options.sourceType==="trinity"||allowPaseudoTrinity ? calcedData.project : "", //project name
-            options.sourceType==="trinity"||allowPaseudoTrinity ? calcedData.hole : "", //hole name
-            options.sourceType==="trinity"||allowPaseudoTrinity ? calcedData.section : "", //section name
-            options.sourceType==="trinity"||allowPaseudoTrinity ? parseFloat(calcedData.distance).toFixed(options.precision) : "", //distance
-            options.sourceType==="trinity"||allowPaseudoTrinity ? parseFloat(calcedData.dd).toFixed(options.precision) : "", //drilling depth
+            options.sourceType==="trinity"||allowPseudoTrinity ? calcedData.project : "", //project name
+            options.sourceType==="trinity"||allowPseudoTrinity ? calcedData.hole : "", //hole name
+            options.sourceType==="trinity"||allowPseudoTrinity ? calcedData.section : "", //section name
+            options.sourceType==="trinity"||allowPseudoTrinity ? parseFloat(calcedData.distance).toFixed(options.precision) : "", //distance
+            options.sourceType==="trinity"||allowPseudoTrinity ? parseFloat(calcedData.dd).toFixed(options.precision) : "", //drilling depth
             calcedData.source_type,
             "",
             basis,
@@ -4128,7 +4165,7 @@ function createMainWIndow() {
   ipcMain.handle("addProject", async(_e, payload) => {
     const { type, name } = payload;
     
-    const result = LCCore.addProject(type, name);
+    const result = withSuppressedCoreAlertRenderer(() => LCCore.addProject(type, name));
 
     if (result == true) {
       console.log("MAIN: Add project completed.");
@@ -4167,13 +4204,13 @@ function createMainWIndow() {
     const { projectId, type, value } = payload;
     console.log(projectId, type, value)
     if(type=="name"){
-      const result = LCCore.changeName(projectId, value);
+      const result = withSuppressedCoreAlertRenderer(() => LCCore.changeName(projectId, value));
       return result;
     }else if(type=="descriptions"){
       const result = LCCore.changeDescriptions(projectId, value);
       return result;
     }else if(type==="model_type"){
-      const result = LCCore.changeProjectType(projectId, value);
+      const result = withSuppressedCoreAlertRenderer(() => LCCore.changeProjectType(projectId, value));
       return result;
     }
   });
@@ -4194,7 +4231,7 @@ function createMainWIndow() {
   ipcMain.handle("addHole", async(_e, payload) => {
     const { projectId, name } = payload;
     
-    const result = LCCore.addHole(projectId, name);
+    const result = withSuppressedCoreAlertRenderer(() => LCCore.addHole(projectId, name));
 
     if (result == true) {
       console.log("MAIN: Add hole completed.");
@@ -4225,20 +4262,20 @@ function createMainWIndow() {
     const { holeId, type, value } = payload;
     
     if(type=="name"){
-      const result = LCCore.changeName(holeId, value);
+      const result = withSuppressedCoreAlertRenderer(() => LCCore.changeName(holeId, value));
       return result;
     }else if(type=="descriptions"){
       const result = LCCore.changeDescriptions(holeId, value);
       return result;
     }else if(type=="order"){
-      const result = LCCore.changeHoleOrder(holeId, value);
+      const result = withSuppressedCoreAlertRenderer(() => LCCore.changeHoleOrder(holeId, value));
       return result;
     }
   });
   ipcMain.handle("moveHoleToProject", async(_e, payload) => {
     const { holeId, projectId } = payload;
     
-    const result = LCCore.moveHoleToProject(holeId, projectId);
+    const result = withSuppressedCoreAlertRenderer(() => LCCore.moveHoleToProject(holeId, projectId));
 
     if (result == true) {
       LCCore.calcCompositeDepth();
@@ -4254,7 +4291,7 @@ function createMainWIndow() {
   ipcMain.handle("addSection", (_e, payload) => {
     const { sectionId, data } = payload;
     //    
-    const result = LCCore.addSection(sectionId,data);//LCCore.deleteSection(sectionId);
+    const result = withSuppressedCoreAlertRenderer(() => LCCore.addSection(sectionId,data));//LCCore.deleteSection(sectionId);
     if(result == true){
       console.log("MAIN: Add section.")
       return result;  
@@ -4282,7 +4319,7 @@ function createMainWIndow() {
   ipcMain.handle("changeSection", (_e, payload) => {    
     const { sectionId, type, value } = payload;
     if(type=="name"){
-      const result = LCCore.changeName(sectionId, value);
+      const result = withSuppressedCoreAlertRenderer(() => LCCore.changeName(sectionId, value));
       return result;
     }else if(type=="descriptions"){
       const result = LCCore.changeDescriptions(sectionId, value);
@@ -4293,7 +4330,7 @@ function createMainWIndow() {
   ipcMain.handle("addMarker", (_e, payload) => {
     const { sectionId, depth, depthScale, relativeX } = payload;
     //add
-    const result = LCCore.addMarker(sectionId, depth, depthScale, relativeX);
+    const result = withSuppressedCoreAlertRenderer(() => LCCore.addMarker(sectionId, depth, depthScale, relativeX));
     if(result==true){
       LCCore.calcCompositeDepth();
       LCCore.calcEventFreeDepth();
@@ -4319,7 +4356,7 @@ function createMainWIndow() {
     const { markerId, type, value } = payload;
     if(type == "distance"){
       //value:distance
-      const result = LCCore.changeDistance(markerId, value);
+      const result = withSuppressedCoreAlertRenderer(() => LCCore.changeDistance(markerId, value));
       if(result == true){
         LCCore.calcCompositeDepth();
         LCCore.calcEventFreeDepth();
@@ -4329,7 +4366,7 @@ function createMainWIndow() {
       }
       return result;
     }else if(type=="name"){
-      const result = LCCore.changeName(markerId, value)
+      const result = withSuppressedCoreAlertRenderer(() => LCCore.changeName(markerId, value))
       return result;
     }else if(type=="descriptions"){
       const result = LCCore.changeDescriptions(markerId, value)
@@ -4685,7 +4722,7 @@ function createMainWIndow() {
         const targetId = data[2];
 
         //get nearest trinity return: [index: , project: , hole: , section: , distance: ]
-        const paseudoTrinity = LCCore.getNearestTrinity(targetId, cd, "composite_depth");
+        const pseudoTrinity = LCCore.getNearestTrinity(targetId, cd, "composite_depth");
 
         //calc efd
         const efd = LCCore.getEFDfromCD(cd);
@@ -4699,10 +4736,10 @@ function createMainWIndow() {
 
         //stack
         results.name = name;
-        results.project = paseudoTrinity.project !== null ? paseudoTrinity.project : NaN;
-        results.hole = paseudoTrinity.hole !== null ? paseudoTrinity.hole : NaN;
-        results.section = paseudoTrinity.section !== null ? paseudoTrinity.section : NaN;
-        results.distance = paseudoTrinity.distance !== null ? paseudoTrinity.distance : NaN;
+        results.project = pseudoTrinity.project !== null ? pseudoTrinity.project : NaN;
+        results.hole = pseudoTrinity.hole !== null ? pseudoTrinity.hole : NaN;
+        results.section = pseudoTrinity.section !== null ? pseudoTrinity.section : NaN;
+        results.distance = pseudoTrinity.distance !== null ? pseudoTrinity.distance : NaN;
         results.cd = cd !== null ? cd : NaN;
         results.efd = efd !== null ? efd : NaN;
         results.dd  = NaN;
@@ -4710,14 +4747,14 @@ function createMainWIndow() {
         results.age_upper = age.upper !== null ? age.upper : NaN;
         results.age_lower = age.lower !== null ? age.lower : NaN;
         results.age_source  = age.source!== null ? age.source: NaN;
-        results.section_type = paseudoTrinity.section_type !== null ? paseudoTrinity.section_type : "";
+        results.section_type = pseudoTrinity.section_type !== null ? pseudoTrinity.section_type : "";
         results.correlation_rank = 3;
-        results.correlation_model_version = paseudoTrinity.index[0] !== null ? LCCore.projects[paseudoTrinity.index[0]].correlation_version : NaN;
-        results.event_model_version       = paseudoTrinity.index[0] !== null ? LCCore.projects[paseudoTrinity.index[0]].correlation_version : NaN;
+        results.correlation_model_version = pseudoTrinity.index[0] !== null ? LCCore.projects[pseudoTrinity.index[0]].correlation_version : NaN;
+        results.event_model_version       = pseudoTrinity.index[0] !== null ? LCCore.projects[pseudoTrinity.index[0]].correlation_version : NaN;
         results.age_model_version         = LCAge.AgeModels[ageIdx] !== undefined ? LCAge.AgeModels[ageIdx].version : NaN;
-        results.description               = "Converted from Composite Depth. The trinity is paseudo data.";
+        results.description               = "Converted from Composite Depth. The trinity is pseudo data.";
         results.source_type = type;
-        results.calc_type = "paseudo-depth";
+        results.calc_type = "pseudo-depth";
       } else if (type == "event_free_depth") {
         //get efd
         const name = data[0];
@@ -4725,9 +4762,9 @@ function createMainWIndow() {
         const targetId = data[2];
 
         //get nearest trinity
-        const paseudoTrinity = LCCore.getNearestTrinity(targetId, efd, "event_free_depth");
+        const pseudoTrinity = LCCore.getNearestTrinity(targetId, efd, "event_free_depth");
 
-        //get paseudo cd
+        //get pseudo cd
         const cd = LCCore.getCDfromEFD(efd);
 
         //calc age
@@ -4737,10 +4774,10 @@ function createMainWIndow() {
 
         //stack
         results.name = name;
-        results.project = paseudoTrinity.project !== null ? paseudoTrinity.project : NaN;
-        results.hole = paseudoTrinity.hole !== null ? paseudoTrinity.hole : NaN;
-        results.section = paseudoTrinity.section !== null ? paseudoTrinity.section : NaN;
-        results.distance = paseudoTrinity.distance !== null ? paseudoTrinity.distance : NaN;
+        results.project = pseudoTrinity.project !== null ? pseudoTrinity.project : NaN;
+        results.hole = pseudoTrinity.hole !== null ? pseudoTrinity.hole : NaN;
+        results.section = pseudoTrinity.section !== null ? pseudoTrinity.section : NaN;
+        results.distance = pseudoTrinity.distance !== null ? pseudoTrinity.distance : NaN;
         results.cd = cd !== null ? cd : NaN;
         results.efd = efd !== null ? efd : NaN;
         results.dd  = NaN;
@@ -4748,14 +4785,14 @@ function createMainWIndow() {
         results.age_upper = age.upper !== null ? age.upper : NaN;
         results.age_lower = age.lower !== null ? age.lower : NaN;
         results.age_source  = age.source!== null ? age.source: NaN;
-        results.section_type = paseudoTrinity.section_type !== null ? paseudoTrinity.section_type : "";
+        results.section_type = pseudoTrinity.section_type !== null ? pseudoTrinity.section_type : "";
         results.correlation_rank = 3;
-        results.correlation_model_version = paseudoTrinity.index[0] !== null ? LCCore.projects[paseudoTrinity.index[0]].correlation_version : NaN;
-        results.event_model_version       = paseudoTrinity.index[0] !== null ? LCCore.projects[paseudoTrinity.index[0]].correlation_version : NaN;
+        results.correlation_model_version = pseudoTrinity.index[0] !== null ? LCCore.projects[pseudoTrinity.index[0]].correlation_version : NaN;
+        results.event_model_version       = pseudoTrinity.index[0] !== null ? LCCore.projects[pseudoTrinity.index[0]].correlation_version : NaN;
         results.age_model_version         = LCAge.AgeModels[ageIdx] !== undefined ? LCAge.AgeModels[ageIdx].version : NaN;
-        results.description               = "Converted from Event Free Depth. The trinity and CD are paseudo data.";
+        results.description               = "Converted from Event Free Depth. The trinity and CD are pseudo data.";
         results.source_type = type;
-        results.calc_type = "paseudo-depth";
+        results.calc_type = "pseudo-depth";
       } else if (type == "drilling_depth") {
         //NOT RECOMMENDED!!
         //get cd
@@ -4769,22 +4806,22 @@ function createMainWIndow() {
         }
 
         //get nearest trinity
-        const paseudoTrinity = LCCore.getNearestTrinity(targetId, dd, "drilling_depth");
+        const pseudoTrinity = LCCore.getNearestTrinity(targetId, dd, "drilling_depth");
         let send_data = [];
         let td = new Trinity();
         td.name         = name;
-        td.project_name = paseudoTrinity.project;
-        td.hole_name    = paseudoTrinity.hole;
-        td.section_name = paseudoTrinity.section;
-        td.distance     = paseudoTrinity.distance;
+        td.project_name = pseudoTrinity.project;
+        td.hole_name    = pseudoTrinity.hole;
+        td.section_name = pseudoTrinity.section;
+        td.distance     = pseudoTrinity.distance;
         send_data.push(td);
 
         //calc cd
-        const cd_list = LCCore.getDepthFromTrinity(targetId, send_data, "composite_depth", options.isForceCalculation); //output:[sec id, cd]
+        const cd_list = LCCore.getDepthFromTrinity(targetId, send_data, "composite_depth", allowExtrapolation, options.isForceCalculation); //output:[sec id, cd]
         const cd = cd_list[0][1];
 
         //calc efd
-        const efd_list = LCCore.getDepthFromTrinity(targetId, send_data, "event_free_depth", options.isForceCalculation); //output:[sec id, efd]
+        const efd_list = LCCore.getDepthFromTrinity(targetId, send_data, "event_free_depth", allowExtrapolation, options.isForceCalculation); //output:[sec id, efd]
         const efd = efd_list[0][1];
         const new_rank = efd_list[0][2];
 
@@ -4795,9 +4832,9 @@ function createMainWIndow() {
 
         //stack
         results.name = name;
-        results.hole = paseudoTrinity.hole !== null ? paseudoTrinity.hole : NaN;
-        results.section = paseudoTrinity.section !== null ? paseudoTrinity.section : NaN;
-        results.distance = paseudoTrinity.distance !== null ? paseudoTrinity.distance : NaN;
+        results.hole = pseudoTrinity.hole !== null ? pseudoTrinity.hole : NaN;
+        results.section = pseudoTrinity.section !== null ? pseudoTrinity.section : NaN;
+        results.distance = pseudoTrinity.distance !== null ? pseudoTrinity.distance : NaN;
         results.cd = cd !== null ? cd : NaN;
         results.efd = efd !== null ? efd : NaN;
         results.dd  = dd !== null ? dd : NaN;
@@ -4805,14 +4842,14 @@ function createMainWIndow() {
         results.age_upper = age.upper !== null ? age.upper : NaN;
         results.age_lower = age.lower !== null ? age.lower : NaN;
         results.age_source  = age.source!== null ? age.source: NaN;
-        results.section_type = paseudoTrinity.section_type !== null ? paseudoTrinity.section_type : "";
+        results.section_type = pseudoTrinity.section_type !== null ? pseudoTrinity.section_type : "";
         results.correlation_rank = 3;
-        results.correlation_model_version = paseudoTrinity.index[0] !== null ? LCCore.projects[paseudoTrinity.index[0]].correlation_version : NaN;
-        results.event_model_version       = paseudoTrinity.index[0] !== null ? LCCore.projects[paseudoTrinity.index[0]].correlation_version : NaN;
+        results.correlation_model_version = pseudoTrinity.index[0] !== null ? LCCore.projects[pseudoTrinity.index[0]].correlation_version : NaN;
+        results.event_model_version       = pseudoTrinity.index[0] !== null ? LCCore.projects[pseudoTrinity.index[0]].correlation_version : NaN;
         results.age_model_version         = LCAge.AgeModels[ageIdx] !== undefined ? LCAge.AgeModels[ageIdx].version : NaN;
-        results.description               = "NOT RECOMMENDED! Converted from Drilling Depth. The trinity, CD, EFD amd Age are paseudo data.";
+        results.description               = "NOT RECOMMENDED! Converted from Drilling Depth. The trinity, CD, EFD amd Age are pseudo data.";
         results.source_type = type;
-        results.calc_type = "paseudo-depth";
+        results.calc_type = "pseudo-depth";
       } else if (type == "age") {
         //get efd
         const name = data[0];
@@ -4823,14 +4860,14 @@ function createMainWIndow() {
         const efdData = LCAge.getEFDFromAge(age, method);
         const efd = efdData.efd.mid;
 
-        //get paseudo cd
+        //get pseudo cd
         const cd = LCCore.getCDfromEFD(efd);
 
         //re-calc age
         const rage = LCAge.getAgeFromEFD(efd, method);
 
         //get nearest trinity
-        const paseudoTrinity = LCCore.getNearestTrinity(targetId, efd, "composite_depth");
+        const pseudoTrinity = LCCore.getNearestTrinity(targetId, efd, "event_free_depth");
 
         //get age model idx
         let ageIdx = null;
@@ -4842,10 +4879,10 @@ function createMainWIndow() {
 
         //stack
         results.name = name;
-        results.project = paseudoTrinity.project !== null ? paseudoTrinity.project : NaN;
-        results.hole = paseudoTrinity.hole !== null ? paseudoTrinity.hole : NaN;
-        results.section = paseudoTrinity.section !== null ? paseudoTrinity.section : NaN;
-        results.distance = paseudoTrinity.distance !== null ? paseudoTrinity.distance : NaN;
+        results.project = pseudoTrinity.project !== null ? pseudoTrinity.project : NaN;
+        results.hole = pseudoTrinity.hole !== null ? pseudoTrinity.hole : NaN;
+        results.section = pseudoTrinity.section !== null ? pseudoTrinity.section : NaN;
+        results.distance = pseudoTrinity.distance !== null ? pseudoTrinity.distance : NaN;
         results.cd = cd !== null ? cd : NaN;
         results.efd = efd !== null ? efd : NaN;
         results.dd  = NaN;
@@ -4853,14 +4890,14 @@ function createMainWIndow() {
         results.age_upper = rage.age.upper !== null ? rage.age.upper : NaN;
         results.age_lower = rage.age.lower !== null ? rage.age.lower : NaN;
         results.age_source  = rage.age.source!== null ? rage.age.source: NaN;
-        results.section_type = paseudoTrinity.section_type !== null ? paseudoTrinity.section_type : "";
+        results.section_type = pseudoTrinity.section_type !== null ? pseudoTrinity.section_type : "";
         results.correlation_rank = 3;
-        results.correlation_model_version = paseudoTrinity.index[0] !== null ? LCCore.projects[paseudoTrinity.index[0]].correlation_version : NaN;
-        results.event_model_version       = paseudoTrinity.index[0] !== null ? LCCore.projects[paseudoTrinity.index[0]].correlation_version : NaN;
+        results.correlation_model_version = pseudoTrinity.index[0] !== null ? LCCore.projects[pseudoTrinity.index[0]].correlation_version : NaN;
+        results.event_model_version       = pseudoTrinity.index[0] !== null ? LCCore.projects[pseudoTrinity.index[0]].correlation_version : NaN;
         results.age_model_version         = LCAge.AgeModels[ageIdx] !== undefined ? LCAge.AgeModels[ageIdx].version : NaN;
-        results.description               = "Converted from Age. The trinity and CD are paseudo data.";
+        results.description               = "Converted from Age. The trinity and CD are pseudo data.";
         results.source_type = type;
-        results.calc_type = "paseudo-depth";
+        results.calc_type = "pseudo-depth";
       } else {
         results = null;
       }
@@ -4914,7 +4951,9 @@ function createMainWIndow() {
     //alert error
     newLCCore.on('error_alert', (err) => {
       console.error('LCCore => '+ err.statusDetails);
-      getMainWindow().webContents.send("AlertRenderer", err);
+      if (!suppressCoreAlertRenderer) {
+        getMainWindow().webContents.send("AlertRenderer", err);
+      }
     });
 
     //fatal error

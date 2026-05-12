@@ -37,3 +37,51 @@ test("edit commands can build and modify a two-project model from scratch", asyn
     await closeElectronApp(electronApp, firstWindow, runtimeIssueMonitor);
   }
 });
+
+test("project add modal remains editable after duplicate correlation error", async () => {
+  const { electronApp, firstWindow, runtimeIssueMonitor } = await launchApp();
+  try {
+    await firstWindow.evaluate(async () => {
+      window.__LC_E2E_ALERTS__ = [];
+      window.alert = (message) => {
+        window.__LC_E2E_ALERTS__.push(String(message));
+      };
+      await window.LCapi.InitialiseCorrelationModel();
+      await window.LCapi.InitialiseAgeModel();
+      await window.LCapi.addProject({ type: "correlation", name: "P1" });
+      await window.__LC_E2E__.reloadModelFromMain(false);
+      await window.LCapi.addHole({ projectId: [0, null, null, null], name: "A" });
+      await window.__LC_E2E__.reloadModelFromMain(false);
+    });
+
+    await firstWindow.evaluate(() => {
+      window.__LC_E2E_PROJECT_ADD_PROMISE__ = window.__LC_E2E__.openProjectAddDialog();
+    });
+    await firstWindow.locator("#lcModalDialog select[name='type']").selectOption("correlation");
+    await firstWindow.locator("#lcModalDialog input[name='name']").click();
+    await firstWindow.keyboard.type("P2");
+    await firstWindow.locator("#lcModalDialog button[type='submit']").click();
+    await expect(firstWindow.locator("#lcModalDialog .lc-dialog-message")).toContainText(
+      "A base correlation model already exists"
+    );
+    await expect.poll(() => firstWindow.evaluate(() => window.__LC_E2E_ALERTS__)).toEqual([]);
+    await firstWindow.locator("#lcModalDialog button[type='submit']").click();
+    await firstWindow.evaluate(() => window.__LC_E2E_PROJECT_ADD_PROMISE__);
+
+    await firstWindow.evaluate(() => {
+      window.__LC_E2E_PROJECT_ADD_PROMISE__ = window.__LC_E2E__.openProjectAddDialog();
+    });
+    await expect(firstWindow.locator("#lcModalDialog select[name='type']")).toHaveValue("duo");
+    const nameField = firstWindow.locator("#lcModalDialog input[name='name']");
+    await nameField.click();
+    await firstWindow.keyboard.type("P2");
+    await expect(nameField).toHaveValue("P2");
+    await firstWindow.locator("#lcModalDialog button[type='submit']").click();
+    await firstWindow.evaluate(() => window.__LC_E2E_PROJECT_ADD_PROMISE__);
+
+    const state = await firstWindow.evaluate(() => window.__LC_E2E__.getRendererState());
+    expect(state.projectCount).toBe(2);
+  } finally {
+    await closeElectronApp(electronApp, firstWindow, runtimeIssueMonitor);
+  }
+});

@@ -8,6 +8,14 @@ document.addEventListener("DOMContentLoaded", () => {
   let headerLines = 1;
   let dataId = null;
   let converterReady = false;
+  function showAlertDialog(message, title = "Alert") {
+    return window.LCModal.show({
+      title,
+      message,
+      submitLabel: "OK",
+      hideCancel: true,
+    });
+  }
   //-------------------------------------------------------------------------------------------
   window.ConverterApi.receive("ConverterMenuClicked", async (data) => {
     output_type = data.output_type;
@@ -338,7 +346,7 @@ document.addEventListener("DOMContentLoaded", () => {
       if(result.ok){
         console.log("[Converter]: Converted data is exported successfully.");
       }else{          
-        alert(result.reason)
+        showAlertDialog(result.reason);
         console.log("[Converter]: Failed to export.",result.reason);
         document.body.style.cursor = "default";
       }
@@ -384,7 +392,7 @@ document.addEventListener("DOMContentLoaded", () => {
       }
       
       if(dataList.length>1){
-        alert("Only one file can be imported.");
+        showAlertDialog("Only one file can be imported.");
         return
       }
       //load

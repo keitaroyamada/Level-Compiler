@@ -176,7 +176,7 @@ class LevelCompilerPlot {
           data[11]= age.age.lower;
         } else if (calcType == "event_free_depth") {
           //calc
-          const cd  = LCCore.getCDfromEFD( targetProjectId, data[7] ); //paseudo
+          const cd  = LCCore.getCDfromEFD( targetProjectId, data[7] ); //pseudo
           const age = LCAge.getAgefromEFD( data[7] );
 
           //add
@@ -187,7 +187,7 @@ class LevelCompilerPlot {
         } else if (calcType == "age") {
           //calc
           const efd = LCAge.getEFDFromAge( data[9], "linear" );          
-          const cd  = LCCore.getCDfromEFD( efd ); //paseudo
+          const cd  = LCCore.getCDfromEFD( efd ); //pseudo
 
           //add
           data[6] = cd;

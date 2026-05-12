@@ -14,6 +14,14 @@ document.addEventListener("DOMContentLoaded", () => {
   let holeName = "";
   let sectionName = "";
   let rect = null;  
+  function showAlertDialog(message, title = "Alert") {
+    return window.LCModal.show({
+      title,
+      message,
+      submitLabel: "OK",
+      hideCancel: true,
+    });
+  }
   function createImageTierBucket() {
     return {
       drilling_depth: {},
@@ -188,7 +196,7 @@ document.addEventListener("DOMContentLoaded", () => {
     return;
     e.preventDefault();
     if(Object.keys(modelImages.drilling_depth).length!==0){
-      alert("The target image is already registered. To replace it with a new image, please press the 'Initialise' button first.");
+      showAlertDialog("The target image is already registered. To replace it with a new image, please press the 'Initialise' button first.");
       return
     }
 
@@ -201,7 +209,7 @@ document.addEventListener("DOMContentLoaded", () => {
         dataList.push({type:file.name.split(".").pop(), name:file.name, path:file});
       } else {
         console.log("Image has incorrect name.");
-        alert("Image has incorrect name.");
+        showAlertDialog("Image has incorrect name.");
       }
       
     }

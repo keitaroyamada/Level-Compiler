@@ -335,7 +335,7 @@ document.addEventListener("DOMContentLoaded", () => {
       })
 
       if(!LCCore && order.length == 0){
-        alert("No correlation/duo model is loaded. Please load a correlation model first.");
+        showAlertDialog("No correlation/duo model is loaded. Please load a correlation model first.");
         return;
       }
 
@@ -367,7 +367,7 @@ document.addEventListener("DOMContentLoaded", () => {
       }else{
         dataList.forEach((data,i)=>{
           if(data.type == "lcsection"){
-            alert("The section model can only be loaded in Edit mode.")
+            showAlertDialog("The section model can only be loaded in Edit mode.")
             return;
           }
         })
@@ -383,7 +383,7 @@ document.addEventListener("DOMContentLoaded", () => {
       })
 
       if(numIm>0){
-        alert("To load images, drop the folder containing them. Image names must follow the format 'holeName-sectionName'.")
+        showAlertDialog("To load images, drop the folder containing them. Image names must follow the format 'holeName-sectionName'.")
         return
       }
 
@@ -433,7 +433,7 @@ document.addEventListener("DOMContentLoaded", () => {
             console.log(LCCore)
           }else{
             console.log("[Renderer]: Failed to load section data"+result);
-            alert("Failed to load LC section: "+result);
+            showAlertDialog("Failed to load LC section: "+result);
             await window.LCapi.clearProgressbar()
             return
           }
@@ -849,7 +849,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     if(!objOpts.edit.editable && !isConnected){
-      alert(
+      showAlertDialog(
         "The loaded model contains a project not connected to the master.\n" +
         "CD and EFD will be calculated independently for that project."
       );
@@ -886,7 +886,7 @@ document.addEventListener("DOMContentLoaded", () => {
     //data: status, statusDetails, hasError, statusDetails
 
     console.log("Error: \n",data);
-    alert(data.statusDetails)
+    await showErrorDialog(data.statusDetails, data.status ?? "Alert");
     //data.errorDetails
   });
   //============================================================================================
@@ -1540,6 +1540,15 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
+  function showAlertDialog(message, title = "Alert") {
+    return window.LCModal.show({
+      title,
+      message,
+      submitLabel: "OK",
+      hideCancel: true,
+    });
+  }
+
   async function handleEditContextmenu(event) {
     event.preventDefault();
     updateContextHittest(event);
@@ -1656,7 +1665,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }else if(clickResult == "addProject"){
       if(LCCore){
         if(LCCore.projects[LCCore.projects.length-1].holes.length  <= 0){
-          alert("The previous project is empty. Please add a hole to it first.");
+          showAlertDialog("The previous project is empty. Please add a hole to it first.");
 
           return
         }else{
@@ -1702,7 +1711,7 @@ document.addEventListener("DOMContentLoaded", () => {
           updateView();   
 
         }else if (result == "duplicate_holes"){
-          alert("Duplicate hole names detected. Please rename them to unique names.");
+          showAlertDialog("Duplicate hole names detected. Please rename them to unique names.");
         }
       }    
     }else if(clickResult == "changeProjectType"){
@@ -1882,7 +1891,7 @@ document.addEventListener("DOMContentLoaded", () => {
           }
         }        
       }else{
-        alert("Please create a project first.");
+        showAlertDialog("Please create a project first.");
       }
     }else if(clickResult == "editWorkspaceDescriptions"){
       if(LCCore){
@@ -1901,7 +1910,7 @@ document.addEventListener("DOMContentLoaded", () => {
           }
         }        
       }else{
-        alert("Please create a project first.");
+        showAlertDialog("Please create a project first.");
       }
     }else if(clickResult == "reload"){
       document.getElementById("bt_reload").click();
@@ -2625,7 +2634,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const result = await window.LCapi.addMarker({
           sectionId,
           depth: objOpts.edit.marker_from.y,
-          depthScale: objOpts.canvas.depth_scale,
+          depthScale: objOpts.edit.marker_from.depth_scale,
           relativeX: ht.relative_x,
         });
         if(result == true){
@@ -2691,7 +2700,7 @@ document.addEventListener("DOMContentLoaded", () => {
     project:null, 
     hole:null, 
     section:null, 
-    distance:null, 
+    distance:null, // Not calculated here. Depth-scale to section-distance conversion belongs to core.
     nearest_marker: null, 
     nearest_distance:null,
     upper_marker:null,
@@ -3504,15 +3513,18 @@ document.addEventListener("DOMContentLoaded", () => {
   }
   //5 Project click--------------------------------------------
   async function ProjectAdd(){
+    const hasBaseCorrelationProject = LCCore?.projects?.some(project => project.model_type === "correlation") ?? false;
+    const initialProjectType = hasBaseCorrelationProject ? "duo" : "correlation";
     const projectData = await window.LCModal.show({
       title: "Add Project",
       submitLabel: "Add",
+      initialFocus: "name",
       fields: [
         {
           name: "type",
           label: "Type",
           type: "select",
-          value: "correlation",
+          value: initialProjectType,
           options: [
             { value: "correlation", label: "Correlation" },
             { value: "duo", label: "Duo" },
@@ -4538,7 +4550,15 @@ document.addEventListener("DOMContentLoaded", () => {
   window.LCapi.receive("MoveToHorizonFromFinder", async (data) => {
     //move position based on finder
       //get location
-    let pos_y = data[objOpts.canvas.depth_scale];
+    if (!data) {
+      return;
+    }
+
+    let pos_y = Number(data[objOpts.canvas.depth_scale]);
+    if (!Number.isFinite(pos_y)) {
+      return;
+    }
+
     objOpts.interface.finder_data = data;
     console.log("[Renderer]: Received data from Finder: ", pos_y, objOpts.canvas.depth_scale);
     if(data.isMove){
@@ -4546,12 +4566,13 @@ document.addEventListener("DOMContentLoaded", () => {
 
       //convert scale from depth to pix
       //const canvasPosY =  yMag  * age_mod * (pos_y + shift_y) + pad_y - scroller.scrollTop;
-      let canvasPosY = null;
+      let yMag = objOpts.canvas.dpir * objOpts.canvas.zoom_level[1];
+      let padY = objOpts.canvas.pad_y;
       if (objOpts.canvas.depth_scale == "age") {
-        canvasPosY = ((pos_y + objOpts.canvas.shift_y) * (objOpts.canvas.dpir * objOpts.canvas.zoom_level[1]) + objOpts.canvas.pad_y + objOpts.canvas.age_zoom_correction[1])  * objOpts.canvas.age_zoom_correction[0];
-      } else {
-        canvasPosY = (pos_y + objOpts.canvas.shift_y) * (objOpts.canvas.dpir * objOpts.canvas.zoom_level[1]) + objOpts.canvas.pad_y;
+        yMag = yMag * objOpts.canvas.age_zoom_correction[0];
+        padY = padY + objOpts.canvas.age_zoom_correction[1];
       }
+      const canvasPosY = (pos_y + objOpts.canvas.shift_y) * yMag + padY;
 
       //update footer
       //const txt = await getFooterInfo(LCCore, objOpts.edit.hittest, objOpts);
@@ -5273,7 +5294,7 @@ document.addEventListener("DOMContentLoaded", () => {
           }
         } catch (err){
           console.error(err)
-          alert("An unexpected error occurred. The LC cache or temporary files may be corrupted.");
+          showAlertDialog("An unexpected error occurred. The LC cache or temporary files may be corrupted.");
 
           return
         }
@@ -5572,19 +5593,43 @@ document.addEventListener("DOMContentLoaded", () => {
           //finder target lines---------------------------------------------------
           //draw finder target line
 
-          if(finderEnable){
+          const finderData = objOpts.interface.finder_data;
+          const finder_pos_y = finderData ? Number(finderData[objOpts.canvas.depth_scale]) : NaN;
+
+          if(finderEnable && Number.isFinite(finder_pos_y)){
             sketch.push();      
             //fix position
-            let finder_pos_y = objOpts.interface.finder_data[objOpts.canvas.depth_scale];
             const target_y = (finder_pos_y + shift_y) * yMag + pad_y;
             //const target_x0 = 140;//for full
             //const target_x1 = (hole_x1 + shift_x + objOpts.hole.width / 2) * xMag + pad_x;//for full
           
-            const target_x0 = ((hole_x0 + shift_x) - (objOpts.hole.distance/2)) * xMag + pad_x;
-            const target_x1 = target_x0 +(objOpts.hole.width + objOpts.hole.distance) * xMag; 
+            let target_x0 = ((hole_x0 + shift_x) - (objOpts.hole.distance/2)) * xMag + pad_x;
+            let target_x1 = target_x0 +(objOpts.hole.width + objOpts.hole.distance) * xMag;
 
-            if(objOpts.canvas.depth_scale =="drilling_depth"){
-              if(hole.id[1]==objOpts.interface.finder_data.trinity.holeId[1]){
+            if(objOpts.canvas.depth_scale !== "drilling_depth"){
+              const enabledHoleOrders = project.holes
+                .filter((projectHole) => projectHole.enable)
+                .map((projectHole) => projectHole.order);
+              const isFirstEnabledHole = hole.order === Math.min(...enabledHoleOrders);
+              const isLastEnabledHole = hole.order === Math.max(...enabledHoleOrders);
+              const hasEnabledProjectBefore = LCCore.projects.some((currentProject) =>
+                currentProject.enable && currentProject.order < project.order
+              );
+              const hasEnabledProjectAfter = LCCore.projects.some((currentProject) =>
+                currentProject.enable && currentProject.order > project.order
+              );
+              const projectGapWidth = (objOpts.hole.width + objOpts.hole.distance) * objOpts.project.interval * xMag;
+
+              if(isFirstEnabledHole && hasEnabledProjectBefore){
+                target_x0 -= projectGapWidth / 2;
+              }
+
+              if(isLastEnabledHole && hasEnabledProjectAfter){
+                target_x1 += projectGapWidth / 2;
+              }
+            }
+
+            if(objOpts.canvas.depth_scale !== "drilling_depth" || (finderData.trinity && hole.id[1]==finderData.trinity.holeId[1])){
                 sketch.strokeWeight(1);
                 sketch.stroke(objOpts.canvas.finder_colour);
                 sketch.line(
@@ -5593,16 +5638,6 @@ document.addEventListener("DOMContentLoaded", () => {
                   target_x1,
                   target_y
                 );
-              }
-            }else{
-              sketch.strokeWeight(1);
-              sketch.stroke(objOpts.canvas.finder_colour);
-              sketch.line(
-                target_x0,
-                target_y,
-                target_x1,
-                target_y
-              );
             }
 
             //(hole_x0 + shift_x) * xMag + pad_x;
@@ -7340,7 +7375,7 @@ document.addEventListener("DOMContentLoaded", () => {
       " cm/yr\nEvent Free Depth: " +
       Math.round(srEFD * 1000) / 1000 +
       " cm/yr";
-    alert(text);
+    showAlertDialog(text, "Measure");
 
     document.getElementById("bt_measure").style.backgroundColor = "#f0f0f0";
     //penObject.isMeasure = false;
@@ -7523,7 +7558,7 @@ document.addEventListener("DOMContentLoaded", () => {
       if(!objOpts.edit.editable && !isConnected && ["user"].includes(objOpts.developer.mode)){
         objOpts.project.is_area_visible = true;
         objOpts.project.area_colour_disconnected = "#f96a6a";
-        alert(
+        showAlertDialog(
               "Please note that the loaded model contains a project not connected to the master.\n"+
               "CD and EFD will be calculated independently for that project."
             );
@@ -7948,6 +7983,10 @@ document.addEventListener("DOMContentLoaded", () => {
         ? objOpts.plotter.selected_options.length
         : 0,
     }),
+    reloadModelFromMain: async (recalcDepth = false) => {
+      await loadModel(true, recalcDepth);
+      return window.__LC_E2E__.getRendererState();
+    },
     setActiveImageSource: async (sourceId) => {
       if (!sourceId || !modelImages?.sources?.[sourceId]) {
         return { ok: false, error: "source_not_found" };
@@ -8258,6 +8297,7 @@ document.addEventListener("DOMContentLoaded", () => {
       sectionFrom: objOpts.edit.section_from,
       sectionTo: objOpts.edit.section_to,
     }),
+    openProjectAddDialog: async () => ProjectAdd(),
     exerciseEditCommandsOnNewModel: async () => {
       const operations = [];
 
@@ -11165,7 +11205,7 @@ function getClickedItemIdx(mouseX, mouseY, LCCore, objOpts){
     project:null, //single id
     hole:null, //single id
     section:null, //single id
-    distance:null, 
+    distance:null, // Not calculated here. Depth-scale to section-distance conversion belongs to core.
     nearest_marker: null, 
     nearest_distance:null,
     upper_marker:null,
@@ -11250,10 +11290,12 @@ function getClickedItemIdx(mouseX, mouseY, LCCore, objOpts){
           const sec_y1 = LCCore.projects[p].holes[h].sections[s].markers.slice(-1)[0][objOpts.canvas.depth_scale];//cd/efd
 
           if(y >= sec_y0 && y <= sec_y1){
-            results.section = LCCore.projects[p].holes[h].sections[s].id[2];
-            results.relative_y = (y-sec_y0)/(sec_y1-sec_y0);
-            results.sectionName = LCCore.projects[p].holes[h].sections[s].name;
-            results.sectionIdx = s;
+            results.sectionIdx  = s;
+            results.section     = LCCore.projects[p].holes[h].sections[s].id[2];
+            results.sectionName = LCCore.projects[p].holes[h].sections[s].name;            
+            
+            results.relative_y = (y-sec_y0)/(sec_y1-sec_y0);//relative y in depth scale
+
             let upperIdx = null;
             let lowerIdx = null;
             let lowerDistance = Infinity;
@@ -11275,25 +11317,9 @@ function getClickedItemIdx(mouseX, mouseY, LCCore, objOpts){
 
             } 
     
-            //Distance calculation is not recommended because the interpolation is in charge of LCCroe module.
-            /*
-            let D1 = LCCore.projects[p].holes[h].sections[s].markers[upperIdx].distance; //distance
-            let D3 = LCCore.projects[p].holes[h].sections[s].markers[lowerIdx].distance; //distance
-            let d1 = LCCore.projects[p].holes[h].sections[s].markers[upperIdx][objOpts.canvas.depth_scale]; //cd/efd
-            let d2 = y; //cd/efd
-            let d3 = LCCore.projects[p].holes[h].sections[s].markers[lowerIdx][objOpts.canvas.depth_scale]; //cd/efd
-
-            let d2d1 = Math.abs(d2 - d1);
-            let d3d1 = Math.abs(d3 - d1);
-            let D2 = null;
-            if (d3d1 == 0) {
-              D2 = D1;
-            } else {
-              D2 = D1 + (d2d1 / d3d1) * (D3 - D1);
-            }
-            results.distance = D2; //(((y - sec_y0) - pad_y) / yMag) - shift_y;
-            */
-
+            // Do not calculate results.distance here. Renderer hit testing should not
+            // convert display depth to section distance; core handles that conversion.
+            
             let nearestIdx = null;
             let markerDistance = null;
             if(Math.abs(lowerDistance) >= Math.abs(upperDistance)){
@@ -11308,7 +11334,7 @@ function getClickedItemIdx(mouseX, mouseY, LCCore, objOpts){
             results.nearest_marker   = LCCore.projects[p].holes[h].sections[s].markers[nearestIdx].id[3];   
             results.markerName       = LCCore.projects[p].holes[h].sections[s].markers[nearestIdx].name;
             results.upper_marker     = LCCore.projects[p].holes[h].sections[s].markers[upperIdx].id[3];
-            results.markerIdx = nearestIdx;
+            results.markerIdx        = nearestIdx;
             if(lowerIdx !== null){
               results.lower_marker = LCCore.projects[p].holes[h].sections[s].markers[lowerIdx].id[3];
             }            

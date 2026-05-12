@@ -122,6 +122,14 @@
       hideCancel: true,
     });
   }
+  function showAlertDialog(message, title = "Alert") {
+    return window.LCModal.show({
+      title,
+      message,
+      submitLabel: "OK",
+      hideCancel: true,
+    });
+  }
 
   //-------------------------------------------------------------------------------------------
   const scroller = document.getElementById("scroller");
@@ -260,7 +268,7 @@
   document.getElementById("scroller").addEventListener("drop", async (e) => {
     e.preventDefault();
     if(Object.keys(modelImages.drilling_depth).length!==0){
-      alert("The target image is already registered. To replace it with a new image, please press the 'Initialise' button first.");
+      showAlertDialog("The target image is already registered. To replace it with a new image, please press the 'Initialise' button first.");
       return
     }
 
@@ -273,7 +281,7 @@
         dataList.push({type:file.name.split(".").pop(), name:file.name, path:file});
       } else {
         console.log("Image has incorrect name.");
-        alert("Image has incorrect name.");
+        showAlertDialog("Image has incorrect name.");
       }
       
     }
@@ -314,7 +322,7 @@
       holeName = fileName.split(/[-]+/)[0];
       sectionName = fileName.split(/[-]+/)[1];
       if (/^\d$/.test(sectionName)){
-        alert("Single-digit numbers are not allowed as section names");
+        showAlertDialog("Single-digit numbers are not allowed as section names");
         return
       }
 
@@ -339,7 +347,7 @@
       holeName = fileName.split(/[-]+/)[0];
       sectionName = fileName.split(/[-]+/)[1];
       if (/^\d$/.test(sectionName)){
-        alert("Single-digit numbers are not allowed as section names");
+        showAlertDialog("Single-digit numbers are not allowed as section names");
         return
       }
 
@@ -389,7 +397,7 @@
         }
         console.log("Load image data: \n",modelImages);
       }else{
-        alert("There is no image corresponding LC model. The image name and the model name need to match.");
+        showAlertDialog("There is no image corresponding LC model. The image name and the model name need to match.");
         return
       }
     }else{
@@ -1087,7 +1095,7 @@
       const result = await window.LabelerApi.saveLabelerData(data);
 
       if(result == true){
-        alert("Successfully saved data.")
+        showAlertDialog("Successfully saved data.", "Saved")
         console.log("Successfully saved data.")
       }else{
         await showErrorDialog("Failed to save annotated data.")
