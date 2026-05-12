@@ -3540,11 +3540,145 @@ function createMainWIndow() {
       console.error(error)
     }
   });
+  function getConverterDepthOutputMask(sourceType, outType = "export") {
+    const exportMasks = {
+      trinity: {
+        project: true,
+        hole: true,
+        section: true,
+        distance: true,
+        dd: true,
+        cd: true,
+        efd: true,
+        age: true,
+      },
+      composite_depth: {
+        project: false,
+        hole: false,
+        section: false,
+        distance: false,
+        dd: false,
+        cd: true,
+        efd: true,
+        age: true,
+        // project: true, // Enable only if pseudo trinity output is allowed.
+        // hole: true,
+        // section: true,
+        // distance: true,
+        // dd: true,
+      },
+      event_free_depth: {
+        project: false,
+        hole: false,
+        section: false,
+        distance: false,
+        dd: false,
+        cd: false,
+        efd: true,
+        age: true,
+        // cd: true, // Enable only if incomplete EFD-to-CD output is allowed.
+        // project: true, // Enable only if pseudo trinity output is allowed.
+        // hole: true,
+        // section: true,
+        // distance: true,
+        // dd: true,
+      },
+      age: {
+        project: false,
+        hole: false,
+        section: false,
+        distance: false,
+        dd: false,
+        cd: false,
+        efd: true,
+        age: true,
+        // cd: true, // Enable only if incomplete Age-to-EFD-to-CD output is allowed.
+        // project: true, // Enable only if pseudo trinity output is allowed.
+        // hole: true,
+        // section: true,
+        // distance: true,
+        // dd: true,
+      },
+      drilling_depth: {
+        project: false,
+        hole: false,
+        section: false,
+        distance: false,
+        dd: false,
+        cd: false,
+        efd: false,
+        age: false,
+        // dd: true, // Enable only with an explicit target section contract.
+        // cd: true,
+        // efd: true,
+        // age: true,
+      },
+    };
+
+    const importMasks = structuredClone(exportMasks);
+    importMasks.event_free_depth.cd = true;
+    importMasks.age.cd = true;
+    // importMasks.composite_depth.project = true; // Enable only if pseudo trinity display is allowed.
+    // importMasks.composite_depth.hole = true;
+    // importMasks.composite_depth.section = true;
+    // importMasks.composite_depth.distance = true;
+    // importMasks.composite_depth.dd = true;
+    // importMasks.event_free_depth.project = true;
+    // importMasks.event_free_depth.hole = true;
+    // importMasks.event_free_depth.section = true;
+    // importMasks.event_free_depth.distance = true;
+    // importMasks.event_free_depth.dd = true;
+    // importMasks.age.project = true;
+    // importMasks.age.hole = true;
+    // importMasks.age.section = true;
+    // importMasks.age.distance = true;
+    // importMasks.age.dd = true;
+
+    const masks = outType === "import" ? importMasks : exportMasks;
+    return masks[sourceType] ?? masks.trinity;
+  }
+
+  function formatConverterNumber(value, precision) {
+    const numericValue = Number(value);
+    if (!Number.isFinite(numericValue)) {
+      return "";
+    }
+
+    return numericValue.toFixed(precision);
+  }
+
+  function applyConverterDepthOutputMask(calcedData, sourceType, outType = "export") {
+    const mask = getConverterDepthOutputMask(sourceType, outType);
+    const maskedData = { ...calcedData };
+
+    if (!mask.project) maskedData.project = null;
+    if (!mask.hole) maskedData.hole = null;
+    if (!mask.section) maskedData.section = null;
+    if (!mask.distance) maskedData.distance = null;
+    if (!mask.dd) maskedData.dd = null;
+    if (!mask.cd) maskedData.cd = null;
+    if (!mask.efd) maskedData.efd = null;
+    if (!mask.age) {
+      maskedData.age_mid = null;
+      maskedData.age_upper = null;
+      maskedData.age_lower = null;
+      maskedData.age_source = null;
+    }
+
+    return maskedData;
+  }
+
   ipcMain.handle("cvtConverter", async (_e, payload) => {
     let { options } = payload;
     options = await unzipData(options);
-    if(!globalTempData){
-
+    if(!globalTempData || globalTempData.from !== "converter" || globalTempData.id !== options.id){
+      return {ok:false, reason: "No converter source data found. Please load a CSV file again."}
+    }
+    if(options.sourceType === "drilling_depth"){
+      return {ok:false, reason: "Drilling depth is not supported as a converter input."}
+    }
+    if(LCAge.AgeModels.length == 0 || !LCAge.selected_id){
+      return {ok:false, reason: "No age model found. Please load an age model first."}
     }
     if(globalTempData.from == "converter" && globalTempData.id == options.id){
       //mage submit indata for depthconverter
@@ -3706,62 +3840,45 @@ function createMainWIndow() {
             continue
           }
 
-          //update header
-          if(i==0){
-            if(options.sourceType !== "trinity"){
-              header[1] += " [PSEUDO]";
-              header[2] += " [PSEUDO]";
-              header[3] += " [PSEUDO]";
-              header[4] += " [PSEUDO]";   
-              if(options.sourceType ==="event_free_depth" || options.sourceType ==="age"){
-                header[9] += " [PSEUDO]";
-              }else if(options.sourceType ==="drilling_depth"){
-                header[9] += " [PSEUDO]";
-                header[10] += " [PSEUDO]";
-                header[11] += " [PSEUDO]";
-                header[12] += " [PSEUDO]";
-                header[13] += " [PSEUDO]";
-              }           
-            }
-          }
+          const outputMask = getConverterDepthOutputMask(options.sourceType, options.outType);
+          const outputData = applyConverterDepthOutputMask(calcedData, options.sourceType, options.outType);
 
           let correlationType = "";                  
-          if(calcedData.project_type === "correlation"){
+          if(outputMask.project && calcedData.project_type === "correlation"){
             correlationType = "Main " + calcedData.section_type;            
-          }else if(calcedData.project_type === "duo"){
+          }else if(outputMask.project && calcedData.project_type === "duo"){
             correlationType = "Duo " + calcedData.section_type;
           }          
 
           let basis = null;
           const baseIdx = LCCore.search_idx_list[LCCore.base_project_id.toString()];
 
-          if(calcedData.is_main_model_connected===false){
+          if(outputMask.project && calcedData.is_main_model_connected===false){
             basis = calcedData.project;
           }else{
             basis = LCCore.projects[baseIdx[0]].name;
           }
 
           //make output array
-          const allowPseudoTrinity = false;
           let rowData = [
-            calcedData.name, //data name
-            options.sourceType==="trinity"||allowPseudoTrinity ? calcedData.project : "", //project name
-            options.sourceType==="trinity"||allowPseudoTrinity ? calcedData.hole : "", //hole name
-            options.sourceType==="trinity"||allowPseudoTrinity ? calcedData.section : "", //section name
-            options.sourceType==="trinity"||allowPseudoTrinity ? parseFloat(calcedData.distance).toFixed(options.precision) : "", //distance
-            options.sourceType==="trinity"||allowPseudoTrinity ? parseFloat(calcedData.dd).toFixed(options.precision) : "", //drilling depth
+            outputData.name, //data name
+            outputData.project ?? "", //project name
+            outputData.hole ?? "", //hole name
+            outputData.section ?? "", //section name
+            formatConverterNumber(outputData.distance, options.precision), //distance
+            formatConverterNumber(outputData.dd, options.precision), //drilling depth
             calcedData.source_type,
             "",
             basis,
-            parseFloat(calcedData.cd).toFixed(options.precision), //composite depth
-            parseFloat(calcedData.efd).toFixed(options.precision), //event free depth            
-            parseFloat(calcedData.age_mid).toFixed(options.precision), //age mid
-            parseFloat(calcedData.age_upper).toFixed(options.precision), //age upper
-            parseFloat(calcedData.age_lower).toFixed(options.precision), //age lower
+            formatConverterNumber(outputData.cd, options.precision), //composite depth
+            formatConverterNumber(outputData.efd, options.precision), //event free depth            
+            formatConverterNumber(outputData.age_mid, options.precision), //age mid
+            formatConverterNumber(outputData.age_upper, options.precision), //age upper
+            formatConverterNumber(outputData.age_lower, options.precision), //age lower
             "",//separator            
-            calcedData.correlation_rank,  //connection rank    
+            outputMask.project ? calcedData.correlation_rank : "",  //connection rank    
             correlationType,//calcedData.is_main_model_connected ? "MAIN " + calcedData.section_type : "DUO " + calcedData.section_type, // MAIN master section/parallel section                    
-            calcedData.age_source.type+"("+calcedData.age_source.upper+"/"+calcedData.age_source.lower+")", //age inter/extrapolation
+            outputData.age_source ? outputData.age_source.type+"("+outputData.age_source.upper+"/"+outputData.age_source.lower+")" : "", //age inter/extrapolation
             //calcedData.calc_type,
             "",
             calcedData.correlation_model_version,
@@ -3799,14 +3916,6 @@ function createMainWIndow() {
         }
         return res
       }else if(options.outType == "import"){
-        if (options.sourceType == "age"){
-          //check age model exist
-          if(LCAge.AgeModels.length == 0 || !LCAge.selected_id){
-            //there is no selected age model
-            return {ok:false, reason: "No age model found. Please load an age model first."}
-          }          
-        }
-        
         progressBar = progressDialog(getConverterWindow(), "Depth Converter", "Now importing...", true);
         await new Promise((resolve) => {
           progressBar.on("ready", resolve);
@@ -3851,14 +3960,7 @@ function createMainWIndow() {
           calcedData.data_values = values;
           calcedData.data_units  = units;
 
-          if(options.sourceType !== "trinity"){
-            calcedData.project  = null;
-            calcedData.hole     = null;
-            calcedData.section  = null;
-            calcedData.distance = null;
-          }
-
-          output.push(calcedData);
+          output.push(applyConverterDepthOutputMask(calcedData, options.sourceType, options.outType));
         }
 
         //convert to flat       
@@ -3913,8 +4015,8 @@ function createMainWIndow() {
         
         //finish
         if(progressBar!==null){
-          //progressBar.close();
-          //progressBar = null;
+          progressBar.close();
+          progressBar = null;
         }
         globalTempData = null;
         if (hasConverterWindow()) {
@@ -4565,6 +4667,23 @@ function createMainWIndow() {
       await new Promise(resolve => progressBar.on('ready', resolve));
     }    
 
+    function applyPseudoTrinityToResult(results, pseudoTrinity) {
+      const idx = pseudoTrinity?.index ?? [null, null, null, null];
+      const project = idx[0] !== null ? LCCore.projects[idx[0]] : null;
+      const hole = project && idx[1] !== null ? project.holes[idx[1]] : null;
+      const section = hole && idx[2] !== null ? hole.sections[idx[2]] : null;
+
+      results.project = pseudoTrinity?.project != null ? pseudoTrinity.project : NaN;
+      results.hole = pseudoTrinity?.hole != null ? pseudoTrinity.hole : NaN;
+      results.section = pseudoTrinity?.section != null ? pseudoTrinity.section : NaN;
+      results.distance = pseudoTrinity?.distance != null ? pseudoTrinity.distance : NaN;
+
+      results.project_id = project ? project.id : [null, null, null, null];
+      results.hole_id = hole ? hole.id : [null, null, null, null];
+      results.section_id = section ? section.id : [null, null, null, null];
+      results.section_type = pseudoTrinity?.section_type != null ? pseudoTrinity.section_type : "";
+    }
+
     let last = performance.now();
     for(let i=0; i<dataList.length; i++){
       const now = performance.now();
@@ -4736,10 +4855,7 @@ function createMainWIndow() {
 
         //stack
         results.name = name;
-        results.project = pseudoTrinity.project !== null ? pseudoTrinity.project : NaN;
-        results.hole = pseudoTrinity.hole !== null ? pseudoTrinity.hole : NaN;
-        results.section = pseudoTrinity.section !== null ? pseudoTrinity.section : NaN;
-        results.distance = pseudoTrinity.distance !== null ? pseudoTrinity.distance : NaN;
+        applyPseudoTrinityToResult(results, pseudoTrinity);
         results.cd = cd !== null ? cd : NaN;
         results.efd = efd !== null ? efd : NaN;
         results.dd  = NaN;
@@ -4747,7 +4863,6 @@ function createMainWIndow() {
         results.age_upper = age.upper !== null ? age.upper : NaN;
         results.age_lower = age.lower !== null ? age.lower : NaN;
         results.age_source  = age.source!== null ? age.source: NaN;
-        results.section_type = pseudoTrinity.section_type !== null ? pseudoTrinity.section_type : "";
         results.correlation_rank = 3;
         results.correlation_model_version = pseudoTrinity.index[0] !== null ? LCCore.projects[pseudoTrinity.index[0]].correlation_version : NaN;
         results.event_model_version       = pseudoTrinity.index[0] !== null ? LCCore.projects[pseudoTrinity.index[0]].correlation_version : NaN;
@@ -4774,10 +4889,7 @@ function createMainWIndow() {
 
         //stack
         results.name = name;
-        results.project = pseudoTrinity.project !== null ? pseudoTrinity.project : NaN;
-        results.hole = pseudoTrinity.hole !== null ? pseudoTrinity.hole : NaN;
-        results.section = pseudoTrinity.section !== null ? pseudoTrinity.section : NaN;
-        results.distance = pseudoTrinity.distance !== null ? pseudoTrinity.distance : NaN;
+        applyPseudoTrinityToResult(results, pseudoTrinity);
         results.cd = cd !== null ? cd : NaN;
         results.efd = efd !== null ? efd : NaN;
         results.dd  = NaN;
@@ -4785,7 +4897,6 @@ function createMainWIndow() {
         results.age_upper = age.upper !== null ? age.upper : NaN;
         results.age_lower = age.lower !== null ? age.lower : NaN;
         results.age_source  = age.source!== null ? age.source: NaN;
-        results.section_type = pseudoTrinity.section_type !== null ? pseudoTrinity.section_type : "";
         results.correlation_rank = 3;
         results.correlation_model_version = pseudoTrinity.index[0] !== null ? LCCore.projects[pseudoTrinity.index[0]].correlation_version : NaN;
         results.event_model_version       = pseudoTrinity.index[0] !== null ? LCCore.projects[pseudoTrinity.index[0]].correlation_version : NaN;
@@ -4832,9 +4943,7 @@ function createMainWIndow() {
 
         //stack
         results.name = name;
-        results.hole = pseudoTrinity.hole !== null ? pseudoTrinity.hole : NaN;
-        results.section = pseudoTrinity.section !== null ? pseudoTrinity.section : NaN;
-        results.distance = pseudoTrinity.distance !== null ? pseudoTrinity.distance : NaN;
+        applyPseudoTrinityToResult(results, pseudoTrinity);
         results.cd = cd !== null ? cd : NaN;
         results.efd = efd !== null ? efd : NaN;
         results.dd  = dd !== null ? dd : NaN;
@@ -4842,7 +4951,6 @@ function createMainWIndow() {
         results.age_upper = age.upper !== null ? age.upper : NaN;
         results.age_lower = age.lower !== null ? age.lower : NaN;
         results.age_source  = age.source!== null ? age.source: NaN;
-        results.section_type = pseudoTrinity.section_type !== null ? pseudoTrinity.section_type : "";
         results.correlation_rank = 3;
         results.correlation_model_version = pseudoTrinity.index[0] !== null ? LCCore.projects[pseudoTrinity.index[0]].correlation_version : NaN;
         results.event_model_version       = pseudoTrinity.index[0] !== null ? LCCore.projects[pseudoTrinity.index[0]].correlation_version : NaN;
@@ -4879,10 +4987,7 @@ function createMainWIndow() {
 
         //stack
         results.name = name;
-        results.project = pseudoTrinity.project !== null ? pseudoTrinity.project : NaN;
-        results.hole = pseudoTrinity.hole !== null ? pseudoTrinity.hole : NaN;
-        results.section = pseudoTrinity.section !== null ? pseudoTrinity.section : NaN;
-        results.distance = pseudoTrinity.distance !== null ? pseudoTrinity.distance : NaN;
+        applyPseudoTrinityToResult(results, pseudoTrinity);
         results.cd = cd !== null ? cd : NaN;
         results.efd = efd !== null ? efd : NaN;
         results.dd  = NaN;
@@ -4890,7 +4995,6 @@ function createMainWIndow() {
         results.age_upper = rage.age.upper !== null ? rage.age.upper : NaN;
         results.age_lower = rage.age.lower !== null ? rage.age.lower : NaN;
         results.age_source  = rage.age.source!== null ? rage.age.source: NaN;
-        results.section_type = pseudoTrinity.section_type !== null ? pseudoTrinity.section_type : "";
         results.correlation_rank = 3;
         results.correlation_model_version = pseudoTrinity.index[0] !== null ? LCCore.projects[pseudoTrinity.index[0]].correlation_version : NaN;
         results.event_model_version       = pseudoTrinity.index[0] !== null ? LCCore.projects[pseudoTrinity.index[0]].correlation_version : NaN;
@@ -4905,10 +5009,9 @@ function createMainWIndow() {
       resultList.push(results);
     }
 
-    if(progressBar!==null){
-      //progressBar   = await updateProgress(progressBar, 1, 1);
-      //progressBar.close();
-      //progressBar = null;
+    if(showProgress && progressBar!==null){
+      progressBar.close();
+      progressBar = null;
     }
 
     return resultList;

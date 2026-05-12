@@ -392,6 +392,324 @@ test("finder coordinate search computes CD, EFD, and age consistently after load
   }
 });
 
+test("finder drilling-depth clicks select the target section by returned IDs", async () => {
+  const { electronApp, firstWindow, runtimeIssueMonitor } = await launchApp();
+  try {
+    await firstWindow.evaluate(
+      async ({ lcmodel, ageCsv }) => {
+        await window.__LC_E2E__.loadLcModelFromPath(lcmodel);
+        await window.__LC_E2E__.loadAgeModelFromPath(ageCsv);
+      },
+      FIXTURE_PATHS
+    );
+
+    await firstWindow.evaluate(() => window.LCapi.OpenFinder());
+    const finderWindow = await findWindowByTitle(electronApp, "LC Finder");
+    await finderWindow.waitForLoadState("domcontentloaded");
+    await finderWindow.waitForFunction(
+      () =>
+        Boolean(window.__LC_FINDER_E2E__ && window.__LC_FINDER_E2E__.isReady()) &&
+        document.getElementById("holeOptions").options.length > 0 &&
+        document.getElementById("sectionOptions").options.length > 0
+    );
+
+    const target = await finderWindow.evaluate(async () => {
+      const [, holeList, sectionList] = await window.FinderApi.finderGetCoreList();
+      const firstProjectId = holeList[0]?.[1]?.[0];
+      let fallbackCandidate = null;
+
+      for (const hole of holeList) {
+        const sections = sectionList[hole[0]] ?? [];
+        for (const section of sections) {
+          const markers = section[5] ?? [];
+          const topDd = Number(markers[0]?.drilling_depth);
+          const bottomDd = Number(markers[markers.length - 1]?.drilling_depth);
+          const topDistance = Number(section[3]);
+          const bottomDistance = Number(section[4]);
+          if (
+            Number.isFinite(topDd) &&
+            Number.isFinite(bottomDd) &&
+            topDd !== bottomDd &&
+            Number.isFinite(topDistance) &&
+            Number.isFinite(bottomDistance)
+          ) {
+            const candidate = {
+              holeValue: hole[0],
+              holeId: hole[1],
+              sectionValue: section[0],
+              sectionId: section[1],
+              y: (topDd + bottomDd) / 2,
+              minDistance: Math.min(topDistance, bottomDistance),
+              maxDistance: Math.max(topDistance, bottomDistance),
+            };
+
+            if (hole[1]?.[0] !== firstProjectId) {
+              return candidate;
+            }
+
+            fallbackCandidate ??= candidate;
+          }
+        }
+      }
+
+      return fallbackCandidate;
+    });
+
+    expect(target).toBeTruthy();
+
+    await firstWindow.evaluate(
+      async ({ target }) => {
+        await window.LCapi.SendDepthToFinder({
+          data: {
+            depth_scale: "drilling_depth",
+            y: target.y,
+            project: target.sectionId[0],
+            hole: target.sectionId[1],
+            section: target.sectionId[2],
+            distance: null,
+          },
+        });
+      },
+      { target }
+    );
+
+    await finderWindow.waitForFunction(
+      ({ target }) => {
+        const state = window.__LC_FINDER_E2E__.getState();
+        return Number(state.hole) === target.holeValue && Number(state.section) === target.sectionValue;
+      },
+      { target }
+    );
+
+    const state = await finderWindow.evaluate(() => window.__LC_FINDER_E2E__.getState());
+    expect(Number(state.hole)).toBe(target.holeValue);
+    expect(Number(state.section)).toBe(target.sectionValue);
+    expect(Number(state.distance)).toBeGreaterThanOrEqual(target.minDistance);
+    expect(Number(state.distance)).toBeLessThanOrEqual(target.maxDistance);
+    expect(Number.isFinite(Number(state.cd))).toBe(true);
+    expect(Number.isFinite(Number(state.efd))).toBe(true);
+  } finally {
+    await closeElectronApp(electronApp, firstWindow, runtimeIssueMonitor);
+  }
+});
+
+test("finder drilling-depth clicks without a section choose the containing section", async () => {
+  const { electronApp, firstWindow, runtimeIssueMonitor } = await launchApp();
+  try {
+    await firstWindow.evaluate(
+      async ({ lcmodel, ageCsv }) => {
+        await window.__LC_E2E__.loadLcModelFromPath(lcmodel);
+        await window.__LC_E2E__.loadAgeModelFromPath(ageCsv);
+      },
+      FIXTURE_PATHS
+    );
+
+    await firstWindow.evaluate(() => window.LCapi.OpenFinder());
+    const finderWindow = await findWindowByTitle(electronApp, "LC Finder");
+    await finderWindow.waitForLoadState("domcontentloaded");
+    await finderWindow.waitForFunction(
+      () =>
+        Boolean(window.__LC_FINDER_E2E__ && window.__LC_FINDER_E2E__.isReady()) &&
+        document.getElementById("holeOptions").options.length > 0 &&
+        document.getElementById("sectionOptions").options.length > 0
+    );
+
+    const target = await finderWindow.evaluate(async () => {
+      const [, holeList, sectionList] = await window.FinderApi.finderGetCoreList();
+
+      for (const hole of holeList) {
+        const sections = sectionList[hole[0]] ?? [];
+        for (const section of sections) {
+          const markers = section[5] ?? [];
+          const topDd = Number(markers[0]?.drilling_depth);
+          const bottomDd = Number(markers[markers.length - 1]?.drilling_depth);
+          if (Number.isFinite(topDd) && Number.isFinite(bottomDd) && topDd !== bottomDd) {
+            return {
+              holeValue: hole[0],
+              holeId: hole[1],
+              sectionValue: section[0],
+              sectionId: section[1],
+              y: (topDd + bottomDd) / 2,
+            };
+          }
+        }
+      }
+
+      return null;
+    });
+
+    expect(target).toBeTruthy();
+
+    await firstWindow.evaluate(
+      async ({ target }) => {
+        await window.LCapi.SendDepthToFinder({
+          data: {
+            depth_scale: "drilling_depth",
+            y: target.y,
+            project: target.holeId[0],
+            hole: target.holeId[1],
+            section: null,
+            distance: null,
+          },
+        });
+      },
+      { target }
+    );
+
+    await finderWindow.waitForFunction(
+      ({ target }) => {
+        const state = window.__LC_FINDER_E2E__.getState();
+        return Number(state.hole) === target.holeValue && Number(state.section) === target.sectionValue;
+      },
+      { target }
+    );
+
+    const state = await finderWindow.evaluate(() => window.__LC_FINDER_E2E__.getState());
+    expect(Number(state.hole)).toBe(target.holeValue);
+    expect(Number(state.section)).toBe(target.sectionValue);
+    expect(Number(state.distance)).toBeGreaterThanOrEqual(0);
+    expect(Number.isFinite(Number(state.cd))).toBe(true);
+    expect(Number.isFinite(Number(state.efd))).toBe(true);
+  } finally {
+    await closeElectronApp(electronApp, firstWindow, runtimeIssueMonitor);
+  }
+});
+
+test("depthConverter returns location IDs for all Finder source types", async () => {
+  const { electronApp, firstWindow, runtimeIssueMonitor } = await launchApp();
+  try {
+    await firstWindow.evaluate(
+      async ({ lcmodel, ageCsv }) => {
+        await window.__LC_E2E__.loadLcModelFromPath(lcmodel);
+        await window.__LC_E2E__.loadAgeModelFromPath(ageCsv);
+      },
+      FIXTURE_PATHS
+    );
+
+    await firstWindow.evaluate(() => window.LCapi.OpenFinder());
+    const finderWindow = await findWindowByTitle(electronApp, "LC Finder");
+    await finderWindow.waitForLoadState("domcontentloaded");
+    await finderWindow.waitForFunction(
+      () =>
+        Boolean(window.__LC_FINDER_E2E__ && window.__LC_FINDER_E2E__.isReady()) &&
+        document.getElementById("holeOptions").options.length > 0 &&
+        document.getElementById("sectionOptions").options.length > 0
+    );
+
+    const target = await finderWindow.evaluate(async () => {
+      const [, holeList, sectionList] = await window.FinderApi.finderGetCoreList();
+
+      for (const hole of holeList) {
+        const sections = sectionList[hole[0]] ?? [];
+        for (const section of sections) {
+          const markers = section[5] ?? [];
+          const topDd = Number(markers[0]?.drilling_depth);
+          const bottomDd = Number(markers[markers.length - 1]?.drilling_depth);
+          const topDistance = Number(section[3]);
+          const bottomDistance = Number(section[4]);
+
+          if (
+            Number.isFinite(topDd) &&
+            Number.isFinite(bottomDd) &&
+            topDd !== bottomDd &&
+            Number.isFinite(topDistance) &&
+            Number.isFinite(bottomDistance)
+          ) {
+            return {
+              holeName: hole[2],
+              sectionName: section[2],
+              sectionId: section[1],
+              distance: (topDistance + bottomDistance) / 2,
+              dd: (topDd + bottomDd) / 2,
+            };
+          }
+        }
+      }
+
+      return null;
+    });
+
+    expect(target).toBeTruthy();
+
+    const converted = await firstWindow.evaluate(async ({ target }) => {
+      const commonOptions = {
+        polationType: "linear",
+        allowOutside: false,
+      };
+      const trinityResult = await window.LCapi.depthConverter({
+        dataList: [["finder_contract_trinity", ["", target.holeName, target.sectionName, target.distance], target.sectionId]],
+        options: {
+          ...commonOptions,
+          sourceType: "trinity",
+          allowOutside: true,
+          isForceCalculation: true,
+        },
+      });
+      const base = trinityResult;
+      const cdResult = await window.LCapi.depthConverter({
+        dataList: [["finder_contract_cd", base.cd, target.sectionId]],
+        options: {
+          ...commonOptions,
+          sourceType: "composite_depth",
+        },
+      });
+      const efdResult = await window.LCapi.depthConverter({
+        dataList: [["finder_contract_efd", base.efd, target.sectionId]],
+        options: {
+          ...commonOptions,
+          sourceType: "event_free_depth",
+        },
+      });
+      const ddResult = await window.LCapi.depthConverter({
+        dataList: [["finder_contract_dd", target.dd, target.sectionId]],
+        options: {
+          ...commonOptions,
+          sourceType: "drilling_depth",
+        },
+      });
+      const ageResult = await window.LCapi.depthConverter({
+        dataList: [["finder_contract_age", base.age_mid, target.sectionId]],
+        options: {
+          ...commonOptions,
+          sourceType: "age",
+        },
+      });
+
+      return {
+        trinity: trinityResult,
+        composite_depth: cdResult,
+        event_free_depth: efdResult,
+        drilling_depth: ddResult,
+        age: ageResult,
+      };
+    }, { target });
+
+    for (const [sourceType, result] of Object.entries(converted)) {
+      expect(result, sourceType).toBeTruthy();
+      expect(result.source_type).toBe(sourceType);
+      expect(result.project).toBeTruthy();
+      expect(result.hole).toBeTruthy();
+      expect(result.section).toBeTruthy();
+      expect(Array.isArray(result.project_id), sourceType).toBe(true);
+      expect(Array.isArray(result.hole_id), sourceType).toBe(true);
+      expect(Array.isArray(result.section_id), sourceType).toBe(true);
+      expect(result.project_id.slice(0, 1), sourceType).toEqual(target.sectionId.slice(0, 1));
+      expect(result.hole_id.slice(0, 2), sourceType).toEqual(target.sectionId.slice(0, 2));
+      expect(result.section_id.slice(0, 3), sourceType).toEqual(target.sectionId.slice(0, 3));
+      expect(Number.isFinite(Number(result.distance)), sourceType).toBe(true);
+      expect(Number.isFinite(Number(result.cd)), sourceType).toBe(true);
+      expect(Number.isFinite(Number(result.efd)), sourceType).toBe(true);
+      expect(Number.isFinite(Number(result.age_mid)), sourceType).toBe(true);
+      expect(result.calc_type, sourceType).toBeTruthy();
+    }
+
+    expect(Number.isFinite(Number(converted.trinity.dd))).toBe(true);
+    expect(Number.isFinite(Number(converted.drilling_depth.dd))).toBe(true);
+  } finally {
+    await closeElectronApp(electronApp, firstWindow, runtimeIssueMonitor);
+  }
+});
+
 test("finder getSectionLimit payload returns the current section bounds", async () => {
   const { electronApp, firstWindow, runtimeIssueMonitor } = await launchApp();
   try {
@@ -542,6 +860,35 @@ test("converter cvtConverter payload runs through import flow without dialogs", 
     const result = await converterWindow.evaluate(() => window.__LC_CONVERTER_E2E__.runConverterPayload());
     expect(result.ok).toBe(false);
     expect(result.reason).toBe("There is no actions.");
+  } finally {
+    await closeElectronApp(electronApp, firstWindow, runtimeIssueMonitor);
+  }
+});
+
+test("converter age import returns an error when no age model is loaded", async () => {
+  test.setTimeout(30000);
+  const { electronApp, firstWindow, runtimeIssueMonitor } = await launchApp();
+  try {
+    await firstWindow.evaluate(
+      async ({ lcmodel }) => window.__LC_E2E__.loadLcModelFromPath(lcmodel),
+      { lcmodel: FIXTURE_PATHS.lcmodel }
+    );
+
+    await clickMenuItemByLabel(electronApp, "Converter");
+    const converterWindow = await findWindowByTitle(electronApp, "LC Converter");
+    await converterWindow.waitForLoadState("domcontentloaded");
+    await converterWindow.waitForFunction(
+      () => Boolean(window.__LC_CONVERTER_E2E__ && window.__LC_CONVERTER_E2E__.isReady())
+    );
+
+    await converterWindow.evaluate(
+      async ({ ageCsv }) => window.__LC_CONVERTER_E2E__.loadCsvFromPath(ageCsv),
+      { ageCsv: FIXTURE_PATHS.ageCsv }
+    );
+
+    const result = await converterWindow.evaluate(() => window.__LC_CONVERTER_E2E__.runConverterPayload());
+    expect(result.ok).toBe(false);
+    expect(result.reason).toBe("No age model found. Please load an age model first.");
   } finally {
     await closeElectronApp(electronApp, firstWindow, runtimeIssueMonitor);
   }

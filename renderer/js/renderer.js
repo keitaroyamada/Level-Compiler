@@ -941,7 +941,7 @@ document.addEventListener("DOMContentLoaded", () => {
           LCPlotData.data_collections[colIdx].rows.forEach((row,ridx)=>{
             const drawPoint  = drawPointData(row, LCCore);
 
-            if(!Number.isFinite(drawPoint.drilling_depth)){
+            if(!Number.isFinite(Number(drawPoint[objOpts.canvas.depth_scale]))){
               return
             }
 
@@ -983,7 +983,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
           LCPlotData.data_collections[colIdx].rows.forEach((row,ridx)=>{
             const drawPoint  = drawPointData(row, LCCore);
-            if(!Number.isFinite(drawPoint.composite_depth)){
+            if(!Number.isFinite(Number(drawPoint[objOpts.canvas.depth_scale]))){
               return
             }
 

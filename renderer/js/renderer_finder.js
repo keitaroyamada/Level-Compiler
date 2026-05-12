@@ -72,29 +72,47 @@ document.addEventListener("DOMContentLoaded", () => {
     targetId = [null, null, null, null];
   }
 
+  function idMatches(actualId, expectedId, depth) {
+    if (!Array.isArray(actualId) || !Array.isArray(expectedId)) {
+      return false;
+    }
+
+    for (let i = 0; i < depth; i++) {
+      if (actualId[i] !== expectedId[i]) {
+        return false;
+      }
+    }
+
+    return true;
+  }
+
   async function selectFinderLocationFromDepthResult(calcedData, fallbackData) {
-    const fallbackProjectId = fallbackData?.project;
-    const fallbackHoleId = fallbackData?.hole;
-    const fallbackSectionId = fallbackData?.section;
+    const resultHoleId = calcedData?.hole_id;
+    const resultSectionId = calcedData?.section_id;
+    const fallbackHoleId =
+      fallbackData?.project != null && fallbackData?.hole != null
+        ? [fallbackData.project, fallbackData.hole, null, null]
+        : null;
+    const fallbackSectionId =
+      fallbackData?.project != null && fallbackData?.hole != null && fallbackData?.section != null
+        ? [fallbackData.project, fallbackData.hole, fallbackData.section, null]
+        : null;
 
     let selectedHoleValue = null;
     for (const hole of holeList) {
       const holeId = hole[1];
-      const sameId =
-        fallbackProjectId != null &&
-        fallbackHoleId != null &&
-        holeId?.[0] === fallbackProjectId &&
-        holeId?.[1] === fallbackHoleId;
+      const sameResultId = idMatches(holeId, resultHoleId, 2);
+      const sameFallbackId = idMatches(holeId, fallbackHoleId, 2);
       const sameName = calcedData?.hole != null && hole[2] === calcedData.hole;
 
-      if (sameId || sameName) {
+      if (sameResultId || sameFallbackId || sameName) {
         selectedHoleValue = hole[0];
         break;
       }
     }
 
     if (selectedHoleValue == null) {
-      return;
+      return false;
     }
 
     document.getElementById("holeOptions").value = selectedHoleValue;
@@ -104,16 +122,11 @@ document.addEventListener("DOMContentLoaded", () => {
     const currentSections = sectionList[selectedHoleValue] ?? [];
     for (const section of currentSections) {
       const sectionId = section[1];
-      const sameId =
-        fallbackProjectId != null &&
-        fallbackHoleId != null &&
-        fallbackSectionId != null &&
-        sectionId?.[0] === fallbackProjectId &&
-        sectionId?.[1] === fallbackHoleId &&
-        sectionId?.[2] === fallbackSectionId;
+      const sameResultId = idMatches(sectionId, resultSectionId, 3);
+      const sameFallbackId = idMatches(sectionId, fallbackSectionId, 3);
       const sameName = calcedData?.section != null && section[2] === calcedData.section;
 
-      if (sameId || sameName) {
+      if (sameResultId || sameFallbackId || sameName) {
         selectedSectionValue = section[0];
         break;
       }
@@ -121,7 +134,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
     if (selectedSectionValue != null) {
       document.getElementById("sectionOptions").value = selectedSectionValue;
+      return true;
     }
+
+    return false;
   }
 
   function resolveDrillingDepthClickTarget(data) {
@@ -716,30 +732,7 @@ document.addEventListener("DOMContentLoaded", () => {
       });
       //window.FinderApi.rendererLog(calcedData);
 
-      //apply//calc(data[2]);
-      let hole_idx = null;
-      let selected_hole_id = null;
-      for(let h=0; h<holeList.length;h++){
-        const hole = holeList[h];
-        if (hole[2] == calcedData.hole) {
-          hole_idx = h;
-          selected_hole_id = hole[0];
-        }
-      }
-
-      let sec_idx = null;
-      let selected_sec_id = null;
-      for(let s=0;s<sectionList[hole_idx].length;s++){
-        const sec = sectionList[hole_idx][s];
-        if (sec[2] == calcedData.section) {
-          
-          sec_idx = s;
-          selected_sec_id = sec[0];
-        }
-      }
-      document.getElementById("holeOptions").value = selected_hole_id;
-      updateSectionList();
-      document.getElementById("sectionOptions").value = selected_sec_id;
+      await selectFinderLocationFromDepthResult(calcedData);
 
       document.getElementById("distanceInput").value = isNaN(calcedData.distance) ? "" : formatPositionValue(calcedData.distance);
       document.getElementById("ddInput").value       = isNaN(calcedData.dd) ? "": formatPositionValue(calcedData.dd);
@@ -769,31 +762,7 @@ document.addEventListener("DOMContentLoaded", () => {
       });
       //await window.FinderApi.rendererLog(calcedData);
 
-      //apply
-      let hole_idx = null;
-      let selected_hole_id = null;
-      for(let h=0; h<holeList.length;h++){
-        const hole = holeList[h];
-        if (hole[2] == calcedData.hole) {
-          hole_idx = h;
-          selected_hole_id = hole[0];
-        }
-      }
-      
-      let sec_idx = null;
-      let selected_sec_id = null;
-      for(let s=0;s<sectionList[hole_idx].length;s++){
-        const sec = sectionList[hole_idx][s];
-        if (sec[2] == calcedData.section) {
-          
-          sec_idx = s;
-          selected_sec_id = sec[0];
-        }
-      }
-
-      document.getElementById("holeOptions").value = selected_hole_id;
-      updateSectionList();
-      document.getElementById("sectionOptions").value = selected_sec_id;
+      await selectFinderLocationFromDepthResult(calcedData);
 
       document.getElementById("distanceInput").value = isNaN(calcedData.distance) ? "" : formatPositionValue(calcedData.distance);
       document.getElementById("ddInput").value       = isNaN(calcedData.dd) ? "" : formatPositionValue(calcedData.dd);
@@ -821,28 +790,7 @@ document.addEventListener("DOMContentLoaded", () => {
       });
       await window.FinderApi.rendererLog(calcedData);
 
-      //apply
-      let hole_idx = null;
-      let selected_hole_id = null;
-      holeList.forEach((hole, h) => {
-        if (hole[2] == calcedData.hole) {
-          hole_idx = h;
-          selected_hole_id = hole[0];
-        }
-      });
-
-      let sec_idx = null;
-      let selected_sec_id = null;
-      sectionList[hole_idx].forEach((sec, s) => {
-        if (sec[2] == calcedData.section) {
-          sec_idx = s;
-          selected_sec_id = sec[0];
-        }
-      });
-
-      document.getElementById("holeOptions").value = selected_hole_id;
-      updateSectionList();
-      document.getElementById("sectionOptions").value = selected_sec_id;
+      await selectFinderLocationFromDepthResult(calcedData);
 
       document.getElementById("distanceInput").value = isNaN(calcedData.distance) ? "" : formatPositionValue(calcedData.distance);
       document.getElementById("ddInput").value       = isNaN(calcedData.dd) ? "" : formatPositionValue(calcedData.dd);
