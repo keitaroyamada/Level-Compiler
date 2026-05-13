@@ -1310,21 +1310,21 @@ class LevelCompilerCore extends EventEmitter{
   }
   convertLocalDepthToMasterDepth(projectId, localDepth, calcType) {
     if (calcType !== "composite_depth" && calcType !== "event_free_depth") {
-      return localDepth;
+      return null;
     }
 
     if (localDepth == null || Number.isNaN(localDepth)) {
-      return localDepth;
+      return null;
     }
 
     const projectIdx = this.search_idx_list[projectId.toString()];
     if (!projectIdx) {
-      return localDepth;
+      return null;
     }
 
     const project = this.projects[projectIdx[0]];
     if (!project) {
-      return localDepth;
+      return null;
     }
 
     const baseProjectIdString = this.base_project_id?.toString();
@@ -1332,7 +1332,7 @@ class LevelCompilerCore extends EventEmitter{
     const rows = this._depthConversionMap?.[baseProjectIdString]?.[projectIdString]?.[calcType];
 
     if (!Array.isArray(rows) || rows.length === 0) {
-      return localDepth;
+      return null;
     }
 
     let lowerIdx = -1;
@@ -1353,7 +1353,7 @@ class LevelCompilerCore extends EventEmitter{
     }
 
     if (lowerIdx === -1 && upperIdx === -1) {
-      return localDepth;
+      return null;
     }
 
     if (lowerIdx !== -1 && upperIdx !== -1) {

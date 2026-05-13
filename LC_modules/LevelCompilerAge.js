@@ -18,23 +18,35 @@ class LevelCompilerAge {
   }
 
   loadAgeFromCsv(LCCore, age_path, type="LC") {
+    //options
+    const useDuoAgePoints = false;
+
     //target
     LCCore.sortModelByOrder();
-    const targetProjectId = LCCore.base_project_id;
-    let targetProjectIdx = null;
+    const baseProjectId = LCCore.base_project_id;
+    if(baseProjectId===null){
+      console.log("LCAge: [ERROR] There is no such a base project id.");
+      return;
+    }
+
+    let baseProjectIdx = null;
     LCCore.projects.forEach((project, p) => {
-      if (project.id[0] == targetProjectId[0]) {
-        targetProjectIdx = [p, null, null, null];
+      if (project.id[0] == baseProjectId[0]) {
+        baseProjectIdx = [p, null, null, null];
       }
     });
-    if (targetProjectId == null) {
+
+    if (baseProjectId == null) {
       console.log("LCAge: [ERROR] There is no such a project.");
       return;
     }
 
-    if(LCCore.projects[targetProjectIdx[0]].model_type == "duo"){
-      console.log("LCAge: [ERROR] There is only duo model. Please load base correlation model.");
-      return;
+    if(!useDuoAgePoints){
+      // Keep age-model loading anchored to the base model while duo age points are disabled.
+      if(LCCore.projects[baseProjectIdx[0]].model_type == "duo"){
+        console.log("LCAge: [ERROR] There is only duo model. Please load base correlation model.");
+        return;
+      }
     }
 
     //check dataset
@@ -42,7 +54,7 @@ class LevelCompilerAge {
     //console.log("Load age model :" + age_path);
 
     //check correlation model
-    if (LCCore.checkModel()[targetProjectIdx[0]]) {
+    if (LCCore.checkModel()[baseProjectIdx[0]]) {
     } else {
       console.log("LCAge: [ERROR] There is any error in model interpolation.");
       return "There is any error in model interpolation.";
@@ -90,19 +102,25 @@ class LevelCompilerAge {
     this.selected_id   = num_age_dataset + 1;
 
     //get index
+    const hasProjectNameColumn =
+    csv_data[0][1] != null && csv_data[0][1].toLowerCase().includes("proj");
+
+    const projectOffset = hasProjectNameColumn ? 1 : 0;
+
     let idxAgeName = 0;
-    let idxHoleName = 1;
-    let idxSectionName = 2;
-    let idxDistance = 3;
-    let idxCD = 4;
-    let idxEFD= 5;
-    let idxAgeUpper1st = 6;
-    let idxAgeMid = 7;
-    let idxAgeLower1st = 8;
-    let idxSourceType = 9;
-    let idxSourceCode = 10;
-    let idxUnit = 11;
-    let idxNote = 12;
+    let idxProjectName = hasProjectNameColumn ? 1 : null;
+    let idxHoleName = 1 + projectOffset;
+    let idxSectionName = 2 + projectOffset;
+    let idxDistance = 3 + projectOffset;
+    let idxCD = 4 + projectOffset;
+    let idxEFD = 5 + projectOffset;
+    let idxAgeUpper1st = 6 + projectOffset;
+    let idxAgeMid = 7 + projectOffset;
+    let idxAgeLower1st = 8 + projectOffset;
+    let idxSourceType = 9 + projectOffset;
+    let idxSourceCode = 10 + projectOffset;
+    let idxUnit = 11 + projectOffset;
+    let idxNote = 12 + projectOffset;
     
     if(type == "LF"){
       idxAgeName = 0;
@@ -131,10 +149,12 @@ class LevelCompilerAge {
       ageData.age_upper_1std = parseFloat(csv_data[r][idxAgeUpper1st]);
       ageData.age_lower_1std = parseFloat(csv_data[r][idxAgeLower1st]);      
 
-      if (csv_data[r][9] == "") {
-        ageData.source_type = "general"; //"general", "terrestrial", "marine", "tephra", "orbital", "climate"
+      if (idxSourceType === null) {
+        ageData.source_type = null;
+      } else if (csv_data[r][idxSourceType] === "") {
+        ageData.source_type = "general";
       } else {
-        ageData.source_type = idxSourceType ? csv_data[r][idxSourceType] : null;
+        ageData.source_type = csv_data[r][idxSourceType];
       }
       ageData.source_code = csv_data[r][idxSourceCode];
       ageData.unit = csv_data[r][idxUnit];
@@ -145,27 +165,128 @@ class LevelCompilerAge {
       ageData.id = r;
       ageData.order = r;
 
+      // Resolve the project for this age-control point.
+      // Legacy LC/LF rows have no project column and are restricted to the base project.
+      let ageProjectId = baseProjectId;
+      const hasExplicitProject =
+        idxProjectName !== null &&
+        csv_data[r][idxProjectName] !== "";
+
+      if (hasExplicitProject) {
+        const projectName = csv_data[r][idxProjectName];
+
+        // Prefer an explicit project-name match.
+        const projectMatches = LCCore.projects.filter(project =>
+          LCCore.equalName(project.name, projectName)
+        );
+
+        let matchedProject = null;
+
+        if (projectMatches.length === 1) {
+          matchedProject = projectMatches[0];
+        } else if (projectMatches.length > 1) {
+          console.log("LCAge: Project name is ambiguous: " + projectName);
+          continue;
+        } else {
+          // Fall back to a unique hole-name match.
+          const holeMatches = LCCore.projects.filter(project =>
+            project.holes.some(hole =>
+              LCCore.equalName(hole.name, projectName)
+            )
+          );
+
+          if (holeMatches.length === 1) {
+            matchedProject = holeMatches[0];
+          } else if (holeMatches.length > 1) {
+            console.log("LCAge: Hole name is ambiguous across projects: " + projectName);
+            continue;
+          } else {
+            console.log("LCAge: Project or hole is not found: " + projectName);
+            continue;
+          }
+        }
+
+        // Duo age-control points are parsed but not accepted until the feature is enabled.
+        if (!useDuoAgePoints && matchedProject.model_type === "duo") {
+          console.log("LCAge: Duo age-control points are disabled: " + ageData.name);
+          continue;
+        }
+
+        ageProjectId = matchedProject.id;
+      }
+      let ageProjectIdx = [null,null,null,null];
+      LCCore.projects.forEach((project, p) => {
+        if (project.id[0] == ageProjectId[0]) {
+          ageProjectIdx = [p, null, null, null];
+        }
+      });
+      if (ageProjectIdx[0] == null) {
+        console.log("LCAge: Project index is not resolved: " + ageData.name);
+        continue;
+      }
+
       //get position
-      if (
-        (type=="LC" && csv_data[r][idxHoleName] !== "" )   || (type=="LF" && csv_data[r][idxHoleName] !== "9999") &&
-        (type=="LC" && csv_data[r][idxSectionName] !== "") || (type=="LF" && csv_data[r][idxSectionName] !== "9999") && 
-        (type=="LC" && csv_data[r][idxDistance] !== "")    || (type=="LF" && csv_data[r][idxDistance] !== "9999")
-      ) {
+      const isDuoAgeProject = LCCore.projects[ageProjectIdx[0]]?.model_type === "duo";
+      const isTrinityDefined =
+          ((type === "LC" && csv_data[r][idxHoleName] !== "") || (type === "LF" && csv_data[r][idxHoleName] !== "9999")) &&
+          ((type === "LC" && csv_data[r][idxSectionName] !== "") || (type === "LF" && csv_data[r][idxSectionName] !== "9999")) &&
+          ((type === "LC" && csv_data[r][idxDistance] !== "") || (type === "LF" && csv_data[r][idxDistance] !== "9999"));
+
+
+        if (hasExplicitProject && isDuoAgeProject && !isTrinityDefined) {
+          console.log("LCAge: Duo age-control points require trinity position: " + ageData.name);
+          continue;
+        }
+
+      if (isTrinityDefined) {
         //case defined by trinity--------------------------------------------------------
         ageData.original_depth_type      = "trinity";
         ageData.trinityData.name         = csv_data[r][idxAgeName];
+        ageData.trinityData.project_name = idxProjectName ? csv_data[r][idxProjectName] : null;
         ageData.trinityData.hole_name    = lcfnc.zeroPadding(csv_data[r][idxHoleName]); //hole
         ageData.trinityData.section_name = lcfnc.zeroPadding(csv_data[r][idxSectionName]); //section
         ageData.trinityData.distance     = parseFloat(csv_data[r][idxDistance]); //distance
 
-        //calc idex
-        let ageDataIdx = LCCore.getIdxFromTrinity(targetProjectId, [ageData.trinityData.hole_name, ageData.trinityData.section_name, ageData.trinityData.distance]);
+
+        // Check duplicate trinity candidates inside the selected project.
+        // Legacy rows are base-only, but duplicate hole/section names inside the base model are still unsafe.
+        const targetProject = LCCore.projects.find(project =>
+          project.id[0] === ageProjectId[0]
+        );
+
+        const matchedSections = [];
+        if (targetProject) {
+          for (const hole of targetProject.holes) {
+            if (!LCCore.equalName(hole.name, ageData.trinityData.hole_name)) {
+              continue;
+            }
+
+            for (const section of hole.sections) {
+              if (LCCore.equalName(section.name, ageData.trinityData.section_name)) {
+                matchedSections.push(section);
+              }
+            }
+          }
+        }
+
+        if (matchedSections.length !== 1) {
+          console.log(
+            "LCAge: Age-control trinity is not unique: " +
+            ageData.trinityData.hole_name + "-" +
+            ageData.trinityData.section_name
+          );
+          continue;
+        }
+
+        // Resolve the age-control point on the selected project.
+        // Duo points will be converted to master EFD only when the feature is enabled.
+        let ageDataIdx = LCCore.getIdxFromTrinity(ageProjectId, [ageData.trinityData.hole_name, ageData.trinityData.section_name, ageData.trinityData.distance]);
         ageData.pidx = ageDataIdx[0];
         ageData.hidx = ageDataIdx[1];
         ageData.sidx = ageDataIdx[2];
 
         //calc EFD
-        const [[sectionId, efd, rank]] = LCCore.getDepthFromTrinity(targetProjectId, [ageData.trinityData],"event_free_depth");
+        const [[sectionId, efd, rank]] = LCCore.getDepthFromTrinity(ageProjectId, [ageData.trinityData],"event_free_depth");
         if (isNaN(efd)) {
           console.log(csv_data[r][idxAgeName] + ":" + csv_data[r][idxHoleName] + "-" + csv_data[r][idxSectionName] + "-" + csv_data[r][idxDistance] + "cm EFD:" + efd);
         }
@@ -182,20 +303,28 @@ class LevelCompilerAge {
         //check model version
         //console.log(ageData.name + ": The age data is defined by composite depth.");
         ageData.original_depth_type = "composite_depth";
-        if (ageDataSet.version == LCCore.projects[targetProjectIdx[0]].correlation_version) {
+        if (ageDataSet.version == LCCore.projects[ageProjectIdx[0]].correlation_version) {
           ageData.composite_depth = csv_data[r][idxCD]; //cd
 
           //convert CD => EFD
+          const efdval = LCCore.getEFDfromCD(ageData.composite_depth);
+          if (Number.isFinite(Number(efdval))) {
+            ageData.event_free_depth = efdval;
+          } else {
+            console.log("Composite depth is out of model definition. :" + csv_data[r][idxAgeName]);
+            continue
+          }
         } else {
           //console.log("Correlation Model Versions do not match between Core model and Age model.");
           //Scheduled to be deleted in the future
           ageData.composite_depth = parseFloat(csv_data[r][idxCD]);
           //convert CD => EFD
           const efdval = LCCore.getEFDfromCD(ageData.composite_depth);
-          if (efdval !== NaN) {
+          if (Number.isFinite(Number(efdval))) {
             ageData.event_free_depth = efdval;
           } else {
-            console.log("Comsposite depth is out of model definition. :" + csv_data[r][idxAgeName]);
+            console.log("Composite depth is out of model definition. :" + csv_data[r][idxAgeName]);
+            continue
           }
           //
         }
@@ -204,7 +333,7 @@ class LevelCompilerAge {
         //check model version
         //console.log();
         ageData.original_depth_type = "event_free_depth";
-        if (ageDataSet.version == LCCore.projects[targetProjectIdx[0]].correlation_version) {
+        if (ageDataSet.version == LCCore.projects[ageProjectIdx[0]].correlation_version) {
           ageData.event_free_depth = csv_data[r][idxEFD]; //efd
         } else {
           //console.log("Correlation Model Versions do not match between Core model and Age model." );
@@ -359,20 +488,127 @@ class LevelCompilerAge {
     if(this.AgeModels.length==0){
       return;
     }
+
+    // Resolve the base project once for CD/EFD-defined age-control points.
+    // CD and EFD inputs are already on the base/master depth axis.
+    const baseProjectId = LCCore.base_project_id;
+    let baseProjectIdx = [null, null, null, null];
+
+    if (baseProjectId == null) {
+      console.log("LCAge: [ERROR] There is no such a base project id.");
+      return;
+    }
+
+    for (let p = 0; p < LCCore.projects.length; p++) {
+      if (LCCore.projects[p].id[0] === baseProjectId[0]) {
+        baseProjectIdx = [p, null, null, null];
+        break;
+      }
+    }
+
+    if (baseProjectIdx[0] == null) {
+      console.log("LCAge: [ERROR] Base project index is not resolved.");
+      return;
+    }
+    
     let errorCounts = 0;
     for(let m=0; m<this.AgeModels.length; m++){
       for(let a=0;a<this.AgeModels[m].ages.length;a++){
         const ageData = this.AgeModels[m].ages[a];
         if(ageData.original_depth_type == "trinity"){
+          // Resolve the project for this age-control point.
+          // Legacy age models have no project name and are recalculated on the base project.
+          let ageProjectId = LCCore.base_project_id;
+
+          if (ageData.trinityData.project_name != null && ageData.trinityData.project_name !== "") {
+            const projectName = ageData.trinityData.project_name;
+
+            const projectMatches = LCCore.projects.filter(project =>
+              LCCore.equalName(project.name, projectName)
+            );
+
+            let matchedProject = null;
+
+            if (projectMatches.length === 1) {
+              matchedProject = projectMatches[0];
+            } else if (projectMatches.length > 1) {
+              console.log("LCAge: Project name is ambiguous: " + projectName);
+              ageData.event_free_depth = null;
+              ageData.composite_depth = null;
+              ageData.section_id = null;
+              continue;
+            } else {
+              const holeMatches = LCCore.projects.filter(project =>
+                project.holes.some(hole =>
+                  LCCore.equalName(hole.name, projectName)
+                )
+              );
+
+              if (holeMatches.length === 1) {
+                matchedProject = holeMatches[0];
+              } else if (holeMatches.length > 1) {
+                console.log("LCAge: Hole name is ambiguous across projects: " + projectName);
+                ageData.event_free_depth = null;
+                ageData.composite_depth = null;
+                ageData.section_id = null;
+                continue;
+              } else {
+                console.log("LCAge: Project or hole is not found: " + projectName);
+                ageData.event_free_depth = null;
+                ageData.composite_depth = null;
+                ageData.section_id = null;
+                continue;
+              }
+            }
+
+            ageProjectId = matchedProject.id;
+          }
+
+          // Reject ambiguous trinity definitions inside the resolved project.
+          // This keeps updateAgeDepth consistent with loadAgeFromCsv.
+          const targetProject = LCCore.projects.find(project =>
+            project.id[0] === ageProjectId[0]
+          );
+
+          const matchedSections = [];
+          if (targetProject) {
+            for (const hole of targetProject.holes) {
+              if (!LCCore.equalName(hole.name, ageData.trinityData.hole_name)) {
+                continue;
+              }
+
+              for (const section of hole.sections) {
+                if (LCCore.equalName(section.name, ageData.trinityData.section_name)) {
+                  matchedSections.push(section);
+                }
+              }
+            }
+          }
+
+          if (matchedSections.length !== 1) {
+            console.log(
+              "LCAge: Age-control trinity is not unique: " +
+              ageData.trinityData.hole_name + "-" +
+              ageData.trinityData.section_name
+            );
+            ageData.event_free_depth = null;
+            ageData.composite_depth = null;
+            ageData.section_id = null;
+            ageData.pidx = null;
+            ageData.hidx = null;
+            ageData.sidx = null;
+            continue;
+          }
+
           //calc idex
-          let ageDataIdx = LCCore.getIdxFromTrinity(LCCore.base_project_id, [ageData.trinityData.hole_name, ageData.trinityData.section_name, ageData.trinityData.distance]);
+          let ageDataIdx = LCCore.getIdxFromTrinity(ageProjectId, [ageData.trinityData.hole_name, ageData.trinityData.section_name, ageData.trinityData.distance]);
           ageData.pidx = ageDataIdx[0];
           ageData.hidx = ageDataIdx[1];
           ageData.sidx = ageDataIdx[2];
           
           //case trinity data
-          const efdData = LCCore.getDepthFromTrinity([null,null,null,null], [ageData.trinityData], "event_free_depth");
-          const cdData  = LCCore.getDepthFromTrinity([null,null,null,null], [ageData.trinityData], "composite_depth");
+          const efdData = LCCore.getDepthFromTrinity(ageProjectId, [ageData.trinityData], "event_free_depth");
+          const cdData  = LCCore.getDepthFromTrinity(ageProjectId, [ageData.trinityData], "composite_depth");
 
           const [sectionId, efd, rank, polationType, sectionType]  = efdData[0];
           const [sectionId2,cd,  rank2,polationType2,sectionType2] = cdData[0];
@@ -400,25 +636,45 @@ class LevelCompilerAge {
           }
         }else if(ageData.original_depth_type == "composite_depth"){
           //case composite depth
+          // CD-defined age-control points are normalized to EFD for age interpolation.
           const efdval = LCCore.getEFDfromCD(ageData.composite_depth);
-          if (efdval !== NaN) {
-            ageData.event_free_depth = efdval;
-            //calc idex
-            let pidx = null;
-            for(let p=0; p<LCCore.projects.length;p++){
-              if(LCCore.projects[p].name == LCCore.base_project_id){
-                pidx = p;
-              }
-            }
-            ageData.pidx = pidx;
+
+          if (Number.isFinite(Number(efdval))) {
+            ageData.event_free_depth = Number(efdval);
+            ageData.pidx = baseProjectIdx[0];
             ageData.hidx = null;
             ageData.sidx = null;
           } else {
-            console.log("Comsposite depth is out of model definition. :" + csv_data[r][0]);
+            console.log("Composite depth is out of model definition: " + ageData.name);
+            ageData.event_free_depth = null;
+            ageData.composite_depth = null;
+            ageData.section_id = null;
+            ageData.pidx = null;
+            ageData.hidx = null;
+            ageData.sidx = null;
           }
         }else if(ageData.original_depth_type == "event_free_depth"){
           //case event free depth
-          console.log("LCAge: Unsuspected depth type depetected",ageData.name, ageData.original_depth_type)
+          // EFD-defined age-control points are already on the age-model axis.
+          // CD is backfilled only for display and diagnostics.
+          const efdval = Number(ageData.event_free_depth);
+
+          if (Number.isFinite(efdval)) {
+            ageData.event_free_depth = efdval;
+            const cdval = LCCore.getCDfromEFD(efdval);
+            ageData.composite_depth = Number.isFinite(Number(cdval)) ? Number(cdval) : null;
+            ageData.pidx = baseProjectIdx[0];
+            ageData.hidx = null;
+            ageData.sidx = null;
+          } else {
+            console.log("Event-free depth is out of model definition: " + ageData.name);
+            ageData.event_free_depth = null;
+            ageData.composite_depth = null;
+            ageData.section_id = null;
+            ageData.pidx = null;
+            ageData.hidx = null;
+            ageData.sidx = null;
+          }
         }else{
           console.log("LCAge: Unsuspected depth type depetected",ageData.name, ageData.original_depth_type)
         }    
