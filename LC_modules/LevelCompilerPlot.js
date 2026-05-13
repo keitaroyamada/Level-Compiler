@@ -142,7 +142,7 @@ class LevelCompilerPlot {
 
         if(targetProjectId===null){continue}
 
-        //calc
+        //calc　
         if (calcType == "trinity") {
           let td = new Trinity();
           td.name         = data[1];
@@ -166,7 +166,7 @@ class LevelCompilerPlot {
           data[11]= age.age.lower;
         } else if (calcType == "composite_depth") {
           //calc
-          const efd = LCCore.getEFDfromCD( targetProjectId, data[6] );
+          const efd = LCCore.getEFDfromCD( data[6] );
           const age = LCAge.getAgeFromEFD( efd, "linear" );
 
           //add
@@ -176,8 +176,8 @@ class LevelCompilerPlot {
           data[11]= age.age.lower;
         } else if (calcType == "event_free_depth") {
           //calc
-          const cd  = LCCore.getCDfromEFD( targetProjectId, data[7] ); //pseudo
-          const age = LCAge.getAgefromEFD( data[7] );
+          const cd  = LCCore.getCDfromEFD( data[7] ); //pseudo
+          const age = LCAge.getAgefromEFD( data[7], "linear"  );
 
           //add
           data[6] = cd;
@@ -186,12 +186,9 @@ class LevelCompilerPlot {
           data[11]= age.age.lower;
         } else if (calcType == "age") {
           //calc
-          const efd = LCAge.getEFDFromAge( data[9], "linear" );          
+          const efdData = LCAge.getEFDFromAge( data[9], "linear" );
+          const efd = efdData.efd.mid;
           const cd  = LCCore.getCDfromEFD( efd ); //pseudo
-
-          //add
-          data[6] = cd;
-          data[7] = efd;
         } else {
           continue;
         }

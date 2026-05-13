@@ -4968,6 +4968,18 @@ function createMainWIndow() {
         const efdData = LCAge.getEFDFromAge(age, method);
         const efd = efdData.efd.mid;
 
+        if (!Number.isFinite(efd)) {
+          results.name = name;
+          results.cd = NaN;
+          results.efd = NaN;
+          results.age_mid = age;
+          results.description = "Age could not be converted to EFD.";
+          results.source_type = type;
+          results.calc_type = "invalid-age";
+          resultList.push(results);
+          continue;
+        }
+
         //get pseudo cd
         const cd = LCCore.getCDfromEFD(efd);
 

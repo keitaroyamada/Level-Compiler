@@ -10568,7 +10568,7 @@ function getSectionImageKey(projectName, holeName, sectionName) {
 }
 function hasSelectedAgeModelForImages() {
   const ageModelSelect = document.getElementById("AgeModelSelect");
-  return Boolean(ageModelSelect?.value) && (age_model_list?.length ?? 0) > 0;
+  return Boolean(ageModelSelect?.value) && (ageModelSelect?.options?.length ?? 0) > 0;
 }
 function getEnabledImageOperations(operations, objOpts) {
   let enabledOperations = [...new Set(operations ?? [])];

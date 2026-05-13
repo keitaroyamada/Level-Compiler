@@ -8,6 +8,7 @@ document.addEventListener("DOMContentLoaded", () => {
   let headerLines = 1;
   let dataId = null;
   let converterReady = false;
+  let isCsvLoading = false;
   function showAlertDialog(message, title = "Alert") {
     return window.LCModal.show({
       title,
@@ -16,6 +17,13 @@ document.addEventListener("DOMContentLoaded", () => {
       hideCancel: true,
     });
   }
+  function setCsvLoadingState(isLoading) {
+    isCsvLoading = isLoading;
+    document.getElementById("cvt_bt_import").disabled = isLoading;
+    document.getElementById("cvt_bt_convert").disabled = isLoading || source_data === null || dataId === null;
+    document.body.style.cursor = isLoading ? "wait" : "default";
+  }
+  setCsvLoadingState(false);
   //-------------------------------------------------------------------------------------------
   window.ConverterApi.receive("ConverterMenuClicked", async (data) => {
     output_type = data.output_type;
@@ -67,8 +75,13 @@ document.addEventListener("DOMContentLoaded", () => {
   //load data
   document.getElementById("cvt_bt_import").addEventListener("click", async (event) => {
     //select csv button
+    if (isCsvLoading) {
+      return;
+    }
       console.log("Load from file chose.");
       source_data = null;
+      dataId = null;
+      setCsvLoadingState(false);
       let path = null;
       
       await loadCsv(path);
@@ -268,6 +281,10 @@ document.addEventListener("DOMContentLoaded", () => {
   //convert
   document.getElementById("cvt_bt_convert").addEventListener("click", async (event) => {
     try{
+      if (isCsvLoading || source_data === null || dataId === null) {
+        await showAlertDialog("CSV loading is not finished. Please wait until the file is loaded.");
+        return;
+      }
       document.getElementById("cvt_bt_convert").disabled = true;
       //await window.ConverterApi.progressbar("Depth converter", "Now checking...", true, "converterWindow");
 
@@ -360,6 +377,8 @@ document.addEventListener("DOMContentLoaded", () => {
       return
     }catch(err){
       console.log("[Converter]: Failed to convert.",err);
+      document.body.style.cursor = "default";
+      document.getElementById("cvt_bt_convert").disabled = source_data === null || dataId === null;
     }      
   });
 
@@ -400,6 +419,7 @@ document.addEventListener("DOMContentLoaded", () => {
         //initialise
         source_data = null;
         dataId      = null;
+        setCsvLoadingState(false);
 
         await loadCsv(dataList[d].fullpath);
       }
@@ -409,19 +429,27 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   async function loadCsv(path){
     //const result = await window.ConverterApi.progressbar("Depth converter", "Now loading...", true, "converterWindow");
+    setCsvLoadingState(true);
 
-    let numRows = 0;
-    const zippedResults = await window.ConverterApi.cvtLoadCsv({
-      title: "Please select the conversion target data",
-      ext: [
-        {
-          name: "CSV file",
-          extensions: ["csv"],
-        },
-      ],
-      pathData: path,
-    });
+    try {
+      let numRows = 0;
+      const zippedResults = await window.ConverterApi.cvtLoadCsv({
+        title: "Please select the conversion target data",
+        ext: [
+          {
+            name: "CSV file",
+            extensions: ["csv"],
+          },
+        ],
+        pathData: path,
+      });
       const unzippedResults = await unzip(zippedResults);
+
+      if (unzippedResults === null || !Array.isArray(unzippedResults.data)) {
+        source_data = null;
+        dataId = null;
+        return;
+      }
 
       source_data = unzippedResults.data;
       loadedpath  = unzippedResults.path;
@@ -432,7 +460,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     if (source_data !== null) {
       source_path = loadedpath;
-      n_r = 10;//source_data.length;
+      n_r = Math.min(10, source_data.length);
       n_c = source_data[0].length;
 
       //Clear all rows within tbody
@@ -492,7 +520,9 @@ document.addEventListener("DOMContentLoaded", () => {
       document.getElementById("data_path").textContent = loadedpath.match(/[^\\\/]*$/)[0];
       document.getElementById("num_rows").textContent  = "Rows = " + numRows;
     }
-   
+    } finally {
+      setCsvLoadingState(false);
+    }
   }
   async function unzip(result) {
   if (result == null) {
