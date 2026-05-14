@@ -31,6 +31,24 @@
   "build": {
     "appId": "io.github.ky_apps.Level-Compiler",
     "npmRebuild": false,
+    "files": [
+      "package.json",
+      "main.js",
+      "main/**",
+      "ipc/**",
+      "LC_modules/**",
+      "preload/**",
+      "renderer/**",
+      "icon/**",
+      "oss-attribution/**",
+      "LICENSE",
+      "ThirdPartyNotices.txt",
+      "!renderer/js/1.5/**",
+      "!renderer/js/1.6/**",
+      "!renderer/js/1.9/**",
+      "!resources/**",
+      "!dist/**"
+    ],
     "publish": {
       "provider": "github",
       "owner": "keitaroyamada",

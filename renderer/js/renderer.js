@@ -5083,8 +5083,10 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     }
 
-    // Ctrl + f => finder
-    if (event.ctrlKey && event.key === "f") {
+    // Ctrl/Cmd + f => finder
+    const isFinderShortcut = (event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "f";
+    if (isFinderShortcut) {
+      event.preventDefault();
       document.getElementById("bt_finder").click();
     }
     
