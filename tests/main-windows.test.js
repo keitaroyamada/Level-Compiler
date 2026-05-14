@@ -89,6 +89,14 @@ registerTest("createWindow applies managed defaults for helper windows", () => {
     throw new Error("Expected createWindow overrides to merge into BrowserWindow options.");
   }
 
+  if (!windowRef.options.icon.endsWith("icon\\levelcompiler.png")) {
+    throw new Error("Expected helper windows to use the application icon.");
+  }
+
+  if (windowRef.options.autoHideMenuBar !== true || windowRef.options.menuBarVisible !== false) {
+    throw new Error("Expected finder window menu bar to be hidden.");
+  }
+
   if (!calls.some((call) => call.type === "setMenu" && call.value === null)) {
     throw new Error("Expected helper windows to clear their menu by default.");
   }

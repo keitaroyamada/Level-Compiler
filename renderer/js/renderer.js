@@ -821,6 +821,7 @@ document.addEventListener("DOMContentLoaded", () => {
   //============================================================================================
   //load correlation model
   window.LCapi.receive("UpdateViewFromMain", async () => {
+    document.body.style.cursor = "default";
     await loadModel(false, false);
     const registeredAgeList = await window.LCapi.MirrorAgeList();
     setAgeList(registeredAgeList);

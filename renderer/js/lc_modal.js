@@ -260,9 +260,6 @@
       };
       const handleBackdropClick = event => {
         event.stopPropagation();
-        if (event.target === backdrop) {
-          cancel();
-        }
       };
       const handleKeydown = event => {
         if (event.key === "Escape") {

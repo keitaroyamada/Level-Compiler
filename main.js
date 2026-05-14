@@ -122,6 +122,15 @@ function closeGlobalProgressBar() {
   return true;
 }
 
+function getRendererDeveloperMode() {
+  const rendererSettings = getSettings("settingsRenderer");
+  return rendererSettings?.developer?.mode ?? "user";
+}
+
+function isRootDeveloperMode() {
+  return getRendererDeveloperMode() === "root";
+}
+
 function resetTransientAppState() {
   globalTempData = null;
   sendBuffer = null;
@@ -3677,7 +3686,7 @@ function createMainWIndow() {
     if(options.sourceType === "drilling_depth"){
       return {ok:false, reason: "Drilling depth is not supported as a converter input."}
     }
-    if(LCAge.AgeModels.length == 0 || !LCAge.selected_id){
+    if(options.sourceType === "age" && (LCAge.AgeModels.length == 0 || !LCAge.selected_id)){
       return {ok:false, reason: "No age model found. Please load an age model first."}
     }
     if(globalTempData.from == "converter" && globalTempData.id == options.id){
@@ -4172,9 +4181,11 @@ function createMainWIndow() {
       getMainWindow().webContents.send("SettingsData", sendData.data);
       if(sendData){
         setSettings("settingsRenderer", sendData.data);
+        menuRebuild();
       }      
     }else if(to=="save"){
       setSettings("settingsRenderer", sendData.data)
+      menuRebuild();
     }    
   });
   ipcMain.handle("openSettingsFolder", async () => {
@@ -5535,6 +5546,33 @@ function createMainWIndow() {
                   getMainWindow().webContents.send("ExportCorrelationAsLFMenuClicked");
                 },
               },
+              {
+                label: "Export master section list",
+                visible: true,
+                click: async () => {
+                  if(LCCore.projects.length > 0){
+                    const targetProjects = LCCore.projects;
+                    for(const project of targetProjects){
+                      const msList = LCCore.getMasterPositionList(project.id);
+                      const output = [
+                        ["Master section", "Section top", "Section bottom", "Master top", "Master bottom"],
+                        ...msList,
+                      ];
+                      console.log("LCCore: Export master section list", output)
+
+                      const listName = project.name+" master section list("+project.correlation_version+").csv";
+                      let safeName = String(listName)
+                        .replace(/[\\/:*?"<>|]/g, "_")
+                        .replace(/[\x00-\x1F\x7F]/g, "_")
+                        .trim()
+                        .replace(/[. ]+$/g, "");
+
+                      await putcsvfile(getMainWindow(), safeName, output);
+                    }
+                    
+                  }
+                }
+              },
             ],
           },                    
           // for Windows--------------------
@@ -5713,28 +5751,56 @@ function createMainWIndow() {
             }
           },
           {
-            label: "Model evaluation",
-            visible: true,
-            click: () => {
+            label: "Leave-one-out evaluation",
+            visible: isRootDeveloperMode(),
+            click: async () => {
+              if (!isRootDeveloperMode()) {
+                dialog.showMessageBoxSync(getMainWindow(), {
+                  type: "warning",
+                  title: "Leave-one-out evaluation",
+                  message: "Leave-one-out evaluation is available only in root mode.",
+                  buttons: ["OK"],
+                });
+                return;
+              }
+
               if(LCCore !== null && LCCore.projects.length>0){
-                const results = LCCore.leaveOneOut("in");
-                
-                getMainWindow().webContents.send("rendererLog", results);
-                putcsvfile(getMainWindow(), "results.csv", results);                
+                closeGlobalProgressBar();
+                progressBar = progressDialog(getMainWindow(), "Leave-one-out evaluation", "Now evaluating...", false);
+                if (progressBar && typeof progressBar.once === "function") {
+                  await new Promise(resolve => progressBar.once("ready", resolve));
+                }
+
+                try {
+                  const startedAt = Date.now();
+                  let lastProgressUpdate = 0;
+                  const results = await runLeaveOneOutInWorker("project", ({ done, total }) => {
+                    const now = Date.now();
+                    if (done >= total || now - lastProgressUpdate >= 100) {
+                      progressBar = updateProgressWithEta(progressBar, done, total, startedAt, "Evaluating");
+                      lastProgressUpdate = now;
+                    }
+                  });
+
+                  progressBar = updateProgressWithEta(progressBar, 1, 1, startedAt, "Evaluating");
+                  closeGlobalProgressBar();
+                  
+                  getMainWindow().webContents.send("rendererLog", results);
+                  await putcsvfile(getMainWindow(), "leave-one-out-results.csv", results);
+                } catch (err) {
+                  closeGlobalProgressBar();
+                  console.error("MAIN: Leave-one-out evaluation failed.", err);
+                  dialog.showMessageBoxSync(getMainWindow(), {
+                    type: "error",
+                    title: "Leave-one-out evaluation",
+                    message: "Leave-one-out evaluation failed.",
+                    detail: err?.message ?? String(err),
+                    buttons: ["OK"],
+                  });
+                }                
               }
             }
           },   
-          {
-            label: "Export MS list",
-            visible: true,
-            click: () => {
-              if(LCCore !== null){
-                const msList = LCCore.getMasterPositionList(LCCore.projects[1].id);
-                console.log(msList)
-                //putcsvfile(mainWindow, "results.csv", msList);  
-              }
-            }
-          },          
           { type: "separator" },   
           {
             label:"Zoom",
@@ -6105,6 +6171,93 @@ function progressDialog(window, tit, txt, indeterminate){
     */
   return progress;
 }
+
+function formatEta(milliseconds) {
+  if (!Number.isFinite(milliseconds) || milliseconds < 0) {
+    return "--:--";
+  }
+
+  const totalSeconds = Math.ceil(milliseconds / 1000);
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+
+  if (hours > 0) {
+    return `${hours}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+  }
+
+  return `${minutes}:${String(seconds).padStart(2, "0")}`;
+}
+
+function updateProgressWithEta(progress, n, N, startedAt, label = "Please wait") {
+  if (!progress) {
+    return null;
+  }
+
+  const total = Math.max(Number(N) || 0, 1);
+  const current = Math.min(Math.max(Number(n) || 0, 0), total);
+  const pct = (current / total) * 100;
+  const elapsed = Date.now() - startedAt;
+  const eta = current > 0 && current < total
+    ? formatEta((elapsed / current) * (total - current))
+    : "0:00";
+
+  try {
+    const winOk = progress._window && progress._window.webContents && !progress._window.isDestroyed();
+    if (!winOk || progress.isCompleted()) {
+      return null;
+    }
+
+    progress.value = pct;
+    progress.detail = `${label} ${current}/${total} (${lcfnc.round(pct, 2)}%)  ETA ${eta}`;
+    return progress;
+  } catch (err) {
+    console.error("MAIN: Failed to update ETA progressbar.", err);
+    return null;
+  }
+}
+
+function runLeaveOneOutInWorker(target, onProgress) {
+  return new Promise((resolve, reject) => {
+    const worker = new Worker(path.join(__dirname, "main", "leave-one-out-worker.js"), {
+      workerData: {
+        model: LCCore.exportSerialisedModel(),
+        target,
+      },
+    });
+
+    worker.on("message", (message) => {
+      if (message?.type === "progress") {
+        if (typeof onProgress === "function") {
+          onProgress({
+            done: message.done,
+            total: message.total,
+          });
+        }
+        return;
+      }
+
+      if (message?.type === "done") {
+        resolve(message.results);
+        return;
+      }
+
+      if (message?.type === "error") {
+        const err = new Error(message.message);
+        err.stack = message.stack ?? err.stack;
+        reject(err);
+      }
+    });
+
+    worker.on("error", reject);
+    worker.on("exit", (code) => {
+      if (code !== 0) {
+        reject(new Error(`Leave-one-out worker exited with code ${code}.`));
+      }
+    });
+  });
+}
+
 async function updateProgress(progress, n, N){
   if (!progress) return null;
 

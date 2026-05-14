@@ -205,6 +205,12 @@ document.addEventListener("DOMContentLoaded", () => {
       sectionIdx: selectedSection[0],
     };
   }
+
+  function applyDepthFromMainInput(inputId, value, precisionFormatter) {
+    document.getElementById(inputId).value = precisionFormatter(value);
+    const eventName = settings.enableRealtimeUpdate ? "input" : "change";
+    document.getElementById(inputId).dispatchEvent(new Event(eventName));
+  }
   //-------------------------------------------------------------------------------------------
   //when startup
   window.FinderApi.receive("FinderToolClicked", async () => {
@@ -908,14 +914,11 @@ document.addEventListener("DOMContentLoaded", () => {
 
       //input value
       if (data.depth_scale == "composite_depth") {
-        document.getElementById("cdInput").value = formatCdValue(data.y);
-        document.getElementById("cdInput").dispatchEvent(new Event("change"));
+        applyDepthFromMainInput("cdInput", data.y, formatCdValue);
       } else if (data.depth_scale == "event_free_depth") {
-        document.getElementById("efdInput").value = formatEfdValue(data.y);
-        document.getElementById("efdInput").dispatchEvent(new Event("change"));
+        applyDepthFromMainInput("efdInput", data.y, formatEfdValue);
       } else if (data.depth_scale == "age") {
-        document.getElementById("ageInput").value = formatAgeValue(data.y);
-        document.getElementById("ageInput").dispatchEvent(new Event("change"));
+        applyDepthFromMainInput("ageInput", data.y, formatAgeValue);
       } else if (data.depth_scale == "drilling_depth"){
         const resolvedData = resolveDrillingDepthClickTarget(data);
 

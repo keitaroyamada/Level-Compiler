@@ -51,6 +51,15 @@ window.addEventListener("DOMContentLoaded", () => {
         .replace(/\b\w/g, (letter) => letter.toUpperCase());
     }
 
+    function formatSectionTitle(key, value) {
+      const keyText = String(key);
+      const baseTitle = /^\d+$/.test(keyText) ? `[${keyText}]` : formatSettingName(key);
+      if (value && typeof value.name === "string" && value.name !== "") {
+        return `${baseTitle} ${value.name}`;
+      }
+      return baseTitle;
+    }
+
     function getValueType(value) {
       if (value === null) return "empty";
       if (typeof value === "boolean") return "boolean";
@@ -99,7 +108,7 @@ window.addEventListener("DOMContentLoaded", () => {
 
           const title = document.createElement("span");
           title.classList.add("settings-section-name");
-          title.textContent = formatSettingName(key);
+          title.textContent = formatSectionTitle(key, value);
 
           const count = document.createElement("span");
           count.classList.add("settings-section-count");

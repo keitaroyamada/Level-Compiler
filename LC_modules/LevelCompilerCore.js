@@ -650,117 +650,259 @@ class LevelCompilerCore extends EventEmitter{
 
   }
   loadEventListFromCsv(filepath){
+    //settings
+    const boundaryDistanceEpsilon = 1e-1;// Distance tolerance for deciding whether a boundary marker already exists.
+
     if(this.projects.length==0) return false;
     this.setStatus("running", "Start load Event List From Csv");
 
-    //for import Level Finder format
-    //load model
+    
+    
     const eventList = lcfnc.readcsv(filepath);
     var fileName = filepath.split(/[/\\]/).pop();
-    const patern = /\[?(.*?)\]?([^\[\]()]*)(?:\((.*?)\))?\.csv$/; // ^(.*?)\((.*?)\)\.csv$/)
-    var match = fileName.match(patern);  
-    const version = match[3];
-    const name = match[2]; 
+    const patern = /\[?(.*?)\]?([^\[\]()]*)(?:\((.*?)\))?\.csv$/;
+    var match = fileName.match(patern);
+    const version = match ? match[3] : null;
+    const name = match ? match[2] : null;
 
-    //formatting
-    for(let i=1; i< eventList.length; i++){
-      const holeName      = eventList[i][0];    
-      const sectionName   = eventList[i][1];        
+    // Keep event rows pending until all required boundary markers have been inserted.
+    const pendingEvents = [];
+
+    // Collect missing boundary markers first to avoid modifying the model while reading CSV rows.
+    const missingMarkers = new Map();
+
+    // Build a stable key so the same missing marker is inserted only once.
+    const makeMissingMarkerKey = (targetProjectId, holeName, sectionName, distance) => {
+      return [
+        targetProjectId[0],
+        String(holeName),
+        String(sectionName),
+        Math.round(Number(distance) / boundaryDistanceEpsilon),
+      ].join("|");
+    };
+
+    // Resolve CSV hole/section names to model ids.
+    // One-digit names are normalized to two digits, e.g. "1" -> "01".
+    const resolveEventTarget = (holeName, sectionName) => {
+      let targetProjectId = null;
+      let targetHoleId = null;
+      let targetSectionId = null;
+
+      this.projects.forEach(p => {
+        p.holes.forEach(h => {
+          const hole = /^\d$/.test(holeName) ? holeName.padStart(2, "0") : holeName;
+          if(h.name == hole){
+            targetProjectId = p.id;
+            targetHoleId = h.id;
+
+            h.sections.forEach(s => {
+              const section = /^\d$/.test(sectionName) ? sectionName.padStart(2, "0") : sectionName;
+              if(s.name == section){
+                targetSectionId = s.id;
+              }
+            });
+          }
+        });
+      });
+
+      return { targetProjectId, targetHoleId, targetSectionId };
+    };
+
+    // Get section data from a section id through the current search index.
+    const getSectionDataById = (sectionId) => {
+      const sectionIdx = this.search_idx_list[sectionId.toString()];
+      if(!sectionIdx){
+        return null;
+      }
+
+      return this.projects[sectionIdx[0]].holes[sectionIdx[1]].sections[sectionIdx[2]];
+    };
+
+    // Find an existing marker in the section using only distance.
+    // This prevents duplicate boundary markers near the same depth.
+    const findMarkerInSectionByDistance = (sectionData, distance) => {
+      if(!sectionData){
+        return null;
+      }
+
+      for(const marker of sectionData.markers){
+        if(Math.abs(marker.distance - distance) < boundaryDistanceEpsilon){
+          return marker;
+        }
+      }
+
+      return null;
+    };
+
+    // Find the nearest existing markers above and below the target distance.
+    // addMarker() requires both neighbors to safely split the vertical connection.
+    const getNeighborMarkersInSection = (sectionData, distance) => {
+      const sortedMarkers = sectionData.markers.slice().sort((a, b) => a.distance - b.distance);
+      let upperMarker = null;
+      let lowerMarker = null;
+
+      for(const marker of sortedMarkers){
+        if(marker.distance <= distance){
+          upperMarker = marker;
+        }
+        if(marker.distance > distance){
+          lowerMarker = marker;
+          break;
+        }
+      }
+
+      return { upperMarker, lowerMarker };
+    };
+
+    // Register a boundary marker only if it does not already exist in the target section.
+    const collectMissingMarker = (targetProjectId, targetSectionId, holeName, sectionName, distance, eventName) => {
+      const sectionData = getSectionDataById(targetSectionId);
+      const existingMarker = findMarkerInSectionByDistance(sectionData, distance);
+
+      if(existingMarker){
+        return;
+      }
+
+      const key = makeMissingMarkerKey(targetProjectId, holeName, sectionName, distance);
+      if(missingMarkers.has(key)){
+        return;
+      }
+
+      missingMarkers.set(key, {
+        targetProjectId,
+        targetSectionId,
+        holeName,
+        sectionName,
+        distance,
+        eventName,
+      });
+    };
+
+    // Pass 1:
+    // Read CSV rows, validate target sections/distances, and collect missing boundary markers.
+    // Event connections are delayed until all boundary markers exist.
+    for(let i=1; i<eventList.length; i++){
+      const holeName      = eventList[i][0];
+      const sectionName   = eventList[i][1];
       const upperDistance = parseFloat(eventList[i][2]);
       const lowerDistance = parseFloat(eventList[i][3]);
       const eventName     = eventList[i][4];
 
-      //search target project
-      let targetProjectId = null;
-      let targetHoleId    = null;
-      let targetSectionId = null;
-      this.projects.forEach(p => {
-        p.holes.forEach(h=>{
-          const hole = /^\d$/.test(holeName) ? holeName.padStart(2,"0") : holeName;
-          if(h.name == hole){
-            targetProjectId = p.id;
-            targetHoleId    = h.id;
+      const { targetProjectId, targetHoleId, targetSectionId } = resolveEventTarget(holeName, sectionName);
 
-            h.sections.forEach(s=>{
-            const section = /^\d$/.test(sectionName) ? sectionName.padStart(2,"0") : sectionName;
-            if(s.name == section){
-              targetSectionId = s.id;
-            }
-          })
-          }         
-        })
-      })
-
-      if(!targetProjectId && !targetHoleId && !targetSectionId){
-        //there is no target hole
-        continue
+      if(!targetProjectId || !targetHoleId || !targetSectionId){
+        continue;
       }
 
-      //check marker exist
-      let upperIdx = this.getIdxFromTrinity(targetProjectId, [holeName, sectionName, upperDistance]);
-      let lowerIdx = this.getIdxFromTrinity(targetProjectId, [holeName, sectionName, lowerDistance]);
-      let upperId = null;
-      let lowerId = null;
-      if(upperIdx[3] == null){
-        //there is no marker
-        let trinityData = new Trinity();
-        trinityData.name = "";
-        trinityData.project_name = this.projects[upperIdx[0]].name;
-        trinityData.hole_name = holeName;
-        trinityData.section_name = sectionName;
-        trinityData.distance = upperDistance;
-
-        const depthData = this.getDepthFromTrinity(targetSectionId, [trinityData], "composite_depth");
-        
-        this.addMarker(targetSectionId, depthData[0][1], "composite_depth");
-        upperIdx = this.getIdxFromTrinity(targetProjectId, [holeName, sectionName, upperDistance]);
+      if(!Number.isFinite(upperDistance) || !Number.isFinite(lowerDistance)){
+        console.warn("LCCore: Skipped event because event boundary distance is invalid.", {
+          holeName,
+          sectionName,
+          upperDistance,
+          lowerDistance,
+          eventName,
+        });
+        continue;
       }
 
-      if(lowerIdx[3] == null){
-        //there is no marker
-        let trinityData = new Trinity();
-        trinityData.name = "";
-        trinityData.project_name = this.projects[lowerIdx[0]].name;
-        trinityData.hole_name = holeName;
-        trinityData.section_name = sectionName;
-        trinityData.distance = lowerDistance;
+      collectMissingMarker(targetProjectId, targetSectionId, holeName, sectionName, upperDistance, eventName);
+      collectMissingMarker(targetProjectId, targetSectionId, holeName, sectionName, lowerDistance, eventName);
 
-        const depthData = this.getDepthFromTrinity(targetSectionId, [trinityData], "composite_depth");
-        
-        this.addMarker(targetSectionId, depthData[0][1], "composite_depth");
-        lowerIdx = this.getIdxFromTrinity(targetProjectId, [holeName, sectionName, lowerDistance]);
-      }
-
-      //add event
-      if(upperIdx[3] !== null && lowerIdx[3] !== null){
-        const upperMarkerData = this.projects[upperIdx[0]].holes[upperIdx[1]].sections[upperIdx[2]].markers[upperIdx[3]];       
-        const lowerMarkerData = this.projects[lowerIdx[0]].holes[lowerIdx[1]].sections[lowerIdx[2]].markers[lowerIdx[3]];
-
-        let upperEventColour = "general";
-        let lowerEventColour = "general";
-        if(eventName.toLowerCase().includes("tephra")){
-          upperEventColour = "tephra";
-          lowerEventColour = "tephra";
-        }else if(eventName.toLowerCase().includes("void")){
-          upperEventColour = "void";
-          lowerEventColour = "void";
-        }else if(eventName.toLowerCase().includes("disturbed")){
-          upperEventColour = "disturbed";
-          lowerEventColour = "disturbed";
-        }else if(eventName.toLowerCase().includes("earthquake")){
-          upperEventColour = "earthquake";
-          lowerEventColour = "earthquake";
-        }          
-        
-        const upperEventData = ["deposition", "downward",lowerMarkerData.id, upperEventColour, null];
-        const lowerEventData = ["deposition", "upward",  upperMarkerData.id, lowerEventColour, null];
-
-        upperMarkerData.event.push(upperEventData);
-        lowerMarkerData.event.push(lowerEventData);
-      }
+      pendingEvents.push({
+        targetProjectId,
+        targetSectionId,
+        holeName,
+        sectionName,
+        upperDistance,
+        lowerDistance,
+        eventName,
+      });
     }
 
-    //connect duo
+    // Insert missing boundary markers.
+    // Use addMarker() instead of manual insertion so vertical connections and existing event
+    // connections are handled consistently.
+    for(const marker of missingMarkers.values()){
+      // Refresh the index because addMarker() sorts and modifies the model.
+      this.updateSearchIdx();
+
+      const sectionData = getSectionDataById(marker.targetSectionId);
+      if(!sectionData){
+        console.warn("LCCore: Skipped event marker because target section was not found.", marker);
+        continue;
+      }
+
+      if(findMarkerInSectionByDistance(sectionData, marker.distance)){
+        continue;
+      }
+
+      const { upperMarker, lowerMarker } = getNeighborMarkersInSection(sectionData, marker.distance);
+
+      // Do not create boundary markers outside the existing vertical marker chain.
+      // Without both neighbors, addMarker() cannot safely reconnect vertical markers.
+      if(!upperMarker || !lowerMarker){
+        console.warn("LCCore: Skipped event marker because vertical neighbor markers were not resolved.", marker);
+        continue;
+      }
+
+      this.addMarker(marker.targetSectionId, marker.distance, "distance");
+    }
+
+    // Recalculate derived depths after all missing markers have been inserted.
+    // This is done once here instead of after every marker insertion.
+    this.sortModel();
+    this.updateSearchIdx();
+    this.calcCompositeDepth(false);
+    this.calcEventFreeDepth(false);
+    this.updateSearchIdx();
+
+    // Pass 2:
+    // Resolve the final boundary markers again and add event connections.
+    // This must run after depth recalculation because newly inserted markers may now have
+    // updated CD/EFD values.
+    for(const item of pendingEvents){
+      const {
+        targetSectionId,
+        upperDistance,
+        lowerDistance,
+        eventName,
+      } = item;
+
+      const sectionData = getSectionDataById(targetSectionId);
+      const upperMarkerData = findMarkerInSectionByDistance(sectionData, upperDistance);
+      const lowerMarkerData = findMarkerInSectionByDistance(sectionData, lowerDistance);
+
+      if(!upperMarkerData || !lowerMarkerData){
+        console.warn("LCCore: Skipped event because boundary markers were not resolved.", item);
+        continue;
+      }
+
+      // Convert event names to display categories used by the model.
+      let eventColour = "general";
+      const eventNameLower = String(eventName || "").toLowerCase();
+
+      if(eventNameLower.includes("tephra")){
+        eventColour = "tephra";
+      }else if(eventNameLower.includes("void")){
+        eventColour = "void";
+      }else if(eventNameLower.includes("disturbed")){
+        eventColour = "disturbed";
+      }else if(eventNameLower.includes("earthquake")){
+        eventColour = "earthquake";
+      }
+
+      // Add the event through the existing API so duplicate checks and event structure
+      // remain centralized in addEvent().
+      this.addEvent(
+        upperMarkerData.id,
+        lowerMarkerData.id,
+        "deposition",
+        eventColour
+      );
+    }
+
+    // Keep the existing duo-model connection step.
+    // This preserves the original behavior for correlation models.
     if(this.projects.length>1){
       const baseIdx = this.search_idx_list[this.base_project_id];
       if(this.projects[baseIdx[0]].model_type == "correlation"){
@@ -768,12 +910,13 @@ class LevelCompilerCore extends EventEmitter{
       }
     }
 
-    //this.sortModelByOrder();
-    this.sortModel();
+    this.calcCompositeDepth();
+    this.calcEventFreeDepth();
+    this.updateSearchIdx();
 
     console.log("LCCore: Event List is loaded from csv.");
     this.setStatus("completed","Event List is loaded from csv.");
-    return true
+    return true;
   }
   replaceNewId(){
     //register
@@ -4472,7 +4615,7 @@ class LevelCompilerCore extends EventEmitter{
     if(eventConnection.result==true){
       //if connected
       //upper
-      for(let e=0; upperMarkerData.event.length; e++){
+      for(let e=0; e<upperMarkerData.event.length; e++){
         if(upperMarkerData.event[e][2].toString() == lowerMarkerData.id.toString()){
           //if connected to lower marker, update
           upperMarkerData.event[e][2] = newMarkerData.id;
@@ -4485,7 +4628,7 @@ class LevelCompilerCore extends EventEmitter{
       newMarkerData.event.push([upperEventData[0], "through-down", lowerId, upperEventData[3], upperEventData[4]]);
 
       //lower
-      for(let e=0; lowerMarkerData.event.length; e++){
+      for(let e=0; e<lowerMarkerData.event.length; e++){
         if(lowerMarkerData.event[e][2].toString() == upperMarkerData.id.toString()){
           //if connected to upper marker, update
           lowerMarkerData.event[e][2] = newMarkerData.id;
@@ -6918,7 +7061,8 @@ class LevelCompilerCore extends EventEmitter{
     }
     return false
   }
-  leaveOneOut(target="in"){
+  leaveOneOut(target = "project", onProgress) {
+    //initiarize
     const data = [];
 
     data.push([
@@ -6926,74 +7070,140 @@ class LevelCompilerCore extends EventEmitter{
       "Hole Name",
       "Section Name",
       "Position",
+      "operation",
       "Original interpolate Source",
-      "Leave One Out interpolate Source",
+      "LOO interpolate Source",
       "Original Composite Depth",
-      "Leave One Out Composite Depth"
+      "LOO Composite Depth",
+      "Original Event Free Depth",
+      "LOO Event Free Depth",
+      "Original Age",
+      "LOO Age"
     ]);
 
-    const backupProjects = structuredClone(this.projects);
+    //backup
+    const originalProjects = structuredClone(this.projects);
+
+    //progress
+    const totalMarkers = this.projects.reduce((sumP, project) => {
+      return sumP + project.holes.reduce((sumH, hole) => {
+        return sumH + hole.sections.reduce((sumS, section) => {
+          return sumS + section.markers.length;
+        }, 0);
+      }, 0);
+    }, 0);
+
+    //main
     console.log("Start Leave-One-Out evaluation")
+    let c = 0;
 
-    for (let p=0; p<this.projects.length; p++){
-      for(let h=0; h<this.projects[p].holes.length; h++){
-        for(let s=0; s<this.projects[p].holes[h].sections.length; s++){
-          for(let m=0; m<this.projects[p].holes[h].sections[s].markers.length; m++){
-            const rateProject = ((p)/(this.projects.length));
-            const rateHole    = ((h)/(this.projects[p].holes.length));
-            const rateSection = ((s)/(this.projects[p].holes[h].sections.length));
+    for (let p = 0; p < originalProjects.length; p++) {
+      for (let h = 0; h < originalProjects[p].holes.length; h++) {
+        for (let s = 0; s < originalProjects[p].holes[h].sections.length; s++) {
+          for (let m = 0; m < originalProjects[p].holes[h].sections[s].markers.length; m++) {
             
+            const project = this.projects[p];
+            const curProjId = project.id[0];
+            const hole = project.holes[h];
+            const section = hole.sections[s];
+            const marker = section.markers[m];
+
             //progress
-            console.log((rateProject*100).toFixed(1)+"%", (rateHole*100).toFixed(1)+"%", (rateSection*100).toFixed(1)+"%")
-            
-            //get current data
-            const currentMarkerData = structuredClone(this.projects[p].holes[h].sections[s].markers[m]);
-            
-            //disconnect horizontal connections
-            for(let hc=0; hc<this.projects[p].holes[h].sections[s].markers[m].h_connection.length; hc++){
-              const connectedId = this.projects[p].holes[h].sections[s].markers[m].h_connection[hc]
-              if(target==="in"){
-                //case in same project
-                if(connectedId[0] ===  this.projects[p].id[0]){
-                  //if same project
-                  const connectedMarkerData = this.getDataByIdx(this.search_idx_list[connectedId.toString()]);
-                  this.disconnectMarkers(currentMarkerData.id, connectedId, "horizontal");
-                }
-              }else{
-                //case between projects
-                if(connectedId[0] !==  this.projects[p].id[0]){
-                  //if between project
-                  
-                  this.disconnectMarkers(currentMarkerData.id, connectedId, "horizontal");
-                }
-              }              
-            }  
+            c++;
+            if (onProgress) {
+              onProgress({
+                done: c,
+                total: totalMarkers
+              })
+            }
 
-            //calc new composite depth
-            this.calcCompositeDepth();
-            const newCurrentMarkerData = this.projects[p].holes[h].sections[s].markers[m];
-            data.push([
-              this.projects[p].name,
-              this.projects[p].holes[h].name,
-              this.projects[p].holes[h].sections[s].name,
-              this.projects[p].holes[h].sections[s].markers[m].distance,
-              currentMarkerData.depth_source[0],
-              newCurrentMarkerData.depth_source[0],
-              currentMarkerData.composite_depth,
-              newCurrentMarkerData.composite_depth
-            ]);
+            //check h connections
+            if(marker.h_connection.length == 0){
+              continue
+            }
 
             //restore connections
-            this.projects = structuredClone(backupProjects);
-            this.updateSearchIdx();
+            this.projects = structuredClone(originalProjects);            
 
+            //get current values
+            let original_source = marker.depth_source[0];
+            let original_cd = marker.local_composite_depth;
+            let original_efd = marker.local_event_free_depth;
+            let original_age = marker.age;
+            let operation = "";
+
+            //disconnect horizontal connections
+            for (let i = marker.h_connection.length - 1; i >= 0; i--) {
+              const hconnect = marker.h_connection[i];
+
+              if (target === "project") {
+                // delete connection in the same project
+                if (curProjId === hconnect[0]) {
+                  //delete own
+                  marker.h_connection.splice(i, 1);
+
+                  //delete pair
+                  const connectedMarker = this.getDataByIdx(this.search_idx_list[hconnect.toString()]);
+                  for (let j = connectedMarker.h_connection.length - 1; j >= 0; j--) {
+                    if (connectedMarker.h_connection[j].toString() === marker.id.toString()) {
+                      connectedMarker.h_connection.splice(j, 1);
+                    }
+                  }
+
+                  operation = "leave";
+                }
+              } else {
+                // delete connection between the other projects
+                if (curProjId !== hconnect[0]) {
+                  //delete own
+                  marker.h_connection.splice(i, 1);
+
+                  //delete pair
+                  const connectedMarker = this.getDataByIdx(this.search_idx_list[hconnect.toString()]);
+                  for (let j = connectedMarker.h_connection.length - 1; j >= 0; j--) {
+                    if (connectedMarker.h_connection[j].toString() === marker.id.toString()) {
+                      connectedMarker.h_connection.splice(j, 1);
+                    }
+                  }
+
+                  operation = "leave";
+                }
+              }
+            }
+
+            //get leave out values
+            this.calcCompositeDepth();
+            this.calcEventFreeDepth();
+
+            const loo_source = marker.depth_source[0];
+            const loo_cd = marker.local_composite_depth;
+            const loo_efd = marker.local_event_free_depth;
+            const loo_age = marker.age;
+
+            //set result
+            data.push([
+              project.name,
+              hole.name,
+              section.name,
+              marker.distance,
+              operation,
+              original_source,
+              loo_source,
+              original_cd,
+              loo_cd,
+              original_efd,
+              loo_efd,
+              original_age,
+              loo_age
+            ]);
           }
         }
       }
     }
 
-    //restore
-
+    //restore connections
+    this.projects = structuredClone(originalProjects);
+    //this.updateSearchIdx();
 
     console.log("Done")
     return data;

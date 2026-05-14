@@ -17,6 +17,7 @@ const windows = {
 };
 
 const projectRoot = path.join(__dirname, "..");
+const appIconPath = path.join(projectRoot, "icon", "levelcompiler.png");
 
 const windowDefinitions = Object.freeze({
   [WINDOW_TYPES.MAIN]: {
@@ -24,7 +25,7 @@ const windowDefinitions = Object.freeze({
       title: "Level Compiler",
       width: isDev ? 2000 : 1000,
       height: 800,
-      icon: path.join(projectRoot, "icon", "levelcompiler.png"),
+      icon: appIconPath,
       webPreferences: {
         preload: path.join(projectRoot, "preload", "preload.js"),
       },
@@ -36,6 +37,9 @@ const windowDefinitions = Object.freeze({
       title: "LC Finder",
       width: 230,
       height: 580,
+      icon: appIconPath,
+      autoHideMenuBar: true,
+      menuBarVisible: false,
       webPreferences: {
         preload: path.join(projectRoot, "preload", "preload_finder.js"),
       },
@@ -48,6 +52,7 @@ const windowDefinitions = Object.freeze({
       title: "LC Divider",
       width: 1300,
       height: 800,
+      icon: appIconPath,
       webPreferences: {
         preload: path.join(projectRoot, "preload", "preload_divider.js"),
       },
@@ -60,6 +65,7 @@ const windowDefinitions = Object.freeze({
       title: "LC Converter",
       width: 700,
       height: 700,
+      icon: appIconPath,
       webPreferences: {
         preload: path.join(projectRoot, "preload", "preload_converter.js"),
       },
@@ -72,6 +78,7 @@ const windowDefinitions = Object.freeze({
       title: "LC Labeler",
       width: 800,
       height: 800,
+      icon: appIconPath,
       webPreferences: {
         preload: path.join(projectRoot, "preload", "preload_labeler.js"),
       },
@@ -84,6 +91,7 @@ const windowDefinitions = Object.freeze({
       title: "LC Settings",
       width: 700,
       height: 700,
+      icon: appIconPath,
       webPreferences: {
         preload: path.join(projectRoot, "preload", "preload_settings.js"),
       },
@@ -97,6 +105,7 @@ const windowDefinitions = Object.freeze({
       frame: false,
       width: 300,
       height: 800,
+      icon: appIconPath,
       webPreferences: {
         preload: path.join(projectRoot, "preload", "preload_image_viewer.js"),
       },
@@ -109,6 +118,7 @@ const windowDefinitions = Object.freeze({
       title: "LC Plotter",
       width: 800,
       height: 600,
+      icon: appIconPath,
       webPreferences: {
         preload: path.join(projectRoot, "preload", "preload_plotter.js"),
       },
@@ -121,6 +131,7 @@ const windowDefinitions = Object.freeze({
       title: "LC About",
       width: 500,
       height: 300,
+      icon: appIconPath,
       webPreferences: {
         preload: path.join(projectRoot, "preload", "preload_about.js"),
       },
