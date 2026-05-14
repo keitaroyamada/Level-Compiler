@@ -4441,9 +4441,23 @@ function createMainWIndow() {
   });
   //-----marker-----
   ipcMain.handle("addMarker", (_e, payload) => {
-    const { sectionId, depth, depthScale, relativeX } = payload;
-    //add
-    const result = withSuppressedCoreAlertRenderer(() => LCCore.addMarker(sectionId, depth, depthScale, relativeX));
+    let { sectionId, depth, depthScale, relativeX } = payload;
+
+    if (depthScale === "age") {
+      const converted = LCAge.getEFDFromAge(Number(depth), "linear");
+      const efd = converted?.efd?.mid;
+
+      if (!Number.isFinite(Number(efd))) {
+        return "invalid_age";
+      }
+
+      depth = Number(efd);
+      depthScale = "event_free_depth";
+    }
+
+    const result = withSuppressedCoreAlertRenderer(() =>
+      LCCore.addMarker(sectionId, depth, depthScale, relativeX)
+    );
     if(result==true){
       LCCore.calcCompositeDepth();
       LCCore.calcEventFreeDepth();
@@ -5110,6 +5124,13 @@ function createMainWIndow() {
     try {
       //register model
       const isLoad = LCCore.loadModelFromCsv(fullpath, type);
+      if (isLoad !== true) {
+        const modelState = LCCore?.getState?.();
+        if (modelState?.status !== "error_alert") {
+          notifyImportFormatError("correlation model", fullpath, modelState?.statusDetails);
+        }
+        return null;
+      }
       history.setInitialState(LCCore.exportSerialisedModel());
 
       //register path
@@ -5121,6 +5142,7 @@ function createMainWIndow() {
     } catch (error) {
       console.log(error);
       console.error("MAIN: Correlation model register error.");
+      notifyImportFormatError("correlation model", fullpath, error);
       return null;
     }
   }
@@ -5136,16 +5158,41 @@ function createMainWIndow() {
 
         return true
       }else{
-        const result={};
-        result.statusDetails = res;
-
-        getMainWindow().webContents.send("AlertRenderer", result);
+        notifyImportFormatError("age model", fullpath, res);
         console.error("MAIN: ",res);
       }
       
     }catch(err){
-      console.log(err)
+      console.log(err);
+      notifyImportFormatError("age model", fullpath, err);
     }
+  }
+  function notifyImportFormatError(importType, fullpath, details = null) {
+    const detailMessage = details instanceof Error
+      ? details.message
+      : typeof details === "string" && details.trim() !== ""
+        ? details.trim()
+        : null;
+    const fileName = fullpath ? path.basename(fullpath) : "selected file";
+    const article = /^[aeiou]/i.test(importType) ? "an" : "a";
+    const expectedFormat = importType === "age model"
+      ? "a Level-Compiler age model CSV with age columns such as age upper, age mid, and age lower"
+      : "a Level-Compiler correlation model CSV";
+    const messageLines = [
+      `The selected file could not be loaded as ${article} ${importType}.`,
+      `File: ${fileName}`,
+      `Expected format: ${expectedFormat}.`,
+      "Please choose a file with the correct format.",
+    ];
+
+    if (detailMessage) {
+      messageLines.push(`Details: ${detailMessage}`);
+    }
+
+    getMainWindow().webContents.send("AlertRenderer", {
+      status: "Unsupported File Format",
+      statusDetails: messageLines.join("\n"),
+    });
   }
   async function registerLCModel(fullpath){
     globalPath.dataPaths.push({type:"lcmodel",path:fullpath});

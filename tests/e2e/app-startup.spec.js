@@ -168,6 +168,66 @@ test("app loads age csv fixture by drop after lcmodel", async () => {
   }
 });
 
+test("app rejects unidentified csv files during drop before import", async () => {
+  const { electronApp, firstWindow, runtimeIssueMonitor } = await launchApp();
+
+  try {
+    await firstWindow.evaluate(() => {
+      const dataTransfer = new DataTransfer();
+      dataTransfer.items.add(new File(["not,a,level,compiler,file\n"], "unknown.csv", { type: "text/csv" }));
+      const dropEvent = new DragEvent("drop", {
+        bubbles: true,
+        cancelable: true,
+        dataTransfer,
+      });
+      document.getElementById("scroller").dispatchEvent(dropEvent);
+    });
+
+    await expect(firstWindow.locator("#lcModalDialog .lc-dialog-message")).toContainText(
+      "The dropped CSV file could not be identified as a supported Level-Compiler file."
+    );
+    await expect(firstWindow.locator("#lcModalDialog .lc-dialog-message")).toContainText(
+      "Expected file name identifiers: [correlation], [duo], or [age]."
+    );
+    await firstWindow.locator("#lcModalDialog button[type='submit']").click();
+  } finally {
+    await closeElectronApp(electronApp, firstWindow, runtimeIssueMonitor);
+  }
+});
+
+test("app shows an unsupported format message for invalid age csv", async () => {
+  const { electronApp, firstWindow, runtimeIssueMonitor } = await launchApp();
+  const invalidAgeDir = path.join(ROOT_DIR, "tests", "temp", `invalid-age-${Date.now()}`);
+  const invalidAgeCsv = path.join(invalidAgeDir, "[age]Invalid.csv");
+
+  try {
+    fs.mkdirSync(invalidAgeDir, { recursive: true });
+    fs.writeFileSync(invalidAgeCsv, "not,an,age,model\n1,2,3,4\n", "utf8");
+
+    await firstWindow.evaluate(
+      async ({ lcmodel }) => window.__LC_E2E__.loadLcModelFromPath(lcmodel),
+      { lcmodel: FIXTURE_PATHS.lcmodel }
+    );
+
+    const result = await firstWindow.evaluate(
+      async ({ invalidAgeCsv }) => window.__LC_E2E__.loadAgeModelFromPath(invalidAgeCsv),
+      { invalidAgeCsv }
+    );
+
+    expect(result.ok).toBe(false);
+    expect(result.error).toBe("register_age_failed");
+    await expect(firstWindow.locator("#lcModalDialog .lc-dialog-message")).toContainText(
+      "The selected file could not be loaded as an age model."
+    );
+    await expect(firstWindow.locator("#lcModalDialog .lc-dialog-message")).toContainText(
+      "Expected format: a Level-Compiler age model CSV"
+    );
+    await firstWindow.locator("#lcModalDialog button[type='submit']").click();
+  } finally {
+    await closeElectronApp(electronApp, firstWindow, runtimeIssueMonitor);
+  }
+});
+
 test("app loads core images into the renderer after lcmodel", async () => {
   const { electronApp, firstWindow, runtimeIssueMonitor } = await launchApp();
   try {

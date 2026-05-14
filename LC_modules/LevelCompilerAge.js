@@ -286,17 +286,22 @@ class LevelCompilerAge {
         ageData.sidx = ageDataIdx[2];
 
         //calc EFD
-        const [[sectionId, efd, rank]] = LCCore.getDepthFromTrinity(ageProjectId, [ageData.trinityData],"event_free_depth");
+        const [[cd_sectionId,  cd,  cd_rank]] = LCCore.getDepthFromTrinity(ageProjectId, [ageData.trinityData],"composite_depth");
+        const [[efd_sectionId, efd, efd_rank]] = LCCore.getDepthFromTrinity(ageProjectId, [ageData.trinityData],"event_free_depth");
+        const [[dd_sectionId,  dd,  dd_rank]] = LCCore.getDepthFromTrinity(ageProjectId, [ageData.trinityData],"drilling_depth");
+        
         if (isNaN(efd)) {
           console.log(csv_data[r][idxAgeName] + ":" + csv_data[r][idxHoleName] + "-" + csv_data[r][idxSectionName] + "-" + csv_data[r][idxDistance] + "cm EFD:" + efd);
         }
 
-        if (sectionId == null) {
+        if (efd_sectionId == null) {
           console.log("[" + r + "]: Could not determine the position of " + ageData.trinityData.name);
           continue;
         } else {
+          ageData.drilling_depth = dd;
+          ageData.composite_depth = cd;
           ageData.event_free_depth = efd;
-          ageData.section_id = sectionId;
+          ageData.section_id = efd_sectionId;
         }
       } else if ((type=="LC" && csv_data[r][idxCD] !== "") || (type=="LF" && csv_data[r][idxCD] !== "9999")) {
         //defined by CD-----------------------------------------------------------------
@@ -533,6 +538,7 @@ class LevelCompilerAge {
               matchedProject = projectMatches[0];
             } else if (projectMatches.length > 1) {
               console.log("LCAge: Project name is ambiguous: " + projectName);
+              ageData.drilling_depth = null;
               ageData.event_free_depth = null;
               ageData.composite_depth = null;
               ageData.section_id = null;
@@ -607,11 +613,9 @@ class LevelCompilerAge {
           ageData.sidx = ageDataIdx[2];
           
           //case trinity data
-          const efdData = LCCore.getDepthFromTrinity(ageProjectId, [ageData.trinityData], "event_free_depth");
-          const cdData  = LCCore.getDepthFromTrinity(ageProjectId, [ageData.trinityData], "composite_depth");
-
-          const [sectionId, efd, rank, polationType, sectionType]  = efdData[0];
-          const [sectionId2,cd,  rank2,polationType2,sectionType2] = cdData[0];
+          const [[sectionId, efd, rank, polationType, sectionType]]  = LCCore.getDepthFromTrinity(ageProjectId, [ageData.trinityData], "event_free_depth");
+          const [[sectionId2,cd,  rank2,polationType2,sectionType2]] = LCCore.getDepthFromTrinity(ageProjectId, [ageData.trinityData], "composite_depth");
+          const [[sectionId3,dd,  rank3,polationType3,sectionType3]] = LCCore.getDepthFromTrinity(ageProjectId, [ageData.trinityData], "drilling_depth");
 
           if (sectionId == null) {
             errorCounts++;
@@ -625,11 +629,13 @@ class LevelCompilerAge {
               console.log("        ...and more " + errorCounts);
             }
             
+            ageData.drilling_depth = null;
             ageData.event_free_depth = null;
             ageData.composite_depth  = null;
             ageData.section_id = null;
             continue;
           } else {
+            ageData.drilling_depth = dd;
             ageData.event_free_depth = efd;
             ageData.composite_depth  = cd;
             ageData.section_id = sectionId;
@@ -640,12 +646,14 @@ class LevelCompilerAge {
           const efdval = LCCore.getEFDfromCD(ageData.composite_depth);
 
           if (Number.isFinite(Number(efdval))) {
+            ageData.drilling_depth = null;
             ageData.event_free_depth = Number(efdval);
             ageData.pidx = baseProjectIdx[0];
             ageData.hidx = null;
             ageData.sidx = null;
           } else {
             console.log("Composite depth is out of model definition: " + ageData.name);
+            ageData.drilling_depth = null;
             ageData.event_free_depth = null;
             ageData.composite_depth = null;
             ageData.section_id = null;
@@ -660,6 +668,7 @@ class LevelCompilerAge {
           const efdval = Number(ageData.event_free_depth);
 
           if (Number.isFinite(efdval)) {
+            ageData.drilling_depth = null;
             ageData.event_free_depth = efdval;
             const cdval = LCCore.getCDfromEFD(efdval);
             ageData.composite_depth = Number.isFinite(Number(cdval)) ? Number(cdval) : null;
@@ -668,6 +677,7 @@ class LevelCompilerAge {
             ageData.sidx = null;
           } else {
             console.log("Event-free depth is out of model definition: " + ageData.name);
+            ageData.drilling_depth = null;
             ageData.event_free_depth = null;
             ageData.composite_depth = null;
             ageData.section_id = null;

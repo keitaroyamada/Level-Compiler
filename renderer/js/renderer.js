@@ -302,6 +302,13 @@ document.addEventListener("DOMContentLoaded", () => {
 
       //check
       let order = [];
+      const unsupportedCsvFiles = dataList.filter((data) =>
+        isCsvFile(data) && getDroppedCsvImportKind(data.name) === null
+      );
+      if (unsupportedCsvFiles.length > 0) {
+        await showUnsupportedDropFormatDialog(unsupportedCsvFiles[0].name);
+        return;
+      }
 
       //check LCMODEL first
       let numModel = 0;
@@ -887,7 +894,7 @@ document.addEventListener("DOMContentLoaded", () => {
     //data: status, statusDetails, hasError, statusDetails
 
     console.log("Error: \n",data);
-    await showErrorDialog(data.statusDetails, data.status ?? "Alert");
+    await showErrorDialog(data?.statusDetails || "The selected file could not be loaded. Please check the file format.", data?.status ?? "Alert");
     //data.errorDetails
   });
   //============================================================================================
@@ -1548,6 +1555,30 @@ document.addEventListener("DOMContentLoaded", () => {
       submitLabel: "OK",
       hideCancel: true,
     });
+  }
+
+  function isCsvFile(data) {
+    return String(data?.type ?? "").toLowerCase() === "csv";
+  }
+
+  function getDroppedCsvImportKind(fileName) {
+    const lowerName = String(fileName ?? "").toLowerCase();
+    if (lowerName.includes("[correlation]") || lowerName.includes("[duo]")) {
+      return "correlation model";
+    }
+    if (lowerName.includes("[age]")) {
+      return "age model";
+    }
+    return null;
+  }
+
+  function showUnsupportedDropFormatDialog(fileName) {
+    return showErrorDialog(
+      "The dropped CSV file could not be identified as a supported Level-Compiler file.\n" +
+      "File: " + fileName + "\n" +
+      "Expected file name identifiers: [correlation], [duo], or [age].",
+      "Unsupported File Format"
+    );
   }
 
   async function handleEditContextmenu(event) {
@@ -6590,14 +6621,24 @@ document.addEventListener("DOMContentLoaded", () => {
           const yBufferVal = (scrollerBotRealScale-scrollerTopRealScale) * objOpts.canvas.buffer_depth * yMag;
           const searchTop = scrollerTopRealScale - yBufferVal;
           const searchBot = scrollerBotRealScale + yBufferVal;
-          let startIndex = binarySearchIndex(ageList, searchTop, (d) => d[objOpts.canvas.depth_scale]);
-          let endIndex   = binarySearchIndex(ageList, searchBot, (d) => d[objOpts.canvas.depth_scale]);
+          const isAgeScale = objOpts.canvas.depth_scale === "age";
+          let startIndex = 0;
+          let endIndex = ageList.length;
+          if (!isAgeScale) {
+            startIndex = binarySearchIndex(ageList, searchTop, (d) => d[objOpts.canvas.depth_scale]);
+            endIndex   = binarySearchIndex(ageList, searchBot, (d) => d[objOpts.canvas.depth_scale]);
+          }
 
           //convert age point
           let val_max = -Infinity;
           let val_min = Infinity;
           const ageDataSet = drawPointDataset();
           for (let a = startIndex; a < endIndex; a++) {   
+            const ageDepth = isAgeScale ? ageList[a].age_mid : ageList[a][objOpts.canvas.depth_scale];
+            if (!Number.isFinite(Number(ageDepth)) || ageDepth < searchTop || ageDepth > searchBot) {
+              continue;
+            }
+
             //set values
             const ageData = drawPointData();
             ageData.id          = ageList[a].id;

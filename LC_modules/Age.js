@@ -16,7 +16,7 @@ class Age {
     this.data_type = "age";
     this.trinityData = new Trinity();
     this.section_id = [null, null, null, null];
-    this.Drilling_depth = null;
+    this.drilling_depth = null;
     this.composite_depth = null;
     this.event_free_depth = null;
 
