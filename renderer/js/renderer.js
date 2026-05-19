@@ -207,6 +207,7 @@ document.addEventListener("DOMContentLoaded", () => {
     objOpts.image.is_load_enabled = {composite_depth: true, event_free_depth: true, age: true};
 
     objOpts.age.is_age_visible = true;
+    objOpts.age.x_shift = 0;
     objOpts.age.age_precision = 0;
     objOpts.age.incon_size = 20;
     objOpts.age.alt_radius = 3;     
@@ -5310,6 +5311,9 @@ document.addEventListener("DOMContentLoaded", () => {
       //sketch.resizeCanvas(scroller.clientWidth, scroller.clientHeight);
       //back ground
       sketch.background(objOpts.canvas.background_colour);
+      if (!LCCore) {
+        return;
+      }
 
       //translate plot position 
       sketch.push(); //save
@@ -6776,7 +6780,7 @@ document.addEventListener("DOMContentLoaded", () => {
               //case: Unknown source type
               sketch.image(
                 agePlotIcons["none"],
-                drawData.pos_x,
+                drawData.pos_x + objOpts.age.x_shift,
                 drawData.pos_y,
                 objOpts.age.incon_size,
                 objOpts.age.incon_size
@@ -6789,7 +6793,7 @@ document.addEventListener("DOMContentLoaded", () => {
                   //case: reliable(normal data)
                   sketch.image(
                     agePlotIcons[drawData.source_type],
-                    drawData.pos_x,
+                    drawData.pos_x + objOpts.age.x_shift,
                     drawData.pos_y,
                     objOpts.age.incon_size,
                     objOpts.age.incon_size
@@ -6798,7 +6802,7 @@ document.addEventListener("DOMContentLoaded", () => {
                   //case: unreliable(reversed data, but used for age model)
                   sketch.image(
                     agePlotIcons[drawData.source_type+"_unreliable"],
-                    drawData.pos_x,
+                    drawData.pos_x + objOpts.age.x_shift,
                     drawData.pos_y,
                     objOpts.age.incon_size,
                     objOpts.age.incon_size
@@ -6808,7 +6812,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 //case: disable data(reversed data, not used for age model)
                 sketch.image(
                   agePlotIcons[drawData.source_type+"_disable"],
-                  drawData.pos_x,
+                  drawData.pos_x + objOpts.age.x_shift,
                   drawData.pos_y,
                   objOpts.age.incon_size,
                   objOpts.age.incon_size
@@ -6824,8 +6828,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
                 sketch.text(
                   drawData.name, 
-                  drawData.pos_x+objOpts.age.incon_size+10, 
-                  drawData.pos_y+objOpts.age.incon_size*0.7
+                  drawData.pos_x + objOpts.age.x_shift+objOpts.age.incon_size+10, 
+                  drawData.pos_y + objOpts.age.x_shift+objOpts.age.incon_size*0.7
                 );
                 sketch.pop();
               }
@@ -11381,7 +11385,7 @@ function getClickedItemIdx(mouseX, mouseY, LCCore, objOpts){
     });
 
     const project_x0 = -objOpts.project.pad_x/xMag + (objOpts.section.width + objOpts.hole.distance) * (num_enable_left + objOpts.project.interval * active_projects_before);
-    let project_w = -objOpts.project.pad_x/xMag + (objOpts.section.width + objOpts.hole.distance) * (num_enable_right + 1);
+    let project_w = objOpts.project.pad_x/(2*xMag) + (objOpts.section.width + objOpts.hole.distance) * (num_enable_right-1) + pad_x/xMag;
     
     if(num_enable_right == 0){
       project_w = (objOpts.hole.distance + objOpts.hole.width);
@@ -11473,7 +11477,6 @@ function getClickedItemIdx(mouseX, mouseY, LCCore, objOpts){
     }  
     num_hole.total += LCCore.projects[p].holes.length + objOpts.project.interval;
   }
-  
   return results;
 }
 
@@ -11634,6 +11637,10 @@ function drawPointData(data=null, LCCore=null){
     hidx: null,
     sidx: null,
 
+    porder: null,
+    horder: null,
+    sorder: null,
+
     composite_depth: null,
     event_free_depth: null,
     drilling_depth: null,
@@ -11679,6 +11686,9 @@ function drawPointData(data=null, LCCore=null){
                 output.pidx = p;
                 output.hidx = h;
                 output.sidx = s;
+                output.porder = project.order; 
+                output.horder = hole.order;
+                output.sorder = section.order;
               }
             })
           }

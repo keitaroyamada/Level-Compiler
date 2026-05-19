@@ -284,6 +284,10 @@ class LevelCompilerAge {
         ageData.pidx = ageDataIdx[0];
         ageData.hidx = ageDataIdx[1];
         ageData.sidx = ageDataIdx[2];
+        ageData.porder = LCCore.projects[ageDataIdx[0]].order;
+        ageData.horder = LCCore.projects[ageDataIdx[0]].holes[ageDataIdx[1]].order;
+        ageData.sorder = LCCore.projects[ageDataIdx[0]].holes[ageDataIdx[1]].sections[ageDataIdx[2]].order;
+
 
         //calc EFD
         const [[cd_sectionId,  cd,  cd_rank]] = LCCore.getDepthFromTrinity(ageProjectId, [ageData.trinityData],"composite_depth");

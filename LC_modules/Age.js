@@ -24,6 +24,10 @@ class Age {
     this.hidx = null;
     this.sidx = null;
 
+    this.porder = null;
+    this.horder = null;
+    this.sorder = null;
+
     this.source_type = "general"; //"general", "terrestrial", "marine", "tephra", "orbital", "climate"
     this.source_code = "";
 
