@@ -4177,6 +4177,11 @@ function createMainWIndow() {
         });
       }
 
+    }else if(to=="settings_sync"){
+      if(hasSettingsWindow()){
+        sendToSettingsWindow("SettingsData", sendData);
+      }
+
     }else if(to=="renderer"){
       getMainWindow().webContents.send("SettingsData", sendData.data);
       if(sendData){

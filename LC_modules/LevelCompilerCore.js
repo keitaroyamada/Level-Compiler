@@ -7062,7 +7062,6 @@ class LevelCompilerCore extends EventEmitter{
     return false
   }
   leaveOneOut(target = "project", onProgress) {
-    //initiarize
     const data = [];
 
     data.push([
@@ -7081,11 +7080,9 @@ class LevelCompilerCore extends EventEmitter{
       "LOO Age"
     ]);
 
-    //backup
     const originalProjects = structuredClone(this.projects);
 
-    //progress
-    const totalMarkers = this.projects.reduce((sumP, project) => {
+    const totalMarkers = originalProjects.reduce((sumP, project) => {
       return sumP + project.holes.reduce((sumH, hole) => {
         return sumH + hole.sections.reduce((sumS, section) => {
           return sumS + section.markers.length;
@@ -7093,94 +7090,92 @@ class LevelCompilerCore extends EventEmitter{
       }, 0);
     }, 0);
 
-    //main
-    console.log("Start Leave-One-Out evaluation")
+    console.log("Start Leave-One-Out evaluation");
+
     let c = 0;
 
     for (let p = 0; p < originalProjects.length; p++) {
       for (let h = 0; h < originalProjects[p].holes.length; h++) {
         for (let s = 0; s < originalProjects[p].holes[h].sections.length; s++) {
           for (let m = 0; m < originalProjects[p].holes[h].sections[s].markers.length; m++) {
-            
-            const project = this.projects[p];
-            const curProjId = project.id[0];
-            const hole = project.holes[h];
-            const section = hole.sections[s];
-            const marker = section.markers[m];
 
-            //progress
             c++;
             if (onProgress) {
               onProgress({
                 done: c,
                 total: totalMarkers
-              })
+              });
             }
 
-            //check h connections
-            if(marker.h_connection.length == 0){
-              continue
+            const originalProject = originalProjects[p];
+            const originalHole = originalProject.holes[h];
+            const originalSection = originalHole.sections[s];
+            const originalMarker = originalSection.markers[m];
+
+            if (originalMarker.h_connection.length === 0) {
+              continue;
             }
 
-            //restore connections
-            this.projects = structuredClone(originalProjects);            
+            const curProjId = originalProject.id[0];
 
-            //get current values
-            let original_source = marker.depth_source[0];
-            let original_cd = marker.local_composite_depth;
-            let original_efd = marker.local_event_free_depth;
-            let original_age = marker.age;
+            const original_source = originalMarker.depth_source[0];
+            const original_cd = originalMarker.local_composite_depth;
+            const original_efd = originalMarker.local_event_free_depth;
+            const original_age = originalMarker.age;
+
+            // reset model for this LOO trial
+            this.projects = structuredClone(originalProjects);
+            this.updateSearchIdx?.();
+
+            // IMPORTANT: re-acquire references from restored this.projects
+            const project = this.projects[p];
+            const hole = project.holes[h];
+            const section = hole.sections[s];
+            const marker = section.markers[m];
+
             let operation = "";
 
-            //disconnect horizontal connections
             for (let i = marker.h_connection.length - 1; i >= 0; i--) {
               const hconnect = marker.h_connection[i];
 
-              if (target === "project") {
-                // delete connection in the same project
-                if (curProjId === hconnect[0]) {
-                  //delete own
-                  marker.h_connection.splice(i, 1);
+              const shouldLeave =
+                target === "project"
+                  ? curProjId === hconnect[0]
+                  : curProjId !== hconnect[0];
 
-                  //delete pair
-                  const connectedMarker = this.getDataByIdx(this.search_idx_list[hconnect.toString()]);
-                  for (let j = connectedMarker.h_connection.length - 1; j >= 0; j--) {
-                    if (connectedMarker.h_connection[j].toString() === marker.id.toString()) {
-                      connectedMarker.h_connection.splice(j, 1);
-                    }
+              if (!shouldLeave) {
+                continue;
+              }
+
+              // delete own connection
+              marker.h_connection.splice(i, 1);
+
+              // delete paired connection
+              const connectedMarker =
+                this.getDataByIdx(this.search_idx_list[hconnect.toString()]);
+
+              if (connectedMarker) {
+                for (let j = connectedMarker.h_connection.length - 1; j >= 0; j--) {
+                  if (connectedMarker.h_connection[j].toString() === marker.id.toString()) {
+                    connectedMarker.h_connection.splice(j, 1);
                   }
-
-                  operation = "leave";
-                }
-              } else {
-                // delete connection between the other projects
-                if (curProjId !== hconnect[0]) {
-                  //delete own
-                  marker.h_connection.splice(i, 1);
-
-                  //delete pair
-                  const connectedMarker = this.getDataByIdx(this.search_idx_list[hconnect.toString()]);
-                  for (let j = connectedMarker.h_connection.length - 1; j >= 0; j--) {
-                    if (connectedMarker.h_connection[j].toString() === marker.id.toString()) {
-                      connectedMarker.h_connection.splice(j, 1);
-                    }
-                  }
-
-                  operation = "leave";
                 }
               }
+
+              operation = "leave";
             }
 
-            //get leave out values
             this.calcCompositeDepth();
             this.calcEventFreeDepth();
 
-            const loo_source = marker.depth_source[0];
-            const loo_cd = marker.local_composite_depth;
-            const loo_efd = marker.local_event_free_depth;
-            const loo_age = marker.age;
+            // IMPORTANT: read LOO values again from current this.projects
+            const looMarker = this.projects[p].holes[h].sections[s].markers[m];
 
-            //set result
+            const loo_source = looMarker.depth_source[0];
+            const loo_cd = looMarker.local_composite_depth;
+            const loo_efd = looMarker.local_event_free_depth;
+            const loo_age = looMarker.age;
+
             data.push([
               project.name,
               hole.name,
@@ -7201,11 +7196,10 @@ class LevelCompilerCore extends EventEmitter{
       }
     }
 
-    //restore connections
     this.projects = structuredClone(originalProjects);
-    //this.updateSearchIdx();
+    this.updateSearchIdx?.();
 
-    console.log("Done")
+    console.log("Done");
     return data;
   }
 

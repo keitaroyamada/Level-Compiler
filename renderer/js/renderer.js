@@ -4094,7 +4094,7 @@ document.addEventListener("DOMContentLoaded", () => {
         canvasPos = [x, y];
 
         //update plot
-        updateView();     
+        updateView();
       }
       
     });
@@ -4464,6 +4464,69 @@ document.addEventListener("DOMContentLoaded", () => {
     
     return sendData
   }
+
+  function setToggleButtonState(id, enabled) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.style.backgroundColor = enabled ? "#ccc" : "#f0f0f0";
+  }
+
+  function setSelectControlValue(id, value) {
+    const el = document.getElementById(id);
+    if (!el || value == null) return;
+    if (el.value !== value) {
+      el.value = value;
+    }
+  }
+
+  function syncControlsFromSettings() {
+    setToggleButtonState("bt_target", objOpts.canvas.is_target_visible);
+    setToggleButtonState("bt_core_model", objOpts.canvas.is_model_visible);
+    setToggleButtonState("bt_connection", objOpts.canvas.is_connection_visible);
+    setToggleButtonState("bt_event_layer", objOpts.canvas.is_event_expanded);
+    setToggleButtonState("bt_core_photo", objOpts.canvas.is_core_photo_visible);
+    setToggleButtonState("bt_rank", objOpts.marker.is_rank_visible);
+    setToggleButtonState("bt_source", objOpts.connection.is_source_visible);
+    setToggleButtonState("bt_grid", objOpts.canvas.is_grid_visible);
+    setToggleButtonState(
+      "bt_show_labels",
+      objOpts.marker.is_name_labels_visible || objOpts.marker.is_position_labels_visible
+    );
+
+    const targetLine = document.getElementById("horizontal_target");
+    if (targetLine) {
+      targetLine.style.display = objOpts.canvas.is_target_visible ? "block" : "none";
+    }
+
+    setSelectControlValue("YAxisSelect", objOpts.canvas.depth_scale);
+    setSelectControlValue("ImageSetSelect", objOpts.image.active_source_id);
+  }
+
+  let settingsWindowSyncTimer = null;
+  let lastSettingsWindowSyncPayload = "";
+
+  function scheduleSettingsWindowSync() {
+    if (settingsWindowSyncTimer) {
+      clearTimeout(settingsWindowSyncTimer);
+    }
+    settingsWindowSyncTimer = setTimeout(async () => {
+      settingsWindowSyncTimer = null;
+      await syncSettingsWindowIfOpen();
+    }, 150);
+  }
+
+  async function syncSettingsWindowIfOpen() {
+    const settings = makeSendSettingData();
+    const payloadSignature = JSON.stringify(settings.data);
+    if (payloadSignature === lastSettingsWindowSyncPayload) {
+      return;
+    }
+    lastSettingsWindowSyncPayload = payloadSignature;
+    await window.LCapi.sendSettings({
+      sendData: settings,
+      to: "settings_sync",
+    });
+  }
   
   window.LCapi.receive("SettingsData", async (data) => {
     if(data == null){
@@ -4505,10 +4568,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
       }else{
         //case: same version (or app is older than saved settings)
-        const updateDeny = new Set([
-          "canvas.zoom_level" //To avoid errors
-        ]);
-
         for (const k in data) {
           if (!objOpts[k]) continue;
 
@@ -4516,7 +4575,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
             const filtered = {};
             for (const subk in data[k]) {
-              if (updateDeny.has(`${k}.${subk}`)) continue;
               filtered[subk] = data[k][subk];
             }
 
@@ -5067,7 +5125,7 @@ document.addEventListener("DOMContentLoaded", () => {
   
       //update plot
       updateView();
-      }
+      }    
     }
     //Shift +1/2 => add masterflag
     if(LCCore){
@@ -9299,8 +9357,8 @@ document.addEventListener("DOMContentLoaded", () => {
     if (!LCCore || !sectionId) {
       return null;
     }
-    const idx = LCCore.search_idx_list?.[sectionId.toString()];
-    if (!idx) {
+    const idx = getIdxById(LCCore, sectionId);
+    if (!idx || idx[0] == null || idx[1] == null || idx[2] == null) {
       return null;
     }
     const project = LCCore.projects[idx[0]];
@@ -9520,6 +9578,7 @@ document.addEventListener("DOMContentLoaded", () => {
   function updateView() {
     objOpts.edit.is_full_snapshot = false;
     if(isProcessing || !LCCore){return}
+    syncControlsFromSettings();
     //update
     if (vectorObjects == null) {
       vectorObjects = new p5(p5Sketch);
@@ -9533,6 +9592,8 @@ document.addEventListener("DOMContentLoaded", () => {
     if (penObject.penCanvas) {
       penObject.penCanvas.redraw();
     }
+
+    scheduleSettingsWindowSync();
   }
   function getConnectedSectionIds(markerIds){
     let outIdList = new Set();
@@ -10176,6 +10237,7 @@ function getIdxById(LCCore, id) {
   let relative_idxs = [null, null, null, null];
 
   try{
+    id = Array.isArray(id) ? id : id?.toString().split(",");
     if (id[0] !== null && id[0] !== "") {
       for (let p = 0; p < LCCore.projects.length; p++) {
         const projectData = LCCore.projects[p];
@@ -10939,8 +11001,8 @@ async function loadCoreImages(modelImages, LCCore, objOpts, operations, requestO
 
       const requestDpcm = {};
       for (const targetId of targetIds) {
-        const idx = LCCore.search_idx_list[targetId.toString()];
-        if (!idx) {
+        const idx = getIdxById(LCCore, targetId);
+        if (!idx || idx[0] == null || idx[1] == null || idx[2] == null) {
           continue;
         }
         const projectName = LCCore.projects[idx[0]].name;

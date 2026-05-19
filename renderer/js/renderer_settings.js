@@ -44,6 +44,7 @@ window.addEventListener("DOMContentLoaded", () => {
     let settings = {};
     let isEditable = false;
     let settingFields = {};
+    let settingsMenuSignature = null;
 
     function formatSettingName(name) {
       return String(name)
@@ -86,9 +87,81 @@ window.addEventListener("DOMContentLoaded", () => {
       document.getElementById("open_settings_folder").style.display = isPreferences && isDeveloperMode ? "block" : "none";
     }
 
-    function createMenu(data, editables, container, depth = 0, fields = {}) {
+    function getOpenSettingsSections(container) {
+      return new Set(
+        Array.from(container?.querySelectorAll("details.settings-section[open][data-settings-path]") ?? [])
+          .map((details) => details.dataset.settingsPath)
+      );
+    }
+
+    function restoreOpenSettingsSections(container, openPaths) {
+      for (const details of container?.querySelectorAll("details.settings-section[data-settings-path]") ?? []) {
+        details.open = openPaths.has(details.dataset.settingsPath);
+      }
+    }
+
+    function getValueAtPath(source, path) {
+      return path.reduce((current, key) => current?.[key], source);
+    }
+
+    function setValueAtPath(source, path, value) {
+      const lastKey = path[path.length - 1];
+      const parent = path.slice(0, -1).reduce((current, key) => current?.[key], source);
+      if (parent && Object.prototype.hasOwnProperty.call(parent, lastKey)) {
+        parent[lastKey] = value;
+      }
+    }
+
+    function getSettingsMenuSignature(data, editables, fields) {
+      return JSON.stringify({
+        keys: getSettingsShape(data),
+        editables,
+        fields,
+      });
+    }
+
+    function getSettingsShape(value) {
+      if (value === null || typeof value !== "object") {
+        return typeof value;
+      }
+
+      if (Array.isArray(value)) {
+        return value.map((child) => getSettingsShape(child));
+      }
+
+      const shape = {};
+      for (const key of Object.keys(value)) {
+        shape[key] = getSettingsShape(value[key]);
+      }
+      return shape;
+    }
+
+    function setInputDisplayValue(input, value) {
+      if (document.activeElement === input) {
+        return;
+      }
+
+      if (input.type === "checkbox") {
+        input.checked = Boolean(value);
+      } else {
+        input.value = value;
+      }
+    }
+
+    function updateMenuValues(nextSettings) {
+      for (const input of document.querySelectorAll("input[data-settings-path], select[data-settings-path], textarea[data-settings-path]")) {
+        const path = input.dataset.settingsPath.split(".");
+        const value = getValueAtPath(nextSettings, path);
+        if (value !== undefined) {
+          setInputDisplayValue(input, value);
+        }
+      }
+    }
+
+    function createMenu(data, editables, container, depth = 0, fields = {}, path = []) {
       Object.entries(data).forEach(([key, value]) => {
         const fieldOptions = settingFieldsForKey(fields, key);
+        const itemPath = [...path, key];
         let isEditableObj;
         if (typeof editables === "object"){
           isEditableObj = editables[key];
@@ -99,6 +172,7 @@ window.addEventListener("DOMContentLoaded", () => {
         if (typeof value === "object" && value !== null) {
           const details = document.createElement("details");
           details.classList.add("settings-section", `settings-depth-${Math.min(depth, 3)}`);
+          details.dataset.settingsPath = itemPath.join(".");
 
           const summary = document.createElement("summary");
           summary.classList.add("settings-section-title");
@@ -119,7 +193,7 @@ window.addEventListener("DOMContentLoaded", () => {
           details.appendChild(summary);
 
           const childFields = fieldOptions;
-          createMenu(value, isEditableObj, details, depth + 1, childFields);
+          createMenu(value, isEditableObj, details, depth + 1, childFields, itemPath);
           container.appendChild(details);
         } else {
           const wrapper = document.createElement("div");
@@ -136,10 +210,11 @@ window.addEventListener("DOMContentLoaded", () => {
           
           if (isEditable && isEditableObj) {
             const input = createInput(value, fieldOptions);
+            input.dataset.settingsPath = itemPath.join(".");
             const field = document.createElement("div");
             field.classList.add("settings-field");
             input.addEventListener("change", () => {
-              data[key] = parseInputValue(input, value);
+              setValueAtPath(settings, itemPath, parseInputValue(input, value));
               const parentNames = [];
               let currentElement = wrapper.parentElement;
               while (currentElement && currentElement.tagName !== "BODY") {
@@ -314,14 +389,29 @@ window.addEventListener("DOMContentLoaded", () => {
 
       document.getElementById("title").textContent = receivedData.options.title;
 
-        settings = receivedData.data;
+        const nextSettings = receivedData.data;
+        const nextSignature = getSettingsMenuSignature(
+          nextSettings,
+          receivedData.editable,
+          receivedData.options.fields ?? {}
+        );
+        const shouldRebuildMenu = nextSignature !== settingsMenuSignature;
+
+        settings = nextSettings;
         isEditable = receivedData.options.editable;
         settingFields = receivedData.options.fields ?? {};
         updatePreferenceActions(receivedData.options);
         const container = document.getElementById("menu-container");
         if (container) {
-          container.innerHTML = "";
-          createMenu(settings,receivedData.editable, container, 0, settingFields);
+          if (shouldRebuildMenu) {
+            const openPaths = getOpenSettingsSections(container);
+            container.innerHTML = "";
+            createMenu(settings,receivedData.editable, container, 0, settingFields);
+            restoreOpenSettingsSections(container, openPaths);
+            settingsMenuSignature = nextSignature;
+          } else {
+            updateMenuValues(settings);
+          }
         }
     });
 
