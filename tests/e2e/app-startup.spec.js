@@ -1118,6 +1118,32 @@ test("settings change round-trips back to the main renderer", async () => {
       () => window.__LC_E2E__.getRendererState().canvasBackgroundColour
     );
     expect(afterColour).toBe(nextColour);
+
+    await settingsWindow.evaluate(() => {
+      window.__LC_SETTINGS_E2E__.applySettingsPatch({
+        hole: {
+          is_name_labels_visible: false,
+        },
+        section: {
+          is_name_labels_visible: false,
+          name_display_mode: "section",
+        },
+      });
+    });
+
+    await firstWindow.waitForFunction(() => {
+      const state = window.__LC_E2E__.getRendererState();
+      return (
+        state.holeNameLabelsVisible === false &&
+        state.sectionNameLabelsVisible === false &&
+        state.sectionNameDisplayMode === "section"
+      );
+    });
+
+    const labelState = await firstWindow.evaluate(() => window.__LC_E2E__.getRendererState());
+    expect(labelState.holeNameLabelsVisible).toBe(false);
+    expect(labelState.sectionNameLabelsVisible).toBe(false);
+    expect(labelState.sectionNameDisplayMode).toBe("section");
   } finally {
     await closeElectronApp(electronApp, firstWindow, runtimeIssueMonitor);
   }

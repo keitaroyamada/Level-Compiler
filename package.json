@@ -1,7 +1,7 @@
 {
   "name": "levelcompiler",
   "productName": "Level-Compiler",
-  "version": "1.6.0",
+  "version": "1.6.1",
   "description": "Stratigraphic Correlation Viewer and Compiler",
   "main": "main.js",
   "scripts": {

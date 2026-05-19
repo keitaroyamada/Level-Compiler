@@ -116,6 +116,7 @@ document.addEventListener("DOMContentLoaded", () => {
     objOpts.hole.width = 20;
     objOpts.hole.line_colour = "#90EE90";
     objOpts.hole.line_width = 2;
+    objOpts.hole.is_name_labels_visible = true;
     objOpts.hole.font = "Arial";
     objOpts.hole.font_size = 20;
     objOpts.hole.font_colour = "#000000";
@@ -129,6 +130,8 @@ document.addEventListener("DOMContentLoaded", () => {
     objOpts.section.font_angle =  -90;
     objOpts.section.font_pos_x = -10;
     objOpts.section.font_colour = "#000000";
+    objOpts.section.is_name_labels_visible = true;
+    objOpts.section.name_display_mode = "hole-section";
     objOpts.section.name_position_mode = "adaptive";
 
     objOpts.marker.is_name_labels_visible = true;
@@ -4316,6 +4319,7 @@ document.addEventListener("DOMContentLoaded", () => {
           width:{description:"Hole display width."},
           line_colour:{description:"Hole outline color."},
           line_width:{description:"Hole outline width."},
+          is_name_labels_visible:{description:"Show hole name labels."},
           font:{description:"Hole label font."},
           font_size:{description:"Hole label font size."},
           font_colour:{description:"Hole label color."},
@@ -4331,6 +4335,12 @@ document.addEventListener("DOMContentLoaded", () => {
           font_angle:{description:"Section label rotation angle."},
           font_pos_x:{description:"Section label horizontal offset."},
           font_colour:{description:"Section label color."},
+          is_name_labels_visible:{description:"Show section name labels."},
+          name_display_mode:{
+            type:"select",
+            options:["hole-section", "section"],
+            description:"Section label text format.",
+          },
           name_position_mode:{
             type:"select",
             options:["center", "adaptive"],
@@ -5642,21 +5652,23 @@ document.addEventListener("DOMContentLoaded", () => {
           }
           let hole_x0 = (objOpts.hole.distance + objOpts.hole.width) * (num_disable.total + hole.order - num_disable.hole);
           //add  hole name---------------------------------------------------
-          let holeDispName = hole.name; 
-          if(["root"].includes(objOpts.developer.mode)){
-            holeDispName = hole.id[1].slice(0,5);
+          if (objOpts.hole.is_name_labels_visible) {
+            let holeDispName = hole.name; 
+            if(["root"].includes(objOpts.developer.mode)){
+              holeDispName = hole.id[1].slice(0,5);
+            }
+            sketch.fill(objOpts.hole.font_colour);
+            sketch.noStroke();
+            sketch.textFont(objOpts.hole.font);
+            sketch.textSize(objOpts.hole.font_size);
+            sketch.text(
+              holeDispName,
+              // /(hole_x0 + shift_x + objOpts.hole.width * 0.3) * xMag + pad_x
+              (hole_x0 + shift_x) * xMag + pad_x + objOpts.section.width * xMag /2 - sketch.textWidth(hole.name)/2,
+              scroller.scrollTop + pad_y - 20,
+              //(hole_top + shift_y) * yMag + pad_y - 20
+            );
           }
-          sketch.fill(objOpts.hole.font_colour);
-          sketch.noStroke();
-          sketch.textFont(objOpts.hole.font);
-          sketch.textSize(objOpts.hole.font_size);
-          sketch.text(
-            holeDispName,
-            // /(hole_x0 + shift_x + objOpts.hole.width * 0.3) * xMag + pad_x
-            (hole_x0 + shift_x) * xMag + pad_x + objOpts.section.width * xMag /2 - sketch.textWidth(hole.name)/2,
-            scroller.scrollTop + pad_y - 20,
-            //(hole_top + shift_y) * yMag + pad_y - 20
-          );
           
           //check position --------------------------------------------------
           // draw empty hole line
@@ -5931,31 +5943,35 @@ document.addEventListener("DOMContentLoaded", () => {
               }
 
               //add section name-------------------------------------------------
-              let secDispName = hole.name + "-" + section.name; 
-              if(["root"].includes(objOpts.developer.mode)){
-                secDispName = section.id[2].slice(0,5);
-              }
-              let sectionLabelMid = section_mid;
-              if(objOpts.section.name_position_mode === "adaptive" && !objOpts.edit.is_full_snapshot){
-                const visibleSectionTop = Math.max(section_top, scrollerTopRealScale);
-                const visibleSectionBottom = Math.min(section_bottom, scrollerBotRealScale);
-                if(visibleSectionTop <= visibleSectionBottom){
-                  sectionLabelMid = (visibleSectionTop + visibleSectionBottom) / 2;
+              if (objOpts.section.is_name_labels_visible) {
+                let secDispName = objOpts.section.name_display_mode === "section"
+                  ? section.name
+                  : hole.name + "-" + section.name; 
+                if(["root"].includes(objOpts.developer.mode)){
+                  secDispName = section.id[2].slice(0,5);
                 }
-              }
+                let sectionLabelMid = section_mid;
+                if(objOpts.section.name_position_mode === "adaptive" && !objOpts.edit.is_full_snapshot){
+                  const visibleSectionTop = Math.max(section_top, scrollerTopRealScale);
+                  const visibleSectionBottom = Math.min(section_bottom, scrollerBotRealScale);
+                  if(visibleSectionTop <= visibleSectionBottom){
+                    sectionLabelMid = (visibleSectionTop + visibleSectionBottom) / 2;
+                  }
+                }
 
-              sketch.fill(objOpts.section.font_colour);
-              sketch.noStroke();
-              sketch.textFont(objOpts.section.font);
-              sketch.textSize(objOpts.section.font_size); 
-              sketch.push();
-              sketch.translate(
-                (hole_x0 + shift_x) * xMag + pad_x + objOpts.section.font_pos_x, //-10
-                (sectionLabelMid + shift_y) * yMag + pad_y + sketch.textWidth(secDispName)/2
-              );
-              sketch.rotate((objOpts.section.font_angle / 180) * Math.PI);
-              sketch.text(secDispName, 0, 0);
-              sketch.pop();
+                sketch.fill(objOpts.section.font_colour);
+                sketch.noStroke();
+                sketch.textFont(objOpts.section.font);
+                sketch.textSize(objOpts.section.font_size); 
+                sketch.push();
+                sketch.translate(
+                  (hole_x0 + shift_x) * xMag + pad_x + objOpts.section.font_pos_x, //-10
+                  (sectionLabelMid + shift_y) * yMag + pad_y + sketch.textWidth(secDispName)/2
+                );
+                sketch.rotate((objOpts.section.font_angle / 180) * Math.PI);
+                sketch.text(secDispName, 0, 0);
+                sketch.pop();
+              }
 
               //make marker objects=================================================================================
               let msaterDirection = "none";
@@ -5995,7 +6011,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
                   //draw event layers
 
-                  if (lowerDepth !== null) {
+                  if (ew!==0 && lowerDepth !== null) {
                     sketch.fill(objOpts.event.face_colour[event[3]]);
                     sketch.noStroke();
                     sketch.stroke(objOpts.event.face_colour[event[3]]);
@@ -6142,12 +6158,14 @@ document.addEventListener("DOMContentLoaded", () => {
                 if (isPhtoExist) {
                   relative_marker_x0 = marker.definition_relative_x;
                 }
-                sketch.line(
-                  marker_x0 + marker_w * relative_marker_x0,
-                  marker_y0,
-                  marker_x0 + marker_w,// + topBot,
-                  marker_y0,                  
-                );
+                if(ew!==0){
+                  sketch.line(
+                    marker_x0 + marker_w * relative_marker_x0,
+                    marker_y0,
+                    marker_x0 + marker_w,// + topBot,
+                    marker_y0,                  
+                  );
+                }                
 
                 //add master section-----------------------------------------
                 const curreM = countMaster(LCCore, marker, "project");   
@@ -6572,7 +6590,8 @@ document.addEventListener("DOMContentLoaded", () => {
                       connection_line_width = objOpts.connection.line_width;
 
                       if(objOpts.connection.is_master_connections_highlighted){
-                        connection_line_width = connection_line_width * 2;
+                        //connection_line_width = connection_line_width * 2;
+                        connection_line_width = objOpts.connection.master_section_line_width;
                       }               
                       
                     }
@@ -8077,6 +8096,9 @@ document.addEventListener("DOMContentLoaded", () => {
         modelImages?.sources?.[objOpts.image.active_source_id]?.highres?.drilling_depth ?? {}
       ).length,
       canvasBackgroundColour: objOpts.canvas.background_colour,
+      holeNameLabelsVisible: objOpts.hole.is_name_labels_visible,
+      sectionNameLabelsVisible: objOpts.section.is_name_labels_visible,
+      sectionNameDisplayMode: objOpts.section.name_display_mode,
       lastPlotPayload: lcE2ELastPlotPayload,
       plotApplyCount: lcE2EPlotApplyCount,
       plotDataCollectionCount: LCPlotData?.data_collections?.length ?? 0,
@@ -10286,7 +10308,6 @@ function getIdxById(LCCore, id) {
         }
       }
     }
-
     return relative_idxs;
   }catch(err){
     console.error(err)
@@ -11026,7 +11047,7 @@ async function loadCoreImages(modelImages, LCCore, objOpts, operations, requestO
         label,
         silentProgress: requestOptions.silentProgress === true,
       };
-      console.log(loadOptions)
+      //console.log(loadOptions)
       
       //main Progress   
       try{
