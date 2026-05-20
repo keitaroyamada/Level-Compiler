@@ -2048,12 +2048,14 @@ function createMainWIndow() {
             submenu:[
               { 
                 label: 'Move to right', 
+                visible: false,
                 click: () => {
                   resolve("holeMoveToRight");                      
                 } 
               },
               { 
                 label: 'Move to left', 
+                visible: false,
                 click: () => {
                   resolve("holeMoveToLeft");                      
                 } 

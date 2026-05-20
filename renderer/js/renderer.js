@@ -6707,7 +6707,7 @@ document.addEventListener("DOMContentLoaded", () => {
           const isAgeScale = objOpts.canvas.depth_scale === "age";
           let startIndex = 0;
           let endIndex = ageList.length;
-          if (!isAgeScale) {
+          if (!objOpts.edit.is_full_snapshot && !isAgeScale) {
             startIndex = binarySearchIndex(ageList, searchTop, (d) => d[objOpts.canvas.depth_scale]);
             endIndex   = binarySearchIndex(ageList, searchBot, (d) => d[objOpts.canvas.depth_scale]);
           }
@@ -6718,7 +6718,7 @@ document.addEventListener("DOMContentLoaded", () => {
           const ageDataSet = drawPointDataset();
           for (let a = startIndex; a < endIndex; a++) {   
             const ageDepth = isAgeScale ? ageList[a].age_mid : ageList[a][objOpts.canvas.depth_scale];
-            if (!Number.isFinite(Number(ageDepth)) || ageDepth < searchTop || ageDepth > searchBot) {
+            if (!objOpts.edit.is_full_snapshot && (!Number.isFinite(Number(ageDepth)) || ageDepth < searchTop || ageDepth > searchBot)) {
               continue;
             }
 
@@ -6908,8 +6908,12 @@ document.addEventListener("DOMContentLoaded", () => {
               const searchBot  = scrollerBotRealScale + yBufferVal;
               //if changed resample option after plotted, depth_map error
               const depthArr   = drawDataset.depth_map[objOpts.canvas.depth_scale]; 
-              let startIndex = binarySearchIndex(depthArr, searchTop, (e) => e.value);
-              let endIndex   = binarySearchIndex(depthArr, searchBot, (e) => e.value);
+              let startIndex = 0;
+              let endIndex = depthArr.length;
+              if (!objOpts.edit.is_full_snapshot) {
+                startIndex = binarySearchIndex(depthArr, searchTop, (e) => e.value);
+                endIndex   = binarySearchIndex(depthArr, searchBot, (e) => e.value);
+              }
 
               //const targetIdxs = depthArr.slice(startIndex, endIndex).map(e => e.idx).sort((a, b) => a - b);
               //const numPoints = targetIdxs.length;
