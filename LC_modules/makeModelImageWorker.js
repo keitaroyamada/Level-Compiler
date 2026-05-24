@@ -22,7 +22,12 @@ parentPort.on("message", async (task) => {
       let resizedBuffer;
       let imageBufferDD;
 
-      if (task.operations.includes("drilling_depth")) {
+      if (
+        task.operations.includes("drilling_depth") ||
+        task.operations.includes("composite_depth") ||
+        task.operations.includes("event_free_depth") ||
+        task.operations.includes("age")
+      ) {
         if (task.imagePath == null) {
           parentPort.postMessage(results);
           return;

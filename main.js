@@ -5296,7 +5296,7 @@ function createMainWIndow() {
         : loadOptions.tier === "thumb"
           ? 4
           : loadOptions.tier === "highres"
-            ? 200
+            ? 100
             : 24;
 
     return {

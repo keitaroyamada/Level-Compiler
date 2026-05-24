@@ -4753,7 +4753,11 @@ document.addEventListener("DOMContentLoaded", () => {
   //scroll event
   scroller.addEventListener("scroll",async function (event) {
     //console.log("[SCROLL]", { left: scroller.scrollLeft, top: scroller.scrollTop });
-
+    
+    if(objOpts.developer.mode==="root"){
+      updateView.scrollCount = (updateView.scrollCount || 0) +  1;
+    }
+    
     //hittest
     const ht = JSON.parse(JSON.stringify(getClickedItemIdx(mousePos[0], mousePos[1], LCCore, objOpts)));
     objOpts.edit.hittest = ht;
@@ -4766,7 +4770,7 @@ document.addEventListener("DOMContentLoaded", () => {
     canvasPos[1] = scroller.scrollTop;//* yMag;
 
     //update plot
-    updateView();
+    updateView({resizeCanvasBase: false, schedule: true});
     scheduleVisibleStandardImageRefresh();
   },
   { passive: false }
@@ -9605,7 +9609,21 @@ document.addEventListener("DOMContentLoaded", () => {
   async function initialisePaths(){
     await window.LCapi.InitialisePaths();
   }
-  function updateView() {
+  function updateView(options = {}) {
+    const shouldResizeCanvasBase = options.resizeCanvasBase !== false;
+    const shouldScheduleRedraw = options.schedule === true;
+
+    if (shouldScheduleRedraw) {
+      if (updateView.frameRequest != null) {
+        return;
+      }
+      updateView.frameRequest = requestAnimationFrame(() => {
+        updateView.frameRequest = null;
+        updateView({ ...options, schedule: false });
+      });
+      return;
+    }
+
     objOpts.edit.is_full_snapshot = false;
     if(isProcessing || !LCCore){return}
     syncControlsFromSettings();
@@ -9614,7 +9632,26 @@ document.addEventListener("DOMContentLoaded", () => {
       vectorObjects = new p5(p5Sketch);
     }
 
-    makeP5CanvasBase();
+    if (shouldResizeCanvasBase) {
+      makeP5CanvasBase();
+    }
+
+    if(objOpts.developer.mode === "root"){
+      updateView.redrawCount = (updateView.redrawCount || 0) +  1;
+
+      const now = performance.now();
+      if (!updateView.lastStatsAt) {
+        updateView.lastStatsAt = now;
+      }
+      if (now - updateView.lastStatsAt >= 1000) {
+        console.log("scroll/redraw", updateView.scrollCount ||
+      0, updateView.redrawCount || 0);
+        updateView.scrollCount = 0;
+        updateView.redrawCount = 0;
+        updateView.lastStatsAt = now;
+      }
+    }
+        
     vectorObjects.clear();
     vectorObjects.redraw();
 
@@ -9652,6 +9689,19 @@ document.addEventListener("DOMContentLoaded", () => {
     if (!Array.isArray(sectionIds) || sectionIds.length === 0) {
       return;
     }
+    const sourceId = requestOptions.sourceId ?? objOpts.image.active_source_id ?? "source_1";
+    const sourceBucket = modelImages?.sources?.[sourceId];
+    const targetTier = requestOptions.tier ?? "standard";
+    const sectionKeys = sectionIds
+      .map((sectionId) => getSectionKeyById(sectionId))
+      .filter(Boolean);
+
+    if (sourceBucket && targetTier === "standard") {
+      sectionKeys.forEach((sectionKey) => deleteImageTierSection(sourceBucket, "highres", sectionKey));
+    } else if (sourceBucket && targetTier === "highres") {
+      sectionKeys.forEach((sectionKey) => deleteImageTierSection(sourceBucket, "standard", sectionKey));
+    }
+
     modelImages = await loadCoreImages(
       modelImages,
       LCCore,
@@ -9659,6 +9709,22 @@ document.addEventListener("DOMContentLoaded", () => {
       operations,
       {
         ...requestOptions,
+        targetIds: sectionIds,
+      }
+    );
+
+    if (targetTier === "thumb") {
+      return;
+    }
+
+    modelImages = await loadCoreImages(
+      modelImages,
+      LCCore,
+      objOpts,
+      operations,
+      {
+        ...requestOptions,
+        tier: "thumb",
         targetIds: sectionIds,
       }
     );
