@@ -18,7 +18,7 @@
   "license": "MIT",
   "dependencies": {
     "@msgpack/msgpack": "^3.1.2",
-    "csv-parse": "^6.1.0",
+    "csv-parse": "^7.0.2",
     "csv-stringify": "^6.6.0",
     "electron-progressbar": "^2.2.1",
     "electron-prompt": "^1.7.0",
@@ -26,7 +26,7 @@
     "jsondiffpatch": "^0.7.3",
     "jszip": "^3.10.1",
     "license-checker": "^25.0.1",
-    "sharp": "^0.34.3"
+    "sharp": "^0.35.4"
   },
   "build": {
     "appId": "io.github.ky_apps.Level-Compiler",
