@@ -177,7 +177,7 @@ class LevelCompilerPlot {
         } else if (calcType == "event_free_depth") {
           //calc
           const cd  = LCCore.getCDfromEFD( data[7] ); //pseudo
-          const age = LCAge.getAgefromEFD( data[7], "linear"  );
+          const age = LCAge.getAgeFromEFD( data[7], "linear"  );
 
           //add
           data[6] = cd;
@@ -189,6 +189,9 @@ class LevelCompilerPlot {
           const efdData = LCAge.getEFDFromAge( data[9], "linear" );
           const efd = efdData.efd.mid;
           const cd  = LCCore.getCDfromEFD( efd ); //pseudo
+
+          data[7] = efd;
+          data[6] = cd;
         } else {
           continue;
         }

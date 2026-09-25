@@ -317,7 +317,7 @@ class LevelCompilerAge {
 
           //convert CD => EFD
           const efdval = LCCore.getEFDfromCD(ageData.composite_depth);
-          if (Number.isFinite(Number(efdval))) {
+          if (Number.isFinite(efdval))  {
             ageData.event_free_depth = efdval;
           } else {
             console.log("Composite depth is out of model definition. :" + csv_data[r][idxAgeName]);
@@ -329,7 +329,7 @@ class LevelCompilerAge {
           ageData.composite_depth = parseFloat(csv_data[r][idxCD]);
           //convert CD => EFD
           const efdval = LCCore.getEFDfromCD(ageData.composite_depth);
-          if (Number.isFinite(Number(efdval))) {
+          if (Number.isFinite(efdval))  {
             ageData.event_free_depth = efdval;
           } else {
             console.log("Composite depth is out of model definition. :" + csv_data[r][idxAgeName]);
@@ -350,6 +350,7 @@ class LevelCompilerAge {
         }
       }else{
         console.log("LCAge: [" + model.name +"] '"+ ageData.name + "' is not defined any depth.");
+        continue;
       }
 
       //===== age convert ==============================================
@@ -649,7 +650,7 @@ class LevelCompilerAge {
           // CD-defined age-control points are normalized to EFD for age interpolation.
           const efdval = LCCore.getEFDfromCD(ageData.composite_depth);
 
-          if (Number.isFinite(Number(efdval))) {
+          if (Number.isFinite(efdval)) {
             ageData.drilling_depth = null;
             ageData.event_free_depth = Number(efdval);
             ageData.pidx = baseProjectIdx[0];
@@ -886,27 +887,23 @@ class LevelCompilerAge {
     }
 
     //get upper/lower age data
-    let upperData = null;
-      for(let i=0; i<this.AgeModels[targetAgeModelIdx].ages.length;i++){
-        //if above
-        const ageData = this.AgeModels[targetAgeModelIdx].ages[i];
-        if (upperData == null || (ageData.age_mid <= age && upperData.age_mid < ageData.age_mid)) {
-          if(ageData.enable==true){
-            upperData = ageData;
-          }      
-        }
-      }
+    
+    const agePoints = this.AgeModels[targetAgeModelIdx].ages
+      .filter(a => a.enable === true &&
+        Number.isFinite(a.age_mid) && Number.isFinite(a.event_free_depth))
+      .sort((a, b) => a.age_mid - b.age_mid)
+      .filter((a, i, points) => i === 0 || a.age_mid !== points[i - 1].age_mid);
 
-      let lowerData = null;
-      for(let i=this.AgeModels[targetAgeModelIdx].ages.length-1; i>=0;i--){
-        //if below
-        const ageData = this.AgeModels[targetAgeModelIdx].ages[i];
-        if (lowerData == null ||(ageData.age_mid >= age && lowerData.age_mid > ageData.age_mid)) {          
-          if(ageData.enable==true){
-            lowerData = ageData;
-          }
-        }
-      }
+    if (agePoints.length < 2) return output;
+
+    let upperData = agePoints[0];
+    let lowerData = agePoints[1];
+    for (let i = 1; i < agePoints.length - 1 && age > lowerData.age_mid; i++) {
+      upperData = agePoints[i];
+      lowerData = agePoints[i + 1];
+    }
+
+
 
     //apply interpolation
     const interpolatedEFD = this.interpolate(

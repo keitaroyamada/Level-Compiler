@@ -131,9 +131,7 @@ contextBridge.exposeInMainWorld("LCapi", {
   //calcs
   CalcCompositeDepth: () => ipcRenderer.invoke("CalcCompositeDepth"),
   CalcEventFreeDepth: () => ipcRenderer.invoke("CalcEventFreeDepth"),
-  GetAgeFromEFD: (payload) => ipcRenderer.invoke("GetAgeFromEFD", payload),
-  GetAgeFromCD: (payload) => ipcRenderer.invoke("GetAgeFromCD", payload),
-
+  
   //tools
   OpenFinder: () => ipcRenderer.invoke("OpenFinder"),
   CloseFinder: () => ipcRenderer.invoke("CloseFinder"),

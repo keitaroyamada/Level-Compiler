@@ -779,6 +779,7 @@ function createMainWIndow() {
         //initialise view
         sendToPlotterWindow("initialiseSendData");
       }
+      sendToFinderWindow("AgeModelChanged");
       console.log("MAIN: Load age model into LCCore. id: " +  LCAge.selected_id + " name:" +  model_name);
       return zipped;
     }catch(err){
@@ -960,6 +961,7 @@ function createMainWIndow() {
     const isShowMemory = false;
     const silentProgress = loadOptions.silentProgress === true;
     if (!silentProgress) {
+      closeGlobalProgressBar();
       progressBar = progressDialog(getMainWindow(), "Load modeled section images", "Now converting...", false);
       //await new Promise(r => progressBar.on('ready', r));
       await new Promise(r => progressBar.once('ready', r));
@@ -2550,10 +2552,7 @@ function createMainWIndow() {
   ipcMain.handle("LabelerLoadModel", (_e) => {
     return tempCore.exportSerialisedModel();
   });
-  ipcMain.handle("ChangeDepthScale", async (_e, payload) => {
-    const { newId } = payload;
-    LCCore.changeBaseProject(newId);
-  });
+ 
   ipcMain.handle("PlotterGetData", (_e, payload) => {
     const { data } = payload;
     openConverterWindow({
@@ -2674,36 +2673,6 @@ function createMainWIndow() {
     const zipped = await zipData(LCCore.exportSerialisedModel());
     //LCCore.getModelSummary();
     return zipped;
-  });
-  ipcMain.handle("GetAgeFromEFD", async (_e, payload) => {
-    const { efd, method } = payload;
-    //calc age
-    const age = LCAge.getAgeFromEFD(efd, method);
-    if (age == null) {
-      return NaN;
-    } else {
-      return age.mid;
-    }
-  });
-  ipcMain.handle("GetAgeFromCD", async (_e, payload) => {
-    const { cd, method } = payload;
-    //calc efd
-    if (LCCore.base_project_id == null) {
-      return NaN;
-    }
-
-    const efd = LCCore.getEFDfromCD(cd);
-    if (efd == null) {
-      return NaN;
-    }
-
-    //calc age
-    const age = LCAge.getAgeFromEFD(efd, method);
-    if (age.age.mid == null) {
-      return "";
-    } else {
-      return age.age.mid;
-    }
   });
   ipcMain.handle("dividerConverter", async (_e, payload) => {
     const { depthData, targetData, direction } = payload;

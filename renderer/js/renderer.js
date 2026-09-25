@@ -693,24 +693,13 @@ document.addEventListener("DOMContentLoaded", () => {
   //============================================================================================
   //age model chooser
   document.getElementById("AgeModelSelect").addEventListener("change", async (event) => {
-      const ageId = event.target.value;
-      console.log(`Selected: ${ageId}`);
+    const ageId = event.target.value;
+    console.log(`Selected: ${ageId}`);
 
-      //load age model
-      selected_age_model_id = ageId;
-      await loadAge(selected_age_model_id);
-      await loadPlotData("age");
-      await loadPlotData("data")
-      applyPlotOptionsToPlotData();
-
-      //update photo
-      if(Object.keys(modelImages.drilling_depth).length>0){
-        modelImages = await loadCoreImages(modelImages, LCCore, objOpts, ["drilling_depth", "age"]);
-      }
-
-      //update plot
-      updateView();
-    });
+    selected_age_model_id = ageId;
+    await syncAgeSelection(selected_age_model_id);
+    updateView();
+  });
   //============================================================================================
   //snapshot
   document.getElementById("bt_snapshot").addEventListener("click", async (event) => {
@@ -7869,6 +7858,30 @@ document.addEventListener("DOMContentLoaded", () => {
     await loadPlotData("age");
     await loadPlotData("data");
     applyPlotOptionsToPlotData();
+
+    for (const sourceId of Object.keys(modelImages.sources ?? {})) {
+      if (!hasImageSetImages(sourceId)) continue;
+
+      const targetIds = await collectAvailableCoreImageTargetIds(LCCore, sourceId);
+
+      for (const tier of ["thumb", "standard", "highres"]) {
+        const loadedIds = tier === "thumb"
+          ? targetIds
+          : targetIds.filter(id =>
+              modelImages.sources[sourceId]?.[tier]?.drilling_depth?.[getSectionKeyById(id)]
+            );
+
+        if (loadedIds.length === 0) continue;
+
+        modelImages = await loadCoreImages(
+          modelImages,
+          LCCore,
+          objOpts,
+          ["age"],
+          { sourceId, tier, targetIds: loadedIds }
+        );
+      }
+    }
 
     return selectedAgeModelId;
   }

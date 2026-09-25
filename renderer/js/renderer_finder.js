@@ -989,6 +989,34 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   //-------------------------------------------------------------------------------------------
+  window.FinderApi.receive("AgeModelChanged", async () => {
+    const efd = parseFloat(document.getElementById("efdInput").value);
+    const cd = parseFloat(document.getElementById("cdInput").value);
+
+    let result = null;
+    if (Number.isFinite(efd) || Number.isFinite(cd)) {
+      result = await window.FinderApi.depthConverter({
+        dataList: [["finder_age_refresh", Number.isFinite(efd) ? efd : cd, targetId]],
+        options: {
+          sourceType: Number.isFinite(efd) ? "event_free_depth" : "composite_depth",
+          polationType: "linear",
+          allowOutside: true,
+        },
+      });
+    }
+
+    document.getElementById("ageInput").value =
+      Number.isFinite(result?.age_mid) ? formatAgeValue(result.age_mid) : "";
+    document.getElementById("ageUpperInput").value =
+      Number.isFinite(result?.age_upper) ? formatAgeValue(result.age_upper) : "";
+    document.getElementById("ageLowerInput").value =
+      Number.isFinite(result?.age_lower) ? formatAgeValue(result.age_lower) : "";
+
+    previousValue.age = document.getElementById("ageInput").value;
+    previousValue.ageUpper = document.getElementById("ageUpperInput").value;
+    previousValue.ageLower = document.getElementById("ageLowerInput").value;
+  });
+
   window.FinderApi.receive("updateModeChanged", async (data) => {
     settings.enableRealtimeUpdate = data;
     console.log("Finder: update mode is changed to ", data)

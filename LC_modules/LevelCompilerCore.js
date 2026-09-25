@@ -2200,11 +2200,14 @@ class LevelCompilerCore extends EventEmitter{
     };
 
     //search nearest markers
+    let nearest = null;
+    let second = null;
     this.projects.forEach((project)=>{
       project.holes.forEach((hole) => {
         hole.sections.forEach((section) => {
           section.markers.forEach((marker) => {
             if(marker.depth_source[0] =="master"){
+              if (!Number.isFinite(marker.composite_depth) || !Number.isFinite(marker.event_free_depth)) return;
               const temp = marker.composite_depth - targetCD;
               if (temp <= 0 && upperData.cumulate_distance < temp) {
                 //console.log(this.getMarkerNameFromId(marker.id));
@@ -2219,12 +2222,36 @@ class LevelCompilerCore extends EventEmitter{
                 lowerData.nearest_data.event_free_depth = marker.event_free_depth;
                 lowerData.cumulate_distance = temp;
               }
+
+              const cdGap = Math.abs(marker.composite_depth - targetCD);
+
+              if (!nearest ||
+                  cdGap < Math.abs(nearest.composite_depth - targetCD)) {
+                second = nearest;
+                nearest = marker;
+              } else if (marker.composite_depth !== nearest.composite_depth &&
+                        (!second ||
+                          cdGap < Math.abs(second.composite_depth - targetCD))) {
+                second = marker;
+              } 
             }
           });
         });
       });
     })
 
+    if (upperData.id == null || lowerData.id == null) {
+      const result = nearest && second
+        ? this.linearInterp(
+            second.event_free_depth,
+            nearest.event_free_depth,
+            targetCD - second.composite_depth,
+            nearest.composite_depth - second.composite_depth
+          )
+        : null;
+      this.setStatus("completed", "");
+      return result;
+    }
     //calc interpolated event free depth
     const D1 = parseFloat(upperData.nearest_data.event_free_depth);
     const D3 = parseFloat(lowerData.nearest_data.event_free_depth);
@@ -2255,10 +2282,14 @@ class LevelCompilerCore extends EventEmitter{
       cumulate_distance: Infinity,
     };
 
+    let nearest = null;
+    let second = null;
+
     this.projects.forEach((project)=>{
       project.holes.forEach((hole) => {
         hole.sections.forEach((section) => {
           section.markers.forEach((marker) => {
+            if (!Number.isFinite(marker.event_free_depth) || !Number.isFinite(marker.composite_depth)) return;
             const temp = marker.event_free_depth - targetEFD;
             if (temp <= 0 && upperData.cumulate_distance < temp) {
               //console.log(this.getMarkerNameFromId(marker.id));
@@ -2273,11 +2304,42 @@ class LevelCompilerCore extends EventEmitter{
               lowerData.nearest_data.event_free_depth = marker.event_free_depth;
               lowerData.cumulate_distance = temp;
             }
+
+            const efdGap = Math.abs(marker.event_free_depth - targetEFD);
+
+            if (!nearest ||
+                efdGap < Math.abs(nearest.event_free_depth - targetEFD)) {
+              second = nearest;
+              nearest = marker;
+            } else if (marker.event_free_depth !== nearest.event_free_depth &&
+                      (!second ||
+                        efdGap < Math.abs(second.event_free_depth - targetEFD))) {
+              second = marker;
+            }                    
+            
           });
         });
       });
     })
     
+    if (!Number.isFinite(targetEFD)) {
+      this.setStatus("completed", "");
+      return null;
+    }
+
+    if (upperData.id == null || lowerData.id == null) {
+      const result = nearest && second
+        ? this.linearInterp(
+            second.composite_depth,
+            nearest.composite_depth,
+            targetEFD - second.event_free_depth,
+            nearest.event_free_depth - second.event_free_depth
+          )
+        : null;
+      this.setStatus("completed", "");
+      return result;
+    }
+
     const D1 = upperData.nearest_data.composite_depth;
     const D3 = lowerData.nearest_data.composite_depth;
     const d1 = upperData.nearest_data.event_free_depth;
@@ -4932,12 +4994,22 @@ class LevelCompilerCore extends EventEmitter{
       }
     
       //make lower marker
+      const markerIdsBefore = new Set(
+        this.projects[upperIdx[0]].holes[upperIdx[1]].sections[upperIdx[2]].markers.map(marker => marker.id.toString())
+      );
+
       this.addMarker(
         this.projects[upperIdx[0]].holes[upperIdx[1]].sections[upperIdx[2]].id, 
         this.projects[upperIdx[0]].holes[upperIdx[1]].sections[upperIdx[2]].markers[upperIdx[3]].distance, 
         "distance",
       )
-      const lowerId = [upperId[0],upperId[1],upperId[2], lcfnc.getUniqueId()];
+
+      const currentUpperIdx = this.search_idx_list[upperId.toString()];
+      const lowerId = this.projects[currentUpperIdx[0]].holes[currentUpperIdx[1]].sections[currentUpperIdx[2]].markers.find(marker => !markerIdsBefore.has(marker.id.toString()))?.id;
+      if (lowerId == null) {
+        this.setErrorAlert("", "E057: Failed to identify the added erosion marker.");
+        return "unsuspected";
+      }
       const lowerIdx = this.search_idx_list[lowerId.toString()];
 
       //make event data
@@ -4945,7 +5017,7 @@ class LevelCompilerCore extends EventEmitter{
       let lowerEvent = [deposition_type, "upward",   upperId, "erosion",  Math.abs(parseFloat(value))];
 
       //add event into upper
-      this.projects[upperIdx[0]].holes[upperIdx[1]].sections[upperIdx[2]].markers[upperIdx[3]].event.push(upperEvent);
+      this.projects[currentUpperIdx[0]].holes[currentUpperIdx[1]].sections[currentUpperIdx[2]].markers[currentUpperIdx[3]].event.push(upperEvent);
       this.projects[lowerIdx[0]].holes[lowerIdx[1]].sections[lowerIdx[2]].markers[lowerIdx[3]].event = [lowerEvent];
       
     }else{
