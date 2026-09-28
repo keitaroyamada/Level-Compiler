@@ -7714,7 +7714,7 @@ document.addEventListener("DOMContentLoaded", () => {
       }
 
       //add hole list
-      LCCore.projects.forEach((project, p) => {
+      [...LCCore.projects].sort((a, b) => a.order - b.order).forEach((project, p) => {
         const container = document.getElementById("hole_list");
         const projItemDiv = document.createElement("div");
         const projListCheck = document.createElement("input");
