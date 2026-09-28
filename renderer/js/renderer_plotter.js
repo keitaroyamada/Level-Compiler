@@ -832,16 +832,9 @@ document.addEventListener("DOMContentLoaded", () => {
                     }
 
                     //get data
-                    let nIdx = null;
-                    let dIdx = null;
-                    LCPlot.data_collections[colIdx].rows.forEach((d,i)=>{
-                        if(d.id == target.numeratorId){
-                            nIdx = i;
-                        }
-                        if(d.id == target.denominatorId){
-                            dIdx = i;
-                        }
-                    })
+                    const dataset = LCPlot.data_collections[colIdx];
+                    const nIdx = target.numeratorId > 0 ? target.numeratorId + 12 : null;
+                    const dIdx = target.denominatorId > 0 ? target.denominatorId + 12 : null;
 
                     if(nIdx==null && dIdx==null){
                         continue
@@ -858,52 +851,27 @@ document.addEventListener("DOMContentLoaded", () => {
                     let denominatorName = "";
                     let numeratorUnit = "";
                     let denominatorUnit = "";
-                    if(nIdx!==null && dIdx!==null){
-                        //normarise by values
-                        const numeratorSeries   = LCPlot.data_collections[colIdx].datasets[nIdx].data_series;//[id,name,age,...]
-                        const denominatorSeries = LCPlot.data_collections[colIdx].datasets[dIdx].data_series;//[id,name,age,...]
-                        numeratorName = LCPlot.data_collections[colIdx].datasets[nIdx].name;
-                        denominatorName = " / "+LCPlot.data_collections[colIdx].datasets[dIdx].name;
-                        denominatorUnit = " / "+LCPlot.data_collections[colIdx].datasets[dIdx].unit;
-                        for(let i=0;i<numeratorSeries.length;i++){
-                            const y = numeratorSeries[i][depthScale]!==null ? numeratorSeries[i][depthScale]*ageMod : NaN;
-                            let x = NaN;
-                            if(numeratorSeries[i].data !== null && denominatorSeries[i].data!==null){
-                                x = numeratorSeries[i].data / denominatorSeries[i].data;
-                            }else{
-                                x = NaN;
-                            }
-                            
-                            x0.push(x);
-                            y0.push(y);                            
-                        }
+                    if(nIdx!==null){
+                        numeratorName = dataset.header[nIdx] || "";
+                        numeratorUnit = dataset.units[nIdx] || "";
                     }else{
-                        if(nIdx!==null){
-                            //without normarisation
-                            const numeratorSeries = LCPlot.data_collections[colIdx].datasets[nIdx].data_series;//[id,name,age,...]
-                            numeratorName = LCPlot.data_collections[colIdx].datasets[nIdx].name;
-                            numeratorUnit = LCPlot.data_collections[colIdx].datasets[nIdx].unit;
-                            for(let i=0;i<numeratorSeries.length;i++){
-                                const y = numeratorSeries[i][depthScale]!==null ? numeratorSeries[i][depthScale]*ageMod : NaN;
-                                const x = numeratorSeries[i].data!==null ? numeratorSeries[i].data : NaN;
-                                x0.push(x);
-                                y0.push(y);                            
-                            }
-                        }else if(dIdx!==null){
-                            //without normarisation
-                            const denominatorSeries = LCPlot.data_collections[colIdx].datasets[dIdx].data_series;//[id,name,age,...]
-                            numeratorName = "1";
-                            numeratorUnit = "1";
-                            denominatorName = " / "+LCPlot.data_collections[colIdx].datasets[dIdx].name;
-                            denominatorUnit = " / "+LCPlot.data_collections[colIdx].datasets[dIdx].unit;
-                            for(let i=0;i<denominatorSeries.length;i++){
-                                const y = denominatorSeries[i][depthScale]!==null ? denominatorSeries[i][depthScale]*ageMod : NaN;
-                                const x = denominatorSeries[i].data!==null ? 1/denominatorSeries[i].data : NaN;
-                                x0.push(x);
-                                y0.push(y);                            
-                            }
-                        }
+                        numeratorName = "1";
+                        numeratorUnit = "1";
                     }
+                    if(dIdx!==null){
+                        denominatorName = " / " + (dataset.header[dIdx] || "");
+                        denominatorUnit = " / " + (dataset.units[dIdx] || "");
+                    }
+
+                    const depthIdx = {composite_depth:6, event_free_depth:7, drilling_depth:8, age:9}[depthScale];
+                    dataset.rows.forEach(row=>{
+                        const numerator = nIdx!==null ? Number(row[nIdx]) : 1;
+                        const denominator = dIdx!==null ? Number(row[dIdx]) : 1;
+                        x0.push(Number.isFinite(numerator) && Number.isFinite(denominator) && denominator!==0
+                            ? numerator / denominator : NaN);
+                        y0.push(row[depthIdx]!==null && Number.isFinite(Number(row[depthIdx]))
+                            ? Number(row[depthIdx]) * ageMod : NaN);
+                    })
 
                     if(x0.length==0){
                         continue
@@ -924,6 +892,15 @@ document.addEventListener("DOMContentLoaded", () => {
                     if (v > xmax) xmax = v;
                     }
                     if (xmin === Infinity) { xmin = 0; xmax = 1; } 
+                    if(xmin === xmax){
+                        if(xmin >= 0){
+                            xmax = xmin === 0 ? 1 : Math.pow(10, Math.floor(Math.log10(xmin)) + 1);
+                            xmin = 0;
+                        }else{
+                            xmin = -Math.pow(10, Math.floor(Math.log10(-xmin)) + 1);
+                            xmax = 0;
+                        }
+                    }
                     let dataWidth = xmax-xmin;
                     if(dataWidth==0){
                         dataWidth = 1;

@@ -1038,6 +1038,15 @@ document.addEventListener("DOMContentLoaded", () => {
         }
 
         dividedDataSeries.forEach(dividedData => {
+          if(Number.isFinite(dividedData.min) && dividedData.min === dividedData.max){
+            if(dividedData.min >= 0){
+              dividedData.max = dividedData.min === 0 ? 1 : Math.pow(10, Math.floor(Math.log10(dividedData.min)) + 1);
+              dividedData.min = 0;
+            }else{
+              dividedData.min = -Math.pow(10, Math.floor(Math.log10(-dividedData.min)) + 1);
+              dividedData.max = 0;
+            }
+          }
           if (dividedData.data.length > 0) {
             if (dividedData.data[0].source == "trinity") {
               const sortDepthMapByValue = list =>
@@ -6910,8 +6919,13 @@ document.addEventListener("DOMContentLoaded", () => {
 
               //const targetIdxs = depthArr.slice(startIndex, endIndex).map(e => e.idx).sort((a, b) => a - b);
               //const numPoints = targetIdxs.length;
-              const numPoints = endIndex - startIndex;
-              if (numPoints <= 0) continue;
+              let numPoints = endIndex - startIndex;
+              if (numPoints <= 0) {
+                if (!pOptions.isAxis || drawDataset.data.length === 0) continue;
+                startIndex = 0;
+                endIndex = 1;
+                numPoints = 1;
+              }
 
               if(["root"].includes(objOpts.developer.mode)){
                 console.log("Dipslay: Zoom: ",zoomLevel,", hight pix: ",sketch.height * dpir,", hight cm: ", (searchBot-searchTop).toFixed(2)," cm, points: N=", numPoints)
@@ -6991,8 +7005,7 @@ document.addEventListener("DOMContentLoaded", () => {
                         }
                         zeroDataDict[hole.name] = zeroDataset.data;
                         //========== X axis for trinity===============                        
-                        if (objOpts.plot.is_axis_visible) {
-                          if(pOptions.isAxis){
+                        if(pOptions.isAxis){
                             let yAxis = 100 + scroller.scrollTop + 60 * t;
 
                             if(h%2==0){
@@ -7037,7 +7050,6 @@ document.addEventListener("DOMContentLoaded", () => {
                             sketch.text(title, xCenter, yTitle);
 
                             sketch.pop(); 
-                          }                          
                         }
                       }
                     })
@@ -7072,9 +7084,8 @@ document.addEventListener("DOMContentLoaded", () => {
                   zeroDataDict["global"] = zeroDataset.data;
 
                   //========== X axis for global ===============
-                  if (objOpts.plot.is_axis_visible) {
-                    if(pOptions.isAxis){
-                      let yAxis = 200 + scroller.scrollTop;
+                  if(pOptions.isAxis){
+                      let yAxis = 200 + scroller.scrollTop + 60 * t;
                         
                       const yLabel = yAxis - 5;
                       const yTitle = yAxis - 25;
@@ -7114,7 +7125,6 @@ document.addEventListener("DOMContentLoaded", () => {
                       sketch.text(title, xCenter, yTitle);
 
                       sketch.pop();
-                    }
                   }
                 }
               }
