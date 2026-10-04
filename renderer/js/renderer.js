@@ -199,6 +199,10 @@ document.addEventListener("DOMContentLoaded", () => {
     objOpts.image.dpcm = 24;
     objOpts.image.dpcm_highresolution = 200;
     objOpts.image.active_source_id = "source_1";
+    objOpts.image.adjustment = {
+      sources: {}, drag: null, keyDown: false, suppressClick: false,
+      pointer: { x: 0, y: 0 },
+    };
     objOpts.image.visible_tier = "standard";
     objOpts.image.thumb_dpcm = 4;
     objOpts.image.standard_dpcm = objOpts.image.dpcm;
@@ -784,6 +788,8 @@ document.addEventListener("DOMContentLoaded", () => {
       isLoadedLCModel = false;
 
       modelImages = initialiseImages();
+      finishPhotoAdjustment();
+      objOpts.image.adjustment.sources = {};
       initialiseImageSetSelect();
 
       console.log("[Renderer]: Unload Models of Correlations, Ages and Canvas.");
@@ -4407,6 +4413,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     const editable = {};
+    delete settings.image.adjustment;
     for (const k in objOpts) {
       if (objOpts[k] && typeof objOpts[k] === "object" && !editable_deny.has(k)) {
         editable[k] = true;
@@ -4696,7 +4703,10 @@ document.addEventListener("DOMContentLoaded", () => {
   window.LCapi.receive("SettingsData", async (data) => {
     if(data == null){
       //call default settings
+      finishPhotoAdjustment();
+      const adjustment = objOpts.image.adjustment;
       objOpts = setupSettings();
+      objOpts.image.adjustment = adjustment;
 
       //back to settings menu
       const settings = makeSendSettingData();
@@ -4740,6 +4750,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
             const filtered = {};
             for (const subk in data[k]) {
+              if (k === "image" && subk === "adjustment") continue;
               filtered[subk] = data[k][subk];
             }
 
@@ -4852,6 +4863,183 @@ document.addEventListener("DOMContentLoaded", () => {
   });
   //============================================================================================
   //mouse move position event
+
+  // Session-only photo display adjustments. B reveals values beside the pointer.
+  {
+    const tooltip = document.createElement("div");
+    tooltip.id = "photo_adjustment_tooltip";
+    tooltip.hidden = true;
+    Object.assign(tooltip.style, {
+      position: "fixed", zIndex: "999", pointerEvents: "none",
+      padding: "6px 9px", border: "1px solid #9aa4ad", borderRadius: "4px",
+      background: "#fff", color: "#222", font: "12px Arial, sans-serif",
+      whiteSpace: "pre-line",
+    });
+    document.body.appendChild(tooltip);
+  }
+
+  function getPhotoAdjustmentSource(sourceId = objOpts.image.active_source_id) {
+    return objOpts.image.adjustment.sources[sourceId] ??= {
+      global: { brightness: 1, contrast: 1 }, sections: {},
+    };
+  }
+
+  function getPhotoAdjustment(sectionId, sourceId = objOpts.image.active_source_id) {
+    const source = getPhotoAdjustmentSource(sourceId);
+    const local = source.sections[sectionId] ?? { brightness: 1, contrast: 1 };
+    return {
+      brightness: Math.min(3, Math.max(0.2, source.global.brightness * local.brightness)),
+      contrast: Math.min(3, Math.max(0.2, source.global.contrast * local.contrast)),
+    };
+  }
+
+  function getHoveredPhoto(event) {
+    if (!LCCore || !objOpts.canvas.is_model_visible || !objOpts.canvas.is_core_photo_visible ||
+        objOpts.canvas.zoom_level[1] < objOpts.marker.ignore_zoom_level) return null;
+    const rect = scroller.getBoundingClientRect();
+    if (event.clientX < rect.left || event.clientX >= rect.right ||
+        event.clientY < rect.top || event.clientY >= rect.bottom) return null;
+    const ht = getPointerHittest(event);
+    if (ht.section === null || ht.relative_x * objOpts.hole.width > objOpts.section.width) return null;
+    const key = getSectionImageKey(ht.projectName, ht.holeName, ht.sectionName);
+    if (!getRenderableSectionImage(modelImages, objOpts, objOpts.canvas.depth_scale, key)) return null;
+    return { sectionId: [ht.project, ht.hole, ht.section].toString() };
+  }
+
+  function updatePhotoAdjustmentTooltip() {
+    const state = objOpts.image.adjustment;
+    const tooltip = document.getElementById("photo_adjustment_tooltip");
+    const pointer = { clientX: state.pointer.x, clientY: state.pointer.y };
+    const photo = state.keyDown ? getHoveredPhoto(pointer) : null;
+    tooltip.hidden = !photo;
+    if (tooltip.hidden) return;
+    const sourceId = state.drag?.sourceId ?? objOpts.image.active_source_id;
+    const value = state.drag
+      ? state.drag.sectionId ? getPhotoAdjustment(state.drag.sectionId, sourceId) : getPhotoAdjustmentSource(sourceId).global
+      : getPhotoAdjustment(photo.sectionId, sourceId);
+    tooltip.textContent = `Brightness ${Math.round(value.brightness * 100)}% · Contrast ${Math.round(value.contrast * 100)}%`;
+    tooltip.style.left = `${Math.max(0, Math.min(state.pointer.x + 16, window.innerWidth - tooltip.offsetWidth - 8))}px`;
+    tooltip.style.top = `${Math.max(0, Math.min(state.pointer.y + 16, window.innerHeight - tooltip.offsetHeight - 8))}px`;
+  }
+
+  function finishPhotoAdjustment(cancel = false) {
+    const state = objOpts.image.adjustment;
+    const drag = state.drag;
+    if (!drag) return;
+    if (cancel) {
+      const source = getPhotoAdjustmentSource(drag.sourceId);
+      if (drag.sectionId) {
+        if (drag.previous) source.sections[drag.sectionId] = drag.previous;
+        else delete source.sections[drag.sectionId];
+      } else source.global = drag.previous;
+    }
+    state.drag = null;
+    scroller.style.cursor = "";
+    updatePhotoAdjustmentTooltip();
+    updateView({ resizeCanvasBase: false, schedule: true });
+  }
+
+  document.addEventListener("keydown", (event) => {
+    const state = objOpts.image.adjustment;
+    if (event.code === "Escape" && state.drag) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      finishPhotoAdjustment(true);
+      return;
+    }
+    if (event.ctrlKey || event.metaKey || event.altKey ||
+        event.target.closest("input, textarea, select, [contenteditable=true]")) return;
+    if (event.code === "KeyB") {
+      event.preventDefault();
+      state.keyDown = true;
+      updatePhotoAdjustmentTooltip();
+    } else if (state.keyDown && event.code === "Digit0") {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      finishPhotoAdjustment();
+      const source = getPhotoAdjustmentSource();
+      if (event.shiftKey) {
+        const photo = getHoveredPhoto({ clientX: state.pointer.x, clientY: state.pointer.y });
+        if (!photo) return;
+        source.sections[photo.sectionId] = {
+          brightness: 1 / source.global.brightness, contrast: 1 / source.global.contrast,
+        };
+      } else {
+        source.global = { brightness: 1, contrast: 1 };
+        source.sections = {};
+      }
+      updatePhotoAdjustmentTooltip();
+      updateView({ resizeCanvasBase: false, schedule: true });
+    }
+  }, true);
+  document.addEventListener("keyup", (event) => {
+    if (event.code !== "KeyB") return;
+    objOpts.image.adjustment.keyDown = false;
+    finishPhotoAdjustment();
+    updatePhotoAdjustmentTooltip();
+  });
+  window.addEventListener("blur", () => {
+    objOpts.image.adjustment.keyDown = false;
+    finishPhotoAdjustment();
+    objOpts.image.adjustment.suppressClick = false;
+    updatePhotoAdjustmentTooltip();
+  });
+  document.addEventListener("mousedown", (event) => {
+    const state = objOpts.image.adjustment;
+    state.suppressClick = false;
+    if (!state.keyDown || event.button !== 0 || !event.target.closest("#scroller")) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    state.suppressClick = true;
+    if (!LCCore || isProcessing || !objOpts.canvas.is_core_photo_visible || !hasActiveImageSetImages()) return;
+    const photo = event.shiftKey ? getHoveredPhoto(event) : null;
+    if (event.shiftKey && !photo) return;
+    const sourceId = objOpts.image.active_source_id;
+    const source = getPhotoAdjustmentSource(sourceId);
+    const sectionId = photo?.sectionId ?? null;
+    const previous = sectionId ? source.sections[sectionId] : source.global;
+    state.drag = {
+      sourceId, sectionId, x: event.clientX, y: event.clientY,
+      start: sectionId ? getPhotoAdjustment(sectionId) : { ...source.global },
+      previous: previous ? { ...previous } : null,
+    };
+    scroller.style.cursor = "move";
+    updatePhotoAdjustmentTooltip();
+  }, true);
+  document.addEventListener("mousemove", (event) => {
+    const state = objOpts.image.adjustment;
+    state.pointer = { x: event.clientX, y: event.clientY };
+    const drag = state.drag;
+    if (drag) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      const value = {
+        brightness: Math.min(3, Math.max(0.2, drag.start.brightness - (event.clientY - drag.y) * 0.005)),
+        contrast: Math.min(3, Math.max(0.2, drag.start.contrast + (event.clientX - drag.x) * 0.005)),
+      };
+      const source = getPhotoAdjustmentSource(drag.sourceId);
+      if (drag.sectionId) {
+        source.sections[drag.sectionId] = {
+          brightness: value.brightness / source.global.brightness,
+          contrast: value.contrast / source.global.contrast,
+        };
+      } else source.global = value;
+      updateView({ resizeCanvasBase: false, schedule: true });
+    }
+    if (state.keyDown) updatePhotoAdjustmentTooltip();
+  }, true);
+  document.addEventListener("mouseup", (event) => {
+    if (!objOpts.image.adjustment.drag || event.button !== 0) return;
+    event.stopImmediatePropagation();
+    finishPhotoAdjustment();
+  }, true);
+  document.addEventListener("click", (event) => {
+    const state = objOpts.image.adjustment;
+    if (!state.suppressClick) return;
+    state.suppressClick = false;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+  }, true);
 
   document.addEventListener("mousemove", async function (event) {
     if(!LCCore){return}
@@ -6052,13 +6240,17 @@ document.addEventListener("DOMContentLoaded", () => {
 
                   if (isPhtoExist) {
                     try {
-                      sketch.image(
-                        img,
-                        sec_x0,
-                        sec_y0,
-                        sec_w,
-                        sec_h
-                      );
+                      if (!isSVG) {
+                        const value = getPhotoAdjustment(section.id.slice(0, 3).toString());
+                        sketch.drawingContext.save();
+                        sketch.drawingContext.filter = value.brightness === 1 && value.contrast === 1
+                          ? "none" : `brightness(${value.brightness}) contrast(${value.contrast})`;
+                      }
+                      try {
+                        sketch.image(img, sec_x0, sec_y0, sec_w, sec_h);
+                      } finally {
+                        if (!isSVG) sketch.drawingContext.restore();
+                      }
                       if(objOpts.image.is_core_photo_visible && modelImages.plot_colour[sectionKey]){
                         const getWidth = 10;
                         const scanWidth = (getWidth*2)+1;
@@ -9539,6 +9731,8 @@ document.addEventListener("DOMContentLoaded", () => {
     return { ok: true, sourceId };
   }
   function clearImageSet(sourceId) {
+    finishPhotoAdjustment();
+    delete objOpts.image.adjustment.sources[sourceId];
     const label = modelImages?.source_meta?.[sourceId]?.label ?? getImageSetLabel(sourceId);
     modelImages.sources[sourceId] = createImageSourceBucket(label);
     modelImages.source_meta[sourceId] = { label };
@@ -9550,8 +9744,10 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
   async function handleImageSetChange(event) {
+    finishPhotoAdjustment();
     const sourceId = event.target.value || "source_1";
     objOpts.image.active_source_id = sourceId;
+    updatePhotoAdjustmentTooltip();
     ensureImageSource(modelImages, sourceId, getImageSetLabel(sourceId));
     modelImages = syncLegacyImageAliases(modelImages, objOpts);
     updateImageSetLoadedState();
@@ -9901,6 +10097,7 @@ document.addEventListener("DOMContentLoaded", () => {
     objOpts.edit.is_full_snapshot = false;
     if(isProcessing || !LCCore){return}
     syncControlsFromSettings();
+    updatePhotoAdjustmentTooltip();
     //update
     if (vectorObjects == null) {
       vectorObjects = new p5(p5Sketch);
@@ -12965,5 +13162,4 @@ function sortDataSetRowsByModelOrder(dataSet, LCCore){
 
 
 //============================================================================================
-
 

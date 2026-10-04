@@ -1002,8 +1002,8 @@ function createMainWIndow() {
         console.log("MAIN: There is no registered image folders.")
         if (!silentProgress) {
           progressBar = await updateProgress(progressBar, 1, 1);
+          progressBar = null;
         }
-        progressBar = null;
         return null
       }
       console.log("MAIN: Load images: N = "+loadOptions.targetIds.length+"; Operations: ["+effectiveOperations+"]");
@@ -1077,8 +1077,8 @@ function createMainWIndow() {
         console.log("MAIN: Failed to get tasks", targetList, loadOptions);
         if (!silentProgress) {
           progressBar = await updateProgress(progressBar, 1, 1);
+          progressBar = null;
         }
-        progressBar = null;
         return null
       }
       //submit
@@ -1128,10 +1128,8 @@ function createMainWIndow() {
         });
       });
 
-      if(progressBar!==null){
-        if (!silentProgress) {
-          progressBar = await updateProgress(progressBar, numTotalTasks, numTotalTasks);
-        }
+      if (!silentProgress && progressBar !== null) {
+        progressBar = await updateProgress(progressBar, numTotalTasks, numTotalTasks);
         progressBar = null;
       }
       return coreImages;
