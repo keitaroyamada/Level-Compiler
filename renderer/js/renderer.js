@@ -29,6 +29,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   //pen canvas
   let penObject = { isPen: false, penCanvas: null, penData: null };
+  let annotationRecords = []; // Project/Hole/Section/Distance/Memo only; display data lives in penObject.
 
   //measure canvas
   let measureObject = {
@@ -673,6 +674,10 @@ document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("bt_pen").addEventListener("click", async (event) => {
     if(LCCore){
       if (!penObject.isPen) {
+        if (objOpts.edit.mode?.startsWith("annotation_")) {
+          finishEditCommand({ contextmenuEnable: objOpts.edit.editable });
+          document.body.style.cursor = objOpts.edit.editable ? "crosshair" : "default";
+        }
         penObject.isPen = true;
         document.getElementById("bt_pen").style.backgroundColor = "#ccc";
         //make new pen canvas
@@ -684,8 +689,9 @@ document.addEventListener("DOMContentLoaded", () => {
         penObject.isPen = false;
         document.getElementById("bt_pen").style.backgroundColor = "#f0f0f0";
         //undisplay canvas plot
-        document.getElementById("p5penCanvas").style.display = "none";
+        document.getElementById("p5penCanvas").style.display = annotationRecords.length ? "block" : "none";
       }
+      updateView();
     }    
   });
   //============================================================================================
@@ -1133,6 +1139,9 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     };
 
+    if (objOpts.edit.mode?.startsWith("annotation_")) {
+      finishEditCommand({ contextmenuEnable: objOpts.edit.editable });
+    }
     if(objOpts.edit.editable == true){
       finishEditCommand({ contextmenuEnable: false });
       objOpts.edit.editable = false;
@@ -1183,6 +1192,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if(clickResult==null){
       return;
     }
+    if (await handleAnnotationCommand(clickResult)) return;
     
     if(clickResult=="loadHighResolutionImage"){
 
@@ -1365,6 +1375,44 @@ document.addEventListener("DOMContentLoaded", () => {
     objOpts.edit.marker_to = null;
     objOpts.edit.section_from = null;
     objOpts.edit.section_to = null;
+  }
+
+  async function handleAnnotationCommand(command) {
+    const isAnnotationCommand = ["addAnnotation", "deleteAnnotation", "clearAnnotations"].includes(command);
+    if (!isAnnotationCommand) {
+      if (objOpts.edit.mode?.startsWith("annotation_")) {
+        const ht = objOpts.edit.hittest;
+        finishEditCommand({ contextmenuEnable: objOpts.edit.editable });
+        objOpts.edit.hittest = ht;
+        document.body.style.cursor = objOpts.edit.editable ? "crosshair" : "default";
+      }
+      return false;
+    }
+    if (isProcessing) return true;
+    if (command === "clearAnnotations") {
+      if (annotationRecords.length && await window.LCapi.Confirm({ opts: {
+        title: "Clear annotations", message: "Delete all recorded annotations?", parent: "main",
+      } })) {
+        annotationRecords.length = 0;
+        penObject.annotationRequest = null;
+        penObject.annotationDepths = [];
+        penObject.annotationHitRegions = [];
+        updateView();
+      }
+      return true;
+    }
+    if (!LCCore?.projects?.length) {
+      await showAlertDialog("Please load a model first.");
+      return true;
+    }
+    if (penObject.isPen) {
+      await showAlertDialog("Turn off the pen before selecting an annotation operation.");
+      return true;
+    }
+    finishEditCommand({ contextmenuEnable: objOpts.edit.editable });
+    objOpts.edit.mode = command === "addAnnotation" ? "annotation_add" : "annotation_delete";
+    document.body.style.cursor = "crosshair";
+    return true;
   }
 
   function startEditCommand(mode, moveHandler, options = {}) {
@@ -1589,6 +1637,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const clickResult = await window.LCapi.showContextMenu({ type: "editContextMenu" });
     if(clickResult==null) return
+    if (await handleAnnotationCommand(clickResult)) return;
 
     if(clickResult == "connectMarkers"){
       startEditCommand("connect_marker", handleConnectMouseMove);
@@ -3710,6 +3759,38 @@ document.addEventListener("DOMContentLoaded", () => {
   
   //============================================================================================
   //load correlation model
+  window.LCapi.receive("ExportAnnotationsAsCsvMenuClicked", async () => {
+    if (!annotationRecords.length) {
+      await showAlertDialog("There are no recorded annotations to export.");
+      return;
+    }
+    const result = await window.LCapi.ExportAnnotationsAsCsv(annotationRecords);
+    if (!result.ok && result.reason === "invalid") {
+      await showAlertDialog(result.message ?? "Could not export annotations.");
+    }
+  });
+  window.LCapi.receive("ImportAnnotationsFromCsvMenuClicked", async (result) => {
+    if (!result.ok) {
+      await showAlertDialog(result.message ?? "Could not import annotations.");
+      return;
+    }
+    if (annotationRecords.length && !await window.LCapi.Confirm({ opts: {
+      title: "Import annotations", message: "Replace the currently recorded annotations?", parent: "main",
+    } })) return;
+    annotationRecords = result.records;
+    penObject.annotationRequest = null;
+    updateView();
+    const owner = penObject;
+    const drawing = refreshAnnotationDrawing();
+    const request = owner.annotationRequest;
+    await drawing;
+    if (penObject !== owner || owner.annotationRequest !== request || annotationRecords !== result.records) return;
+    if (request && (request.model !== LCCore || request.ageModel !== LCPlotAge ||
+        request.ageId !== document.getElementById("AgeModelSelect").value ||
+        request.depthScale !== objOpts.canvas.depth_scale)) return;
+    const unavailable = annotationRecords.length - (owner.annotationDepths ?? []).filter(Boolean).length;
+    if (unavailable) await showAlertDialog(`${unavailable} annotation(s) could not be drawn in the current model.`);
+  });
   window.LCapi.receive("ExportCorrelationAsLCMenuClicked", async () => {
     console.log(LCCore.projects.length)
     //check model
@@ -4161,6 +4242,81 @@ document.addEventListener("DOMContentLoaded", () => {
   });
   //mouse click (send depth to finder)   1111111111111111111111111
   scroller.addEventListener("click", async function (event) {
+    if (objOpts.edit.mode?.startsWith("annotation_")) {
+      if (isProcessing || !LCCore || penObject.isPen) return;
+      event.preventDefault();
+      const mode = objOpts.edit.mode;
+      const model = LCCore;
+      const isShift = event.shiftKey;
+      const ht = getPointerHittest(event);
+      if (!ht) return;
+      objOpts.edit.hittest = ht;
+      if (mode === "annotation_add" && (ht.project === null || ht.hole === null || ht.section === null)) return;
+      let deleteIndex = null;
+      if (mode === "annotation_delete") {
+        const rect = document.getElementById("p5Canvas").getBoundingClientRect();
+        const x = event.clientX - rect.left;
+        // Match Delete Marker: same section, nearest depth, existing sensitivity.
+        if (ht.section === null) return;
+        let nearestDistance = Infinity;
+        for (const region of penObject.annotationHitRegions ?? []) {
+          const display = penObject.annotationDepths?.[region.index];
+          if (!display || display.sectionId[0] !== ht.project || display.sectionId[1] !== ht.hole ||
+              display.sectionId[2] !== ht.section || x < region.left || x > region.right) continue;
+          const distance = Math.abs(display.depth - ht.y);
+          if (distance <= nearestDistance) {
+            nearestDistance = distance;
+            deleteIndex = region.index;
+          }
+        }
+        if (deleteIndex === null || nearestDistance >= objOpts.edit.sensibility) return;
+      }
+      isProcessing = true;
+      objOpts.edit.hittest = ht;
+      try {
+        if (mode === "annotation_add") {
+          const position = await window.LCapi.GetAnnotationPosition({
+            sectionId: [ht.project, ht.hole, ht.section, null], depth: ht.y, depthScale: ht.depth_scale,
+          });
+          if (LCCore !== model || objOpts.edit.mode !== mode) return;
+          if (!position) {
+            await showAlertDialog("The clicked position could not be converted to section distance.");
+          } else {
+            const memo = await showDescriptionDialog({
+              title: `${position.project} / ${position.hole} / ${position.section} / ${position.distance}`,
+              value: "",
+            });
+            if (LCCore !== model || objOpts.edit.mode !== mode) return;
+            if (memo !== null) {
+              annotationRecords.push({ ...position, memo });
+              penObject.annotationRequest = null;
+            }
+          }
+        } else {
+          const record = annotationRecords[deleteIndex];
+          const confirmed = await window.LCapi.Confirm({ opts: {
+            title: "Delete annotation",
+            message: `Delete annotation ${deleteIndex + 1}: ${record.memo}?`, parent: "main",
+          } });
+          if (LCCore !== model || objOpts.edit.mode !== mode) return;
+          if (confirmed && annotationRecords[deleteIndex] === record) {
+            annotationRecords.splice(deleteIndex, 1);
+            penObject.annotationRequest = null;
+          }
+        }
+        if (mode === "annotation_add" && isShift) {
+          objOpts.edit.contextmenu_enable = false;
+          resetEditSelection();
+        } else {
+          finishEditCommand({ contextmenuEnable: objOpts.edit.editable });
+          document.body.style.cursor = objOpts.edit.editable ? "crosshair" : "default";
+        }
+      } finally {
+        isProcessing = false;
+        updateView();
+      }
+      return;
+    }
     //calc position
     const rect = document.getElementById("p5Canvas").getBoundingClientRect(); 
     const mouseX = event.clientX - rect.left;
@@ -7558,7 +7714,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
         sketch.stroke(objOpts.pen.colour);
 
-        if (sketch.mouseIsPressed) {
+        if (sketch.mouseIsPressed && sketch.mouseButton === sketch.LEFT) {
           sketch.line(
             sketch.mouseX + scroller.scrollLeft,
             sketch.mouseY + scroller.scrollTop,
@@ -7577,6 +7733,51 @@ document.addEventListener("DOMContentLoaded", () => {
 
         sketch.pop(); // Restore settings
       }
+      // Click annotations use the same model coordinates and transforms as p5Sketch.
+      penObject.annotationHitRegions = [];
+      if (!LCCore || !objOpts.canvas.is_model_visible) return;
+      const xMag = objOpts.canvas.dpir * objOpts.canvas.zoom_level[0];
+      let yMag = objOpts.canvas.dpir * objOpts.canvas.zoom_level[1];
+      let padY = objOpts.canvas.pad_y;
+      if (objOpts.canvas.depth_scale === "age") {
+        yMag *= objOpts.canvas.age_zoom_correction[0];
+        padY += objOpts.canvas.age_zoom_correction[1];
+      }
+      sketch.push();
+      sketch.translate(-canvasPos[0], -canvasPos[1]);
+      sketch.textFont("Arial");
+      sketch.textSize(12);
+      const numDisable = { total: 0, hole: 0 };
+      for (const project of LCCore.projects) {
+        if (!project.enable) numDisable.hole += objOpts.project.interval;
+        for (const hole of project.holes) {
+          if (!hole.enable) { numDisable.hole += 1; continue; }
+          const holeX0 = (objOpts.hole.distance + objOpts.hole.width) *
+            (numDisable.total + hole.order - numDisable.hole);
+          for (let i = 0; i < annotationRecords.length; i++) {
+            const display = penObject.annotationDepths?.[i];
+            if (!display || display.sectionId[0] !== project.id[0] || display.sectionId[1] !== hole.id[1]) continue;
+            const section = hole.sections.find(section => section.id[2] === display.sectionId[2]);
+            if (!section) continue;
+            const x = (holeX0 + objOpts.section.width / 2 + objOpts.canvas.shift_x) * xMag + objOpts.canvas.pad_x;
+            const y = (display.depth + objOpts.canvas.shift_y) * yMag + padY;
+            const label = `[${annotationRecords[i].distance.toFixed(2)} cm]:${annotationRecords[i].memo}`;
+            sketch.stroke(objOpts.pen.colour);
+            sketch.strokeWeight(2);
+            sketch.line(x + 20, y, x + 5, y);
+            sketch.noStroke();
+            sketch.fill(objOpts.pen.colour);
+            // The arrow tip is the recorded section position.
+            sketch.triangle(x, y, x + 8, y - 4, x + 8, y + 4);
+            sketch.text(label, x + 24, y + 4);
+            penObject.annotationHitRegions.push({ index: i,
+              left: x - canvasPos[0], right: x - canvasPos[0] + 20,
+            });
+          }
+        }
+        numDisable.total += project.holes.length + objOpts.project.interval;
+      }
+      sketch.pop();
     };
 
     // Window resize handler should be outside of draw()
@@ -7584,6 +7785,7 @@ document.addEventListener("DOMContentLoaded", () => {
       sketch.resizeCanvas(scroller.clientWidth, scroller.clientHeight);
     };
     sketch.mousePressed = () => {
+      if (!penObject.isPen) return;
       if (sketch.mouseButton == sketch.LEFT) {
         sketch.pmouseX = sketch.mouseX;
         sketch.pmouseY = sketch.mouseY;
@@ -7591,6 +7793,7 @@ document.addEventListener("DOMContentLoaded", () => {
       } 
     };
     sketch.keyPressed = async () => {
+      if (!penObject.isPen) return;
       if (sketch.key === 'n' && sketch.keyIsDown(sketch.CONTROL)) { 
         const response = await window.LCapi.Confirm(
           {
@@ -8096,6 +8299,17 @@ document.addEventListener("DOMContentLoaded", () => {
   }
   window.__LC_E2E__ = {
     isReady: () => true,
+    ...(window.__LC_ANNOTATION_E2E__ ? {
+      getAnnotationState: () => ({
+        records: annotationRecords.map(record => ({ ...record })),
+        regions: (penObject.annotationHitRegions ?? []).map(region => ({ ...region })),
+        depths: (penObject.annotationDepths ?? []).map(depth => depth ? { ...depth } : null),
+        mode: objOpts.edit.mode,
+        penEnabled: penObject.isPen,
+        processing: isProcessing,
+      }),
+      getAnnotationTestData: () => ({ model: LCCore, options: objOpts, canvasPos: canvasPos.slice() }),
+    } : {}),
     clearEvents: () => {
       lcE2EEventLog.length = 0;
     },
@@ -9619,6 +9833,7 @@ document.addEventListener("DOMContentLoaded", () => {
     while (parentElement1.firstChild) {
       parentElement1.removeChild(parentElement1.firstChild);
     }
+    penObject.penCanvas?.remove();
     const parentElement2 = document.getElementById("p5penCanvas"); //pen
     while (parentElement2.firstChild) {
       parentElement2.removeChild(parentElement2.firstChild);
@@ -9631,6 +9846,42 @@ document.addEventListener("DOMContentLoaded", () => {
   }
   async function initialisePaths(){
     await window.LCapi.InitialisePaths();
+  }
+  async function refreshAnnotationDrawing() {
+    const owner = penObject;
+    const previous = owner.annotationRequest;
+    const depthScale = objOpts.canvas.depth_scale;
+    const ageId = document.getElementById("AgeModelSelect").value;
+    if (!annotationRecords.length || !LCCore) {
+      owner.annotationRequest = null;
+      owner.annotationDepths = [];
+      owner.annotationHitRegions = [];
+      return;
+    }
+    if (previous && previous.model === LCCore && previous.ageModel === LCPlotAge &&
+        previous.ageId === ageId && previous.depthScale === depthScale &&
+        previous.records.length === annotationRecords.length &&
+        previous.records.every((record, i) => record === annotationRecords[i])) return previous.promise;
+    const request = { model: LCCore, ageModel: LCPlotAge, ageId,
+      depthScale, records: annotationRecords.slice() };
+    owner.annotationRequest = request;
+    owner.annotationDepths = [];
+    owner.annotationHitRegions = [];
+    request.promise = window.LCapi.GetAnnotationDepths({ records: request.records, depthScale }).then(depths => {
+      if (penObject !== owner || owner.annotationRequest !== request || LCCore !== request.model ||
+          LCPlotAge !== request.ageModel || document.getElementById("AgeModelSelect").value !== request.ageId ||
+          objOpts.canvas.depth_scale !== depthScale || request.records.length !== annotationRecords.length ||
+          !request.records.every((record, i) => record === annotationRecords[i])) return;
+      owner.annotationDepths = Array.isArray(depths) ? depths : [];
+      owner.penCanvas?.redraw();
+    }).catch(error => {
+      if (penObject === owner && owner.annotationRequest === request) {
+        owner.annotationDepths = [];
+        owner.annotationHitRegions = [];
+        document.getElementById("footerRightText").textContent = "Could not draw annotations: " + error.message;
+      }
+    });
+    return request.promise;
   }
   function updateView(options = {}) {
     const shouldResizeCanvasBase = options.resizeCanvasBase !== false;
@@ -9678,8 +9929,18 @@ document.addEventListener("DOMContentLoaded", () => {
     vectorObjects.clear();
     vectorObjects.redraw();
 
+    // Both overlays share the existing annotation canvas; freehand data stays in penSketch.
+    if (annotationRecords.length && !penObject.penCanvas) {
+      penObject.penCanvas = new p5(penSketch);
+    }
+    document.getElementById("p5penCanvas").style.display =
+      penObject.isPen || annotationRecords.length ? "block" : "none";
+    refreshAnnotationDrawing();
     //update pen canvas
     if (penObject.penCanvas) {
+      if (penObject.penCanvas.width !== scroller.clientWidth || penObject.penCanvas.height !== scroller.clientHeight) {
+        penObject.penCanvas.resizeCanvas(scroller.clientWidth, scroller.clientHeight);
+      }
       penObject.penCanvas.redraw();
     }
 

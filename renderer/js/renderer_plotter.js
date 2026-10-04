@@ -401,13 +401,8 @@ document.addEventListener("DOMContentLoaded", () => {
             deleteBtn.style.marginLeft = "10px";
             deleteBtn.dataset.name = "delete";
             deleteBtn.addEventListener("click", () => {
-                const parentElement = document.getElementById("plot_list");
-                const grandChild = seriesDiv.querySelector("input[type='checkbox']");
-                if (grandChild) {
-                    grandChild.checked = false;
-                    parentElement.dispatchEvent(new Event('change', { bubbles: true }));
-                }
                 seriesDiv.remove();
+                sendToRenderer("updateDataset");
                 updateView();
             });
 

@@ -2218,12 +2218,33 @@ function createMainWIndow() {
         ] 
       }
        
+      if (["normalContextMenu", "holeContextMenu", "sectionContextMenu", "editContextMenu"].includes(type)) {
+        template.push({ type: "separator" }, {
+          label: "Annotation",
+          submenu: [
+            { label: "Add (Shift-click to continue)", click: () => resolve("addAnnotation") },
+            { label: "Delete", click: () => resolve("deleteAnnotation") },
+            { label: "Clear all", click: () => resolve("clearAnnotations") },
+          ],
+        });
+      }
       const menu = Menu.buildFromTemplate(template);
       menu.popup({ 
         window:BrowserWindow.fromWebContents(event.sender),
         callback: () => resolve(null)
       });
     });
+  });
+  ipcMain.handle("ExportAnnotationsAsCsvFromRenderer", async (_e, records) => {
+    if (!Array.isArray(records) || !records.length) return { ok: false, reason: "empty" };
+    if (records.some(record => !record || !Number.isFinite(record.distance) ||
+        ["project", "hole", "section", "memo"].some(key => typeof record[key] !== "string"))) {
+      return { ok: false, reason: "invalid", message: "Invalid annotation data." };
+    }
+    const rows = [["ID", "project", "hole", "section", "distance", "memo"],
+      ...records.map((record, index) => [index + 1, record.project, record.hole,
+        record.section, record.distance, record.memo])];
+    return putcsvfile(getMainWindow(), "annotations.csv", rows, true);
   });
   ipcMain.handle("ExportCorrelationAsCsvFromRenderer", async (_e) => {
     console.log("MAIN: Start contructing CSV data.");
@@ -4416,6 +4437,52 @@ function createMainWIndow() {
     }
   });
   //-----marker-----
+  // Annotation queries reuse marker positioning without creating or editing markers.
+  ipcMain.handle("getAnnotationPosition", (_e, payload) => {
+    let { sectionId, depth, depthScale } = payload ?? {};
+    if (!Array.isArray(sectionId) || sectionId.length !== 4 || sectionId[3] !== null ||
+        sectionId.slice(0, 3).some(id => id == null) || !Number.isFinite(depth) ||
+        !["composite_depth", "event_free_depth", "drilling_depth", "age"].includes(depthScale)) return null;
+    const idx = LCCore.search_idx_list[sectionId.toString()];
+    if (!idx || !LCCore.projects[idx[0]]?.holes[idx[1]]?.sections[idx[2]]) return null;
+    if (depthScale === "age") {
+      depth = LCAge.getEFDFromAge(Number(depth), "linear")?.efd?.mid;
+      if (!Number.isFinite(depth)) return null;
+      depthScale = "event_free_depth";
+    }
+    const position = withSuppressedCoreAlertRenderer(() =>
+      LCCore.getNearestTrinity(sectionId, depth, depthScale)
+    );
+    if (!Number.isFinite(position?.distance) ||
+        !position.index?.slice(0, 3).every((value, i) => value === idx[i])) return null;
+    return {
+      project: position.project, hole: position.hole, section: position.section,
+      distance: position.distance,
+    };
+  });
+  ipcMain.handle("getAnnotationDepths", (_e, payload) => {
+    const { records, depthScale } = payload ?? {};
+    if (!Array.isArray(records) ||
+        !["composite_depth", "event_free_depth", "drilling_depth", "age"].includes(depthScale)) return [];
+    return records.map(record => {
+      if (!record || !Number.isFinite(record.distance)) return null;
+      const projects = LCCore.projects.filter(project => project.name === record.project);
+      if (projects.length !== 1) return null;
+      const holes = projects[0].holes.filter(hole => hole.name === record.hole);
+      if (holes.length !== 1) return null;
+      const sections = holes[0].sections.filter(section => section.name === record.section);
+      if (sections.length !== 1) return null;
+      const trinity = { hole_name: record.hole, section_name: record.section, distance: record.distance };
+      const scale = depthScale === "age" ? "event_free_depth" : depthScale;
+      const converted = withSuppressedCoreAlertRenderer(() =>
+        LCCore.getDepthFromTrinity(sections[0].id, [trinity], scale, false)
+      );
+      let depth = converted?.[0]?.[1];
+      if (!Number.isFinite(depth)) return null;
+      if (depthScale === "age") depth = LCAge.getAgeFromEFD(depth, "linear")?.age?.mid;
+      return Number.isFinite(depth) ? { sectionId: sections[0].id.slice(), depth } : null;
+    });
+  });
   ipcMain.handle("addMarker", (_e, payload) => {
     let { sectionId, depth, depthScale, relativeX } = payload;
 
@@ -5420,6 +5487,33 @@ function createMainWIndow() {
             label:"Import",
             submenu:[              
               {
+                label: "Import annotations from CSV",
+                click: async () => {
+                  const filePath = await getfile(getMainWindow(), "Import annotations", [{ name: "CSV Files", extensions: ["csv"] }]);
+                  if (!filePath) return;
+                  let result;
+                  try {
+                    const rows = parse(fs.readFileSync(filePath, "utf8"), { bom: true, skip_empty_lines: true });
+                    const columns = ["ID", "project", "hole", "section", "distance", "memo"];
+                    if (!rows.length || rows[0].length !== columns.length || rows[0].some((value, index) => value !== columns[index])) {
+                      throw new Error("Expected CSV columns: " + columns.join(","));
+                    }
+                    const records = rows.slice(1).map((row, index) => {
+                      const [, project, hole, section, distance, memo] = row;
+                      if (row.length !== columns.length || [project, hole, section].some(name => !name.trim()) ||
+                          !distance.trim() || !Number.isFinite(Number(distance))) {
+                        throw new Error("Invalid annotation CSV at row " + (index + 2));
+                      }
+                      return { project, hole, section, distance: Number(distance), memo };
+                    });
+                    result = { ok: true, records };
+                  } catch (error) {
+                    result = { ok: false, message: error.message };
+                  }
+                  getMainWindow().webContents.send("ImportAnnotationsFromCsvMenuClicked", result);
+                },
+              },
+              {
                 label: "Import Correlation Model for Level Finder",
                 click: async() => {
                   const fullpath = await getfile(getMainWindow(), "Please Chose Correlation Model (fro LF)", [{name: "CSV file", extensions: ["csv"]}]);
@@ -5555,18 +5649,27 @@ function createMainWIndow() {
           },
           {
             label:"Export",
-            visible:isEditMode,
             submenu:[
               {
                 label: "Export csv model for Level Compiler",
+                visible: isEditMode,
+                enabled: isEditMode,
                 click: () => {
                   getMainWindow().webContents.send("ExportCorrelationAsLCMenuClicked");
                 },
               },
               {
                 label: "Export csv model for Level Finder",
+                visible: isEditMode,
+                enabled: isEditMode,
                 click: () => {
                   getMainWindow().webContents.send("ExportCorrelationAsLFMenuClicked");
+                },
+              },
+              {
+                label: "Export annotations as CSV",
+                click: () => {
+                  getMainWindow().webContents.send("ExportAnnotationsAsCsvMenuClicked");
                 },
               },
               {
@@ -6783,7 +6886,7 @@ async function findFileInDir(in_path, fileName, type) {
 
 
 //--------------------------------------------------------------------------------------------------
-async function putcsvfile(window = null, filePath, data) {
+async function putcsvfile(window = null, filePath, data, bom = false) {
   try {
     const { canceled, filePath: savePath } = await dialog.showSaveDialog(
       window,
@@ -6800,7 +6903,7 @@ async function putcsvfile(window = null, filePath, data) {
     }
 
     const overwritten = fs.existsSync(savePath); // 上書きか新規かを判定
-    const csv = stringify(data, { record_delimiter: "\r\n" });
+    const csv = stringify(data, { bom, record_delimiter: "\r\n" });
     fs.writeFileSync(savePath, csv);
 
     return { ok: true, filePath: savePath, overwritten };

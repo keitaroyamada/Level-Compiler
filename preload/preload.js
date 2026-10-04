@@ -1,5 +1,6 @@
 // preload.js
 const { contextBridge, ipcRenderer, webUtils } = require("electron");
+if (process.env.LC_E2E === "1") contextBridge.exposeInMainWorld("__LC_ANNOTATION_E2E__", true);
 
 const IPC_CHANNELS = {
   ASK_DIALOG: "askdialog",
@@ -124,6 +125,7 @@ contextBridge.exposeInMainWorld("LCapi", {
   Reregister: () => ipcRenderer.invoke("Reregister"),
 
   //export
+  ExportAnnotationsAsCsv: (records) => ipcRenderer.invoke("ExportAnnotationsAsCsvFromRenderer", records),
   ExportCorrelationAsCsv: () => ipcRenderer.invoke("ExportCorrelationAsCsvFromRenderer"),
   ExportCorrelationAsLF: () => ipcRenderer.invoke("ExportCorrelationAsLFFromRenderer"),
 
@@ -176,6 +178,8 @@ contextBridge.exposeInMainWorld("LCapi", {
   disconnectAllConnections: (payload) => ipcRenderer.invoke("disconnectAllConnections", payload),
   deleteMarker: (payload) => ipcRenderer.invoke("deleteMarker", payload),
   addMarker: (payload) => ipcRenderer.invoke("addMarker", payload),
+  GetAnnotationPosition: (payload) => ipcRenderer.invoke("getAnnotationPosition", payload),
+  GetAnnotationDepths: (payload) => ipcRenderer.invoke("getAnnotationDepths", payload),
   changeMarker: (payload) => ipcRenderer.invoke("changeMarker", payload),
   changeSection: (payload) => ipcRenderer.invoke("changeSection", payload),
   deleteSection: (payload) => ipcRenderer.invoke("deleteSection", payload),
@@ -195,7 +199,7 @@ contextBridge.exposeInMainWorld("LCapi", {
   AddEvent: (payload) => ipcRenderer.invoke("AddEvent", payload),
   DeleteEvent: (payload) => ipcRenderer.invoke("DeleteEvent", payload),
   addSectionFromLcsection:(args1) => ipcRenderer.invoke("addSectionFromLcsection", webUtils.getPathForFile(args1)),
-  changeEditMode:(mode) => ipcRenderer.invoke("changeEditMode", { mode }),
+  changeEditMode:(payload) => ipcRenderer.invoke("changeEditMode", payload),
   sendSettings:(payload) => ipcRenderer.invoke("sendSettings", payload),
   getDisplayInfo:() => ipcRenderer.invoke("getDisplayInfo"),
   changeEnable:(payload) => ipcRenderer.invoke("changeEnable", payload),
