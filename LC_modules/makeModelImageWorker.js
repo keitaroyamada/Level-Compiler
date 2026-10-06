@@ -132,7 +132,7 @@ parentPort.on("message", async (task) => {
             let newIm = sharp({
               create: {
                 width: metadata.width,
-                height: Math.round(newHeight),
+                height: Math.ceil(newHeight),
                 channels: 3,
                 background: { r: 0, g: 0, b: 0 },
               },
