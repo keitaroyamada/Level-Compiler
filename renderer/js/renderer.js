@@ -4761,6 +4761,7 @@ document.addEventListener("DOMContentLoaded", () => {
           }
         }
 
+        objOpts.canvas.zoom_level = [4, 3];
         console.log("[Renderer]: Settings are loaded.", objOpts)        
       }
     }    
@@ -4880,16 +4881,23 @@ document.addEventListener("DOMContentLoaded", () => {
 
   function getPhotoAdjustmentSource(sourceId = objOpts.image.active_source_id) {
     return objOpts.image.adjustment.sources[sourceId] ??= {
-      global: { brightness: 1, contrast: 1 }, sections: {},
+      projects: {},
+    };
+  }
+
+  function getPhotoAdjustmentProject(projectId, sourceId = objOpts.image.active_source_id) {
+    const source = getPhotoAdjustmentSource(sourceId);
+    return source.projects[projectId] ??= {
+      brightness: 1, contrast: 1, sections: {},
     };
   }
 
   function getPhotoAdjustment(sectionId, sourceId = objOpts.image.active_source_id) {
-    const source = getPhotoAdjustmentSource(sourceId);
-    const local = source.sections[sectionId] ?? { brightness: 1, contrast: 1 };
+    const project = getPhotoAdjustmentProject(sectionId.split(",")[0], sourceId);
+    const local = project.sections[sectionId] ?? { brightness: 1, contrast: 1 };
     return {
-      brightness: Math.min(3, Math.max(0.2, source.global.brightness * local.brightness)),
-      contrast: Math.min(3, Math.max(0.2, source.global.contrast * local.contrast)),
+      brightness: Math.min(3, Math.max(0.2, project.brightness * local.brightness)),
+      contrast: Math.min(3, Math.max(0.2, project.contrast * local.contrast)),
     };
   }
 
@@ -4903,7 +4911,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (ht.section === null || ht.relative_x * objOpts.hole.width > objOpts.section.width) return null;
     const key = getSectionImageKey(ht.projectName, ht.holeName, ht.sectionName);
     if (!getRenderableSectionImage(modelImages, objOpts, objOpts.canvas.depth_scale, key)) return null;
-    return { sectionId: [ht.project, ht.hole, ht.section].toString() };
+    return { projectId: ht.project, sectionId: [ht.project, ht.hole, ht.section].toString() };
   }
 
   function updatePhotoAdjustmentTooltip() {
@@ -4915,7 +4923,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (tooltip.hidden) return;
     const sourceId = state.drag?.sourceId ?? objOpts.image.active_source_id;
     const value = state.drag
-      ? state.drag.sectionId ? getPhotoAdjustment(state.drag.sectionId, sourceId) : getPhotoAdjustmentSource(sourceId).global
+      ? state.drag.sectionId ? getPhotoAdjustment(state.drag.sectionId, sourceId) : getPhotoAdjustmentProject(state.drag.projectId, sourceId)
       : getPhotoAdjustment(photo.sectionId, sourceId);
     tooltip.textContent = `Brightness ${Math.round(value.brightness * 100)}% · Contrast ${Math.round(value.contrast * 100)}%`;
     tooltip.style.left = `${Math.max(0, Math.min(state.pointer.x + 16, window.innerWidth - tooltip.offsetWidth - 8))}px`;
@@ -4927,11 +4935,14 @@ document.addEventListener("DOMContentLoaded", () => {
     const drag = state.drag;
     if (!drag) return;
     if (cancel) {
-      const source = getPhotoAdjustmentSource(drag.sourceId);
+      const project = getPhotoAdjustmentProject(drag.projectId, drag.sourceId);
       if (drag.sectionId) {
-        if (drag.previous) source.sections[drag.sectionId] = drag.previous;
-        else delete source.sections[drag.sectionId];
-      } else source.global = drag.previous;
+        if (drag.previous) project.sections[drag.sectionId] = drag.previous;
+        else delete project.sections[drag.sectionId];
+      } else {
+        project.brightness = drag.previous.brightness;
+        project.contrast = drag.previous.contrast;
+      }
     }
     state.drag = null;
     scroller.style.cursor = "";
@@ -4957,16 +4968,17 @@ document.addEventListener("DOMContentLoaded", () => {
       event.preventDefault();
       event.stopImmediatePropagation();
       finishPhotoAdjustment();
-      const source = getPhotoAdjustmentSource();
+      const photo = getHoveredPhoto({ clientX: state.pointer.x, clientY: state.pointer.y });
+      if (!photo) return;
+      const project = getPhotoAdjustmentProject(photo.projectId);
       if (event.shiftKey) {
-        const photo = getHoveredPhoto({ clientX: state.pointer.x, clientY: state.pointer.y });
-        if (!photo) return;
-        source.sections[photo.sectionId] = {
-          brightness: 1 / source.global.brightness, contrast: 1 / source.global.contrast,
+        project.sections[photo.sectionId] = {
+          brightness: 1 / project.brightness, contrast: 1 / project.contrast,
         };
       } else {
-        source.global = { brightness: 1, contrast: 1 };
-        source.sections = {};
+        project.brightness = 1;
+        project.contrast = 1;
+        project.sections = {};
       }
       updatePhotoAdjustmentTooltip();
       updateView({ resizeCanvasBase: false, schedule: true });
@@ -4992,15 +5004,15 @@ document.addEventListener("DOMContentLoaded", () => {
     event.stopImmediatePropagation();
     state.suppressClick = true;
     if (!LCCore || isProcessing || !objOpts.canvas.is_core_photo_visible || !hasActiveImageSetImages()) return;
-    const photo = event.shiftKey ? getHoveredPhoto(event) : null;
-    if (event.shiftKey && !photo) return;
+    const photo = getHoveredPhoto(event);
+    if (!photo) return;
     const sourceId = objOpts.image.active_source_id;
-    const source = getPhotoAdjustmentSource(sourceId);
-    const sectionId = photo?.sectionId ?? null;
-    const previous = sectionId ? source.sections[sectionId] : source.global;
+    const project = getPhotoAdjustmentProject(photo.projectId, sourceId);
+    const sectionId = event.shiftKey ? photo.sectionId : null;
+    const previous = sectionId ? project.sections[sectionId] : project;
     state.drag = {
-      sourceId, sectionId, x: event.clientX, y: event.clientY,
-      start: sectionId ? getPhotoAdjustment(sectionId) : { ...source.global },
+      sourceId, projectId: photo.projectId, sectionId, x: event.clientX, y: event.clientY,
+      start: sectionId ? getPhotoAdjustment(sectionId) : { brightness: project.brightness, contrast: project.contrast },
       previous: previous ? { ...previous } : null,
     };
     scroller.style.cursor = "move";
@@ -5017,13 +5029,16 @@ document.addEventListener("DOMContentLoaded", () => {
         brightness: Math.min(3, Math.max(0.2, drag.start.brightness - (event.clientY - drag.y) * 0.005)),
         contrast: Math.min(3, Math.max(0.2, drag.start.contrast + (event.clientX - drag.x) * 0.005)),
       };
-      const source = getPhotoAdjustmentSource(drag.sourceId);
+      const project = getPhotoAdjustmentProject(drag.projectId, drag.sourceId);
       if (drag.sectionId) {
-        source.sections[drag.sectionId] = {
-          brightness: value.brightness / source.global.brightness,
-          contrast: value.contrast / source.global.contrast,
+        project.sections[drag.sectionId] = {
+          brightness: value.brightness / project.brightness,
+          contrast: value.contrast / project.contrast,
         };
-      } else source.global = value;
+      } else {
+        project.brightness = value.brightness;
+        project.contrast = value.contrast;
+      }
       updateView({ resizeCanvasBase: false, schedule: true });
     }
     if (state.keyDown) updatePhotoAdjustmentTooltip();
@@ -13162,4 +13177,3 @@ function sortDataSetRowsByModelOrder(dataSet, LCCore){
 
 
 //============================================================================================
-

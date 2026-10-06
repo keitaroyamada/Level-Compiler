@@ -129,10 +129,37 @@ parentPort.on("message", async (task) => {
           if (newHeight < 0.5) {
             results[depthScale][task.imageName] = undefined;
           } else {
+            const MAX_JPEG_DIMENSION = 65500;
+            const originalHeight = Math.ceil(newHeight);
+            const resizeScale = Math.min(
+              1,
+              MAX_JPEG_DIMENSION / metadata.width,
+              MAX_JPEG_DIMENSION / originalHeight
+            );
+
+            const outputWidth = Math.max(
+              1,
+              Math.min(MAX_JPEG_DIMENSION, Math.floor(metadata.width * resizeScale))
+            );
+            const outputHeight = Math.max(
+              1,
+              Math.min(MAX_JPEG_DIMENSION, Math.ceil(originalHeight * resizeScale))
+            );
+
+            if (resizeScale < 1) {
+              for (const op of operations) {
+                op.toTop = Math.floor(op.toTop * resizeScale);
+                op.toBottom = Math.min(
+                  outputHeight,
+                  Math.ceil(op.toBottom * resizeScale)
+                );
+              }
+            }
+
             let newIm = sharp({
               create: {
-                width: metadata.width,
-                height: Math.ceil(newHeight),
+                width: outputWidth,
+                height: outputHeight,
                 channels: 3,
                 background: { r: 0, g: 0, b: 0 },
               },
@@ -174,7 +201,7 @@ parentPort.on("message", async (task) => {
                     height: Math.round(extractHeight),
                   })
                   .resize({
-                    width: metadata.width,
+                    width: outputWidth,
                     height: Math.round(op.toBottom - op.toTop),
                     fit: "fill",
                   })
