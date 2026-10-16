@@ -7459,6 +7459,146 @@ class LevelCompilerCore extends EventEmitter{
 
     return answer;
   }
+
+  exportProjectCorrelationTable(includeUncorrelated = false) {
+    const master = this.projects.find(
+      project =>
+        project.model_type === "correlation" &&
+        project.id[0] === this.base_project_id?.[0]
+    );
+
+    if (!master) {
+      throw new Error("Master project was not found.");
+    }
+
+    // Build a read-only index in model order.
+    const markerMap = new Map();
+    const masterEntries = [];
+
+    for (const project of this.projects) {
+      for (const hole of project.holes) {
+        for (const section of hole.sections) {
+          for (const marker of section.markers) {
+            const entry = { project, hole, section, marker };
+            markerMap.set(marker.id.toString(), entry);
+
+            if (project === master) {
+              masterEntries.push(entry);
+            }
+          }
+        }
+      }
+    }
+
+    // Collect markers connected on the same horizontal horizon.
+    const getHorizon = startMarker => {
+      const visited = new Set();
+      const stack = [startMarker.id];
+      const entries = [];
+
+      while (stack.length > 0) {
+        const id = stack.pop();
+        const key = id.toString();
+
+        if (visited.has(key)) {
+          continue;
+        }
+        visited.add(key);
+
+        const entry = markerMap.get(key);
+
+        if (!entry) {
+          throw new Error(`Connected marker was not found: ${key}`);
+        }
+
+        entries.push(entry);
+        stack.push(...entry.marker.h_connection);
+      }
+
+      return entries;
+    };
+
+    const correlations = masterEntries.map(entry => ({
+      master: entry,
+      duo: getHorizon(entry.marker).filter(
+        connected => connected.project.model_type === "duo"
+      ),
+    }));
+
+    const connectedProjectIds = new Set(
+      correlations.flatMap(correlation =>
+        correlation.duo.map(entry => entry.project.id[0])
+      )
+    );
+
+    // Keep a fixed column group for each connected duo project.
+    const duoProjects = this.projects.filter(
+      project =>
+        project.model_type === "duo" &&
+        connectedProjectIds.has(project.id[0])
+    );
+
+    const fields = ["project", "hole", "sec", "position"];
+
+    const table = [
+      [master, ...duoProjects].flatMap(project =>
+        fields.map(field => `${project.name}_${field}`)
+      ),
+    ];
+
+    const toCells = entry =>
+      entry
+        ? [
+            entry.project.name,
+            entry.hole.name,
+            entry.section.name,
+            entry.marker.distance ?? "",
+          ]
+        : ["", "", "", ""];
+
+    for (const correlation of correlations) {
+      if (!includeUncorrelated && correlation.duo.length === 0) {
+        continue;
+      }
+
+      const matchedIds = new Set(
+        correlation.duo.map(entry => entry.marker.id.toString())
+      );
+
+      // Preserve model order within each duo project.
+      const groups = duoProjects.map(project => {
+        const entries = [];
+
+        for (const hole of project.holes) {
+          for (const section of hole.sections) {
+            for (const marker of section.markers) {
+              if (matchedIds.has(marker.id.toString())) {
+                entries.push({ project, hole, section, marker });
+              }
+            }
+          }
+        }
+
+        return entries;
+      });
+
+      // Use additional rows when a duo has multiple matching markers.
+      const rowCount = Math.max(
+        1,
+        ...groups.map(entries => entries.length)
+      );
+
+      for (let index = 0; index < rowCount; index++) {
+        table.push([
+          ...toCells(correlation.master),
+          ...groups.flatMap(entries => toCells(entries[index])),
+        ]);
+      }
+    }
+
+    return table;
+  }
+
   
 }
 

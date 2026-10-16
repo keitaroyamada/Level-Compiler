@@ -5697,6 +5697,78 @@ function createMainWIndow() {
                   }
                 }
               },
+              {
+                label: "Export project correlation table",
+                visible: isEditMode,
+                enabled: isEditMode,
+                click: async () => {
+                  const window = getMainWindow();
+
+                  try {
+                    const master = LCCore.projects.find(
+                      project =>
+                        project.model_type === "correlation" &&
+                        project.id[0] === LCCore.base_project_id?.[0]
+                    );
+
+                    if (!master) {
+                      await dialog.showMessageBox(window, {
+                        type: "info",
+                        title: "Export project correlation table",
+                        message: "No master project was found.",
+                        buttons: ["OK"],
+                      });
+                      return;
+                    }
+
+                    const table = LCCore.exportProjectCorrelationTable();
+
+                    if (table.length <= 1) {
+                      await dialog.showMessageBox(window, {
+                        type: "info",
+                        title: "Export project correlation table",
+                        message: "No project correlations were found.",
+                        buttons: ["OK"],
+                      });
+                      return;
+                    }
+
+                    const safeName = String(master.name)
+                      .replace(/[\\/:*?"<>|]/g, "_")
+                      .replace(/[\x00-\x1F\x7F]/g, "_")
+                      .trim()
+                      .replace(/[. ]+$/g, "") || "Master";
+
+                    const result = await putcsvfile(
+                      window,
+                      `${safeName} project correlation table.csv`,
+                      table,
+                      true
+                    );
+
+                    if (result.ok) {
+                      console.log(
+                        "MAIN: Exported project correlation table:",
+                        result.filePath
+                      );
+                    }
+                  } catch (error) {
+                    console.error(
+                      "MAIN: Failed to construct project correlation table:",
+                      error
+                    );
+
+                    await dialog.showMessageBox(window, {
+                      type: "error",
+                      title: "Export project correlation table",
+                      message: "Failed to construct project correlation table.",
+                      detail: error.message,
+                      buttons: ["OK"],
+                    });
+                  }
+                },
+              },
+
             ],
           },                    
           // for Windows--------------------
