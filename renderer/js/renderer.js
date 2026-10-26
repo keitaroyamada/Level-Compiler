@@ -77,12 +77,13 @@ document.addEventListener("DOMContentLoaded", () => {
     };
 
     //=========== public properties =========== 
-    objOpts.information.version = "2.5";
+    objOpts.information.version = "2.6";
     objOpts.developer.mode = "user";//"user";"developer";"root"; 
     objOpts.canvas.use_touchpad_mode = true;
     objOpts.canvas.depth_scale = "composite_depth";
     objOpts.canvas.background_colour = "#ffffff";//"#f4f5f7";//"#f7f7f7"//"#f8fbff";//"#fffdfa";//""white    
     objOpts.canvas.display_height = 20.2;
+    objOpts.canvas.core_width = 20;
     objOpts.canvas.is_model_visible = true;
     objOpts.canvas.is_event_expanded = true;
     objOpts.canvas.is_connection_visible = true;
@@ -114,7 +115,6 @@ document.addEventListener("DOMContentLoaded", () => {
     objOpts.project.font_colour = "#000000";
   
     objOpts.hole.distance = 20;
-    objOpts.hole.width = 20;
     objOpts.hole.line_colour = "#90EE90";
     objOpts.hole.line_width = 2;
     objOpts.hole.is_name_labels_visible = true;
@@ -125,7 +125,6 @@ document.addEventListener("DOMContentLoaded", () => {
     objOpts.section.line_colour = "#808080";
     objOpts.section.face_colour = "#D3D3D3";
     objOpts.section.line_width = 2;
-    objOpts.section.width = 20;
     objOpts.section.font = "Arial";
     objOpts.section.font_size = 20;
     objOpts.section.font_angle =  -90;
@@ -141,7 +140,6 @@ document.addEventListener("DOMContentLoaded", () => {
     objOpts.marker.is_rank_visible = false;
     objOpts.marker.line_colour = "#808080";
     objOpts.marker.line_width = 1;
-    objOpts.marker.width = 20;    
     objOpts.marker.rank_colours = [
       "#008000", // green
       "#66CC66", // medium green
@@ -4443,6 +4441,7 @@ document.addEventListener("DOMContentLoaded", () => {
           },
           background_colour:{description:"Canvas background color."},
           display_height:{description:"Displayed model height in the canvas."},
+          core_width:{description:"Shared display width for holes, sections, and markers."},
           is_model_visible:{description:"Show or hide the model drawing."},
           is_event_expanded:{description:"Draw events at expanded width instead of folded width."},
           is_connection_visible:{description:"Show marker and section connections."},
@@ -4478,7 +4477,6 @@ document.addEventListener("DOMContentLoaded", () => {
         hole:{
           description:"Hole drawing settings.",
           distance:{description:"Horizontal distance between holes."},
-          width:{description:"Hole display width."},
           line_colour:{description:"Hole outline color."},
           line_width:{description:"Hole outline width."},
           is_name_labels_visible:{description:"Show hole name labels."},
@@ -4491,7 +4489,6 @@ document.addEventListener("DOMContentLoaded", () => {
           line_colour:{description:"Section outline color."},
           face_colour:{description:"Section fill color."},
           line_width:{description:"Section outline width."},
-          width:{description:"Section display width."},
           font:{description:"Section label font."},
           font_size:{description:"Section label font size."},
           font_angle:{description:"Section label rotation angle."},
@@ -4517,7 +4514,6 @@ document.addEventListener("DOMContentLoaded", () => {
           is_rank_visible:{description:"Show marker rank indicators."},
           line_colour:{description:"Marker line color."},
           line_width:{description:"Marker line width."},
-          width:{description:"Marker display width."},
           rank_colours:{description:"Colors used for marker rank indicators."},
           ignore_zoom_level:{description:"Hide markers and labels below this zoom level."},
           font:{description:"Marker label font."},
@@ -4908,7 +4904,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (event.clientX < rect.left || event.clientX >= rect.right ||
         event.clientY < rect.top || event.clientY >= rect.bottom) return null;
     const ht = getPointerHittest(event);
-    if (ht.section === null || ht.relative_x * objOpts.hole.width > objOpts.section.width) return null;
+    if (ht.section === null || ht.relative_x * objOpts.canvas.core_width > objOpts.canvas.core_width) return null;
     const key = getSectionImageKey(ht.projectName, ht.holeName, ht.sectionName);
     if (!getRenderableSectionImage(modelImages, objOpts, objOpts.canvas.depth_scale, key)) return null;
     return { projectId: ht.project, sectionId: [ht.project, ht.hole, ht.section].toString() };
@@ -5620,7 +5616,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const bottom_padding = 100;
 
-    let canvasBaseWidth  = parseInt(objOpts.project.pad_x*3+(objOpts.hole.distance + objOpts.hole.width + shift_x) * (num_total_holes + 1) * xMag + pad_x + 500);
+    let canvasBaseWidth  = parseInt(objOpts.project.pad_x*3+(objOpts.hole.distance + objOpts.canvas.core_width + shift_x) * (num_total_holes + 1) * xMag + pad_x + 500);
     let canvasBaseHeight = parseInt(objOpts.project.pad_y*3+(holes_bottom + bottom_padding - holes_top + shift_y + objOpts.canvas.bottom_pad) * yMag + pad_y);
 
     //case base is too small
@@ -5898,9 +5894,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
         const prj_padx = objOpts.project.pad_x;//objOpts.hole.distance * xMag;
         const prj_pady = objOpts.project.pad_y;
-        const project_x0 = -prj_padx + ((objOpts.section.width + objOpts.hole.distance) * prj_num_enable_left + shift_x) * xMag + pad_x;
+        const project_x0 = -prj_padx + ((objOpts.canvas.core_width + objOpts.hole.distance) * prj_num_enable_left + shift_x) * xMag + pad_x;
         let project_y0 = -prj_pady + (shift_y) * yMag + pad_y;
-        let project_w  = prj_padx/2 + (objOpts.section.width + objOpts.hole.distance) * (prj_num_enable_right-1) * xMag + pad_x;
+        let project_w  = prj_padx/2 + (objOpts.canvas.core_width + objOpts.hole.distance) * (prj_num_enable_right-1) * xMag + pad_x;
         if(project_w<=0){
           project_w = 100;
         }
@@ -6015,7 +6011,7 @@ document.addEventListener("DOMContentLoaded", () => {
             hole_top = hole.sections[0].markers[0][objOpts.canvas.depth_scale];
             hole_bottom = hole.sections.slice(-1)[0].markers.slice(-1)[0][objOpts.canvas.depth_scale];
           }
-          let hole_x0 = (objOpts.hole.distance + objOpts.hole.width) * (num_disable.total + hole.order - num_disable.hole);
+          let hole_x0 = (objOpts.hole.distance + objOpts.canvas.core_width) * (num_disable.total + hole.order - num_disable.hole);
           //add  hole name---------------------------------------------------
           if (objOpts.hole.is_name_labels_visible) {
             let holeDispName = hole.name; 
@@ -6028,8 +6024,8 @@ document.addEventListener("DOMContentLoaded", () => {
             sketch.textSize(objOpts.hole.font_size);
             sketch.text(
               holeDispName,
-              // /(hole_x0 + shift_x + objOpts.hole.width * 0.3) * xMag + pad_x
-              (hole_x0 + shift_x) * xMag + pad_x + objOpts.section.width * xMag /2 - sketch.textWidth(hole.name)/2,
+              // /(hole_x0 + shift_x + objOpts.canvas.core_width * 0.3) * xMag + pad_x
+              (hole_x0 + shift_x) * xMag + pad_x + objOpts.canvas.core_width * xMag /2 - sketch.textWidth(hole.name)/2,
               scroller.scrollTop + pad_y - 20,
               //(hole_top + shift_y) * yMag + pad_y - 20
             );
@@ -6051,9 +6047,9 @@ document.addEventListener("DOMContentLoaded", () => {
             sketch.strokeWeight(objOpts.hole.line_width);
             sketch.stroke(objOpts.hole.line_colour);
             sketch.line(
-              (hole_x0 + shift_x + objOpts.hole.width / 2) * xMag + pad_x, //if centre, + objOpts.hole.width / 2
+              (hole_x0 + shift_x + objOpts.canvas.core_width / 2) * xMag + pad_x, //if centre, + objOpts.canvas.core_width / 2
               (Htop + shift_y) * yMag + pad_y,
-              (hole_x0 + shift_x + objOpts.hole.width / 2) * xMag + pad_x,
+              (hole_x0 + shift_x + objOpts.canvas.core_width / 2) * xMag + pad_x,
               (Hbot + shift_y) * yMag + pad_y,
             );
             sketch.pop();
@@ -6070,10 +6066,10 @@ document.addEventListener("DOMContentLoaded", () => {
             //fix position
             const target_y = (finder_pos_y + shift_y) * yMag + pad_y;
             //const target_x0 = 140;//for full
-            //const target_x1 = (hole_x1 + shift_x + objOpts.hole.width / 2) * xMag + pad_x;//for full
+            //const target_x1 = (hole_x1 + shift_x + objOpts.canvas.core_width / 2) * xMag + pad_x;//for full
           
             let target_x0 = ((hole_x0 + shift_x) - (objOpts.hole.distance/2)) * xMag + pad_x;
-            let target_x1 = target_x0 +(objOpts.hole.width + objOpts.hole.distance) * xMag;
+            let target_x1 = target_x0 +(objOpts.canvas.core_width + objOpts.hole.distance) * xMag;
 
             if(objOpts.canvas.depth_scale !== "drilling_depth"){
               const enabledHoleOrders = project.holes
@@ -6087,7 +6083,7 @@ document.addEventListener("DOMContentLoaded", () => {
               const hasEnabledProjectAfter = LCCore.projects.some((currentProject) =>
                 currentProject.enable && currentProject.order > project.order
               );
-              const projectGapWidth = (objOpts.hole.width + objOpts.hole.distance) * objOpts.project.interval * xMag;
+              const projectGapWidth = (objOpts.canvas.core_width + objOpts.hole.distance) * objOpts.project.interval * xMag;
 
               if(isFirstEnabledHole && hasEnabledProjectBefore){
                 target_x0 -= projectGapWidth / 2;
@@ -6110,7 +6106,7 @@ document.addEventListener("DOMContentLoaded", () => {
             }
 
             //(hole_x0 + shift_x) * xMag + pad_x;
-            //let hole_x0 = (objOpts.hole.distance + objOpts.hole.width) * (num_disable.total + hole.order - num_disable.hole);
+            //let hole_x0 = (objOpts.hole.distance + objOpts.canvas.core_width) * (num_disable.total + hole.order - num_disable.hole);
             
             /*
             sketch.fill("#ff0000");
@@ -6158,7 +6154,7 @@ document.addEventListener("DOMContentLoaded", () => {
                   sketch.stroke("#ff0000");
                   const hole_ht_x0 = (hole_x0 + shift_x) * xMag + pad_x - 3;
                   const hole_ht_y0 = (hole_top + shift_y) * yMag + pad_y - 3;
-                  const hole_ht_w  = objOpts.section.width * xMag + 6;
+                  const hole_ht_w  = objOpts.canvas.core_width * xMag + 6;
                   const hole_ht_h  = (hole_bottom_e - hole_top) * yMag + 6;
                   //console.log(hole_ht_x0,hole_ht_y0,hole_ht_w,hole_ht_h)
                   sketch.rect(hole_ht_x0, hole_ht_y0, hole_ht_w, hole_ht_h, 3, 3, 3, 3); //rounded
@@ -6189,7 +6185,7 @@ document.addEventListener("DOMContentLoaded", () => {
               //calc position
               const sec_x0 = (hole_x0 + shift_x) * xMag + pad_x;
               const sec_y0 = (section_top + shift_y) * yMag + pad_y;
-              const sec_w = objOpts.section.width * xMag;
+              const sec_w = objOpts.canvas.core_width * xMag;
               const sec_h = (section_bottom - section_top) * yMag;
               const sec_rect = {
                 x: sec_x0,
@@ -6387,7 +6383,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     sketch.rect(
                       (hole_x0 + shift_x) * xMag + pad_x + (objOpts.section.line_width+2)/2,
                       (lowerDepth + shift_y) * yMag + pad_y,
-                      objOpts.section.width * ew * xMag - objOpts.section.line_width-2,
+                      objOpts.canvas.core_width * ew * xMag - objOpts.section.line_width-2,
                       eventThickness * yMag * objOpts.event.face_height,
                       1,1,1,1 //rounded option
                     );
@@ -6409,7 +6405,7 @@ document.addEventListener("DOMContentLoaded", () => {
                       sketch.rect(
                         (hole_x0 + shift_x) * xMag + pad_x + 3,
                         (upper_depth + shift_y) * yMag + pad_y,
-                        objOpts.section.width * ew * xMag - 6,
+                        objOpts.canvas.core_width * ew * xMag - 6,
                         ((lower_depth-upper_depth)) * yMag,
                         1,1,1,1 //rounded option
                       );
@@ -6429,7 +6425,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 if(objOpts.canvas.is_core_photo_visible){
                   sketch.stroke("Magenta"); //(markerLineColour);
                   if (m == 0 || m == section.markers.length - 1) {
-                    topBot -= objOpts.marker.width * xMag; //or +20
+                    topBot -= objOpts.canvas.core_width * xMag; //or +20
                     sketch.strokeWeight(objOpts.marker.line_width*3);
                   } 
                 }else{
@@ -6474,7 +6470,7 @@ document.addEventListener("DOMContentLoaded", () => {
                         sketch.line(
                           (hole_x0 + shift_x) * xMag + pad_x,
                           sketch.mouseY+scroller.scrollTop, //(marker_top + shift_y) * yMag + pad_y,
-                          (hole_x0 + shift_x) * xMag + pad_x + objOpts.marker.width * xMag,// + topBot,
+                          (hole_x0 + shift_x) * xMag + pad_x + objOpts.canvas.core_width * xMag,// + topBot,
                           sketch.mouseY+scroller.scrollTop, //(marker_top + shift_y) * yMag + pad_y
                         )
                         sketch.pop();//load
@@ -6497,8 +6493,8 @@ document.addEventListener("DOMContentLoaded", () => {
                         let ey1 = sketch.mouseY+scroller.scrollTop;
                         
                         //mouse position is righ/left of "from hole"
-                        if((sketch.mouseX + scroller.scrollLeft) > ((hole_x0 + shift_x) * xMag + pad_x + (objOpts.marker.width * mw * xMag)/2)){
-                          ex0 = (hole_x0 + shift_x) * xMag + pad_x + objOpts.marker.width * mw * xMag;
+                        if((sketch.mouseX + scroller.scrollLeft) > ((hole_x0 + shift_x) * xMag + pad_x + (objOpts.canvas.core_width * mw * xMag)/2)){
+                          ex0 = (hole_x0 + shift_x) * xMag + pad_x + objOpts.canvas.core_width * mw * xMag;
                         }
 
                         //if hit second marker
@@ -6522,7 +6518,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 //drow marker line
                 const marker_x0 = (hole_x0 + shift_x) * xMag + pad_x;
                 const marker_y0 = (marker_top + shift_y) * yMag + pad_y;
-                const marker_w  = (objOpts.marker.width * mw * xMag);
+                const marker_w  = (objOpts.canvas.core_width * mw * xMag);
                 let relative_marker_x0 = 0;
                 if (isPhtoExist) {
                   relative_marker_x0 = marker.definition_relative_x;
@@ -6796,7 +6792,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     }
                     sketch.text(
                       markerDistanceLabel,
-                      (hole_x0 + shift_x) * xMag + pad_x + objOpts.marker.width * xMag + 5,
+                      (hole_x0 + shift_x) * xMag + pad_x + objOpts.canvas.core_width * xMag + 5,
                       markerLabelY
                     );
                   }
@@ -6886,7 +6882,7 @@ document.addEventListener("DOMContentLoaded", () => {
                   const idxTo = connectionData.connected_idx;
 
                   //get connectied hole position
-                  const connectedHole_x0 = (objOpts.hole.distance + objOpts.hole.width) * ((LCCore.projects[idxTo[0]].order * objOpts.project.interval)+ (connectionData.num_total - connectionData.num_total_disable)); //LCCore.projects[idxTo[0]].holes[idxTo[1]].order
+                  const connectedHole_x0 = (objOpts.hole.distance + objOpts.canvas.core_width) * ((LCCore.projects[idxTo[0]].order * objOpts.project.interval)+ (connectionData.num_total - connectionData.num_total_disable)); //LCCore.projects[idxTo[0]].holes[idxTo[1]].order
                   const connectedMarker  = LCCore.projects[idxTo[0]].holes[idxTo[1]].sections[idxTo[2]].markers[idxTo[3]];
                   const connectedMarker_top = connectedMarker[objOpts.canvas.depth_scale];
 
@@ -6896,7 +6892,7 @@ document.addEventListener("DOMContentLoaded", () => {
                   }
 
                   //get connector position
-                  const cn_x0 = (hole_x0 + shift_x + objOpts.marker.width) * xMag + pad_x;
+                  const cn_x0 = (hole_x0 + shift_x + objOpts.canvas.core_width) * xMag + pad_x;
                   const cn_y0 = (marker_top + shift_y) * yMag + pad_y;
                   const cn_x1 = cn_x0 + objOpts.connection.tab_length;
                   const cn_y1 = cn_y0;
@@ -7361,9 +7357,9 @@ document.addEventListener("DOMContentLoaded", () => {
                         for(let z=0; z<zeroDataset.data.length;z++){
                                                   
                           if(pOptions.position == "rightside"){
-                            zeroDataset.data[z].pos_x = zeroDataset.data[z].pos_x + objOpts.hole.width * xMag;
+                            zeroDataset.data[z].pos_x = zeroDataset.data[z].pos_x + objOpts.canvas.core_width * xMag;
                           }else if(pOptions.position == "leftside"){
-                            zeroDataset.data[z].pos_x = zeroDataset.data[z].pos_x - objOpts.hole.width * xMag;
+                            zeroDataset.data[z].pos_x = zeroDataset.data[z].pos_x - objOpts.canvas.core_width * xMag;
                           }
                         }
                         zeroDataDict[hole.name] = zeroDataset.data;
@@ -7506,9 +7502,9 @@ document.addEventListener("DOMContentLoaded", () => {
                 //get data
                 const pData = drawData.data[d];
                 if(pOptions.position == "rightside"){
-                  pData.pos_x = pData.pos_x + objOpts.hole.width * xMag;
+                  pData.pos_x = pData.pos_x + objOpts.canvas.core_width * xMag;
                 }else if(pOptions.position == "leftside"){
-                  pData.pos_x = pData.pos_x - objOpts.hole.width * xMag;
+                  pData.pos_x = pData.pos_x - objOpts.canvas.core_width * xMag;
                 }
 
                 //if valid data exist, plot
@@ -7959,14 +7955,14 @@ document.addEventListener("DOMContentLoaded", () => {
         if (!project.enable) numDisable.hole += objOpts.project.interval;
         for (const hole of project.holes) {
           if (!hole.enable) { numDisable.hole += 1; continue; }
-          const holeX0 = (objOpts.hole.distance + objOpts.hole.width) *
+          const holeX0 = (objOpts.hole.distance + objOpts.canvas.core_width) *
             (numDisable.total + hole.order - numDisable.hole);
           for (let i = 0; i < annotationRecords.length; i++) {
             const display = penObject.annotationDepths?.[i];
             if (!display || display.sectionId[0] !== project.id[0] || display.sectionId[1] !== hole.id[1]) continue;
             const section = hole.sections.find(section => section.id[2] === display.sectionId[2]);
             if (!section) continue;
-            const x = (holeX0 + objOpts.section.width / 2 + objOpts.canvas.shift_x) * xMag + objOpts.canvas.pad_x;
+            const x = (holeX0 + objOpts.canvas.core_width / 2 + objOpts.canvas.shift_x) * xMag + objOpts.canvas.pad_x;
             const y = (display.depth + objOpts.canvas.shift_y) * yMag + padY;
             const label = `[${annotationRecords[i].distance.toFixed(2)} cm]:${annotationRecords[i].memo}`;
             sketch.stroke(objOpts.pen.colour);
@@ -9891,7 +9887,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }
 
         const holeX0 =
-          (objOpts.hole.distance + objOpts.hole.width) *
+          (objOpts.hole.distance + objOpts.canvas.core_width) *
           (numDisable.total + hole.order - numDisable.hole);
 
         for (const section of hole.sections) {
@@ -9908,7 +9904,7 @@ document.addEventListener("DOMContentLoaded", () => {
           const sectionRect = {
             x: (holeX0 + shift_x) * xMag + pad_x,
             y: (sectionTop + shift_y) * yMag + pad_y,
-            width: objOpts.section.width * xMag,
+            width: objOpts.canvas.core_width * xMag,
             height: (sectionBottom - sectionTop) * yMag,
           };
 
@@ -11935,11 +11931,11 @@ function getClickedItemIdx(mouseX, mouseY, LCCore, objOpts){
     let num_enable_left = 0;
     LCCore.projects.filter(p1=>p1.order<LCCore.projects[p].order).forEach(p2=>p2.holes.forEach(h1=>{if(h1.enable){num_enable_left++;}}))
       
-    //const project_x0 = ((objOpts.section.width + objOpts.hole.distance) * num_enable_left + shift_x) * xMag + pad_x - 3;
-    //const project_w  = (objOpts.section.width + objOpts.hole.distance) * num_enable_right * xMag - objOpts.hole.distance/2;
-    //const project_x0 = -objOpts.project.pad_x + ((objOpts.section.width + objOpts.hole.distance) * prj_num_enable_left + shift_x) * xMag + pad_x
-    const project_x0 = -objOpts.project.pad_x/xMag + (objOpts.section.width + objOpts.hole.distance) * (num_enable_left + objOpts.project.interval*p);//  + 1;
-    let project_w    = -objOpts.project.pad_x/xMag + (objOpts.section.width + objOpts.hole.distance)  * (num_enable_right + 1);
+    //const project_x0 = ((objOpts.canvas.core_width + objOpts.hole.distance) * num_enable_left + shift_x) * xMag + pad_x - 3;
+    //const project_w  = (objOpts.canvas.core_width + objOpts.hole.distance) * num_enable_right * xMag - objOpts.hole.distance/2;
+    //const project_x0 = -objOpts.project.pad_x + ((objOpts.canvas.core_width + objOpts.hole.distance) * prj_num_enable_left + shift_x) * xMag + pad_x
+    const project_x0 = -objOpts.project.pad_x/xMag + (objOpts.canvas.core_width + objOpts.hole.distance) * (num_enable_left + objOpts.project.interval*p);//  + 1;
+    let project_w    = -objOpts.project.pad_x/xMag + (objOpts.canvas.core_width + objOpts.hole.distance)  * (num_enable_right + 1);
     */
     const active_projects_before = LCCore.projects.filter(proj => proj.order < LCCore.projects[p].order && proj.enable).length;
 
@@ -11950,11 +11946,11 @@ function getClickedItemIdx(mouseX, mouseY, LCCore, objOpts){
       });
     });
 
-    const project_x0 = -objOpts.project.pad_x/xMag + (objOpts.section.width + objOpts.hole.distance) * (num_enable_left + objOpts.project.interval * active_projects_before);
-    let project_w = objOpts.project.pad_x/(2*xMag) + (objOpts.section.width + objOpts.hole.distance) * (num_enable_right-1) + pad_x/xMag;
+    const project_x0 = -objOpts.project.pad_x/xMag + (objOpts.canvas.core_width + objOpts.hole.distance) * (num_enable_left + objOpts.project.interval * active_projects_before);
+    let project_w = objOpts.project.pad_x/(2*xMag) + (objOpts.canvas.core_width + objOpts.hole.distance) * (num_enable_right-1) + pad_x/xMag;
     
     if(num_enable_right == 0){
-      project_w = (objOpts.hole.distance + objOpts.hole.width);
+      project_w = (objOpts.hole.distance + objOpts.canvas.core_width);
     }
     const project_x1 = project_x0 + project_w;
     if(x >= project_x0 && x <= project_x1){
@@ -11967,8 +11963,8 @@ function getClickedItemIdx(mouseX, mouseY, LCCore, objOpts){
       if(!LCCore.projects[p].holes[h].enable){
         num_hole.disable += 1;
       }
-      const hole_x0 = (objOpts.hole.distance + objOpts.hole.width) * (num_hole.total + LCCore.projects[p].holes[h].order - num_hole.disable);
-      const hole_x1 = hole_x0 + objOpts.hole.width;
+      const hole_x0 = (objOpts.hole.distance + objOpts.canvas.core_width) * (num_hole.total + LCCore.projects[p].holes[h].order - num_hole.disable);
+      const hole_x1 = hole_x0 + objOpts.canvas.core_width;
       if(x >= hole_x0 && x <= hole_x1){
         results.hole    = LCCore.projects[p].holes[h].id[1];
         results.relative_x = (x-hole_x0)/(hole_x1-hole_x0);
@@ -12130,7 +12126,7 @@ function getPlotPosiotion(data, LCCore, objOpts){
     //calc position
     if(data.type == "age"){
       //age xpos is fixed. adjust icon size
-      result.pos_canvas_x = ((objOpts.hole.distance + objOpts.hole.width) * (num_hole.enable -1 ) + shift_x) * xMag + pad_x + objOpts.hole.width * xMag - objOpts.age.incon_size * 1.2;
+      result.pos_canvas_x = ((objOpts.hole.distance + objOpts.canvas.core_width) * (num_hole.enable -1 ) + shift_x) * xMag + pad_x + objOpts.canvas.core_width * xMag - objOpts.age.incon_size * 1.2;
       
       //age ypos, adjust icon size
       if(data[objOpts.canvas.depth_scale] !== null){
@@ -12139,7 +12135,7 @@ function getPlotPosiotion(data, LCCore, objOpts){
     } else{
       //data xpos, without adjust
       if(data.x !== null){
-        result.pos_canvas_x = ((objOpts.hole.distance + objOpts.hole.width) * (num_hole.enable -1 ) + (data.x - data.min_x) * data.amplification_x + shift_x) * xMag + pad_x;
+        result.pos_canvas_x = ((objOpts.hole.distance + objOpts.canvas.core_width) * (num_hole.enable -1 ) + (data.x - data.min_x) * data.amplification_x + shift_x) * xMag + pad_x;
       }
       //data ypos, without adjust
       if(data[objOpts.canvas.depth_scale] !== null){
@@ -12897,7 +12893,7 @@ function calcDrawPosition(drawPointDataset, LCCore, objOpts, pOptions){
 
   const val_min = drawPointDataset.min;
   const val_max = drawPointDataset.max;
-  const amp     = pOptions?.amplification ? [(objOpts.hole.width / 2) * pOptions.amplification / (val_max - val_min), 1] : 1;
+  const amp     = pOptions?.amplification ? [(objOpts.canvas.core_width / 2) * pOptions.amplification / (val_max - val_min), 1] : 1;
 
   //get enable hole num
   let numEnable  = 0;
@@ -12944,16 +12940,16 @@ function calcDrawPosition(drawPointDataset, LCCore, objOpts, pOptions){
         //calc        
         if(drawData.type == "age"){
           //age xpos is fixed. adjust icon size
-          drawData.pos_x = ((objOpts.hole.distance + objOpts.hole.width) * (enableHoles.enable -1 ) + shift_x) * xMag + pad_x + objOpts.hole.width * xMag - objOpts.age.incon_size * 1.2;
+          drawData.pos_x = ((objOpts.hole.distance + objOpts.canvas.core_width) * (enableHoles.enable -1 ) + shift_x) * xMag + pad_x + objOpts.canvas.core_width * xMag - objOpts.age.incon_size * 1.2;
           drawData.pos_y = (drawData[objOpts.canvas.depth_scale] + shift_y) * yMag + pad_y - objOpts.age.incon_size / 2;
         } else{
           //data xpos, without adjust
           if(Number.isFinite(drawData.val)){
             let relative_x = (drawData.val - val_min) * amp[0];
             if(isFlip){
-              relative_x = objOpts.hole.width - relative_x;
+              relative_x = objOpts.canvas.core_width - relative_x;
             }
-            drawData.pos_x = ((objOpts.hole.distance + objOpts.hole.width) * (enableHoles.enable -1 ) + relative_x + shift_x) * xMag + pad_x;
+            drawData.pos_x = ((objOpts.hole.distance + objOpts.canvas.core_width) * (enableHoles.enable -1 ) + relative_x + shift_x) * xMag + pad_x;
           }else{
             drawData.pos_x = NaN;
           }
@@ -12971,7 +12967,7 @@ function calcDrawPosition(drawPointDataset, LCCore, objOpts, pOptions){
         let relative_x = (drawData.val - val_min) * amp[0];
 
         if(isFlip){
-          relative_x = objOpts.hole.width - relative_x;
+          relative_x = objOpts.canvas.core_width - relative_x;
         }
 
         drawData.pos_x = (relative_x + shift_x) * xMag + 20;
@@ -13004,7 +13000,7 @@ function calcDrawPosition(drawPointDataset, LCCore, objOpts, pOptions) {
 
   const val_min = drawPointDataset.min;
   const val_max = drawPointDataset.max;
-  const amp = pOptions?.amplification ? [(objOpts.hole.width / 2) * pOptions.amplification / (val_max - val_min), 1] : 1;
+  const amp = pOptions?.amplification ? [(objOpts.canvas.core_width / 2) * pOptions.amplification / (val_max - val_min), 1] : 1;
 
   //get enable hole num
   let numEnable = 0;
@@ -13078,16 +13074,16 @@ function calcDrawPosition(drawPointDataset, LCCore, objOpts, pOptions) {
         //calc        
         if (drawData.type == "age") {
           //age xpos is fixed. adjust icon size
-          drawData.pos_x = ((objOpts.hole.distance + objOpts.hole.width) * (enableHoles.enable - 1) + shift_x) * xMag + pad_x + objOpts.hole.width * xMag - objOpts.age.incon_size * 1.2;
+          drawData.pos_x = ((objOpts.hole.distance + objOpts.canvas.core_width) * (enableHoles.enable - 1) + shift_x) * xMag + pad_x + objOpts.canvas.core_width * xMag - objOpts.age.incon_size * 1.2;
           drawData.pos_y = (drawData[objOpts.canvas.depth_scale] + shift_y) * yMag + pad_y - objOpts.age.incon_size / 2;
         } else {
           //data xpos, without adjust
           if (Number.isFinite(drawData.val)) {
             let relative_x = (drawData.val - val_min) * amp[0];
             if (isFlip) {
-              relative_x = objOpts.hole.width - relative_x;
+              relative_x = objOpts.canvas.core_width - relative_x;
             }
-            drawData.pos_x = ((objOpts.hole.distance + objOpts.hole.width) * (enableHoles.enable - 1) + relative_x + shift_x) * xMag + pad_x;
+            drawData.pos_x = ((objOpts.hole.distance + objOpts.canvas.core_width) * (enableHoles.enable - 1) + relative_x + shift_x) * xMag + pad_x;
           } else {
             drawData.pos_x = NaN;
           }
@@ -13105,7 +13101,7 @@ function calcDrawPosition(drawPointDataset, LCCore, objOpts, pOptions) {
         let relative_x = (drawData.val - val_min) * amp[0];
 
         if (isFlip) {
-          relative_x = objOpts.hole.width - relative_x;
+          relative_x = objOpts.canvas.core_width - relative_x;
         }
 
         drawData.pos_x = (relative_x + shift_x) * xMag + 20;

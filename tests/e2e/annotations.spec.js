@@ -57,7 +57,7 @@ function annotationTarget() {
     if (!project.enable) numDisable.hole += objOpts.project.interval;
     for (const hole of project.holes) {
       if (!hole.enable) { numDisable.hole += 1; continue; }
-      const holeX0 = (objOpts.hole.distance + objOpts.hole.width) *
+      const holeX0 = (objOpts.hole.distance + objOpts.canvas.core_width) *
         (numDisable.total + hole.order - numDisable.hole);
       for (const section of hole.sections) {
         const markers = section.markers ?? [];
@@ -65,7 +65,7 @@ function annotationTarget() {
         const bottom = markers[markers.length - 1]?.[depthScale];
         if (!Number.isFinite(top) || !Number.isFinite(bottom) || top === bottom) continue;
         const depth = (top + bottom) / 2;
-        const x = (holeX0 + objOpts.section.width / 2 + objOpts.canvas.shift_x) * xMag + objOpts.canvas.pad_x;
+        const x = (holeX0 + objOpts.canvas.core_width / 2 + objOpts.canvas.shift_x) * xMag + objOpts.canvas.pad_x;
         const y = (depth + objOpts.canvas.shift_y) * yMag + padY;
         return { sectionId: section.id, depth, depthScale,
           yMag,
